@@ -31,7 +31,7 @@
 > >
 > > **SRT Generation**
 > >
-> > Generate subtitles for your videos. Runs [FasterWhisper](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
+> > Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
 
 > **Audio Transcription**
 >
@@ -56,10 +56,10 @@
 
 ## Setup
 
-> Both the [frontend](https://github.com/svdC1/mirumoji_open_front) and [backend](https://github.com/svdC1/mirumoji_open_api) have pre-built [Docker](https://www.docker.com/) images which will be pulled if you choose to use the [docker-compose](https://docs.docker.com/compose/) setup method.
+> Both the [`frontend`](https://github.com/svdC1/mirumoji_open_front) and [`backend`](https://github.com/svdC1/mirumoji_open_api) have pre-built [`Docker`](https://www.docker.com/) images which will be pulled if you choose to use the [`docker-compose`](https://docs.docker.com/compose/) setup method.
 
-> You can also choose to [build](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
+> You can also choose to [`build`](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
 
-> **For detailed instructions please refer to the [Setup Guide](https://github.com/svdC1/mirumoji/wiki/Setup-Guide)**
+> **For detailed instructions please refer to the [`Setup Guide`](https://github.com/svdC1/mirumoji/wiki/Setup-Guide)**
 
 ---
