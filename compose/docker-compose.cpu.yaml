@@ -1,0 +1,36 @@
+services:
+  frontend:
+    image: ghcr.io/svdc1/mirumoji_open_front:latest
+    ports:
+      - "4173:80" # Map host port 4173 to Nginx port 80 in the container
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    image: ghcr.io/svdc1/mirumoji_open_api-cpu:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # This tells Docker Compose to get the value for OPENAI_API_KEY
+      # from the .env file or from the shell environment if set there.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODAL_TOKEN_ID=${MODAL_TOKEN_ID}
+      - MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET}
+    volumes:
+      - jamdict_data:/root/.jamdict/data
+      - huggingface_cache:/root/.cache/huggingface
+      - data:/app/data/
+      - media_files:/app/media_files
+    networks:
+      - app-network
+
+volumes:
+  jamdict_data:
+  huggingface_cache:
+  data:
+  media_files:
+networks:
+  app-network:
+    driver: bridge
