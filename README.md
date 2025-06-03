@@ -4,7 +4,7 @@
 
 > Optional [`OpenAI`](https://platform.openai.com/docs/overview) + [`Modal`](https://modal.com) Integration
 
-## Features
+# Features
 
 > **Interactive Video Player**
 >
@@ -54,7 +54,7 @@
 
 ---
 
-## Setup
+# Setup
 
 > Both the [`frontend`](https://github.com/svdC1/mirumoji_open_front) and [`backend`](https://github.com/svdC1/mirumoji_open_api) have pre-built [`Docker`](https://www.docker.com/) images which will be pulled if you choose to use the [`docker-compose`](https://docs.docker.com/compose/) setup method.
 
