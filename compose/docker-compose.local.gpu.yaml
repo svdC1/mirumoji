@@ -1,0 +1,40 @@
+services:
+  frontend:
+    image: mirumoji_frontend_local:latest # Changed
+    ports:
+      - "4173:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    image: mirumoji_backend_gpu_local:latest # Changed
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - jamdict_data:/root/.jamdict/data
+      - huggingface_cache:/root/.cache/huggingface
+      - data:/app/data/
+      - media_files:/app/media_files
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - app-network
+
+volumes:
+  jamdict_data:
+  huggingface_cache:
+  data:
+  media_files:
+
+networks:
+  app-network:
+    driver: bridge

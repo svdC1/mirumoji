@@ -1,0 +1,35 @@
+services:
+  frontend:
+    image: mirumoji_frontend_local:latest
+    ports:
+      - "4173:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    image: mirumoji_backend_cpu_local:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODAL_TOKEN_ID=${MODAL_TOKEN_ID}
+      - MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET}
+    volumes:
+      - jamdict_data:/root/.jamdict/data
+      - huggingface_cache:/root/.cache/huggingface
+      - data:/app/data/
+      - media_files:/app/media_files
+    networks:
+      - app-network
+
+volumes:
+  jamdict_data:
+  huggingface_cache:
+  data:
+  media_files:
+
+networks:
+  app-network:
+    driver: bridge
