@@ -218,11 +218,15 @@ def check_env_file(expected_vars: List,
         """)
         click.secho(message=message, fg="red", err=True)
         sys.exit(1)
-    load_dotenv()
+    load_dotenv(dotenv_path=env_file_path)
     click.secho(message="Variable Configuration Passed", fg="bright_green")
 
 
 def get_options():
+    """
+    Asks for user input on whether to build images locally or pull
+    pre-built images and whether to use the CPU or GPU version.
+    """
     try:
         click.secho("\n--- Configuration Choices ---", fg="blue")
         build_locally = click.confirm(
@@ -250,6 +254,10 @@ def get_options():
 
 
 def build_imgs_locally(use_gpu: bool):
+    """
+    Runs the docker build command for the frontend and backend
+    images based on whether CPU or GPU version is chosen.
+    """
     try:
         click.secho("\n--- Building Docker Images ---", fg="blue")
         click.secho("\nBuilding frontend image...", fg="green")
@@ -295,6 +303,35 @@ def build_imgs_locally(use_gpu: bool):
         sys.exit(1)
 
 
+def configure_repo():
+    """
+    Displays a header, sets up the local repository path, clones or
+    updates the repository, makes sure submodules are initialized,
+    sets the working directory to the local repository path and
+    returns both the local repository path and original working
+    directory.
+    """
+    try:
+        click.secho("--- Mirumoji Launcher ---", fg="magenta")
+        current_user_cwd = Path.cwd()
+        repo_path = current_user_cwd / MAIN_REPO_SUBDIR
+        ensure_repo(MAIN_REPO_URL, repo_path)
+        original_cwd = current_user_cwd
+        # All subsequent paths are relative to repo_path
+        os.chdir(repo_path)
+        click.secho(message=f"Changed working directory to: {repo_path}",
+                    fg="blue")
+        return (repo_path, original_cwd)
+
+    except Exception as e:
+        click.secho(
+            f"Error while configuring repository: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+
+
 # --- Click CLI structure ---
 @click.group()
 def cli():
@@ -307,16 +344,7 @@ def launch():
     """
     Guides through setup, image building (optional), and running Mirumoji.
     """
-    click.secho("--- Mirumoji Launcher ---", color="magenta")
-    current_user_cwd = Path.cwd()
-    repo_path = current_user_cwd / MAIN_REPO_SUBDIR
-    ensure_repo(MAIN_REPO_URL, repo_path)
-    original_cwd = current_user_cwd
-    # All subsequent paths are relative to repo_path
-    os.chdir(repo_path)
-    click.secho(message=f"Changed working directory to: {repo_path}",
-                fg="blue")
-
+    repo_path, original_cwd = configure_repo()
     try:
         build_locally, use_gpu = get_options()
 
@@ -370,6 +398,46 @@ def launch():
     except Exception as e:
         click.secho(
             f"An unexpected error occurred during the launch process: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+    finally:
+        os.chdir(original_cwd)
+        click.secho(f"Returned to original working directory: {original_cwd}",
+                    fg="blue")
+
+
+@cli.command()
+def shutdown():
+    """
+    Runs docker compose down on all docker-compose files.
+    """
+    repo_path, original_cwd = configure_repo()
+    delete_volumes = click.confirm(
+        text="Delete Data (Docker Volumes) ?",
+        default=False
+        )
+    try:
+        docker_compose_paths = [COMPOSE_LOCAL_CPU_RELPATH,
+                                COMPOSE_LOCAL_GPU_RELPATH,
+                                COMPOSE_PREBUILT_CPU_RELPATH,
+                                COMPOSE_PREBUILT_GPU_RELPATH]
+
+        for compose_path in docker_compose_paths:
+            cmd = ['docker',
+                   'compose',
+                   '-f',
+                   str(compose_path),
+                   "down"
+                   ]
+            if delete_volumes:
+                cmd.append("-v")
+            run_command(cmd, cwd=repo_path)
+        click.secho(message="All Services Stopped.", fg="bright_green")
+    except Exception as e:
+        click.secho(
+            f"An unexpected error occurred during shutdown: {e}",
             fg="red",
             err=True
         )
