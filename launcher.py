@@ -411,7 +411,7 @@ def launch():
 @cli.command()
 def shutdown():
     """
-    Runs docker compose down on all docker-compose files.
+    Runs docker compose down on application.
     """
     repo_path, original_cwd = configure_repo()
     delete_volumes = click.confirm(
@@ -419,21 +419,15 @@ def shutdown():
         default=False
         )
     try:
-        docker_compose_paths = [COMPOSE_LOCAL_CPU_RELPATH,
-                                COMPOSE_LOCAL_GPU_RELPATH,
-                                COMPOSE_PREBUILT_CPU_RELPATH,
-                                COMPOSE_PREBUILT_GPU_RELPATH]
-
-        for compose_path in docker_compose_paths:
-            cmd = ['docker',
-                   'compose',
-                   '-f',
-                   str(compose_path),
-                   "down"
-                   ]
-            if delete_volumes:
-                cmd.append("-v")
-            run_command(cmd, cwd=repo_path)
+        cmd = ['docker',
+               'compose',
+               '-p',
+               'mirumoji',
+               "down"
+               ]
+        if delete_volumes:
+            cmd.append("-v")
+        run_command(cmd, cwd=repo_path)
         click.secho(message="All Services Stopped.", fg="bright_green")
     except Exception as e:
         click.secho(
