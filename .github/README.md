@@ -8,18 +8,18 @@
 
 > **Interactive Video Player**
 >
-> ![alt-text](example_imgs/player.png)
+> ![alt-text](../example_imgs/player.png)
 > Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.
 
 > **Clickable Japanese Subtitles**
 >
-> ![alt-text](example_imgs/word_dialog.png)
+> ![alt-text](../example_imgs/word_dialog.png)
 > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words with
 > integrated offline JMDict for definitions.
 
 > **OpenAI Integration**
 >
-> ![alt-text](example_imgs/gpt_template.png)
+> ![alt-text](../example_imgs/gpt_template.png)
 > Modify System Message and User Prompt with `{sentence}` and `{word}` variables.
 > Requires OpenAI API Key.
 
@@ -35,20 +35,20 @@
 
 > **Audio Transcription**
 >
-> ![alt-text](example_imgs/transcription.png)
+> ![alt-text](../example_imgs/transcription.png)
 > Transcribe Japanese audio from recordings or uploaded files.
 
 > **Profile-Based Data Management:**
 >
 > **Persistent Storage**
 >
-> ![alt-img](example_imgs/profile.png)
+> ![alt-img](../example_imgs/profile.png)
 >
 > > Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.
 
 > **Clip Saving**
 >
-> ![alt-img](example_imgs/clips.png)
+> ![alt-img](../example_imgs/clips.png)
 >
 > > Save important video segments with their associated word breakdowns and export as an Anki Deck
 
