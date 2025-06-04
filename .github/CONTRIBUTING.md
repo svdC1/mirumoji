@@ -12,7 +12,7 @@
 
 # Ground Rules
 ### Follow The Code of Conduct
-> When submiting contributions, please adhere to the [`Code of Conduct`](https://github.com/svdC1/mirumoji/blob/main/CODE_OF_CONDUCT.md)
+> When submiting contributions, please adhere to the [`Code of Conduct`](https://github.com/svdC1/mirumoji/blob/main/.github/CODE_OF_CONDUCT.md)
 
 > Responsibilities
 > * Create issues for any major changes and enhancements that you wish to make. Discuss things transparently and get community feedback.
