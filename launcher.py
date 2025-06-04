@@ -5,7 +5,7 @@ import sys
 from textwrap import dedent
 from typing import Optional, List
 from pathlib import Path
-from dotenv import dotenv_values
+from dotenv import dotenv_values, load_dotenv
 
 MAIN_REPO_SUBDIR = Path("mirumoji_workspace")
 MAIN_REPO_URL = "https://github.com/svdC1/mirumoji.git"
@@ -200,6 +200,7 @@ def check_env_file(expected_vars: List,
         """)
         click.echo(message=message, err=True)
         sys.exit(1)
+    load_dotenv()
     click.echo(message="Variable Configuration Passed")
 
 
@@ -307,7 +308,7 @@ def launch():
             click.echo("\nUsing pre-built images.")
 
         click.echo(f"\n--- Checking {ENV_FILE_NAME} File ---")
-        env_file_abs_path = Path.cwd() / ENV_FILE_NAME
+        env_file_abs_path = original_cwd / ENV_FILE_NAME
         required_env_vars = ["OPENAI_API_KEY"]
 
         if not use_gpu:

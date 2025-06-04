@@ -1,0 +1,136 @@
+name: Build Mirumoji Launcher Release
+
+on:
+    push:
+        # Release Tag
+        tags:
+            - "v*"
+
+jobs:
+    build_executables:
+        name: Build on ${{ matrix.os_name }}
+        # Use GitHub-hosted runners for each OS
+        runs-on: ${{ matrix.os_image }}
+        strategy:
+            matrix:
+                include:
+                    - os_image: ubuntu-latest
+                      os_name: Linux
+                      asset_name_suffix: linux
+                      executable_name: mirumoji-launcher
+                    - os_image: macos-latest
+                      os_name: macOS
+                      asset_name_suffix: macos
+                      executable_name: mirumoji-launcher
+                    - os_image: windows-latest
+                      os_name: Windows
+                      asset_name_suffix: windows
+                      executable_name: mirumoji-launcher.exe
+
+        env:
+            PYTHON_VERSION: "3.11"
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python ${{ env.PYTHON_VERSION }}
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install pyinstaller
+
+            - name: Build executable with PyInstaller
+              run: pyinstaller --name ${{ matrix.executable_name }} --onefile --clean launcher.py
+
+            - name: Archive executable
+              # Uploads the built executable as an artifact,
+              # so it can be downloaded by the 'create_release' job.
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.executable_name }}-${{ matrix.asset_name_suffix }}
+                  path: dist/${{ matrix.executable_name }}
+
+    create_release_and_upload_assets:
+        name: Create GitHub Release and Upload Assets
+        needs: build_executables
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Fetch all history for all tags and branches
+
+            - name: Get Release Notes from Tag
+              id: get_release_notes
+              run: |
+                  NOTES=$(git tag -l "${{ github.ref_name }}" --format='%(contents)')
+                  if [ -z "$NOTES" ]; then
+                    NOTES="Mirumoji Launcher - Release ${{ github.ref_name }}"
+                  fi
+                  # Escape special characters for JSON
+                  NOTES=$(echo "$NOTES" | awk '{gsub(/%/,"%25"); gsub(/\n/,"%0A"); gsub(/\r/,"%0D"); print}')
+                  echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
+              # This step tries to get the annotated tag message. Falls back to a default.
+
+            - name: Download all build artifacts
+              # Downloads all artifacts uploaded by the 'build_executables' jobs.
+              # They will be placed in subdirectories named after the artifacts.
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+
+            - name: List downloaded artifacts
+              run: ls -R artifacts
+
+            - name: Create GitHub Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ github.ref_name }} # Gets the tag name like v1.0
+                  release_name: Release ${{ github.ref_name }}
+                  body: ${{ steps.get_release_notes.outputs.release_notes }}
+                  draft: true
+                  prerelease: contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc')
+
+            - name: Upload Windows Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./artifacts/mirumoji-launcher-exe-windows/mirumoji-launcher.exe
+                  asset_name: mirumoji-launcher-windows.exe
+                  asset_content_type: application/vnd.microsoft.portable-executable
+
+            - name: Upload Linux Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./artifacts/mirumoji-launcher-linux/mirumoji-launcher
+                  asset_name: mirumoji-launcher-linux
+                  asset_content_type: application/octet-stream
+
+            - name: Upload macOS Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./artifacts/mirumoji-launcher-macos/mirumoji-launcher
+                  asset_name: mirumoji-launcher-macos
+                  asset_content_type: application/octet-stream
