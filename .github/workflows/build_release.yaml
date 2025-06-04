@@ -1,32 +1,32 @@
-name: Build Mirumoji Launcher Release
+name: Attach Builds to GitHub Release
 
 on:
-    push:
-        # Release Tag
-        tags:
-            - "v*"
+    release:
+        types: [published] # Trigger only when a release is published via the UI
 
 jobs:
     build_executables:
         name: Build on ${{ matrix.os_name }}
-        # Use GitHub-hosted runners for each OS
         runs-on: ${{ matrix.os_image }}
         strategy:
+            fail-fast: false
             matrix:
                 include:
                     - os_image: ubuntu-latest
                       os_name: Linux
                       asset_name_suffix: linux
-                      executable_name: mirumoji-launcher
+                      executable_name_base: mirumoji-launcher
+                      final_executable_name: mirumoji-launcher
                     - os_image: macos-latest
                       os_name: macOS
                       asset_name_suffix: macos
-                      executable_name: mirumoji-launcher
+                      executable_name_base: mirumoji-launcher
+                      final_executable_name: mirumoji-launcher
                     - os_image: windows-latest
                       os_name: Windows
                       asset_name_suffix: windows
-                      executable_name: mirumoji-launcher.exe
-
+                      executable_name_base: mirumoji-launcher
+                      final_executable_name: mirumoji-launcher.exe
         env:
             PYTHON_VERSION: "3.11"
 
@@ -46,72 +46,45 @@ jobs:
                   pip install pyinstaller
 
             - name: Build executable with PyInstaller
-              run: pyinstaller --name ${{ matrix.executable_name }} --onefile --clean launcher.py
+              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean launcher.py
+
+            - name: List dist directory contents (Post-PyInstaller)
+              if: always()
+              run: |
+                  echo "Listing contents of ./dist/ for ${{ matrix.os_name }}"
+                  ls -R ./dist/
 
             - name: Archive executable
-              # Uploads the built executable as an artifact,
-              # so it can be downloaded by the 'create_release' job.
               uses: actions/upload-artifact@v4
               with:
-                  name: ${{ matrix.executable_name }}-${{ matrix.asset_name_suffix }}
-                  path: dist/${{ matrix.executable_name }}
+                  name: ${{ matrix.executable_name_base }}-${{ matrix.asset_name_suffix }}
+                  path: dist/${{ matrix.final_executable_name }}
+                  if-no-files-found: error
 
-    create_release_and_upload_assets:
-        name: Create GitHub Release and Upload Assets
+    upload_assets_to_release:
+        name: Upload Assets to Existing Release
         needs: build_executables
         runs-on: ubuntu-latest
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-
+        # This job now uses the context from the 'release' event
         permissions:
-            contents: write
+            contents: write # Required to write assets to releases
 
         steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Fetch all history for all tags and branches
-
-            - name: Get Release Notes from Tag
-              id: get_release_notes
-              run: |
-                  NOTES=$(git tag -l "${{ github.ref_name }}" --format='%(contents)')
-                  if [ -z "$NOTES" ]; then
-                    NOTES="Mirumoji Launcher - Release ${{ github.ref_name }}"
-                  fi
-                  # Escape special characters for JSON
-                  NOTES=$(echo "$NOTES" | awk '{gsub(/%/,"%25"); gsub(/\n/,"%0A"); gsub(/\r/,"%0D"); print}')
-                  echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
-              # This step tries to get the annotated tag message. Falls back to a default.
-
             - name: Download all build artifacts
-              # Downloads all artifacts uploaded by the 'build_executables' jobs.
-              # They will be placed in subdirectories named after the artifacts.
               uses: actions/download-artifact@v4
               with:
                   path: artifacts
 
-            - name: List downloaded artifacts
+            - name: List downloaded artifacts (Crucial for Debugging)
               run: ls -R artifacts
-
-            - name: Create GitHub Release
-              id: create_release
-              uses: actions/create-release@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ github.ref_name }} # Gets the tag name like v1.0
-                  release_name: Release ${{ github.ref_name }}
-                  body: ${{ steps.get_release_notes.outputs.release_notes }}
-                  draft: true
-                  prerelease: contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc')
 
             - name: Upload Windows Asset
               uses: actions/upload-release-asset@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./artifacts/mirumoji-launcher-exe-windows/mirumoji-launcher.exe
+                  upload_url: ${{ github.event.release.upload_url }} # Get upload_url from the trigger event
+                  asset_path: ./artifacts/mirumoji-launcher-windows/mirumoji-launcher.exe
                   asset_name: mirumoji-launcher-windows.exe
                   asset_content_type: application/vnd.microsoft.portable-executable
 
@@ -120,7 +93,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  upload_url: ${{ github.event.release.upload_url }}
                   asset_path: ./artifacts/mirumoji-launcher-linux/mirumoji-launcher
                   asset_name: mirumoji-launcher-linux
                   asset_content_type: application/octet-stream
@@ -130,7 +103,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  upload_url: ${{ github.event.release.upload_url }}
                   asset_path: ./artifacts/mirumoji-launcher-macos/mirumoji-launcher
                   asset_name: mirumoji-launcher-macos
                   asset_content_type: application/octet-stream
