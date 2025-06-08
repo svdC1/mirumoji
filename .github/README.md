@@ -1,8 +1,10 @@
 # Overview
 
-> Open-Source Local Media Toolkit to help you learn Japanese from your favorite video and audio content.
+> Mirumoji is an open-source, self-hosted Japanese immersion toolkit. Drop in any video, anime episode, drama or audio clip and it gives you: clickable tokenized subtitles with dictionary pop-ups, Whisper-powered transcription, instant SRT/clip extraction, and one-click Anki deck export — all in Docker, all running on your own machine.
 
-> Optional [`OpenAI`](https://platform.openai.com/docs/overview) + [`Modal`](https://modal.com) Integration
+> Optional [`OpenAI`](https://platform.openai.com/docs/overview) Integration - Customizable GPT Breakdowns of Subtitles -
+
+> Optional [`Modal`](https://modal.com) Integration - Install a CPU only version and run all GPU tasks on the cloud -
 
 # Features
 
