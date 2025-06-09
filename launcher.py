@@ -2,6 +2,7 @@ import click
 import os
 import subprocess
 import sys
+import socket
 from textwrap import dedent
 from typing import Optional, List
 from pathlib import Path
@@ -23,12 +24,40 @@ BACKEND_BUILD_CONTEXT_RELPATH = Path("build/mirumoji_open_api")
 
 COMPOSE_PREBUILT_CPU_RELPATH = Path("compose/docker-compose.cpu.yaml")
 COMPOSE_PREBUILT_GPU_RELPATH = Path("compose/docker-compose.gpu.yaml")
+COMPOSE_PREBUILT_DOCKER_GPU_RELPATH = Path(
+    "compose/docker-compose.gpu.dockerpull.yaml")
+COMPOSE_PREBUILT_DOCKER_CPU_RELPATH = Path(
+    "compose/docker-compose.cpu.dockerpull.yaml")
 COMPOSE_LOCAL_CPU_RELPATH = Path("compose/docker-compose.local.cpu.yaml")
 COMPOSE_LOCAL_GPU_RELPATH = Path("compose/docker-compose.local.gpu.yaml")
 ENV_FILE_NAME = ".env"
 
 
 # --- Helper Functions ---
+
+def get_host_lan_ip():
+    """
+    Returns the primary LAN IPv4 address of the host machine
+    and loads it as an environment variable
+    """
+    click.secho("\n--- Getting HOST IPv4 ---", fg="blue")
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        click.secho(f"HOST IPv4 Acquired : {ip}", fg="bright_green")
+        os.environ["HOST_LAN_IP"] = ip
+        return ip
+    except Exception as e:
+        click.secho(
+            f"Error Getting Host IPv4 Address: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+    finally:
+        s.close()
+
 
 def run_command(command_list: List,
                 cwd: Optional[Path] = None,
@@ -239,7 +268,7 @@ def get_options():
         )
 
         click.secho(
-            f"\nSelected: Build Locally: {build_locally}, Use GPU: {use_gpu}",
+            f"\nSelected:\nBuild Locally: {build_locally}\nUse GPU: {use_gpu}",
             fg="blue"
             )
         return (build_locally, use_gpu)
@@ -247,6 +276,32 @@ def get_options():
     except Exception as e:
         click.secho(
             f"Error while selecting configuration options: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+
+
+def get_registry():
+    try:
+        click.secho("\n--- Registry Configuration ---", fg="blue")
+        pull_registry = click.confirm(
+            text="Pull from GitHub Registry ? (N = Pull from DockerHub)",
+            default=False
+            )
+        if pull_registry:
+            reg = "GitHub"
+        else:
+            reg = "DockerHub"
+        click.secho(
+            f"\nSelected:\nRegistry:{reg}",
+            fg="blue"
+            )
+        return reg
+
+    except Exception as e:
+        click.secho(
+            f"Error while selecting registry configuration options: {e}",
             fg="red",
             err=True
         )
@@ -351,6 +406,7 @@ def launch():
         if build_locally:
             build_imgs_locally(use_gpu=use_gpu)
         else:
+            registry = get_registry()
             click.secho("\nUsing pre-built images.", fg='green')
 
         click.secho(f"\n--- Checking {ENV_FILE_NAME} File ---", fg="blue")
@@ -363,6 +419,9 @@ def launch():
         check_env_file(required_env_vars,
                        env_file_abs_path)
 
+        # Get Host IPv4
+        get_host_lan_ip()
+
         if build_locally:
             if use_gpu:
                 compose_file_relpath = COMPOSE_LOCAL_GPU_RELPATH
@@ -370,9 +429,15 @@ def launch():
                 compose_file_relpath = COMPOSE_LOCAL_CPU_RELPATH
         else:
             if use_gpu:
-                compose_file_relpath = COMPOSE_PREBUILT_GPU_RELPATH
+                if registry == "DockerHub":
+                    compose_file_relpath = COMPOSE_PREBUILT_DOCKER_GPU_RELPATH
+                else:
+                    compose_file_relpath = COMPOSE_PREBUILT_GPU_RELPATH
             else:
-                compose_file_relpath = COMPOSE_PREBUILT_CPU_RELPATH
+                if registry == "DockerHub":
+                    compose_file_relpath = COMPOSE_PREBUILT_DOCKER_CPU_RELPATH
+                else:
+                    compose_file_relpath = COMPOSE_PREBUILT_CPU_RELPATH
 
         click.secho("\n--- Running Docker Compose ---", fg="blue")
         click.secho(f"Using compose file: {compose_file_relpath}",
