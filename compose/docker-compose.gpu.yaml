@@ -2,7 +2,10 @@ services:
   frontend:
     image: ghcr.io/svdc1/mirumoji_open_front:latest
     ports:
-      - "4173:80" # Map host port 4173 to Nginx port 80 in the container
+      - "80:80" # HTTP Nginx
+      - "443:443" #HTTPS Nginx
+    environment:
+      - HOST_LAN_IP=${HOST_LAN_IP}
     depends_on:
       - backend
     networks:
