@@ -32,8 +32,15 @@ COMPOSE_LOCAL_CPU_RELPATH = Path("compose/docker-compose.local.cpu.yaml")
 COMPOSE_LOCAL_GPU_RELPATH = Path("compose/docker-compose.local.gpu.yaml")
 ENV_FILE_NAME = ".env"
 
+# --- Help Messages ---
+BUILD_HELP = "Build Docker images locally (--build) or pull pre-built \
+    images from registry. (--pull)"
 
+GPU_HELP = "Use GPU Version of Backend (--gpu) or CPU version (--cpu)"
+REG_HELP = "Pull Images from GitHub Registry (--github-pull) or \
+    from Docker Hub (--docker-pull)"
 # --- Helper Functions ---
+
 
 def get_host_lan_ip():
     """
@@ -251,27 +258,48 @@ def check_env_file(expected_vars: List,
     click.secho(message="Variable Configuration Passed", fg="bright_green")
 
 
-def get_options():
+def get_build_locally():
     """
     Asks for user input on whether to build images locally or pull
-    pre-built images and whether to use the CPU or GPU version.
+    pre-built images.
     """
     try:
-        click.secho("\n--- Configuration Choices ---", fg="blue")
+        click.secho("\n--- Build Configuration ---", fg="blue")
         build_locally = click.confirm(
             text="Build Docker images locally?",
             default=False
         )
+        click.secho(
+            f"\nSelected:\nBuild Locally: {build_locally}",
+            fg="blue"
+            )
+        return build_locally
+
+    except Exception as e:
+        click.secho(
+            f"Error while selecting configuration options: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+
+
+def get_gpu_cpu():
+    """
+    Asks for user input on whether to use CPU or GPU version.
+    """
+    try:
+        click.secho("\n--- Backend Configuration ---", fg="blue")
         use_gpu = click.confirm(
             text="Run Local GPU version of the backend (NVIDIA GPU required)?",
             default=False
         )
 
         click.secho(
-            f"\nSelected:\nBuild Locally: {build_locally}\nUse GPU: {use_gpu}",
+            f"\nSelected:\nUse GPU: {use_gpu}",
             fg="blue"
             )
-        return (build_locally, use_gpu)
+        return use_gpu
 
     except Exception as e:
         click.secho(
@@ -395,18 +423,64 @@ def cli():
 
 
 @cli.command()
-def launch():
+@click.option('--build/--pull',
+              default=None,
+              help=BUILD_HELP)
+@click.option("--gpu/--cpu",
+              default=None,
+              help=GPU_HELP)
+@click.option("--github-pull/--docker-pull",
+              default=None,
+              help=REG_HELP)
+@click.option('--no-clear',
+              is_flag=True,
+              default=False,
+              help="Do not clear the terminal after each step")
+def launch(build, gpu, github_pull, no_clear):
     """
     Guides through setup, image building (optional), and running Mirumoji.
     """
-    repo_path, original_cwd = configure_repo()
+    # --- Option Config ---
     try:
-        build_locally, use_gpu = get_options()
+        if build is None:
+            build_locally = get_build_locally()
+            if not no_clear:
+                click.clear()
+        else:
+            build_locally = build
+        if gpu is None:
+            use_gpu = get_gpu_cpu()
+            if not no_clear:
+                click.clear()
+        else:
+            use_gpu = gpu
+    except Exception as e:
+        click.secho(
+            f"\nError while configuring options: {e}",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
 
+    repo_path, original_cwd = configure_repo()
+    if not no_clear:
+        click.clear()
+    try:
         if build_locally:
             build_imgs_locally(use_gpu=use_gpu)
+            if not no_clear:
+                click.clear()
         else:
-            registry = get_registry()
+            if github_pull is None:
+                registry = get_registry()
+                if not no_clear:
+                    click.clear()
+            else:
+                if github_pull:
+                    reg = "GitHub"
+                else:
+                    reg = "DockerHub"
+                registry = reg
             click.secho("\nUsing pre-built images.", fg='green')
 
         click.secho(f"\n--- Checking {ENV_FILE_NAME} File ---", fg="blue")
@@ -418,9 +492,12 @@ def launch():
             required_env_vars.extend(["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"])
         check_env_file(required_env_vars,
                        env_file_abs_path)
-
+        if not no_clear:
+            click.clear()
         # Get Host IPv4
-        get_host_lan_ip()
+        HOST_LAN_IP = get_host_lan_ip()
+        if not no_clear:
+            click.clear()
 
         if build_locally:
             if use_gpu:
@@ -453,10 +530,23 @@ def launch():
             "-d"
         ]
         run_command(docker_compose_cmd)
+        if not no_clear:
+            click.clear()
         stop_instructions = dedent(f"""\
-        Mirumoji services started with {compose_file_relpath}.
-        To stop them, navigate to "{repo_path}" and run:
-        "docker compose -f {compose_file_relpath} down"
+
+        --- Accessible at ---
+
+        Local: 'https://localhost'
+
+        LAN: 'https://{HOST_LAN_IP}'
+
+        --- Launcher Stop Command ---
+
+        launcher shutdown
+
+        --- Docker Stop Command ---
+
+        docker compose -p mirumoji down
         """)
         click.secho(message=stop_instructions, fg="bright_green")
 
@@ -474,15 +564,29 @@ def launch():
 
 
 @cli.command()
-def shutdown():
+@click.option("--clean/--no-clean",
+              default=None,
+              help="Delete Docker Volumes")
+@click.option('--no-clear',
+              is_flag=True,
+              default=False,
+              help="Do not clear the terminal after each step")
+def shutdown(clean, no_clear):
     """
     Runs docker compose down on application.
     """
     repo_path, original_cwd = configure_repo()
-    delete_volumes = click.confirm(
-        text="Delete Data (Docker Volumes) ?",
-        default=False
-        )
+    if not no_clear:
+        click.clear()
+    if clean is None:
+        delete_volumes = click.confirm(
+            text="Delete Data (Docker Volumes) ?",
+            default=False
+            )
+        if not no_clear:
+            click.clear()
+    else:
+        delete_volumes = clean
     try:
         cmd = ['docker',
                'compose',
@@ -493,6 +597,8 @@ def shutdown():
         if delete_volumes:
             cmd.append("-v")
         run_command(cmd, cwd=repo_path)
+        if not no_clear:
+            click.clear()
         click.secho(message="All Services Stopped.", fg="bright_green")
     except Exception as e:
         click.secho(
