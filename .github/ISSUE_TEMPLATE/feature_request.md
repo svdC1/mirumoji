@@ -1,20 +1,33 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: ''
-assignees: ''
-
+name: "Feature Request"
+about: "Request a feature to be added to Mirumoji"
+title: "[Feature Request]"
+labels: ""
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Service
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+> **Select all services affected by the Feature**
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+> -   [ ] Backend
+> -   [ ] Frontend
+> -   [ ] Launcher
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+## Feature Type
+
+> **Please check one of the boxes**
+>
+> -   [ ] New Feature
+> -   [ ] Improvement
+
+## Description
+
+> **A clear and concise description of the feature and the behavior you want to see**
+
+## Why Is This Useful ?
+
+> **A clear and concise description of why this would be a good addition to the project**
+
+## Additional Information
+
+> **Add any other context about the feature here**

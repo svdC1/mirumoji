@@ -1,38 +1,42 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
-
+name: "Bug Report"
+about: "Report a bug in Mirumoji to help us improve"
+title: "[BUG]"
+labels: "bug"
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Service
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+> **Please select which of the application services the bug occurs in**
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+> -   [ ] Backend
+> -   [ ] Frontend
+> -   [ ] Launcher
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Description
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+> **A clear and concise description of what the bug is.**
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+## Affected Functionality
 
-**Additional context**
-Add any other context about the problem here.
+> **What part of the functionality is the bug affecting ?**
+
+## To Reproduce
+
+> **Steps to reproduce the bug in list form.**
+
+## Version & System
+
+> **Information about the package version and the environment in which the bug is occuring**
+
+> -   OS &rarr;
+> -   Python Version &rarr;
+> -   Kotobase Version &rarr;
+
+## Expected Behavior
+
+> **A clear and concise description of what you expected to happen.**
+
+## Other Information
+
+> **Add any other context about the problem here.**
