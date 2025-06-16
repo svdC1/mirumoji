@@ -1,0 +1,48 @@
+# ── CUDA 12.3 + cuDNN 9 runtime ──────────────────────────────────────
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
+
+# Set Workdir
+WORKDIR /app
+
+# Set environment Variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/local/bin:${PATH}" \
+    PIP_NO_CACHE_DIR=1
+
+# ── System deps & Python shim ────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    git \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure /usr/bin/python and /usr/bin/python3 both point to python3.11
+RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Set PYTHONPATH
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# ── Core Python packages (CUDA 12.4 wheels) ──────────────────────────
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
+    python3.11 -m pip install --no-cache-dir \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    faster-whisper==1.1.1 \
+    huggingface_hub \
+    srt \
+    requests \
+    sentencepiece \
+    openai \
+    python-dotenv \
+    pydantic \
+    modal
+
+# ── Pre-cache the Faster-Whisper model ──────
+RUN python3.11 -c "from huggingface_hub import snapshot_download; \
+    snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
+
+COPY . .
