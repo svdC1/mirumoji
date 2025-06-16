@@ -1,0 +1,39 @@
+name: Frontend licenses bundle
+
+on:
+    workflow_dispatch:
+
+jobs:
+    licenses:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - name: Generate NOTICE + legal texts
+              run: |
+                  cd apps/frontend && \
+                  npm ci --omit=dev
+                  rm -rf docs/licenses/licenses-frontend
+                  mkdir  docs/licenses/licenses-frontend
+                  cd apps/frontend && \
+                  npx license-checker-rseidelsohn --production \
+                    --markdown \
+                    --out docs/licenses/licenses-fronted/NOTICE-frontend.md
+                  curl -L \
+                    "https://raw.githubusercontent.com/nodejs/node/v22.x/LICENSE" \
+                    -o docs/licenses/licenses-frontend/NodeJS_LICENSE.txt
+                  curl -L \
+                    "https://raw.githubusercontent.com/nginx/nginx/master/LICENSE" \
+                    -o docs/licenses/licenses-frontend/NGINX_LICENSE.txt
+
+            - name: Upload licenses folder
+              uses: actions/upload-artifact@v4
+              with:
+                  name: licenses-frontend
+                  path: docs/licenses/licenses-frontend

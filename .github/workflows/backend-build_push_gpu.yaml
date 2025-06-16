@@ -1,0 +1,79 @@
+name: Build and Push Backend GPU Docker Image
+
+# Controls when the workflow will run
+on:
+    # Triggers the workflow on release
+    release:
+        types: [published]
+
+    # Run manually
+    workflow_dispatch:
+
+jobs:
+    # This job builds the docker image and pushes it to a registry
+    build-and-push:
+        runs-on: ubuntu-latest
+
+        # Grant GITHUB_TOKEN permissions to write packages
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # Set up Docker Buildx for multi-platform builds
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            # Login to Docker Hub
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_TOKEN }}
+
+            # Login to the container registry (GitHub Container Registry)
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  # GITHUB_ACTOR is the username of the account that initiated the workflow run
+                  username: ${{ github.actor }}
+                  # GITHUB_TOKEN is automatically created by Actions, needs 'packages: write' permission
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            # Extract metadata (tags, labels) for Docker
+            - name: Extract Docker metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  # Define the image name structure. Uses ghcr.io/<owner>/<repo>
+                  images: |
+                      ghcr.io/${{ github.repository_owner }}/mirumoji
+                      docker.io/${{ secrets.DOCKER_USERNAME }}/mirumoji
+                  tags: |
+                      # immutable
+                      type=semver,pattern={{version}},prefix=backend-gpu-
+                      # rolling-tag
+                      type=raw,value=backend-gpu-latest
+
+            - name: Clean up disk space before build
+              run: |
+                  docker system prune -af || true
+                  sudo rm -rf /usr/share/dotnet || true
+                  sudo rm -rf /usr/local/lib/android || true
+                  sudo rm -rf /opt/ghc || true
+                  sudo rm -rf /tmp/* || true
+                  sudo apt-get clean
+
+            # Build and push the Docker image
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./apps/backend # Build context is the root of backend
+                  file: ./apps/backend/Dockerfile # Path to the Dockerfile
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
+                  labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step

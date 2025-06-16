@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: svdc1/mirumoji_open_front:latest
+    image: svdc1/mirumoji:frontend-latest
     ports:
       - "80:80" # HTTP Nginx
       - "443:443" #HTTPS Nginx
@@ -12,7 +12,7 @@ services:
       - app-network
 
   backend:
-    image: svdc1/mirumoji_open_api:latest
+    image: svdc1/mirumoji:backend-gpu-latest
     ports:
       - "8000:8000"
     environment:
