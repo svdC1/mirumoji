@@ -10,7 +10,7 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy the rest of your application code
+# Copy the rest of application code
 COPY . .
 
 # Build the Vite project
@@ -30,7 +30,7 @@ COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy Licenses
-COPY .github/licenses /licenses
+COPY ./licenses /licenses
 
 # Ensure openssl to generate cert
 RUN apk add --no-cache openssl

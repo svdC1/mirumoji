@@ -17,7 +17,7 @@ jobs:
 
             - name: Generate NOTICE + legal texts
               run: |
-                  cd apps/fronted && \
+                  cd apps/frontend && \
                   npm ci --omit=dev
                   rm -rf docs/licenses/licenses-frontend
                   mkdir  docs/licenses/licenses-frontend

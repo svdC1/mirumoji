@@ -19,7 +19,7 @@ jobs:
                   pip-licenses \
                     --format=markdown \
                     --with-authors \
-                    --output-file docs/licenses-backend/NOTICE-backend.md
+                    --output-file docs/licenses/licenses-backend/NOTICE-backend.md
                   curl -L \
                     "https://huggingface.co/Nonene/cookie-character-LoRAs/raw/81ff0b676e7a03bac24244455ac20f8de172e3e8/NGC-DL-CONTAINER-LICENSE" \
                     -o docs/licenses/licenses-backend/NVIDIA_EULA.txt

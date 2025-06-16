@@ -68,7 +68,7 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                   context: ./apps/frontend # Build context is the root of the frontend
-                  file: .apps/frontend/Dockerfile
+                  file: ./apps/frontend/Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
