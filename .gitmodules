@@ -1,6 +1,0 @@
-[submodule "build/mirumoji_open_front"]
-	path = build/mirumoji_open_front
-	url = https://github.com/svdC1/mirumoji_open_front.git
-[submodule "build/mirumoji_open_api"]
-	path = build/mirumoji_open_api
-	url = https://github.com/svdC1/mirumoji_open_api.git
