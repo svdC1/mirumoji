@@ -15,12 +15,12 @@ FRONTEND_LOCAL_IMAGE_NAME = "mirumoji_frontend_local:latest"
 BACKEND_GPU_LOCAL_IMAGE_NAME = "mirumoji_backend_gpu_local:latest"
 BACKEND_CPU_LOCAL_IMAGE_NAME = "mirumoji_backend_cpu_local:latest"
 
-# Relative paths within MAIN_REPO_SUBDIR
-FRONTEND_DOCKERFILE_RELPATH = Path("build/mirumoji_open_front/Dockerfile")
-FRONTEND_BUILD_CONTEXT_RELPATH = Path("build/mirumoji_open_front")
-BACKEND_GPU_DOCKERFILE_RELPATH = Path("build/mirumoji_open_api/Dockerfile")
-BACKEND_CPU_DOCKERFILE_RELPATH = Path("build/mirumoji_open_api/Dockerfile.cpu")
-BACKEND_BUILD_CONTEXT_RELPATH = Path("build/mirumoji_open_api")
+# Relative paths within MAIN_REPO
+FRONTEND_DOCKERFILE_RELPATH = Path("apps/frontend/Dockerfile")
+FRONTEND_BUILD_CONTEXT_RELPATH = Path("apps/frontend")
+BACKEND_GPU_DOCKERFILE_RELPATH = Path("apps/backend/Dockerfile")
+BACKEND_CPU_DOCKERFILE_RELPATH = Path("apps/backend/Dockerfile.cpu")
+BACKEND_BUILD_CONTEXT_RELPATH = Path("apps/backend")
 
 COMPOSE_PREBUILT_CPU_RELPATH = Path("compose/docker-compose.cpu.yaml")
 COMPOSE_PREBUILT_GPU_RELPATH = Path("compose/docker-compose.gpu.yaml")
@@ -152,8 +152,7 @@ def run_command(command_list: List,
 def ensure_repo(repo_url: str,
                 repo_path: Path):
     """
-    Ensures the repository is cloned or updated,
-    and submodules are initialized.
+    Ensures the repository is cloned or updated.
     """
     if not repo_path.is_dir():
         click.secho(
@@ -211,16 +210,6 @@ def ensure_repo(repo_url: str,
             fg="green"
             )
         run_command(["git", "pull", "origin", current_branch], cwd=repo_path)
-
-    click.secho(message="Initializing/updating submodules...",
-                fg="green")
-    submodule_cmd = ["git",
-                     "submodule",
-                     "update",
-                     "--init",
-                     "--recursive",
-                     "--remote"]
-    run_command(submodule_cmd, cwd=repo_path)
     click.secho("Repository setup complete.", fg="bright_green")
 
 
@@ -389,9 +378,8 @@ def build_imgs_locally(use_gpu: bool):
 def configure_repo():
     """
     Displays a header, sets up the local repository path, clones or
-    updates the repository, makes sure submodules are initialized,
-    sets the working directory to the local repository path and
-    returns both the local repository path and original working
+    updates the repository, sets the working directory to the local repository
+    path and returns both the local repository path and original working
     directory.
     """
     try:
