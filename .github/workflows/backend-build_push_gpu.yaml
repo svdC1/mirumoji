@@ -1,14 +1,10 @@
-name: Build and Push Default Docker Image
+name: Build and Push Backend GPU Docker Image
 
 # Controls when the workflow will run
 on:
-    # Triggers the workflow on push events but only for the main branch
-    push:
-        branches:
-            - main
-        paths-ignore:
-            - ".github/**"
-            - "README.md"
+    # Triggers the workflow on release
+    release:
+        types: [published]
 
     # Run manually
     workflow_dispatch:
@@ -55,11 +51,13 @@ jobs:
               with:
                   # Define the image name structure. Uses ghcr.io/<owner>/<repo>
                   images: |
-                      ghcr.io/${{ github.repository }}
-                      docker.io/svdc1/mirumoji_open_api
+                      ghcr.io/${{ github.repository_owner }}/mirumoji
+                      docker.io/${{ secrets.DOCKER_USERNAME }}/mirumoji
                   tags: |
-                      type=sha,prefix=
-                      type=raw,value=latest,enable={{is_default_branch}}
+                      # immutable
+                      type=semver,pattern={{version}},prefix=backend-gpu-
+                      # rolling-tag
+                      type=raw,value=backend-gpu-latest
 
             - name: Clean up disk space before build
               run: |
@@ -74,8 +72,8 @@ jobs:
             - name: Build and push Docker image
               uses: docker/build-push-action@v5
               with:
-                  context: . # Build context is the root of the repository
-                  file: ./Dockerfile # Path to the Dockerfile
+                  context: ./apps/backend # Build context is the root of backend
+                  file: ./apps/backend/Dockerfile # Path to the Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step

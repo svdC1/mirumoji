@@ -1,14 +1,10 @@
-name: Build and Push CPU Docker Image
+name: Build and Push Backend CPU Docker Image
 
 # Controls when the workflow will run
 on:
-    # Triggers the workflow on push events but only for the main branch
-    push:
-        branches:
-            - main
-        paths-ignore:
-            - ".github/**"
-            - "README.md"
+    # Triggers the workflow on release
+    release:
+        types: [published]
 
     # Run manually
     workflow_dispatch:
@@ -55,11 +51,13 @@ jobs:
               with:
                   # Define the image name structure. Uses ghcr.io/<owner>/<repo>
                   images: |
-                      ghcr.io/${{ github.repository }}-cpu
-                      docker.io/svdc1/mirumoji_open_api-cpu
+                      ghcr.io/${{ github.repository_owner }}/mirumoji
+                      docker.io/${{ secrets.DOCKER_USERNAME }}/mirumoji
                   tags: |
-                      type=sha,prefix=
-                      type=raw,value=latest,enable={{is_default_branch}}
+                      # immutable
+                      type=semver,pattern={{version}},prefix=backend-cpu-
+                      # rolling-tag
+                      type=raw,value=backend-cpu-latest
 
             - name: Clean up disk space before build
               run: |
@@ -72,10 +70,10 @@ jobs:
 
             # Build and push the Docker image
             - name: Build and push Docker image
-              uses: docker/build-push-action@v5
+              uses: docker/build-push-action@v6
               with:
-                  context: . # Build context is the root of the repository
-                  file: ./Dockerfile.cpu # Path to the Dockerfile
+                  context: ./apps/backend # Build context is backend root
+                  file: ./apps/backend/Dockerfile.cpu # Path to the Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step

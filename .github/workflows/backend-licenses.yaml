@@ -1,46 +1,43 @@
-name: Generate Licenses
+name: Generate Backend Licenses
 
 on:
-  workflow_dispatch:
+    workflow_dispatch:
 
 jobs:
-  licenses:
-    runs-on: ubuntu-latest
+    licenses:
+        runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+        steps:
+            - uses: actions/checkout@v4
 
-    - name: Build NOTICE and legal texts
-      run: |
-        rm -rf licenses
-        mkdir  licenses
-        python -m pip install --upgrade pip-licenses==5.*
-        python -m pip install -r requirements.txt
-        pip-licenses \
-          --format=markdown \
-          --with-authors \
-          --output-file licenses/NOTICE-backend.md
-        curl -L \
-          "https://huggingface.co/Nonene/cookie-character-LoRAs/raw/81ff0b676e7a03bac24244455ac20f8de172e3e8/NGC-DL-CONTAINER-LICENSE" \
-          -o licenses/NVIDIA_EULA.txt
-        cat <<'TEXT' > licenses/JMdict_attribution.txt
-        This product includes dictionary data from JMdict, JMnedict and KANJIDIC2.
-        Copyright © Jim Breen & the Electronic Dictionary Research and Development Group.
-        Licensed under Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0).
-        TEXT
+            - name: Build NOTICE and legal texts
+              run: |
+                  rm -rf docs/licenses/licenses-backend
+                  mkdir  docs/licenses/licenses-backend
+                  python -m pip install --upgrade pip-licenses==5.*
+                  python -m pip install -r apps/backend/requirements.txt
+                  pip-licenses \
+                    --format=markdown \
+                    --with-authors \
+                    --output-file docs/licenses-backend/NOTICE-backend.md
+                  curl -L \
+                    "https://huggingface.co/Nonene/cookie-character-LoRAs/raw/81ff0b676e7a03bac24244455ac20f8de172e3e8/NGC-DL-CONTAINER-LICENSE" \
+                    -o docs/licenses/licenses-backend/NVIDIA_EULA.txt
+                  cat <<'TEXT' > docs/licenses/licenses-backend/JMdict_attribution.txt
+                  This product includes dictionary data from JMdict, JMnedict and KANJIDIC2.
+                  Copyright © Jim Breen & the Electronic Dictionary Research and Development Group.
+                  Licensed under Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0).
+                  TEXT
 
-    - name: Upload licenses folder
-      uses: actions/upload-artifact@v4
-      with:
-        name: licenses-backend
-        path: licenses
+            - name: Upload licenses folder
+              uses: actions/upload-artifact@v4
+              with:
+                  name: licenses-backend
+                  path: docs/licenses/licenses-backend
 
-
-    - name: Build SBOM
-      uses: anchore/sbom-action@v0
-      with:
-        format: spdx-json
-        upload-artifact: true
-        dependency-snapshot: false
+            - name: Build SBOM
+              uses: anchore/sbom-action@v0
+              with:
+                  format: spdx-json
+                  upload-artifact: true
+                  dependency-snapshot: false
