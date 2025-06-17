@@ -30,6 +30,7 @@ jobs:
         name: Upload Release to PyPI
         runs-on: ubuntu-latest
         environment: pypi
+        needs: build-package
         permissions:
             # IMPORTANT: this permission is mandatory for Trusted Publishing
             id-token: write
