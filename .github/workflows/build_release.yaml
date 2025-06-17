@@ -3,6 +3,7 @@ name: Attach Builds to GitHub Release
 on:
     release:
         types: [published] # Trigger only when a release is published via the UI
+    workflow_dispatch:
 
 jobs:
     build_executables:

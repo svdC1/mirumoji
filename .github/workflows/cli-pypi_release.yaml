@@ -2,6 +2,7 @@ name: Release CLI Launcher Package to PyPi
 on:
     release:
         types: [published]
+    workflow_dispatch:
 jobs:
     build-package:
         name: Build CLI Package
