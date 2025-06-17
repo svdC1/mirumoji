@@ -16,7 +16,7 @@ jobs:
                   python-version: "3.11"
 
             - name: Build Package
-              run: cd ./apps/cli/mirumoji && python build
+              run: cd ./apps/cli/mirumoji && python -m build
 
             - name: Upload Dist Artifact
               uses: actions/upload-artifact@v4
