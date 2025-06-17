@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirumoji"
+version = "2.0.1"
+authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
+maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
+description = "CLI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."
+keywords = ["japanese", "video-player", "language", "cli", "language-learning"]
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = ["click", "python-dotenv"]
+
+[project.scripts]
+mirumoji = "mirumoji.launcher:cli"
+
+[project.urls]
+Homepage = "https://github.com/svdC1/mirumoji"
+Issues = "https://github.com/svdC1/mirumoji/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
