@@ -4,6 +4,10 @@ on:
     release:
         types: [published] # Trigger only when a release is published via the UI
     workflow_dispatch:
+        inputs:
+            release_tag:
+                description: "Release tag to use for version"
+                required: false
 
 jobs:
     build_executables:
@@ -71,6 +75,20 @@ jobs:
             contents: write # Required to write assets to releases
 
         steps:
+            - name: Get Release Upload URL (if manual)
+              id: get_upload_url
+              if: github.event.release == null
+              run: |
+                  TAG="${{ github.event.inputs.release_tag }}"
+                  if [ -z "$TAG" ]; then
+                  echo "No release tag provided!"
+                  exit 1
+                  fi
+                  UPLOAD_URL=$(gh api repos/${{ github.repository }}/releases/tags/$TAG --jq '.upload_url')
+                  echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
             - name: Download all build artifacts
               uses: actions/download-artifact@v4
               with:
@@ -84,7 +102,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ github.event.release.upload_url }} # Get upload_url from the trigger event
+                  upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }} # Get upload_url from the trigger event
                   asset_path: ./artifacts/mirumoji-launcher-windows/mirumoji-launcher.exe
                   asset_name: mirumoji-launcher-windows.exe
                   asset_content_type: application/vnd.microsoft.portable-executable
@@ -94,7 +112,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ github.event.release.upload_url }}
+                  upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
                   asset_path: ./artifacts/mirumoji-launcher-linux/mirumoji-launcher
                   asset_name: mirumoji-launcher-linux
                   asset_content_type: application/octet-stream
@@ -104,7 +122,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ github.event.release.upload_url }}
+                  upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
                   asset_path: ./artifacts/mirumoji-launcher-macos/mirumoji-launcher
                   asset_name: mirumoji-launcher-macos
                   asset_content_type: application/octet-stream
