@@ -46,7 +46,7 @@ jobs:
                   pip install pyinstaller
 
             - name: Build executable with PyInstaller
-              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean apps/cli/mirumoji/src/mirumoij/launcher.py
+              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean apps/cli/mirumoji/src/mirumoji/launcher.py
 
             - name: List dist directory contents (Post-PyInstaller)
               if: always()
