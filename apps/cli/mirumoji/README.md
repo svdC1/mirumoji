@@ -16,7 +16,7 @@
 
 ## **Interactive Video Player**
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
+![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
 
 > Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.
 
