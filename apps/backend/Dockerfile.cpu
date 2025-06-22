@@ -16,7 +16,6 @@ RUN apt-get update && \
     git \
     mecab \
     libmecab-dev \
-    mecab-ipadic-utf8 \
     ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
@@ -33,16 +32,9 @@ RUN python3.11 -m pip install --no-cache-dir \
 COPY requirements.txt .
 RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
 
-# --- Download jamdict.db ---
-RUN mkdir -p /root/.jamdict/data && \
-    wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1QZRzOoMF4CGlkdl0FyU7ledAZLRlpoom' \
-    -O /tmp/jamdict.db.xz && \
-    unxz /tmp/jamdict.db.xz && \
-    mv /tmp/jamdict.db /root/.jamdict/data/jamdict.db
-
-
-# --- Download UniDic Dictionary ---
+# --- Download UniDic Dictionary and Kotobase DB---
 RUN python3.11 -m unidic download
+RUN kotobase pull-db
 
 # Copy app code
 COPY . .
