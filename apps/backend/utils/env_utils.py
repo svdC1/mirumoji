@@ -1,5 +1,8 @@
 """
 This module defines helper functions for environment management.
+
+Attributes:
+  LOGGER (logging.Logger): Module's logger.
 """
 
 from typing import List, Dict, Optional

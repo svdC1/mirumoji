@@ -235,9 +235,9 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> pathlib.Path | None:
+    ) -> Union[pathlib.Path, None]:
         """
-        Convert any video to MP4 (H.264 + AAC) that streams well in <video>.
+        Convert any video to MP4 (H.264 + AAC).
 
         Args:
           input_path (str): Source file (any container/codec FFmpeg supports).
@@ -247,7 +247,7 @@ class AudioTools:
           use_nvenc (bool): True → try NVIDIA NVENC; False → libx264 CPU.
 
         Returns:
-            pathlib.Path of the MP4, or None on failure.
+            pathlib.Path: Path of the MP4, or None on failure.
         """
 
         src = pathlib.Path(input_path).resolve()

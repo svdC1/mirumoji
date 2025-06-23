@@ -1,5 +1,12 @@
-# main.py
+"""
+Module defining the FastAPI API. Sets up Database connection
+and manages application lifecycle.
+
+Attributes:
+  LOGGER (logging.Logger): Root Logging object.
+"""
 import logging
+from typing import AsyncGenerator, Any
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +24,7 @@ from db.db import connect_db, disconnect_db, DATABASE_URL
 logging.basicConfig(level=logging.INFO,
                     format="%(levelname)8s %(name)s | %(message)s",
                     )
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 # ───────────────────────────────────────────────────────────
 # App setup
@@ -25,13 +32,22 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None, None]:
+    """
+    Context Manager for managing API's lifecyle.
+
+    Args:
+      app (FastAPI): The API object.
+
+    Yields:
+      Any: Application
+    """
     await connect_db()
     media_files = Path("media_files/profiles").resolve()
     media_files.mkdir(exist_ok=True)
     media_files_tmp = Path("media_files/temp").resolve()
     media_files_tmp.mkdir(exist_ok=True)
-    logger.info(f"Storage ensured at: '{media_files.parent}'")
+    LOGGER.info(f"Storage ensured at: '{media_files.parent}'")
     yield
     await disconnect_db()
 
@@ -58,7 +74,16 @@ app.add_middleware(
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
+async def http_exception_handler(request: Request,
+                                 exc: HTTPException
+                                 ) -> JSONResponse:
+    """
+    Custom Exception Handler for all HTTP Errors.
+
+    Args:
+      request (Request): Incoming request object.
+      exc (HTTPException): Raised Exception Object.
+    """
     return JSONResponse(
         status_code=exc.status_code,
         content={"success": False,
@@ -73,6 +98,6 @@ app.include_router(video_router)
 app.include_router(profile_router)
 
 
-logger.info(f"Database URL: {DATABASE_URL}")
-logger.info("Setup Complete")
-logger.info(f"Serving {Path('media_files').resolve()} at '/media'.")
+LOGGER.info(f"Database URL: {DATABASE_URL}")
+LOGGER.info("Setup Complete")
+LOGGER.info(f"Serving {Path('media_files').resolve()} at '/media'.")

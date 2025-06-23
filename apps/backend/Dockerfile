@@ -34,7 +34,7 @@ RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  
 RUN python3.11 -m pip install --upgrade pip
 
 # Install PyTorch with CUDA support
-# Specify index URL for CUDA 12.1 compatible wheels, suitable for CUDA 12.3 base image.
+# Specify index URL for CUDA 12.4 compatible wheels, suitable for CUDA 12.3 base image.
 RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
 # Install Helpers

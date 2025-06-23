@@ -1,6 +1,9 @@
 """
 This module defines the `FWhisperWrapper` class for running the FasterWhisper
 model.
+
+Attributes:
+  LOGGER (logging.Logger): Module's Logging object.
 """
 
 from typing import Dict, Union, Optional

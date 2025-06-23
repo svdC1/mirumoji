@@ -1,5 +1,8 @@
 """
 This module defines the `GptModel` class for sending requests to OpenAI's API.
+
+Attributes:
+  LOGGER (logging.Logger): Module's logger object
 """
 from __future__ import annotations
 from openai import OpenAI
@@ -25,11 +28,7 @@ class GptModel:
       max_context (int): The session's context limit in tokens.
 
     Attributes:
-      MODEL_VERSIONS (list): List of available model versions
-      FRMAP (dict): Mapping of returned finish reason text to codes.
-      FRCODEDICT (dict): Mapping of OpenAI's finishing reason
-                         codes to their meanings.
-
+      info (dict): Dictionary containing all object information.
     """
     MODEL_VERSIONS = [
         'gpt-4.1',
@@ -59,7 +58,7 @@ class GptModel:
                  from_dotenv: bool = True,
                  ApiKey: Optional[str] = None,
                  max_context: int = 100000
-                 ):
+                 ) -> None:
         try:
             # Store Session Info
             self.info = {}
@@ -133,15 +132,15 @@ class GptModel:
                 f'Error while cretaing Model Object : {str(e)}')
 
     @staticmethod
-    def _format_input(message: str):
+    def _format_input(message: str) -> Dict[str, str]:
         return {"role": "user", "content": message}
 
     @staticmethod
-    def _format_output(message: str):
+    def _format_output(message: str) -> Dict[str, str]:
         return {"role": "assistant", "content": message}
 
     @staticmethod
-    def _process_output(response: ChatCompletion):
+    def _process_output(response: ChatCompletion) -> Dict:
 
         usage_dict = response.usage.to_dict()
         try:
@@ -167,10 +166,10 @@ class GptModel:
                 'finish_reason': finish_reason
                 }
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.info['model']}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.info}"
 
     def request(self, prompt: str) -> Dict:

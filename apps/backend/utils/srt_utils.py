@@ -1,20 +1,47 @@
+"""
+This module defines helper functions for SRT manipulation.
+
+Attributes:
+  LOGGER (logging.Logger): Logger's Module
+"""
+
 from typing import (Dict,
                     Any)
 import logging
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def format_time(seconds: float) -> str:
-    """Format seconds into SRT timestamp format: HH:MM:SS,mmm."""
+    """
+    Format seconds into SRT timestamp format.
+
+    Args:
+      seconds (float): The time to format in seconds.
+
+    Returns:
+      str: Formatted time in the format HH:MM:SS,mmm.
+    """
     hours, rem = divmod(seconds, 3600)
     minutes, seconds = divmod(rem, 60)
     ms = int((seconds - int(seconds)) * 1000)
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{ms:03}"
 
 
-def generate_srt(result: Dict[str, Any], srt_path: str) -> str:
-    """Generate an SRT file from Whisper transcription result."""
+def generate_srt(result: Dict[str, Any],
+                 srt_path: str) -> str:
+    """
+    Generate an SRT file from Whisper transcription result.
+
+    Args:
+      result (dict): The result object from FasterWhisper's transcribe
+                     function.
+      srt_path (str): Path to save the SRT file.
+
+    Returns:
+      str: The Path where the file was saved from `srt_path`
+
+    """
     srt_content = ""
     segments = result.get("segments", [])
     srt_lines = []

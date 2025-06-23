@@ -1,14 +1,22 @@
+"""
+This module defines helper functions for colleting information
+about the system running the program.
+"""
+
 from __future__ import annotations
 import os
 import platform
 import socket
 import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 
-def gpu_available() -> Dict[bool, str]:
+def gpu_available() -> Dict[str, Union[bool, str]]:
     """
-    Return True if a CUDA GPU is visible to torch, False otherwise.
+    Check if there's a GPU available in the machine running the program.
+
+    Returns:
+      Dict[str, Union[bool, str]: Dict with keys "available" and "name".
     """
     try:
         import torch
@@ -26,6 +34,12 @@ def gpu_available() -> Dict[bool, str]:
 
 
 def get_system_info() -> Dict[str, Any]:
+    """
+    Collects basic information about the system running the program.
+
+    Returns:
+      Dict[str, Any]: Dict with information about the system.
+    """
     info: Dict[str, Any] = {
         "time": datetime.datetime.now().isoformat(timespec="seconds") + "Z",
         "hostname": socket.gethostname(),
