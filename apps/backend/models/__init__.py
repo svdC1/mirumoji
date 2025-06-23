@@ -1,0 +1,3 @@
+"""
+Mirumoji API Pydantic Models.
+"""

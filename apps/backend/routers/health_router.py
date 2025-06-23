@@ -1,5 +1,8 @@
 """
-This module defines the `health_router` of the API.
+This module defines the `health_router` of the Mirumoji API.
+
+Attributes:
+  health_router (APIRouter): The FastAPI Router Object.
 """
 
 

@@ -1,9 +1,10 @@
 """
-This module defines the `dict_router` of the API.
+This module defines the `dict_router` of the Mirumoji API.
 
 Attributes:
   USING_MODAL (bool): Wether using MODAL or not.
   LOGGER (logging.Logger): Router Logging Object.
+  dict_router (APIRouter): The FastAPI Router object.
 
 """
 
