@@ -1,16 +1,32 @@
+"""
+Module defining helper functions meant to be run inside
+FastAPI endpoints for management of Mirumoji `Profiles`
+
+Attributes:
+  LOGGER (logging.Logger): Module's Logging object.
+"""
+
 from fastapi import Header, HTTPException, Depends, status
 from db.db import get_db
 from db.Tables import profiles
 import logging
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
-async def get_profile_id_from_header(x_profile_id: str = Header(None)
-                                     ) -> Optional[str]:
+async def get_profile_id_from_header(
+    x_profile_id: str = Header(None)
+) -> Optional[str]:
     """
-    Simply extracts X-Profile-ID header if present.
+    Function meant to be run inside FastAPI endpoint which
+    extracts X-Profile-ID header if present.
+
+    Args:
+      x_profile_id (str): The X-Profile-ID Header
+
+    Returns:
+      str: The X-Profile-ID Header content.
     """
     return x_profile_id
 
@@ -19,8 +35,19 @@ async def ensure_profile_exists(
     profile_id: str = Depends(get_profile_id_from_header)
 ) -> str:
     """
-    Ensures a profile exists for the given ID. If ID is None or profile
-    doesn't exist and cannot be created, raises HTTPException.
+    Function meant to be run inside FastAPI endpoint which
+    ensures a profile exists for the given ID.
+
+    Args:
+      profile_id (str): The profile ID to check.
+
+    Returns:
+      str: The profile ID from input if it exists or
+           could be created.
+
+    Raises:
+      HTTPException: If ID is None or profile
+                     doesn't exist and cannot be created
     """
     if not profile_id:
         raise HTTPException(
@@ -36,9 +63,10 @@ async def ensure_profile_exists(
             insert_query = profiles.insert().values(id=profile_id,
                                                     name=profile_id)
             await db.execute(insert_query)
-            logger.info(f"Implicitly created profile with ID: {profile_id}")
+            LOGGER.info(f"Implicitly created profile with ID: {profile_id}")
         except Exception as e:
-            logger.error(f"Error creating profile {profile_id}: {e}")
+            LOGGER.exception(f"Error creating profile {profile_id}: {e}")
+
             # Check if it was created by another request in the meantime
             profile_check_after_error = await db.fetch_one(query)
             if not profile_check_after_error:
@@ -50,9 +78,20 @@ async def ensure_profile_exists(
 
 async def get_profile_id_optional(
     profile_id: str = Depends(get_profile_id_from_header)
-) -> str | None:
-    """Returns the profile ID if X-Profile-ID is provided and the profile
-    exists (implicitly creates if new). Returns None if header is missing."""
+) -> Optional[str]:
+    """
+    Function meant to be run inside FastAPI endpoint which returns the content
+    of Profile ID Header.
+
+    Args:
+      profile_id (str): Profile ID from header.
+
+    Returns:
+      str: profile ID if X-Profile-ID is provided and the profile exists
+           or could be implicitly created.
+
+      None: If profile doesn't exist or couldn't be created
+    """
     if not profile_id:
         return None
 
@@ -65,16 +104,16 @@ async def get_profile_id_optional(
             insert_query = profiles.insert().values(id=profile_id,
                                                     name=profile_id)
             await db.execute(insert_query)
-            logger.info(f"Implicitly created profile with\
+            LOGGER.info(f"Implicitly created profile with\
                 ID (optional context): {profile_id}")
-        except Exception as e:
-            logger.error(f"Error creating profile {profile_id} \
-                (optional context): {e}")
+        except Exception:
+            LOGGER.exception(f"Error creating profile {profile_id}")
+
             # Check again in case of race condition
             profile_check_after_error = await db.fetch_one(query)
             if not profile_check_after_error:
-                # Don't raise 500 here, as profile is optional.
-                logger.error(f"Could not find or create profile \
-                    {profile_id} (optional context) after error.")
+                LOGGER.exception(f"Could not find or create profile \
+                    {profile_id} after error.")
                 return None
+
     return profile_id

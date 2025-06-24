@@ -282,6 +282,9 @@ class GptModel:
 
         Args:
           info (str): JSON string.
+
+        Returns:
+          GptModel: The loaded `GptModel` object
         """
         info = json.loads(info)
 
@@ -299,5 +302,8 @@ class GptModel:
     def serialize(self) -> str:
         """
         Serialize object information into JSON string
+
+        Returns:
+          str: JSON string of serialized object.
         """
         return json.dumps(self.info, skipkeys=True)

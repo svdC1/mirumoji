@@ -2,7 +2,6 @@
 This module defines the `dict_router` of the Mirumoji API.
 
 Attributes:
-  USING_MODAL (bool): Wether using MODAL or not.
   LOGGER (logging.Logger): Router Logging Object.
   dict_router (APIRouter): The FastAPI Router object.
 
@@ -21,15 +20,18 @@ breakdown_service = processor.sentence_breakdown_service
 
 
 @dict_router.get("/sentence_lookup")
-async def explain_sentence(sentence: str = Query(...)):
+async def explain_sentence(sentence: str = Query(...)) -> dict:
     """
     Endpoint returning enriched tokens without gpt explanation.
 
     Args:
       sentence (string): Sentence to return tokens from.
 
+    Returns:
+      dict: Dictionary containg 'sentence' and 'tokens' fields.
+
     Raises:
-      HTTPException
+      HTTPException: If lookup fails.
     """
     try:
         tokens = breakdown_service.word_lookup(sentence)

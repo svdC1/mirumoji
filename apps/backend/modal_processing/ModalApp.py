@@ -114,7 +114,7 @@ def video_conversion_job(video_fp: Union[str, Path],
       video_fp (Union[str, Path]): Path to the video for conversion.
 
     Yields:
-      Generator[bytes, None, None]: The converted video chunks.
+      bytes: The converted video chunks.
     """
     logging.basicConfig(level=logging.INFO,
                         style="{",

@@ -83,6 +83,9 @@ async def http_exception_handler(request: Request,
     Args:
       request (Request): Incoming request object.
       exc (HTTPException): Raised Exception Object.
+
+    Returns:
+      JSONResponse: The exception response to return.
     """
     return JSONResponse(
         status_code=exc.status_code,

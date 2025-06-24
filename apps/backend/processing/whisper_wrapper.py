@@ -4,8 +4,9 @@ model.
 
 Attributes:
   LOGGER (logging.Logger): Module's Logging object.
+  DEFAULT_SYS_MSG (str): Default system message to use for OpenAI
+                         post-processing.
 """
-
 from typing import Dict, Union, Optional
 import logging
 import time
@@ -16,6 +17,28 @@ from pathlib import Path
 from processing.gpt_wrapper import GptModel
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_SYS_MSG = """You are an expert subtitle editor for Japanese anime.
+You understand:
+  - Conversational Japanese, character names, honorifics onomatopoeia and \
+      scene-specific slang.
+  - How to pick the correct Kanji/Kana from phonetic transcriptions based on\
+      context.
+  - Natural sentence flow and typical timing for subtitles.
+
+ Your job is to **clean only the text** of each SRT cue:
+   • Fix mis-recognized Kanji or Kana.
+   • Merge cues that split a single sentence (new cue’s start = earlier, \
+       end = later).
+   • Remove any pure gibberish or repeated song-lyric artifacts.
+   • Insert correct punctuation (。？！、) and adjust spacing.
+
+**You must not**:
+  - Change any start/end timestamps.
+  - Renumber beyond simple sequential order.
+  - Add or remove cues (only merge as above).
+  - Add any commentary or explanations.
+
+Output **only** the cleaned `.srt` file content."""
 
 
 class FWhisperWrapper:
@@ -47,38 +70,20 @@ class FWhisperWrapper:
         self.device = device
         self.model_name = model_name
         self.gpt_version = gpt_version
-
-        if not gpt_sys_msg:
-            self.gpt_sys_msg = """You are an expert subtitle editor for \
-                Japanese anime.You understand:\
-            - Conversational Japanese, character names, honorifics,\
-                onomatopoeia and scene-specific slang.\
-            - How to pick the correct Kanji/Kana from phonetic transcriptions\
-                based on context.\
-            - Natural sentence flow and typical timing for subtitles.
-
-            Your job is to **clean only the text** of each SRT cue:
-            • Fix mis-recognized Kanji or Kana.
-            • Merge cues that split a single sentence \
-                (new cue’s start = earlier, end = later).\
-            • Remove any pure gibberish or repeated song-lyric artifacts.
-            • Insert correct punctuation (。？！、) and adjust spacing.
-
-            **You must not**:
-            - Change any start/end timestamps.
-            - Renumber beyond simple sequential order.
-            - Add or remove cues (only merge as above).
-            - Add any commentary or explanations.
-
-            Output **only** the cleaned `.srt` file content.
-            """
-        else:
-            self.gpt_sys_msg = gpt_sys_msg
+        self.gpt_sys_msg = gpt_sys_msg if gpt_sys_msg else DEFAULT_SYS_MSG
 
     def _check_input(self,
                      audio_path: str
                      ) -> Union[str, None]:
+        """
+        Check if input audio is a valid file.
 
+        Args:
+          audio_path (str): The path to the file.
+
+        Return:
+          str: The same audio path from input or None if path is not valid.
+        """
         audio_path = Path(audio_path).resolve()
         if audio_path.is_file():
             return str(audio_path)
@@ -118,7 +123,7 @@ class FWhisperWrapper:
             rsrt = request['response']
             return rsrt
         except Exception as e:
-            LOGGER.error(f"Error Requesting GPT: {e}")
+            LOGGER.exception(f"Error Requesting GPT: {e}")
             return None
 
     def transcribe(self,
@@ -145,6 +150,8 @@ class FWhisperWrapper:
         audio_path = self._check_input(audio_path)
 
         if not audio_path:
+            LOGGER.error(
+                "Error during transcription: audio path provided is invalid")
             return None
 
         add_kwds = {
@@ -162,7 +169,7 @@ class FWhisperWrapper:
         if add_kargs:
             add_kwds.update(add_kargs)
         try:
-            segments, info = self.instance.transcribe(** add_kwds)
+            segments, info = self.instance.transcribe(**add_kwds)
             if generator_only:
                 return {'obj': segments,
                         'info': info}
@@ -174,7 +181,7 @@ class FWhisperWrapper:
                         'info': info,
                         'elapsed': tt}
         except Exception as e:
-            LOGGER.error(f"Transcription Failed :{e}")
+            LOGGER.exception(f"Transcription Failed :{e}")
             return None
 
     def transcribe_to_str(self,
@@ -284,5 +291,5 @@ class FWhisperWrapper:
                 LOGGER.info("Generated SRT")
                 return output_path
             except Exception as e:
-                LOGGER.error(f"Failed to save SRT File : {e}")
+                LOGGER.exception(f"Failed to save SRT File : {e}")
                 return None

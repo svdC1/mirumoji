@@ -13,7 +13,7 @@ health_router = APIRouter(prefix="/health")
 
 
 @health_router.get("/status")
-async def health_check():
+async def health_check() -> dict:
     """
     Endpoint for checking if API is running.
 
@@ -24,7 +24,7 @@ async def health_check():
 
 
 @health_router.get("/system")
-async def gpu_check():
+async def gpu_check() -> dict:
     """
     Endpoint for checking information about the system
     running the API

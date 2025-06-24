@@ -35,7 +35,7 @@ def _generate_reply(version: str,
       prompt (str): User prompt for the model.
 
     Yields:
-      Union[Iterator[str], None]: The text chunks from the reply.
+      Iterator[str]: The text chunks from the reply.
     """
     try:
         model = GptModel(
@@ -61,7 +61,7 @@ def sse_gen(version: str,
       prompt (str): User prompt for the model.
 
     Yields:
-      Generator[str, Any, None]: The text chunks from the reply.
+      str: The text chunks from the reply.
     """
     reply = _generate_reply(version,
                             system_message,
@@ -95,8 +95,8 @@ def stream_response_with_task(
       keepalive_interval (float): Interval between spaces yielded in seconds.
 
     Returns:
-      StreamReponse: Once the task is done, streams the file at `path` in 8k
-                     chunks.
+      StreamingReponse: Once the task is done, streams the file at `path` in 8k
+                        chunks.
     """
     async def _generator():
         task = asyncio.create_task(asyncio.to_thread(task_func))

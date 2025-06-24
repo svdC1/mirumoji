@@ -62,7 +62,9 @@ class Processor:
         else:
             self.save_path = Path(save_path).resolve()
             if not self.save_path.is_dir():
+                LOGGER.error(f"Dir: '{save_path}' does not exist")
                 raise FileNotFoundError(f"Dir: '{save_path}' does not exist")
+
         # Configure API Keys
         load_dotenv(dotenv_path=dotenv_path)
         if use_modal:
@@ -72,20 +74,30 @@ class Processor:
         else:
             LOGGER.info("Not using Modal")
             expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY}
+
         self.API_KEYS = check_env(expected_keys.keys(),
                                   expected_keys,
-                                  dotenv_path)
+                                  dotenv_path
+                                  )
+
         # Initializing Instances
+
+        # Text Processing
         gpt_kwargs = {"from_dotenv": False,
-                      "ApiKey": self.API_KEYS["OPENAI_API_KEY"]}
+                      "ApiKey": self.API_KEYS["OPENAI_API_KEY"]
+                      }
         self.sentence_breakdown_service = SentenceBreakdownService(gpt_version,
                                                                    gpt_kwargs)
+        # Audio Tools
         if not save_path:
             self.audio_tools = AudioTools(self.save_path.name)
         else:
             self.audio_tools = AudioTools(self.save_path)
+
+        # Whisper
         if use_modal:
             # CPU Version - Don't Import Whisper - No GPU
+            # Import Modal Functions
             from modal_processing.ModalApp import (app,
                                                    transcribe_srt_job,
                                                    transcribe_to_string_job,
@@ -193,5 +205,5 @@ class Processor:
                 LOGGER.info("Finished receiving converted video")
                 return Path(outpath)
             except Exception as e:
-                LOGGER.error(f"Error Converting Video: {e}")
+                LOGGER.exception(f"Error Converting Video: {e}")
                 return None
