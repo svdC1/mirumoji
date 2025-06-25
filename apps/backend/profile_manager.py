@@ -87,10 +87,9 @@ async def get_profile_id_optional(
       profile_id (str): Profile ID from header.
 
     Returns:
-      str: profile ID if X-Profile-ID is provided and the profile exists
-           or could be implicitly created.
-
-      None: If profile doesn't exist or couldn't be created
+      Union[str, None]: If profile ID if X-Profile-ID is provided and the
+                        profile exists or could be implicitly created
+                        returns str, otherwise returns None.
     """
     if not profile_id:
         return None
