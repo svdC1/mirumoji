@@ -9,7 +9,7 @@ Attributes:
 import fugashi
 from typing import List, Dict, Optional
 from kotobase import Kotobase
-from kotobase.core.datatypes import (JMDictEntryDTO, JMNeDictEntryDTO)
+from kotobase.core.datatypes import (JMDictEntryDTO)
 from processing.gpt_wrapper import GptModel
 from functools import lru_cache
 from models.FocusInfo import FocusInfo
@@ -179,24 +179,28 @@ def _query_kotobase(word: str) -> Dict:
     """
     l_result = Kotobase().lookup(word=word,
                                  wildcard=False,
-                                 include_names=True,
+                                 include_names=False,
                                  sentence_limit=5
                                  )
-    entry = l_result.entries[0] if l_result.entries else None
-    if entry and isinstance(entry, JMDictEntryDTO):
-        meanings = [s["gloss"] for s in entry.senses] if entry.senses else []
-        reading = ",".join(entry.kana) if entry.kana else ""
-        jlpt = (f"N{l_result.jlpt_vocab.level}" if l_result.has_jlpt()
-                else "Unknown"
-                )
-        examples = ([st.text for st in l_result.examples]
-                    if l_result.examples else []
+    jlpt = (
+        f"N{l_result.jlpt_vocab.level}" if l_result.has_jlpt() else "Unknown"
+        )
+    examples = (
+        [st.text for st in l_result.examples] if l_result.examples else []
+        )
+    if l_result.entries:
+        meanings = []
+        reading = []
+        for entry in l_result.entries:
+            if isinstance(entry, JMDictEntryDTO):
+                meanings.append(
+                    [s["gloss"] for s in entry.senses] if entry.senses else []
                     )
-    elif entry and isinstance(entry, JMNeDictEntryDTO):
-        meanings = [g for g in entry.gloss] if entry.gloss else []
-        reading = ",".join(entry.kana) if entry.kana else ""
-        jlpt = "Unknown"
-        examples = []
+                reading.append(",".join(entry.kana) if entry.kana else "")
+        if meanings:
+            meanings = [m for m_lst in meanings for m in m_lst if m_lst]
+        if reading:
+            reading = ','.join(set(','.join(reading).split(",")))
     else:
         meanings = []
         reading = ""

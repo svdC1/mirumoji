@@ -32,7 +32,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """
     Context Manager for managing API's lifecyle.
 

@@ -16,7 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-LOGGER = logging.getLOGGER(__name__)
+LOGGER = logging.getLogger(__name__)
 MODAL_IMAGE = os.getenv("MODAL_IMAGE",
                         "docker.io/svdc1/mirumoji-modal-gpu:latest")
 MODAL_GPU = os.getenv("MODAL_GPU", "A10G")
