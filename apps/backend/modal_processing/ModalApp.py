@@ -12,8 +12,6 @@ from typing import Union, Generator
 import modal
 import os
 import logging
-from processing.whisper_wrapper import FWhisperWrapper
-from processing.audio_processing import AudioTools
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -64,6 +62,7 @@ def transcribe_srt_job(OPENAI_API_KEY: str,
     Returns:
       str: Transcription in form of SRT string.
     """
+    from processing.whisper_wrapper import FWhisperWrapper
 
     logging.basicConfig(level=logging.INFO,
                         style="{",
@@ -121,6 +120,7 @@ def video_conversion_job(video_fp: Union[str, Path],
                         format="{levelname}-{name}-{message}"
                         )
 
+    from processing.audio_processing import AudioTools
     LOGGER.info(f"video_conversion_job started for video: {video_fp}")
     tmp_p = Path.cwd() / "tmp"
     LOGGER.info(f"Using temporary directory for video conversion: {tmp_p}")
@@ -178,6 +178,7 @@ def transcribe_to_string_job(audio_fp: Union[str, Path],
     Returns:
       str: Transcription in form of string.
     """
+    from processing.whisper_wrapper import FWhisperWrapper
     logging.basicConfig(level=logging.INFO,
                         style="{",
                         format="{levelname}-{name}-{message}"
