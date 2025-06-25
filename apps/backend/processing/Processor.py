@@ -192,7 +192,7 @@ class Processor:
           outpath (Union[str, Path]): Where to save the received video stream.
 
         Returns:
-          str: The path to converted video from `outpath`.
+          Path: The path to converted video from `outpath`.
         """
         with self.modal_app.run():
             video_fp = Path(video_fp).as_posix()

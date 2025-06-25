@@ -165,7 +165,7 @@ class AudioTools:
           input_path (str): Path to the file.
 
         Returns:
-          pathlib.Path -> The output path of the converted file.
+          pathlib.Path: The output path of the converted file.
         """
 
         ext = pathlib.Path(input_path).resolve().suffix

@@ -1,13 +1,20 @@
+"""
+This module defines the `video_router` of the Mirumoji API.
+
+Attributes:
+  LOGGER (logging.Logger): Module's Logging object.
+  video_router (APIRouter): The FastAPI Router Object.
+"""
+
 import logging
 from pathlib import Path
-from fastapi import (
-    APIRouter,
-    File,
-    UploadFile,
-    Depends,
-    HTTPException,
-    status,
-)
+from fastapi import (APIRouter,
+                     File,
+                     UploadFile,
+                     Depends,
+                     HTTPException,
+                     status
+                     )
 import asyncio
 from profile_manager import ensure_profile_exists
 import shutil
@@ -18,19 +25,14 @@ from utils.env_utils import using_modal
 from processing.audio_processing import AudioTools
 from processing.Processor import Processor
 USING_MODAL = using_modal()
-if not USING_MODAL:
-    from processing.whisper_wrapper import FWhisperWrapper
-    fwhisper = FWhisperWrapper()
-
-
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
-if USING_MODAL:
-    processor = Processor(save_path=BASE_MEDIA_DIR,
-                          use_modal=True)
+processor = Processor(save_path=BASE_MEDIA_DIR,
+                      use_modal=USING_MODAL
+                      )
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -38,7 +40,21 @@ TEMP_DIR.mkdir(parents=True, exist_ok=True)
 async def generate_srt(
     video_file: UploadFile = File(...),
     profile_id: str = Depends(ensure_profile_exists),
-):
+) -> dict:
+    """
+    POST endpoint for generating an SRT string from a video file.
+
+    Args:
+      video_file (UploadFile): File uploaded passed through endpoint.
+      profile_id (str): Profile ID from Header.
+
+    Returns:
+      dict: Response with key `srt_content`
+
+    Raises:
+      HTTPException: If no profile ID was provided or there was an error
+                     generating the SRT
+    """
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -62,7 +78,7 @@ async def generate_srt(
         # 1. Save uploaded video to operation's temp dir
         with open(tmp_vid_upload_loc, "wb+") as f_obj:
             shutil.copyfileobj(video_file.file, f_obj)
-        logger.info(f"Temp video for SRT: {tmp_vid_upload_loc}")
+        LOGGER.info(f"Temp video for SRT: {tmp_vid_upload_loc}")
 
         # 2. Init AudioTools with operation's temp dir
         audio_tools = AudioTools(working_dir=op_tmp_dir)
@@ -73,32 +89,37 @@ async def generate_srt(
         )
         if not extracted_audio_fpath or not Path(extracted_audio_fpath
                                                  ).exists():
-            logger.error(f"Audio extraction failed for {tmp_vid_upload_loc}")
+            LOGGER.error(f"Audio extraction failed for {tmp_vid_upload_loc}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to extract audio from video.",
             )
-        logger.info(f"Audio extracted to {extracted_audio_fpath}")
+        LOGGER.info(f"Audio extracted to {extracted_audio_fpath}")
 
         # 4. Transcribe extracted audio to SRT string
         # If Modal env variables are available use MODAL
         if USING_MODAL:
-            logger.info("Conversion sent to Modal")
-            logger.info(f"Local Filepath: {extracted_audio_fpath}")
+            LOGGER.info("Conversion sent to Modal")
+            LOGGER.info(f"Local Filepath: {extracted_audio_fpath}")
             # Fix path for Internal Mounted Modal Container
             parts = Path(extracted_audio_fpath).parts
+            # Local Path ->
+            # local/path/(media_files/temp/gen_srt_{profile_id}_{op_id}/{video_file.filename})
+            # parts[-4:] ->
+            # media_files/temp/gen_srt_{profile_id}_{op_id}/{video_file.filename}
             extracted_audio_fpath = Path(*parts[-4:])
-            logger.info(
+            LOGGER.info(
                 f"Media Filepath Adapted for Modal: {extracted_audio_fpath}")
             srt_result = await processor.modal_transcribe_to_srt(
-                    media_fp=str(extracted_audio_fpath),
-                    )
+                media_fp=str(extracted_audio_fpath),
+                )
         # Run locally
         else:
-            logger.info("Running Locally")
-            logger.info(f"Local Filepath: {extracted_audio_fpath}")
+            # Processor will have `fwhisper` attribute
+            LOGGER.info("Running Locally")
+            LOGGER.info(f"Local Filepath: {extracted_audio_fpath}")
             srt_result = await asyncio.to_thread(
-                fwhisper.transcribe_to_srt,
+                processor.fwhisper.transcribe_to_srt,
                 audio_path=str(extracted_audio_fpath),
                 output_path=" ",
                 string_result=True,
@@ -106,7 +127,7 @@ async def generate_srt(
             )
 
         if not srt_result:
-            logger.error(
+            LOGGER.error(
                 f"SRT transcription failed for {extracted_audio_fpath}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -114,29 +135,36 @@ async def generate_srt(
             )
         with open(srt_fp, "w", encoding="utf-8") as f:
             f.write(srt_result)
-        logger.info(f"SRT content generated for profile {profile_id}")
+        LOGGER.info(f"SRT content generated for profile {profile_id}")
 
         # 5. Save metadata
         db = await get_db()
         vid_rec_id = str(uuid.uuid4())
-        ins_vid_query = profile_files.insert().values(
-            id=vid_rec_id,
-            profile_id=profile_id,
-            file_name=srt_fp.name,
-            file_path=str(relative_srt_fp),
-            file_type="srt",
-        )
+        ins_vid_query = (
+            profile_files
+            .insert()
+            .values(
+                id=vid_rec_id,
+                profile_id=profile_id,
+                file_name=srt_fp.name,
+                file_path=str(relative_srt_fp),
+                file_type="srt"
+                )
+            )
         await db.execute(ins_vid_query)
-        logger.info(
+        LOGGER.info(
             f"SRT record saved for profile {profile_id}"
         )
 
-        return {"srt_content": srt_result}
+        return {
+            "srt_content": srt_result
+            }
 
     except HTTPException:
+        # Propagate Exceptions
         raise
     except Exception as e:
-        logger.exception(
+        LOGGER.exception(
             f"Error generating SRT for {video_file.filename},prof {profile_id}"
         )
         raise HTTPException(
@@ -148,16 +176,30 @@ async def generate_srt(
         if op_tmp_dir.exists():
             try:
                 shutil.rmtree(op_tmp_dir)
-                logger.info(f"Cleaned temp dir: {op_tmp_dir}")
+                LOGGER.info(f"Cleaned temp dir: {op_tmp_dir}")
             except OSError as e_os:
-                logger.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
+                LOGGER.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
 
 
 @video_router.post("/convert_to_mp4")
 async def convert_to_mp4(
     video_file: UploadFile = File(...),
     profile_id: str = Depends(ensure_profile_exists),
-):
+) -> dict:
+    """
+    POST endpoint for converting a video file to MP4 format.
+
+    Args:
+      video_file (UploadFile): File uploaded passed through endpoint.
+      profile_id (str): Profile ID from Header.
+
+    Returns:
+      dict: Response with key `converted_video_url`
+
+    Raises:
+      HTTPException: If no profile ID was provided or there was an error
+                     converting the video
+    """
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -189,23 +231,25 @@ async def convert_to_mp4(
         # 1. Save uploaded video to temp location
         with open(tmp_uploaded_vid_loc, "wb+") as f_obj:
             shutil.copyfileobj(video_file.file, f_obj)
-        logger.info(f"Temp video for conversion: {tmp_uploaded_vid_loc}")
+        LOGGER.info(f"Temp video for conversion: {tmp_uploaded_vid_loc}")
 
-        # 3. Convert video, saving to final converted location
+        # 2. Convert video, saving to final converted location
         # If MODAL env variables are available use MODAL
         if USING_MODAL:
-            logger.info("Conversion sent to Modal")
-            logger.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
-            logger.info(f"Output Path: {final_conv_stored_loc}")
+            LOGGER.info("Conversion sent to Modal")
+            LOGGER.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
+            LOGGER.info(f"Output Path: {final_conv_stored_loc}")
             conv_path_obj = await processor.modal_convert_to_mp4(
                 video_fp=str(tmp_uploaded_vid_loc),
                 outpath=str(final_conv_stored_loc)
             )
         # Run Locally
+        # If CPU version ->
+        # NVENC is not available but to_mp4 falls back to normal enconding
         else:
-            logger.info("Running Locally")
-            logger.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
-            logger.info(f"Output Path: {final_conv_stored_loc}")
+            LOGGER.info("Running Locally")
+            LOGGER.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
+            LOGGER.info(f"Output Path: {final_conv_stored_loc}")
             audio_tools = AudioTools(working_dir=op_tmp_dir)
             conv_path_obj = await asyncio.to_thread(
                 audio_tools.to_mp4,
@@ -215,38 +259,45 @@ async def convert_to_mp4(
             )
 
         if not conv_path_obj or not final_conv_stored_loc.exists():
-            logger.error(f"MP4 conversion failed for {tmp_uploaded_vid_loc}")
+            LOGGER.error(f"MP4 conversion failed for {tmp_uploaded_vid_loc}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Video conversion to MP4 failed.",
             )
-        logger.info(f"Video converted to {final_conv_stored_loc}")
+        LOGGER.info(f"Video converted to {final_conv_stored_loc}")
 
-        # 5. Save metadata for converted files to DB
+        # 3. Save metadata for converted files to DB
         db = await get_db()
         conv_rec_id = str(uuid.uuid4())
 
-        ins_conv_q = profile_files.insert().values(
-            id=conv_rec_id,
-            profile_id=profile_id,
-            file_name=conv_stored_fname,
-            file_path=str(rel_conv_db_path),
-            file_type="mp4",
-        )
+        ins_conv_q = (
+            profile_files
+            .insert()
+            .values(
+                id=conv_rec_id,
+                profile_id=profile_id,
+                file_name=conv_stored_fname,
+                file_path=str(rel_conv_db_path),
+                file_type="mp4"
+                )
+            )
         await db.execute(ins_conv_q)
-        logger.info(
+        LOGGER.info(
             f"Converted video records saved for profile:{profile_id}"
         )
 
-        # 6. Construct URL for frontend
+        # 4. Construct URL for frontend
         converted_video_url = f"/media/{str(rel_conv_db_path)}"
 
-        return {"converted_video_url": converted_video_url}
+        return {
+            "converted_video_url": converted_video_url
+            }
 
     except HTTPException:
+        # Propagate Exceptions
         raise
     except Exception as e:
-        logger.exception(
+        LOGGER.exception(
             f"Error converting {video_file.filename} for profile {profile_id}"
         )
         # Attempt to clean up partially created files
@@ -255,16 +306,16 @@ async def convert_to_mp4(
                 try:
                     loc.unlink()
                 except OSError:
-                    logger.error(f"Could not remove {loc}")
+                    LOGGER.error(f"Could not remove {loc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during video conversion: {str(e)}",
         )
     finally:
-        # 7. Clean up temp operation directory
+        # 5. Clean up temp operation directory
         if op_tmp_dir.exists():
             try:
                 shutil.rmtree(op_tmp_dir)
-                logger.info(f"Cleaned temp dir: {op_tmp_dir}")
+                LOGGER.info(f"Cleaned temp dir: {op_tmp_dir}")
             except OSError as e_os:
-                logger.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
+                LOGGER.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
