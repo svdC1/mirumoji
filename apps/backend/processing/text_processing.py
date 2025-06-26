@@ -9,7 +9,7 @@ Attributes:
 import fugashi
 from typing import List, Dict, Optional
 from kotobase import Kotobase
-from kotobase.core.datatypes import (JMDictEntryDTO, JMNeDictEntryDTO)
+from kotobase.core.datatypes import (JMDictEntryDTO)
 from processing.gpt_wrapper import GptModel
 from functools import lru_cache
 from models.FocusInfo import FocusInfo
@@ -56,7 +56,7 @@ In your response:
         if "from_dotenv" not in gpt_model_kwargs.keys():
             gpt_model_kwargs['from_dotenv'] = True
         if "max_context" not in gpt_model_kwargs.keys():
-            gpt_model_kwargs["max_content"] = 100000
+            gpt_model_kwargs["max_context"] = 100000
 
         self.model_kwargs = gpt_model_kwargs
 
@@ -179,7 +179,7 @@ def _query_kotobase(word: str) -> Dict:
     """
     l_result = Kotobase().lookup(word=word,
                                  wildcard=False,
-                                 include_names=True,
+                                 include_names=False,
                                  sentence_limit=5
                                  )
     jlpt = (
@@ -189,18 +189,20 @@ def _query_kotobase(word: str) -> Dict:
         [st.text for st in l_result.examples] if l_result.examples else []
         )
     if l_result.entries:
-        # Get first entry
-        entry = l_result.entries[0]
-        if isinstance(entry, JMDictEntryDTO):
-            meanings = (
+        meanings = []
+        reading = []
+        for entry in l_result.entries:
+            if isinstance(entry, JMDictEntryDTO):
+                g_lst = (
                     [s["gloss"] for s in entry.senses] if entry.senses else []
                     )
-            # Split meanings
-            meanings = [m for a in meanings for m in a.split(",")]
-            reading = (",".join(entry.kana) if entry.kana else "")
-        elif isinstance(entry, JMNeDictEntryDTO):
-            meanings = ([g for g in entry.gloss] if entry.gloss else [])
-            reading = (','.join([k for k in entry.kana]) if entry.kana else "")
+                # Split meanings
+                [meanings.append(m) for a in g_lst for m in a.split(",")
+                 if g_lst]
+                if entry.kana:
+                    [reading.append(k) for k in entry.kana]
+        meanings = meanings if meanings else []
+        reading = ",".join(reading) if reading else ""
     else:
         meanings = []
         reading = ""
@@ -297,7 +299,6 @@ class SentenceBreakdownService:
                 "jlpt": lu["jlpt"],
                 "examples": lu["examples"]
             } for tok, lu in zip(tokens, lookups)]
-
         return e_tokens
 
     def explain(self,
@@ -321,6 +322,7 @@ class SentenceBreakdownService:
             f_lemma = focus or ""
             try:
                 info = _query_kotobase(word=f_lemma)
+                info["reading"] = self.tokenize(f_lemma)[0]["kana"]
                 focus_data = FocusInfo(word=f_lemma,
                                        reading=info["reading"],
                                        meanings=info["meanings"],
