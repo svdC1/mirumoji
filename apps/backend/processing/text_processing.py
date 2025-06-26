@@ -9,7 +9,7 @@ Attributes:
 import fugashi
 from typing import List, Dict, Optional
 from kotobase import Kotobase
-from kotobase.core.datatypes import (JMDictEntryDTO)
+from kotobase.core.datatypes import (JMDictEntryDTO, JMNeDictEntryDTO)
 from processing.gpt_wrapper import GptModel
 from functools import lru_cache
 from models.FocusInfo import FocusInfo
@@ -179,28 +179,28 @@ def _query_kotobase(word: str) -> Dict:
     """
     l_result = Kotobase().lookup(word=word,
                                  wildcard=False,
-                                 include_names=False,
+                                 include_names=True,
                                  sentence_limit=5
                                  )
     jlpt = (
-        f"N{l_result.jlpt_vocab.level}" if l_result.has_jlpt() else "Unknown"
+        f"N{l_result.jlpt_vocab.level}" if l_result.jlpt_vocab else "Unknown"
         )
     examples = (
         [st.text for st in l_result.examples] if l_result.examples else []
         )
     if l_result.entries:
-        meanings = []
-        reading = []
-        for entry in l_result.entries:
-            if isinstance(entry, JMDictEntryDTO):
-                meanings.append(
+        # Get first entry
+        entry = l_result.entries[0]
+        if isinstance(entry, JMDictEntryDTO):
+            meanings = (
                     [s["gloss"] for s in entry.senses] if entry.senses else []
                     )
-                reading.append(",".join(entry.kana) if entry.kana else "")
-        if meanings:
-            meanings = [m for m_lst in meanings for m in m_lst if m_lst]
-        if reading:
-            reading = ','.join(set(','.join(reading).split(",")))
+            # Split meanings
+            meanings = [m for a in meanings for m in a.split(",")]
+            reading = (",".join(entry.kana) if entry.kana else "")
+        elif isinstance(entry, JMNeDictEntryDTO):
+            meanings = ([g for g in entry.gloss] if entry.gloss else [])
+            reading = (','.join([k for k in entry.kana]) if entry.kana else "")
     else:
         meanings = []
         reading = ""
@@ -208,7 +208,7 @@ def _query_kotobase(word: str) -> Dict:
         examples = []
 
     return {
-        "entry": entry,
+        "result": l_result,
         "meanings": meanings,
         "reading": reading,
         "jlpt": jlpt,
@@ -244,7 +244,9 @@ class SentenceBreakdownService:
         # Check if Kotobase is available
         try:
             self.kb = Kotobase()
-            self.kb.lookup("試し", sentence_limit=1)
+            self.kb.lookup("試し",
+                           wildcard=False,
+                           sentence_limit=1)
         except Exception as e:
             LOGGER.exception("Failed to start kotobase.")
             raise e
@@ -263,6 +265,7 @@ class SentenceBreakdownService:
 
         return [{
             "surface": tok.surface,
+            "kana": tok.feature.kana,
             "pos": tok.feature.pos1,
             "lemma": tok.feature.lemma,
             "cType": tok.feature.cType,
@@ -288,7 +291,7 @@ class SentenceBreakdownService:
         e_tokens = [{
                 "surface": tok["surface"],
                 "lemma": tok["lemma"],
-                "reading": lu["reading"],
+                "reading": tok["kana"],
                 "pos": tok["pos"],
                 "meanings": lu["meanings"],
                 "jlpt": lu["jlpt"],
