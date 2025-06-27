@@ -19,7 +19,6 @@ from fastapi import (APIRouter,
                      status
                      )
 from processing.audio_processing import AudioTools
-from processing.text_processing import GptExplainService
 from profile_manager import ensure_profile_exists
 from db.db import get_db
 from db.Tables import (profile_transcripts,
@@ -163,7 +162,9 @@ async def transcribe_from_audio(
                 gpt_explanation_text = "Transcript content empty,\
                     no explanation."
             else:
-                gpt_explainer = GptExplainService()
+                gpt_explainer = (
+                    processor.sentence_breakdown_service.gpt_explainer
+                    )
                 try:
                     LOGGER.info(f"Generating GPT \
                         explanation (Profile: {profile_id})")
