@@ -7,8 +7,15 @@ import { Copy, Check, Bookmark } from "lucide-react";
 import { apiFetch, ApiError } from "../utils/api";
 import { toast } from "react-hot-toast";
 import { toastApiError } from "../utils/error_toaster";
-import { lookupDict, DictEntry } from "../utils/dict";
+import {
+    apiWordQuery,
+    DictLookup,
+    JMEntry,
+    JMNEntry,
+    KanjiInfo,
+} from "../utils/dict_api";
 import { GptTemplate, SaveClipResponse } from "../types";
+
 interface Props {
     sentence: string;
     word: string;
@@ -33,9 +40,12 @@ export default function WordDialog({
     const key = `${sentence}__${word}`;
     const [data, setData] = useState<any | null>(gptCache.get(key) ?? null);
     const [tab, setTab] = useState<"gpt" | "dict">("dict");
+    const [dictTab, setDictTab] = useState<"jmdict" | "jmnedict" | "kanji">(
+        "jmdict"
+    );
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [dictEntry, setDictEntry] = useState<DictEntry | null | undefined>(
+    const [dictData, setDictData] = useState<DictLookup | null | undefined>(
         undefined
     );
 
@@ -133,16 +143,31 @@ export default function WordDialog({
 
     useEffect(() => {
         if (tab !== "dict") return;
-        setDictEntry(undefined);
-        lookupDict(word)
-            .then((entry) => setDictEntry(entry))
+        setDictData(undefined);
+        apiWordQuery(word)
+            .then((entry) => {
+                if (entry) {
+                    entry.kanji = entry.kanji.filter(
+                        (k) => k.stroke_count !== 99
+                    );
+                }
+                setDictData(entry);
+                if (entry?.jmentries.length === 0) {
+                    if (entry?.jmnentries.length > 0) {
+                        setDictTab("jmnedict");
+                    } else if (entry?.kanji.length > 0) {
+                        setDictTab("kanji");
+                    }
+                }
+            })
             .catch((e) => {
-                console.error("lookupDict error", e);
-                setDictEntry(null);
+                console.error("apiWordQuery error", e);
+                setDictData(null);
             });
     }, [tab, word]);
 
     const handleCopy = () => {
+        // This function will need to be updated to handle the new dictData structure
         let textToCopy = "";
         if (tab === "gpt" && data) {
             textToCopy = [
@@ -152,13 +177,10 @@ export default function WordDialog({
                 "",
                 data.gpt_explanation,
             ].join("\n");
-        } else if (tab === "dict" && dictEntry) {
-            textToCopy = [
-                word,
-                ...(dictEntry.readings ?? []),
-                "",
-                ...dictEntry.meanings,
-            ].join("\n");
+        } else if (tab === "dict" && dictData) {
+            // Simplified for now, can be expanded
+            textToCopy = `${word}
+${dictData.meanings.join(", ")}`;
         }
         if (textToCopy) {
             navigator.clipboard.writeText(textToCopy).then(() => {
@@ -401,13 +423,110 @@ export default function WordDialog({
         }
     };
 
-    const dictMarkdown =
-        dictEntry &&
-        `**Readings:**  \n${dictEntry.readings.join(
-            "、"
-        )}\n\n**Meanings:**  \n${dictEntry.meanings
-            .map((m, i) => `${i + 1}. ${m}`)
-            .join("  \n")}`.trim();
+    const JmdictEntryDisplay = ({
+        entry,
+        isLast,
+    }: {
+        entry: JMEntry;
+        isLast: boolean;
+    }) => (
+        <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
+            <div className="flex items-center">
+                <h3 className="text-lg font-bold mr-2">
+                    {entry.kanji.join("、")}
+                </h3>
+                <p className="text-md text-neutral-300">
+                    {entry.kana.join("、")}
+                </p>
+            </div>
+            {entry.senses.map((sense, i) => (
+                <div key={i} className="ml-4 mt-1">
+                    <p className="text-neutral-400 text-sm">({sense.pos})</p>
+                    <p>
+                        <span className="text-neutral-400">{i + 1}.</span>{" "}
+                        {sense.gloss}
+                    </p>
+                </div>
+            ))}
+        </div>
+    );
+
+    const JmnedictEntryDisplay = ({
+        entry,
+        isLast,
+    }: {
+        entry: JMNEntry;
+        isLast: boolean;
+    }) => (
+        <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
+            <div className="flex items-center">
+                <h3 className="text-lg font-bold mr-2">
+                    {entry.kanji.join("、")}
+                </h3>
+                <p className="text-md text-neutral-300">
+                    {entry.kana.join("、")}
+                </p>
+            </div>
+            <p className="text-neutral-400 text-sm">
+                ({entry.translation_type})
+            </p>
+            <p>{entry.gloss.join("; ")}</p>
+        </div>
+    );
+
+    const KanjiInfoDisplay = ({
+        kanjiInfo,
+        isLast,
+    }: {
+        kanjiInfo: KanjiInfo;
+        isLast: boolean;
+    }) => (
+        <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
+            <h3 className="text-xl font-bold">{kanjiInfo.literal}</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm mt-1">
+                <p>
+                    <span className="font-semibold text-neutral-400">
+                        Strokes:
+                    </span>{" "}
+                    {kanjiInfo.stroke_count}
+                </p>
+                <p>
+                    <span className="font-semibold text-neutral-400">
+                        Grade:
+                    </span>{" "}
+                    {kanjiInfo.grade || "N/A"}
+                </p>
+                <p>
+                    <span className="font-semibold text-neutral-400">
+                        JLPT:
+                    </span>{" "}
+                    {kanjiInfo.jlpt_tanos || "N/A"}
+                </p>
+                <div className="col-span-2">
+                    <p>
+                        <span className="font-semibold text-neutral-400">
+                            On'yomi:
+                        </span>{" "}
+                        {kanjiInfo.onyomi.join("、")}
+                    </p>
+                    <p>
+                        <span className="font-semibold text-neutral-400">
+                            Kun'yomi:
+                        </span>{" "}
+                        {kanjiInfo.kunyomi.join("、")}
+                    </p>
+                </div>
+                <div className="col-span-2">
+                    <p>
+                        <span className="font-semibold text-neutral-400">
+                            Meanings:
+                        </span>{" "}
+                        {kanjiInfo.meanings.join(", ")}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 pointer-events-none p-4">
@@ -530,22 +649,91 @@ export default function WordDialog({
                                 </ReactMarkdown>
                             </>
                         )
-                    ) : dictEntry === undefined ? (
+                    ) : dictData === undefined ? (
                         <p className="text-neutral-400">Loading dictionary…</p>
-                    ) : dictEntry === null ? (
+                    ) : dictData === null ? (
                         <p className="italic text-neutral-400">
                             No dictionary entry found for "{word}".
                         </p>
                     ) : (
-                        <div
-                            className="prose prose-sm sm:prose-base prose-invert max-w-none"
-                            style={{ whiteSpace: "pre-wrap" }}
-                        >
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
-                            >
-                                {dictMarkdown}
-                            </ReactMarkdown>
+                        <div>
+                            <div className="flex border-b border-neutral-700 mb-2">
+                                {dictData.jmentries.length > 0 && (
+                                    <button
+                                        className={`flex-1 py-2 text-sm ${
+                                            dictTab === "jmdict"
+                                                ? "border-b-2 border-teal-400 text-white"
+                                                : "text-neutral-400 hover:text-neutral-200"
+                                        }`}
+                                        onClick={() => setDictTab("jmdict")}
+                                    >
+                                        Common
+                                    </button>
+                                )}
+                                {dictData.jmnentries.length > 0 && (
+                                    <button
+                                        className={`flex-1 py-2 text-sm ${
+                                            dictTab === "jmnedict"
+                                                ? "border-b-2 border-teal-400 text-white"
+                                                : "text-neutral-400 hover:text-neutral-200"
+                                        }`}
+                                        onClick={() => setDictTab("jmnedict")}
+                                    >
+                                        Proper Nouns
+                                    </button>
+                                )}
+                                {dictData.kanji.length > 0 && (
+                                    <button
+                                        className={`flex-1 py-2 text-sm ${
+                                            dictTab === "kanji"
+                                                ? "border-b-2 border-teal-400 text-white"
+                                                : "text-neutral-400 hover:text-neutral-200"
+                                        }`}
+                                        onClick={() => setDictTab("kanji")}
+                                    >
+                                        Kanji
+                                    </button>
+                                )}
+                            </div>
+                            {dictTab === "jmdict" ? (
+                                <div>
+                                    {dictData.jmentries.map((entry, i) => (
+                                        <JmdictEntryDisplay
+                                            key={i}
+                                            entry={entry}
+                                            isLast={
+                                                i ===
+                                                dictData.jmentries.length - 1
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            ) : dictTab === "jmnedict" ? (
+                                <div>
+                                    {dictData.jmnentries.map((entry, i) => (
+                                        <JmnedictEntryDisplay
+                                            key={i}
+                                            entry={entry}
+                                            isLast={
+                                                i ===
+                                                dictData.jmnentries.length - 1
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div>
+                                    {dictData.kanji.map((kanji, i) => (
+                                        <KanjiInfoDisplay
+                                            key={i}
+                                            kanjiInfo={kanji}
+                                            isLast={
+                                                i === dictData.kanji.length - 1
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
