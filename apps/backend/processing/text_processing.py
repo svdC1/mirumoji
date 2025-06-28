@@ -9,11 +9,18 @@ Attributes:
 import fugashi
 from typing import List, Dict, Optional
 from kotobase import Kotobase
-from kotobase.core.datatypes import (JMDictEntryDTO, JMNeDictEntryDTO)
+from kotobase.core.datatypes import (JMDictEntryDTO,
+                                     JMNeDictEntryDTO,
+                                     LookupResult)
 from processing.gpt_wrapper import GptModel
 from functools import lru_cache
 from models.FocusInfo import FocusInfo
 from models.Token import Token
+from models.DictLookup import DictLookup
+from models.KanjiInfo import KanjiInfo
+from models.WordSense import WordSense
+from models.JMEntry import JMEntry
+from models.JMNEntry import JMNEntry
 import logging
 
 LOGGER = logging.getLogger(__name__)
@@ -298,6 +305,116 @@ class SentenceBreakdownService:
                 "examples": lu["examples"]
             } for tok, lu in zip(tokens, lookups)]
         return e_tokens
+
+    def single_word_lookup(self, word: str) -> DictLookup:
+        """
+        Perform a kotobase search for a specific word and
+        return results formatted into a pydantic model
+
+        Args:
+          word (str): The word to lookup
+
+        Returns:
+          DictLookup: Pydantic model containing kotobase info
+
+        """
+        result: LookupResult
+        result = _query_kotobase(word=word)["result"]
+        default_sense = [WordSense(order=99, pos="", gloss="")]
+        default_jmentry = JMEntry(rank=99,
+                                  kana=[],
+                                  kanji=[],
+                                  senses=default_sense
+                                  )
+        default_jmnentry = JMNEntry(kana=[],
+                                    kanji=[],
+                                    translation_type="",
+                                    gloss=[]
+                                    )
+        default_kanjiinfo = KanjiInfo(
+                    literal="",
+                    grade=None,
+                    stroke_count=99,
+                    meanings=[],
+                    onyomi=[],
+                    kunyomi=[],
+                    jlpt_kanjidic=None,
+                    jlpt_tanos=None
+                    )
+        jmentries = []
+        jmnentries = []
+        kanji_lst = []
+        jlpt = (
+            f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else "Unknown"
+            )
+        examples = [i.text for i in result.examples] if result.examples else []
+        # Build Entries
+        if result.entries:
+            # Build Meanings
+            f_entry = result.entries[0]
+            if isinstance(f_entry, JMDictEntryDTO):
+                meanings = [s["gloss"] for s in f_entry.senses]
+            elif isinstance(f_entry, JMNeDictEntryDTO):
+                meanings = f_entry.gloss
+            for entry in result.entries:
+                if isinstance(entry, JMDictEntryDTO):
+                    # Senses
+                    if entry.senses:
+                        jm_senses = [WordSense(order=sense["order"],
+                                               pos=sense["pos"],
+                                               gloss=sense["gloss"]
+                                               ) for sense in entry.senses
+                                     ]
+                    else:
+                        jm_senses = [WordSense(order=99, pos="", gloss="")]
+                    # Other Fields
+                    jm_kana = entry.kana
+                    jm_kanji = entry.kanji
+                    jm_rank = entry.rank
+                    jmentries.append(JMEntry(rank=jm_rank,
+                                             kana=jm_kana,
+                                             kanji=jm_kanji,
+                                             senses=jm_senses
+                                             ))
+                elif isinstance(entry, JMNeDictEntryDTO):
+                    jmne_kana = entry.kana
+                    jmne_kanji = entry.kanji
+                    jmne_tt = entry.translation_type
+                    jmne_gloss = entry.gloss
+                    jmnentries.append(JMNEntry(
+                        kana=jmne_kana,
+                        kanji=jmne_kanji,
+                        translation_type=jmne_tt,
+                        gloss=jmne_gloss))
+        else:
+            jmentries.append(default_jmentry)
+            jmnentries.append(default_jmnentry)
+            meanings = []
+        # Build KanjiInfo
+        if result.kanji:
+            for k in result.kanji:
+                kanji_lst.append(KanjiInfo(
+                    literal=k.literal,
+                    grade=k.grade,
+                    stroke_count=k.stroke_count,
+                    meanings=k.meanings,
+                    onyomi=k.onyomi,
+                    kunyomi=k.kunyomi,
+                    jlpt_kanjidic=k.jlpt_kanjidic,
+                    jlpt_tanos=k.jlpt_tanos))
+        else:
+            kanji_lst.append(default_kanjiinfo)
+
+        # Build Final Model
+        return DictLookup(
+            word=word,
+            jmentries=jmentries,
+            jmnentries=jmnentries,
+            kanji=kanji_lst,
+            meanings=meanings,
+            jlpt=jlpt,
+            examples=examples
+            )
 
     def explain(self,
                 sentence: str,
