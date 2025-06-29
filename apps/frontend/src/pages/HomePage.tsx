@@ -1,4 +1,14 @@
 import { Link } from "react-router-dom";
+const GitHubIcon = () => (
+    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+        <path
+            fillRule="evenodd"
+            d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.165 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.031-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.82c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.378.203 2.397.1 2.65.64.7 1.03 1.595 1.03 2.688 0 3.848-2.338 4.695-4.566 4.942.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.577.688.482A10.001 10.001 0 0022 12c0-5.523-4.477-10-10-10z"
+            clipRule="evenodd"
+        />
+    </svg>
+);
+
 const ChevronRightIcon = () => (
     <svg
         className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform"
@@ -149,19 +159,27 @@ export default function HomePage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 text-gray-100 font-sans antialiased">
+            <header className="absolute top-0 left-0 p-4">
+                <a
+                    href="https://github.com/svdC1/mirumoji"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                    <GitHubIcon />
+                    GitHub Repo
+                </a>
+            </header>
             <main className="pt-8">
                 {/* Hero Section */}
                 <section className="text-center py-20 md:py-32 px-6">
                     <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 leading-tight text-white">
-                        Master Japanese with{" "}
-                        <span className="text-indigo-400">
-                            Interactive Video
-                        </span>
+                        Immerse in Japanese with{" "}
+                        <span className="text-indigo-400">Mirumoji</span>
                     </h1>
                     <p className="max-w-2xl mx-auto text-lg sm:text-xl md:text-2xl text-gray-300 mb-10">
                         Mirumoji uses AI to turn your favorite content into
-                        immersive Japanese lessons. Click words, understand
-                        grammar, learn effectively.
+                        immersive Japanese lessons.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-5">
                         <Link
@@ -186,7 +204,7 @@ export default function HomePage() {
                 >
                     <div className="max-w-7xl mx-auto">
                         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-16 md:mb-20 text-white">
-                            Your Immersion Toolkit
+                            Immersion Toolkit
                         </h2>
                         <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
                             {featureList.map((feature) => (
@@ -216,8 +234,14 @@ export default function HomePage() {
                 {/* Footer */}
                 <footer className="text-center py-16 border-t border-slate-700/50">
                     <p className="text-gray-500 text-sm">
-                        © {new Date().getFullYear()} Mirumoji. MIT LICENSE.
+                        © {new Date().getFullYear()} svdC1
                     </p>
+                    <a
+                        className="text-blue-500 text-sm"
+                        href="https://github.com/svdC1/mirumoji/blob/main/LICENSE"
+                    >
+                        MIT LICENSE
+                    </a>
                 </footer>
             </main>
         </div>
