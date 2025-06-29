@@ -30,7 +30,7 @@ jobs:
                   node-version: 22
 
             - name: Install dependencies
-              run: cd ./apps/frontend && npm ci
+              run: cd ./apps/frontend && npm i
 
             - name: Build for GitHub Pages
               run: cd ./apps/frontend && npx vite build --base "/${{ github.event.repository.name }}/"
