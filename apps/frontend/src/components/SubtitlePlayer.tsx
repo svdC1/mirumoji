@@ -4,6 +4,7 @@ import { getTokenizer } from "../tokenizer";
 import WordDialog from "./WordDialog";
 import { isKanji, toHiragana } from "../utils/languageUtils";
 import { IpadicFeatures } from "kuromoji";
+import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 
 interface Cue {
     start: number;
@@ -25,6 +26,14 @@ const toSec = (t: string): number => {
     return +h * 3600 + +m * 60 + +s + +ms / 1000;
 };
 
+// Helper function to convert hex to rgba
+const hexToRgba = (hex: string, alpha: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export default function SubtitlePlayer({
     video,
     srt,
@@ -43,6 +52,8 @@ export default function SubtitlePlayer({
         cueStart: number;
         cueEnd: number;
     } | null>(null);
+
+    const { subtitleStyle } = useSubtitleSettings();
 
     useEffect(() => {
         if (videoUrl) {
@@ -120,6 +131,19 @@ export default function SubtitlePlayer({
         return () => v.removeEventListener("timeupdate", onTime);
     }, [cues]);
 
+    const activeCue = activeIdx !== null ? cues[activeIdx] : null;
+
+    const computedSubtitleStyle: React.CSSProperties = {
+        color: subtitleStyle.fontColor,
+        fontSize: `${subtitleStyle.fontSize}px`,
+        backgroundColor: hexToRgba(
+            subtitleStyle.backgroundColor,
+            subtitleStyle.backgroundOpacity
+        ),
+        textShadow: subtitleStyle.textShadow,
+        bottom: `${subtitleStyle.position}%`,
+    };
+
     return (
         <div className="relative w-full flex flex-col items-center">
             <video
@@ -133,10 +157,16 @@ export default function SubtitlePlayer({
                 className="w-full max-h-[92vh] bg-black rounded-xl overflow-hidden"
             />
 
-            {activeIdx !== null && cues[activeIdx] && (
-                <div className="absolute bottom-4 w-full px-2 text-center pointer-events-none">
-                    <span className="inline-block mx-auto bg-black/60 px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 rounded-lg pointer-events-auto font-semibold shadow-xl max-w-[95%] break-words text-xl sm:text-2xl md:text-3xl lg:text-4xl">
-                        {cues[activeIdx].tokens.map((token, i) => {
+            {activeCue && (
+                <div
+                    className="absolute w-full px-2 text-center pointer-events-none"
+                    style={{ bottom: `${subtitleStyle.position}%` }}
+                >
+                    <span
+                        className="inline-block mx-auto px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 rounded-lg pointer-events-auto font-semibold shadow-xl max-w-[95%] break-words"
+                        style={computedSubtitleStyle}
+                    >
+                        {activeCue.tokens.map((token, i) => {
                             const shouldDisplayFurigana =
                                 showFurigana &&
                                 token.reading &&
@@ -151,15 +181,12 @@ export default function SubtitlePlayer({
                                     key={i}
                                     className="inline-flex flex-col items-center mx-1 group align-bottom hover:text-yellow-300"
                                     onClick={() => {
-                                        const currentCue = cues[activeIdx];
-                                        if (currentCue) {
-                                            setDialog({
-                                                sentence: currentCue.raw,
-                                                word: token.surface_form,
-                                                cueStart: currentCue.start,
-                                                cueEnd: currentCue.end,
-                                            });
-                                        }
+                                        setDialog({
+                                            sentence: activeCue.raw,
+                                            word: token.surface_form,
+                                            cueStart: activeCue.start,
+                                            cueEnd: activeCue.end,
+                                        });
                                     }}
                                 >
                                     {shouldDisplayFurigana && furiganaText && (

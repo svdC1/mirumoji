@@ -20,7 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     mecab \
     libmecab-dev \
-    mecab-ipadic-utf8 \
     python3.11 \
     python3.11-dev \
     python3.11-venv \
@@ -35,7 +34,7 @@ RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  
 RUN python3.11 -m pip install --upgrade pip
 
 # Install PyTorch with CUDA support
-# Specify index URL for CUDA 12.1 compatible wheels, suitable for CUDA 12.3 base image.
+# Specify index URL for CUDA 12.4 compatible wheels, suitable for CUDA 12.3 base image.
 RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
 # Install Helpers
@@ -43,19 +42,13 @@ RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0
 RUN python3.11 -m pip install huggingface_hub \
     requests sentencepiece
 
-# Download jamdict.db
-RUN mkdir -p /root/.jamdict/data && \
-    wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1QZRzOoMF4CGlkdl0FyU7ledAZLRlpoom' \
-    -O /tmp/jamdict.db.xz && \
-    unxz /tmp/jamdict.db.xz && \
-    mv /tmp/jamdict.db /root/.jamdict/data/jamdict.db
-
 # Copy requirements.txt and install all dependencies
 COPY requirements.txt .
 RUN python3.11 -m pip install -r requirements.txt
 
-# Download UniDic Dictionary
+# Download UniDic Dictionary and Kotobase DB
 RUN python3.11 -m unidic download
+RUN kotobase pull-db
 
 # Pre-cache the Faster-Whisper model (from modal Dockerfile)
 RUN python3.11 -c "from huggingface_hub import snapshot_download; \

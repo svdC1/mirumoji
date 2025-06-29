@@ -1,5 +1,15 @@
+"""
+This module defines helper functions for handling streaming responses
+for fastapi's endpoints.
+
+Attributes:
+  LOGGER (logging.Logger): Module's logger object.
+"""
+
 from typing import (Union,
-                    Iterator)
+                    Iterator,
+                    Generator,
+                    Any)
 from processing.gpt_wrapper import GptModel
 import logging
 from pathlib import Path
@@ -8,14 +18,25 @@ from fastapi import HTTPException
 from typing import Callable
 from fastapi.responses import StreamingResponse
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
-def generate_reply(version: str,
-                   sys_msg: str,
-                   prompt: str) -> Union[Iterator[str],
-                                         None]:
-    """Core streaming logic, yields chunks of text."""
+def _generate_reply(version: str,
+                    sys_msg: str,
+                    prompt: str
+                    ) -> Union[Iterator[str],
+                               None]:
+    """
+    Stream reply from a `GptModel` object OpenAI API call.
+
+    Args:
+      version (str): The OpenAI GPT model version to use.
+      sys_msg (str): The system message to use for the model.
+      prompt (str): User prompt for the model.
+
+    Yields:
+      Iterator[str]: The text chunks from the reply.
+    """
     try:
         model = GptModel(
                 version=version,
@@ -23,19 +44,31 @@ def generate_reply(version: str,
         for chunk in model.stream_request(prompt):
             yield chunk
     except Exception as e:
-        logger.error(str(e))
+        LOGGER.error(str(e))
         return None
 
 
 def sse_gen(version: str,
             system_message: str,
-            prompt: str):
-    reply = generate_reply(version,
-                           system_message,
-                           prompt)
+            prompt: str
+            ) -> Generator[str, Any, None]:
+    """
+    Stream reply from a `GptModel` object OpenAI API call.
+
+    Args:
+      version (str): The OpenAI GPT model version to use.
+      system_message (str): The system message to use for the model.
+      prompt (str): User prompt for the model.
+
+    Yields:
+      str: The text chunks from the reply.
+    """
+    reply = _generate_reply(version,
+                            system_message,
+                            prompt)
 
     if not reply:
-        logger.error("Failed to generate stream")
+        LOGGER.error("Failed to generate stream")
         raise HTTPException(400, "Failed to generate stream")
     for chunk in reply:
         yield f"data: {chunk}\n\n"
@@ -50,25 +83,28 @@ def stream_response_with_task(
     keepalive_interval: float = 20.0
 ) -> StreamingResponse:
     """
-    Streams a long‐running task’s output file over HTTP without timing out.
-    1) Runs task_func() in a background thread.
-    2) Yields a single space every `keepalive_interval` seconds to
-    keep proxies alive.
-    3) Once the task is done, streams the file at `path` in 8k chunks.
+    Streams a long‐running task’s output file over HTTP without timing out
+    by running `task_func` in a background thread while yielding a space
+    every `keepalive_interval` seconds to keep proxies alive.
+    Args:
+      path (pathlib.Path): The path to the function's resulting file.
+      task_func (Callable[[], None]): The function which generates the file.
+      filename (str): Filename to pass to response header.
+      media_type (str, optional): Optional media type to pass to response
+                                  header.
+      keepalive_interval (float): Interval between spaces yielded in seconds.
+
+    Returns:
+      StreamingReponse: Once the task is done, streams the file at `path` in 8k
+                        chunks.
     """
     async def _generator():
-        # 1) launch the blocking work
         task = asyncio.create_task(asyncio.to_thread(task_func))
-
-        # 2) keep the connection alive until task completes
         while not task.done():
             await asyncio.sleep(keepalive_interval)
             yield b" "
-
-        # 3) propagate any exception from the task
         await task
 
-        # 4) stream the real file
         with path.open("rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 yield chunk

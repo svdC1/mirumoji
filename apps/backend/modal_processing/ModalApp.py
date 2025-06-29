@@ -1,14 +1,25 @@
+"""
+This module defines the modal integration and the code to be run
+in Modal's container.
+
+Attributes:
+  LOGGER (logging.Logger): Module's logging object.
+  MODAL_IMAGE (str): Docker Repository URL for pre-built Image.
+  GPU (str): Which Modal GPU to use from environment variable, defaults to A10G
+"""
+
 from typing import Union, Generator
 import modal
+import os
 import logging
-from processing.whisper_wrapper import FWhisperWrapper
-from processing.audio_processing import AudioTools
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-logger = logging.getLogger(__name__)
-
+LOGGER = logging.getLogger(__name__)
+MODAL_IMAGE = os.getenv("MODAL_IMAGE",
+                        "docker.io/svdc1/mirumoji-modal-gpu:latest")
+MODAL_GPU = os.getenv("MODAL_GPU", "A10G")
 # --- Modal Setup ---
 script_dir = Path(__file__).resolve().parent
 project_root_dir = script_dir.parent
@@ -16,14 +27,14 @@ media_files_path = project_root_dir / "media_files"
 media_files_path.mkdir(parents=True,
                        exist_ok=True)
 
-logger.info(f"Config Image + Mount {media_files_path} at /root/media_files")
+LOGGER.info(f"Config Image + Mount {media_files_path} at /root/media_files")
 # Build media_files on modal container startup
-mirumoji_image = modal.Image.from_registry(
-    "docker.io/svdc1/mirumoji-modal-gpu:latest"
-).add_local_dir(media_files_path,
-                remote_path="/root/media_files")
+mirumoji_image = (modal.Image.from_registry(MODAL_IMAGE)
+                  .add_local_dir(media_files_path,
+                                 remote_path="/root/media_files")
+                  )
 
-logger.info("Configured.")
+LOGGER.info("Configured.")
 
 app = modal.App(
     "mirumoji-gpu",
@@ -33,7 +44,7 @@ app = modal.App(
 
 
 @app.function(
-    gpu="A10G",
+    gpu=MODAL_GPU,
     timeout=600,
     include_source=True
 )
@@ -43,14 +54,22 @@ def transcribe_srt_job(OPENAI_API_KEY: str,
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
     and returns SRT string.
+
+    Args:
+      OPENAI_API_KEY (str): OpenAI API key for fixing transcription.
+      media_fp (Union[str, Path]): Path to the video for transcription.
+
+    Returns:
+      str: Transcription in form of SRT string.
     """
+    from processing.whisper_wrapper import FWhisperWrapper
 
     logging.basicConfig(level=logging.INFO,
                         style="{",
                         format="{levelname}-{name}-{message}"
                         )
 
-    logger.info(f"transcribe_srt_job started for media: {media_fp}")
+    LOGGER.info(f"transcribe_srt_job started for media: {media_fp}")
     try:
         fwhisper = FWhisperWrapper()
 
@@ -67,19 +86,19 @@ def transcribe_srt_job(OPENAI_API_KEY: str,
             )
 
         if srt_result_string:
-            logger.info(f"Generated SRT For: {media_fp}")
+            LOGGER.info(f"Generated SRT For: {media_fp}")
             return srt_result_string
         else:
-            logger.warning(f"SRT Transcription Failed For: {media_fp}")
+            LOGGER.warning(f"SRT Transcription Failed For: {media_fp}")
             return None
     except Exception as e:
-        logger.error(f"Error in transcribe_srt_job for {media_fp}: {e}",
+        LOGGER.error(f"Error in transcribe_srt_job for {media_fp}: {e}",
                      exc_info=True)
         return None
 
 
 @app.function(
-    gpu="A10G",
+    gpu=MODAL_GPU,
     timeout=600,
     include_source=True,
     is_generator=True
@@ -89,15 +108,22 @@ def video_conversion_job(video_fp: Union[str, Path],
     """
     Converts video_fp to MP4 using NVENC and returns the
     video content as bytes.
+
+    Args:
+      video_fp (Union[str, Path]): Path to the video for conversion.
+
+    Yields:
+      bytes: The converted video chunks.
     """
     logging.basicConfig(level=logging.INFO,
                         style="{",
                         format="{levelname}-{name}-{message}"
                         )
 
-    logger.info(f"video_conversion_job started for video: {video_fp}")
+    from processing.audio_processing import AudioTools
+    LOGGER.info(f"video_conversion_job started for video: {video_fp}")
     tmp_p = Path.cwd() / "tmp"
-    logger.info(f"Using temporary directory for video conversion: {tmp_p}")
+    LOGGER.info(f"Using temporary directory for video conversion: {tmp_p}")
 
     audio_tools = AudioTools(working_dir=tmp_p)
 
@@ -105,7 +131,7 @@ def video_conversion_job(video_fp: Union[str, Path],
     outp_local = tmp_p / f"{input_p.stem}_converted.mp4"
 
     try:
-        logger.info(f"Converting {video_fp} to {outp_local} using NVENC.")
+        LOGGER.info(f"Converting {video_fp} to {outp_local} using NVENC.")
         result_p = audio_tools.to_mp4(
             input_path=str(video_fp),
             output_path=str(outp_local),
@@ -113,9 +139,9 @@ def video_conversion_job(video_fp: Union[str, Path],
         )
 
         if result_p and result_p.exists() and result_p.stat().st_size > 0:
-            logger.info(f"Converted video to: {result_p}")
+            LOGGER.info(f"Converted video to: {result_p}")
             video_bytes = result_p.read_bytes()
-            logger.info(
+            LOGGER.info(
                 f"Returning {len(video_bytes)} bytes for converted video.")
             # Stream the converted file in chunks
             with open(result_p, "rb") as f:
@@ -124,25 +150,35 @@ def video_conversion_job(video_fp: Union[str, Path],
                     if not chunk:
                         break
                     yield chunk
-            logger.info(f"Finished streaming video bytes for: {result_p}")
+            LOGGER.info(f"Finished streaming video bytes for: {result_p}")
         else:
             e = f"Video conversion failed or produced an \
                 empty file for: {video_fp}"
-            logger.error(e)
+            LOGGER.error(e)
             raise Exception(e)
     except Exception as e:
-        logger.error(f"Error in video_conversion_job for {video_fp}: {e}",
+        LOGGER.error(f"Error in video_conversion_job for {video_fp}: {e}",
                      exc_info=True)
         raise e
 
 
 @app.function(
-    gpu="A10G",
+    gpu=MODAL_GPU,
     timeout=600,
     include_source=True
 )
 def transcribe_to_string_job(audio_fp: Union[str, Path],
                              ) -> Union[str, None]:
+    """
+    Transcribe audio to string using Faster Whisper.
+
+    Args:
+      audio_fp (Union[str, Path]): Path to the audio for transcription.
+
+    Returns:
+      str: Transcription in form of string.
+    """
+    from processing.whisper_wrapper import FWhisperWrapper
     logging.basicConfig(level=logging.INFO,
                         style="{",
                         format="{levelname}-{name}-{message}"

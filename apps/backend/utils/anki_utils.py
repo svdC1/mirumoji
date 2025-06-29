@@ -1,10 +1,21 @@
+"""
+This module defines the `AnkiExporter` class for creating an
+Anki deck from the user's saved clips using `genanki`
+
+Attributes:
+  LOGGER (logging.Logger): Module's logger.
+  VIDEO_CSS (str): Pre-defined CSS of the cards
+  CARD_TEMPLATE (list): Pre-defined template of the cards for `genanki`
+  MODEL_FIELDS (list): Pre-defined card model fields.
+  MODEL_NAME (str): Pre-defined standard deck name.
+"""
 import genanki
 import hashlib
 from typing import List, Optional
 from pathlib import Path
 import logging
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 VIDEO_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;\
@@ -81,14 +92,23 @@ MODEL_NAME = "Mirumoji-Anki-V1"
 
 class AnkiExporter:
     """
-    Helper class to export saved passages as Anki Cards.
+    Exports saved clips as an Anki Deck.
+
+    Args:
+      model_name (str, optional): Model name for genanki
+      deck_name (str, optional): Deck name for genanki
+      model_fields (list, optional): Model fields for genanki
+      css (str, optional): Card CSS for genanki
+      card_template (list, optional): Card template for genanki.
+
     """
     def __init__(self,
                  model_name: Optional[str] = MODEL_NAME,
                  deck_name:  Optional[str] = MODEL_NAME + " Deck",
                  model_fields: Optional[List] = MODEL_FIELDS,
                  css: Optional[str] = VIDEO_CSS,
-                 card_template: Optional[List] = CARD_TEMPLATE):
+                 card_template: Optional[List] = CARD_TEMPLATE
+                 ) -> None:
 
         self.model_name = model_name
         self.model_id = __class__.id_from_string(model_name)
@@ -109,9 +129,15 @@ class AnkiExporter:
             type="video/webm"/></video>'
 
     @staticmethod
-    def id_from_string(s: str):
+    def id_from_string(s: str) -> int:
         """
         Create a unique anki deck ID from string
+
+        Args:
+          s (str): String to create ID from
+
+        Returns:
+          int: ID generated using hashlib.
         """
         return int.from_bytes(hashlib.sha1(s.encode()).digest()[:4], 'big')
 
@@ -124,8 +150,15 @@ class AnkiExporter:
                  tags: Optional[List[str]] = None
                  ) -> None:
         """
-        Add one note/card to the deck.
-        clip_path will be bundled as media
+        Add one card to the deck, `clip_path` will be bundled as media.
+
+        Args:
+          clip_path (str): Path to the clip
+          word (str): Card word
+          meanings (str): Word meanings in string form.
+          sentence (str): Sentence the word came from.
+          explanation (str): GPT explanation of the sentence.
+          tags (list, optional): Optional card tags.
         """
         filename = Path(clip_path).name
         video = self.video_tag.format(filename)
@@ -147,10 +180,13 @@ class AnkiExporter:
                output_path: str) -> None:
         """
         Write .apkg (deck + all media) to output_path.
+
+        Args:
+          output_path (str): Path to save the Anki Deck.
         """
         pkg = genanki.Package(self.deck,
                               self.media_files)
         pkg.write_to_file(output_path)
         _notes = f"#Notes -> {len(self.deck.notes)};"
         _media = f"#Media -> {len(self.media_files)};"
-        logger.info(f"Anki Package -> {output_path};{_notes}{_media}")
+        LOGGER.info(f"Anki Package -> {output_path};{_notes}{_media}")

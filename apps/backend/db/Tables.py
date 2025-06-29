@@ -1,3 +1,14 @@
+"""
+This module defines the Tables of the Mirumoji Database for profile management.
+
+Attributes:
+  METADATA (MetaData): Database MetaData object.
+  profiles (Table): sqalchemy table object for profiles.
+  gpt_templates (Table): sqalchemy table object for gpt_templates.
+  profile_transcripts (Table): sqalchemy table object for transcripts.
+  profile_files (Table): sqalchemy table object for files.
+  clips (Table): sqalchemy table object for saved clips.
+"""
 import uuid
 from sqlalchemy import (MetaData,
                         Table,
@@ -20,11 +31,13 @@ profiles = Table(
     Column("id",
            String,
            primary_key=True,
-           index=True),
+           index=True
+           ),
     Column("name",
            String,
            unique=True,
-           index=True),
+           index=True
+           ),
 )
 # ----------------------------
 # --- GPT Templates Table ---
@@ -35,20 +48,24 @@ gpt_templates = Table(
            String,
            primary_key=True,
            index=True,
-           default=lambda: str(uuid.uuid4())),
+           default=lambda: str(uuid.uuid4())
+           ),
     Column("profile_id",
            String,
            ForeignKey("profiles.id", ondelete="CASCADE"),
            nullable=False,
-           unique=True),
+           unique=True
+           ),
     Column("sys_msg",
            Text,
            nullable=False),
     Column("prompt",
            Text,
-           nullable=False),
+           nullable=False
+           ),
     UniqueConstraint("profile_id",
-                     name="uq_profile_template")
+                     name="uq_profile_template"
+                     )
 )
 # ---------------------------------
 # --- Profile Transcripts Table ---
@@ -59,24 +76,33 @@ profile_transcripts = Table(
            String,
            primary_key=True,
            index=True,
-           default=lambda: str(uuid.uuid4())),
+           default=lambda: str(uuid.uuid4())
+           ),
     Column("profile_id",
            String,
            ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False),
+           nullable=False
+           ),
     Column("original_file_name",
            String,
-           nullable=True),
+           nullable=True
+           ),
     Column("transcript",
            Text,
-           nullable=False),
+           nullable=False
+           ),
     Column("gpt_explanation",
            Text,
-           nullable=True),
+           nullable=True
+           ),
     Column("audio_file_path",
            String,
-           nullable=True),
-    Column("created_at", DateTime, default=datetime.datetime.now)
+           nullable=True
+           ),
+    Column("created_at",
+           DateTime,
+           default=lambda: datetime.datetime.now()
+           )
 )
 # ---------------------------
 # --- Profile Files Table ---
@@ -87,28 +113,35 @@ profile_files = Table(
            String,
            primary_key=True,
            index=True,
-           default=lambda: str(uuid.uuid4())),
+           default=lambda: str(uuid.uuid4())
+           ),
     Column("profile_id",
            String,
            ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False),
+           nullable=False
+           ),
     Column("file_name",
            String,
-           nullable=False),
+           nullable=False
+           ),
     Column("file_path",
            String,
            nullable=False,
-           unique=True),
+           unique=True
+           ),
     Column("file_type",
            String,
-           nullable=True),
+           nullable=True
+           ),
     Column("created_at",
            DateTime,
-           default=datetime.datetime.now),
+           default=lambda: datetime.datetime.now()
+           ),
     Column("related_transcript_id",
            String,
            ForeignKey("profile_transcripts.id"),
-           nullable=True),
+           nullable=True
+           ),
 )
 # -------------------
 # --- Clips Table ---
@@ -119,33 +152,42 @@ clips = Table(
            String,
            primary_key=True,
            index=True,
-           default=lambda: str(uuid.uuid4())),
+           default=lambda: str(uuid.uuid4())
+           ),
     Column("profile_id",
            String,
            ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False),
+           nullable=False
+           ),
     Column("clip_start_time",
            Float,
-           nullable=False),
+           nullable=False
+           ),
     Column("clip_end_time",
            Float,
-           nullable=False),
+           nullable=False
+           ),
     # Store the full JSON string or dict
     Column("gpt_breakdown_response",
            JSON,
-           nullable=False),
+           nullable=False
+           ),
     Column("video_clip_path",
            String,
            nullable=False,
-           unique=True),
+           unique=True
+           ),
     Column("original_video_file_name",
            String,
-           nullable=True),
+           nullable=True
+           ),
     Column("original_video_url",
            String,
-           nullable=True),
+           nullable=True
+           ),
     Column("created_at",
            DateTime,
-           default=datetime.datetime.now),
+           default=lambda: datetime.datetime.now()
+           ),
 )
 # ------------------------------

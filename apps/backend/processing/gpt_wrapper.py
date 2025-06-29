@@ -1,36 +1,70 @@
+"""
+This module defines the `GptModel` class for sending requests to OpenAI's API.
+
+Attributes:
+  LOGGER (logging.Logger): Module's logger object
+"""
+from __future__ import annotations
 from openai import OpenAI
 from openai.types.chat.chat_completion import ChatCompletion
 from dotenv import dotenv_values, load_dotenv
 import logging
 import os
+from typing import Optional, Dict, Generator, Any
+import json
+
+LOGGER = logging.getLogger(__name__)
 
 
 class GptModel:
-    model_versions = ['gpt-4.1', 'gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini']
-    # Per 1 Million Tokens, in Dollars
-    pricing_dict = {'gpt-4o-mini': {'input': 0.150, 'output': 0.6},
-                    'gpt-4.1': {'input': 2.0, 'output': 8},
-                    'gpt-4o': {'input': 2.5, 'output': 10},
-                    'gpt-4.1-mini': {'input': 0.4, 'output': 1.6}}
+    """
+    Send requests to OpenAI's API and manage sessions.
 
-    logger = logging.getLogger('gpt-model')
-    fr_0 = 'Success,Complete Message'
-    fr_1 = 'Token Limit or parameter "max_token" exceeded,Incomplete Message'
-    fr_2 = 'The model decided to call a function,Incomplete Message'
-    fr_3 = "Content flagged and stopped by model's content filter"
-    fr_3 += ",Incomplete Message"
-    fr_4 = "API Response is still in progress,Incomplete Message"
-    finish_reason_code_dict = {0: fr_0,
-                               1: fr_1,
-                               2: fr_2,
-                               3: fr_3,
-                               4: fr_4}
+    Args:
+      version (str): Which GPT model version to use.
+      system_msg (str): The System Message to use for the model.
+      from_dotenv (bool): Wether to get the OpenAI API key through a .env file.
+      ApiKey (str, optional): Option to pass the OpenAI API key directly.
+      max_context (int): The session's context limit in tokens.
 
-    def __init__(self, version: str, system_msg: str = 'default',
-                 from_dotenv: bool = True, ApiKey=None,
-                 max_context: int = 100000):
+    Attributes:
+      info (dict): Dictionary containing all object information.
+    """
+    MODEL_VERSIONS = [
+        'gpt-4.1',
+        'gpt-4o-mini',
+        'gpt-4o',
+        'gpt-4.1-mini'
+        ]
+    FRMAP = {'stop': 0,
+             'length': 1,
+             'function_call': 2,
+             'content_filter': 3,
+             'null': 4,
+             }
+
+    FRCODEDICT = {
+        0: 'Success,Complete Message',
+        1: 'Token Limit or parameter "max_token" exceeded,Incomplete Message',
+        2: 'The model decided to call a function,Incomplete Message',
+        3: "Content flagged and stopped by model's content filter, \
+            Incomplete Message",
+        4: "API Response is still in progress,Incomplete Message"
+        }
+
+    def __init__(self,
+                 version: str,
+                 system_msg: str = 'default',
+                 from_dotenv: bool = True,
+                 ApiKey: Optional[str] = None,
+                 max_context: int = 100000
+                 ) -> None:
         try:
+            # Store Session Info
+            self.info = {}
+
             if from_dotenv:
+                # Get API Key from .env
                 load_dotenv()
                 try:
                     key = dotenv_values('.env')['OPENAI_API_KEY']
@@ -38,267 +72,238 @@ class GptModel:
                     try:
                         key = os.environ["OPENAI_API_KEY"]
                     except Exception as e:
-                        GptModel.logger.error("OpenAI key not found")
+                        LOGGER.error("OpenAI key not found")
                         raise e
-                self.ApiKey = key
-                ApiKey = self.ApiKey
+
             elif ApiKey is not None:
                 key = ApiKey
+
             else:
-                _msg = "Must provide ApiKey or enable from_dotenv to create"
-                _msg += 'client'
-                GptModel.logger.error(_msg)
-                raise Exception(_msg)
+                LOGGER.error(
+                    "Must provide ApiKey or enable from_dotenv to create \
+                        client"
+                    )
+                raise Exception(
+                    "Must provide ApiKey or enable from_dotenv to create \
+                        client")
+
             self.client = OpenAI(api_key=key)
-            if version not in GptModel.model_versions:
-                _msg = 'Model version provided is not supported, got'
-                _msg += f"{version};Expected one of {GptModel.model_versions}"
-                GptModel.logger.error(_msg)
-                raise Exception(_msg)
+
+            if version not in GptModel.MODEL_VERSIONS:
+                LOGGER.error(
+                    f"Model version provided is not supported, got {version};\
+                        Expected one of {GptModel.MODEL_VERSIONS}"
+                    )
+                raise Exception(
+                    f"Model version provided is not supported, got {version};\
+                        Expected one of {GptModel.MODEL_VERSIONS}")
             else:
-                self.model = version
+                model = version
             if system_msg == 'default':
                 system_message = "You are a helpful assistant."
             else:
                 system_message = system_msg
+
             sys_msg = {"role": "system", "content": system_message}
-            # --Attrs for repr----
-            self.raw_sys_msg = system_message
-            self.from_dotenv = from_dotenv
-            self.ApiKey = ApiKey
-            # --------------------
-            self.sys_msg = sys_msg
-            self.window_token_limit = max_context
-            self.messages = [sys_msg]
-            self.outputs = []
-            self.inputs = []
-            self.total_price = 0
-            self.total_tokens = None
-            self.input_tokens = None
-            self.request_count = 0
-            self.output_tokens = None
-            self.requests_info = []
-            self.sessions_info = []
-            self.text_finishin_reasons = []
+
+            self.info["client"] = self.client
+            self.info["ApiKey"] = key
+            self.info["model"] = model
+            self.info["sys_msg"] = sys_msg
+            self.info["raw_sys_msg"] = system_message
+            self.info["from_dotenv"] = from_dotenv
+            self.info["raw_ApiKey"] = ApiKey
+            self.info["window_token_limit"] = max_context
+            self.info["messages"] = [sys_msg]
+            self.info["outputs"] = []
+            self.info["inputs"] = []
+            self.info["total_tokens"] = None
+            self.info["input_tokens"] = None
+            self.info["request_count"] = 0
+            self.info["output_tokens"] = None
+            self.info["requests_info"] = []
+            self.info["sessions_info"] = []
+            self.info["text_finishin_reasons"] = []
+
         except Exception as e:
-            _msg = f'Error while cretaing Model Object : {str(e)}'
-            GptModel.logger.error(_msg)
-            raise Exception(_msg)
+            LOGGER.error(
+                f'Error while cretaing Model Object : {str(e)}')
+            raise Exception(
+                f'Error while cretaing Model Object : {str(e)}')
 
     @staticmethod
-    def format_input(message: str):
+    def _format_input(message: str) -> Dict[str, str]:
         return {"role": "user", "content": message}
 
     @staticmethod
-    def format_output(message: str):
+    def _format_output(message: str) -> Dict[str, str]:
         return {"role": "assistant", "content": message}
 
     @staticmethod
-    def response_price(model: str, input_tokens: int, output_tokens: int):
-        if model not in GptModel.model_versions:
-            raise Exception(f'Model {model} not supported')
-        input_price_1m = GptModel.pricing_dict[model]['input']
-        output_price_1m = GptModel.pricing_dict[model]['output']
-        input_price_per_token = input_price_1m/(10**6)
-        output_price_per_token = output_price_1m/(10**6)
-        InputPrice = input_tokens*input_price_per_token
-        OutputPrice = output_tokens*output_price_per_token
-        return InputPrice+OutputPrice
+    def _process_output(response: ChatCompletion) -> Dict:
 
-    @staticmethod
-    def process_output(response: ChatCompletion,
-                       model: str):
         usage_dict = response.usage.to_dict()
         try:
             prompt_tokens = int(usage_dict['prompt_tokens'])
             output_tokens = int(usage_dict['completion_tokens'])
             total_tokens = int(usage_dict['total_tokens'])
-            request_price = GptModel.response_price(model,
-                                                    prompt_tokens,
-                                                    output_tokens)
+
         except Exception as e:
-            em = "Error converting token counts to int"
-            em += f"and calculating price : {str(e)}"
-            raise Exception(em)
+            raise Exception(f"Error converting token counts to int : {e}")
+
         message = response.choices[0].message.content
         finish_reason = response.choices[0].finish_reason
-        if finish_reason == 'stop':
-            finish_reason = 0
-        elif finish_reason == 'length':
-            finish_reason = 1
-        elif finish_reason == 'function_call':
-            finish_reason = 2
-        elif finish_reason == 'content_filter':
-            finish_reason = 3
-        elif finish_reason == 'null':
-            finish_reason = 4
-        else:
-            em = f'Received Unexpected Finish Reason: {finish_reason}'
-            raise Exception(em)
+        try:
+            finish_reason = GptModel.FRMAP[finish_reason]
+        except KeyError:
+            LOGGER.error(f'Received Unexpected Finish Reason: {finish_reason}')
+            raise
 
-        return {'output': message, 'prompt_tokens': prompt_tokens,
-                'output_tokens': output_tokens, 'total_tokens': total_tokens,
-                'finish_reason': finish_reason, 'price': request_price}
+        return {'output': message,
+                'prompt_tokens': prompt_tokens,
+                'output_tokens': output_tokens,
+                'total_tokens': total_tokens,
+                'finish_reason': finish_reason
+                }
 
-    def __str__(self):
-        return f"{self.model} Wrapper, with System Message :{self.raw_sys_msg}"
+    def __str__(self) -> str:
+        return f"{self.info['model']}"
 
-    def __repr__(self):
-        m = self.model
-        s = self.raw_sys_msg
-        d = self.from_dotenv
-        a = self.ApiKey
-        w = self.window_token_limit
-        at = ['version', 'system_msg', 'from_dotenv', 'ApiKey', 'max_content']
-        c = 'GptModel'
-        ats = [f"{at[0]}='{m}'",
-               f"{at[1]}='{s}'",
-               f"{at[2]}={d}",
-               f"{at[3]}='{a}'",
-               f"{at[4]}={w}"]
-        r = f"{c}({ats[0]},{ats[1]},{ats[2]},{ats[3]},{ats[4]})"
-        return r
+    def __repr__(self) -> str:
+        return f"{self.info}"
 
-    def request(self, prompt: str):
-        self.inputs.append(prompt)
-        new_message = GptModel.format_input(prompt)
-        self.messages.append(new_message)
-        wtl = self.window_token_limit
-        if self.request_count > 0 and self.total_tokens >= wtl:
+    def request(self, prompt: str) -> Dict:
+        """
+        Make a new session request.
+
+        Args:
+          prompt (str): The prompt for the request.
+
+        Returns:
+          dict: Dictionary containg "prompt" used and the formatted "response"
+        """
+        self.info["inputs"].append(prompt)
+        new_message = GptModel._format_input(prompt)
+        self.info["messages"].append(new_message)
+        wtl = self.info["window_token_limit"]
+        if self.info["request_count"] > 0 and self.info["total_tokens"] >= wtl:
             raise Exception('Max Context Exceeded')
         try:
-            msgs = self.messages
-            result = self.client.chat.completions.create(model=self.model,
-                                                         messages=msgs)
-            f_result = GptModel.process_output(result, self.model)
-            self.requests_info.append(f_result)
-            self.outputs.append(f_result['output'])
-            self.messages.append(GptModel.format_output(f_result['output']))
-            self.input_tokens = f_result['prompt_tokens']
-            self.output_tokens = f_result['output_tokens']
-            self.total_tokens = f_result['total_tokens']
-            self.total_price += f_result['price']
-            self.request_count += 1
-            freason_dict = GptModel.finish_reason_code_dict
+            msgs = self.info["messages"]
+            result = self.info["client"].chat.completions.create(
+                model=self.info["model"],
+                messages=msgs)
+            f_result = GptModel._process_output(result)
+            self.info["requests_info"].append(f_result)
+            self.info["outputs"].append(f_result['output'])
+            self.info["messages"].append(
+                GptModel._format_output(f_result['output']))
+            self.info["input_tokens"] = f_result['prompt_tokens']
+            self.info["output_tokens"] = f_result['output_tokens']
+            self.info["total_tokens"] = f_result['total_tokens']
+            self.info["request_count"] += 1
+            freason_dict = GptModel.FRCODEDICT
             freason = freason_dict[f_result['finish_reason']]
-            self.text_finishin_reasons.append(freason)
-            return {'prompt': prompt, 'response': f_result['output']}
+            self.info["text_finishin_reasons"].append(freason)
+            return {'prompt': prompt,
+                    'response': f_result['output']
+                    }
 
         except Exception as e:
-            _msg = f'Error Requesting : {str(e)}'
-            GptModel.logger.error(_msg)
-            raise Exception(_msg)
+            LOGGER.error(f'Error Requesting : {str(e)}')
+            raise e
 
-    def stream_request(self, prompt: str):
-        """Send a streaming chat request; yield each content
-        chunk as it arrives."""
-        # 1) stash the user prompt in history
-        self.inputs.append(prompt)
-        self.messages.append(GptModel.format_input(prompt))
+    def stream_request(self, prompt: str) -> Generator[Any, None, None]:
+        """
+        Send a streaming chat request; yield each content
+        chunk as it arrives.
+
+        Args:
+          prompt (str): Prompt to use.
+
+        Yields:
+          str: The string chunks from the request response.
+        """
+        self.info["inputs"].append(prompt)
+        self.info["messages"].append(GptModel._format_input(prompt))
 
         try:
-            # 2) fire off a streaming completion
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=self.messages,
+            stream = self.info["client"].chat.completions.create(
+                model=self.info["model"],
+                messages=self.info["messages"],
                 stream=True
             )
 
             full_output = ""
-            # 3) as chunks come in, yield them immediately
             for chunk in stream:
                 delta = chunk.choices[0].delta
-                # use getattr to safely pull out .content
                 text = getattr(delta, "content", None) or ""
                 if text:
                     full_output += text
                     yield text
 
-            # 4) once done, record the full response
-            self.outputs.append(full_output)
-            self.messages.append(GptModel.format_output(full_output))
-            self.request_count += 1
+            self.info["outputs"].append(full_output)
+            self.info["messages"].append(GptModel._format_output(full_output))
+            self.info["request_count"] += 1
 
         except Exception as e:
-            GptModel.logger.error(f"Streaming request error: {e}")
+            LOGGER.error(f"Streaming request error: {e}")
             raise Exception(f"Error during streaming request: {e}")
 
-    def new_session(self):
-        session_info = {'total_tokens': self.total_tokens,
-                        'total_price': self.total_price,
-                        'inputs': self.inputs,
-                        'outputs': self.outputs,
-                        'requests_info': self.requests_info,
-                        'input_tokens': self.input_tokens,
-                        'output_tokens': self.output_tokens,
-                        'request_count': self.request_count}
-        self.sessions_info.append(session_info)
-        self.messages = [self.sys_msg]
-        self.outputs = []
-        self.inputs = []
-        self.total_price = 0
-        self.total_tokens = None
-        self.input_tokens = None
-        self.request_count = 0
-        self.output_tokens = None
-        self.requests_info = []
-        GptModel.logger.info('Session Cleared!')
+    def new_session(self) -> None:
+        """
+        Clear the current session.
+        """
+
+        session_info = {'total_tokens': self.info["total_tokens"],
+                        'inputs': self.info["inputs"],
+                        'outputs': self.info["outputs"],
+                        'requests_info': self.info["requests_info"],
+                        'input_tokens': self.info["input_tokens"],
+                        'output_tokens': self.info["output_tokens"],
+                        'request_count': self.info["request_count"]
+                        }
+        self.info["sessions_info"].append(session_info)
+        self.info["messages"] = [self.sys_msg]
+        self.info["outputs"] = []
+        self.info["inputs"] = []
+        self.info["total_price"] = 0
+        self.info["total_tokens"] = None
+        self.info["input_tokens"] = None
+        self.info["request_count"] = 0
+        self.info["output_tokens"] = None
+        self.info["requests_info"] = []
+        LOGGER.info('Session Cleared!')
 
     @staticmethod
-    def load_from_dict(info: dict):
-        keys = ['model',
-                'sys_msg',
-                'max_context',
-                'messages',
-                'outputs',
-                'inputs',
-                'total_price',
-                'total_tokens',
-                'input_tokens',
-                'request_count',
-                'output_tokens',
-                'requests_info',
-                'sessions_info',
-                'text_finishin_reasons'
-                ]
-        gpt_model = GptModel('gpt-4o-mini')
-        for key in info.keys():
-            if key not in keys:
-                raise Exception(f"Error loading from dict: {key} not found.")
-        fmt_sys_msg = {"role": "system", "content": info['sys_msg']}
-        gpt_model.raw_sys_msg = info['sys_msg']
-        gpt_model.from_dotenv = True
-        gpt_model.ApiKey = dotenv_values('.env')['OPENAI_API_KEY']
-        gpt_model.sys_msg = fmt_sys_msg
-        gpt_model.window_token_limit = info['max_context']
-        gpt_model.messages = info['messages']
-        gpt_model.outputs = info['outputs']
-        gpt_model.inputs = info['inputs']
-        gpt_model.total_price = info['total_price']
-        gpt_model.total_tokens = info['total_tokens']
-        gpt_model.input_tokens = info['input_tokens']
-        gpt_model.request_count = info['request_count']
-        gpt_model.output_tokens = info['output_tokens']
-        gpt_model.requests_info = info['requests_info']
-        gpt_model.sessions_info = info['sessions_info']
-        gpt_model.text_finishin_reasons = info['text_finishin_reasons']
-        gpt_model.client = OpenAI(api_key=gpt_model.ApiKey)
+    def load_from_json(info: str) -> GptModel:
+        """
+        Load an object from a serialized JSON string
+
+        Args:
+          info (str): JSON string.
+
+        Returns:
+          GptModel: The loaded `GptModel` object
+        """
+        info = json.loads(info)
+
+        gpt_model = GptModel(version=info["model"],
+                             system_msg=info["sys_msg"],
+                             from_dotenv=info["from_dotenv"],
+                             ApiKey=info["raw_ApiKey"],
+                             max_context=info["window_token_limit"]
+                             )
+
+        gpt_model.info = info
+        gpt_model.info["client"] = OpenAI(api_key=gpt_model.info["ApiKey"])
         return gpt_model
 
-    def serialize(self):
-        d = {'model': self.model,
-             'sys_msg': self.raw_sys_msg,
-             'max_context': self.window_token_limit,
-             'messages': self.messages,
-             'outputs': self.outputs,
-             'inputs': self.inputs,
-             'total_price': self.total_price,
-             'total_tokens': self.total_tokens,
-             'input_tokens': self.input_tokens,
-             'request_count': self.request_count,
-             'output_tokens': self.output_tokens,
-             'requests_info': self.requests_info,
-             'sessions_info': self.sessions_info,
-             'text_finishin_reasons': self.text_finishin_reasons
-             }
-        return d
+    def serialize(self) -> str:
+        """
+        Serialize object information into JSON string
+
+        Returns:
+          str: JSON string of serialized object.
+        """
+        return json.dumps(self.info, skipkeys=True)

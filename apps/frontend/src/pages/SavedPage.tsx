@@ -1,4 +1,3 @@
-// src/pages/SavedPage.tsx
 import React, { useState, useMemo } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";

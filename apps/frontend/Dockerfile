@@ -1,5 +1,5 @@
 # ---- Build Stage ----
-# Use a Node.js image to build your Vite project
+# Noje.js Alpine
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # ---- Serve Stage ----
-# Use an Nginx image to serve the built application
+# Nginx Alpine Server
 FROM nginx:1.25-alpine
 
 # Remove default Nginx configuration
@@ -40,8 +40,10 @@ COPY entrypoint.sh /entrypoint.sh
 
 # Make Entrypoint executable
 RUN chmod +x /entrypoint.sh
-# Expose ports
+
+# Nginx HTTP Redirect 80 -> 443
 EXPOSE 80
+# Nginx HTTPS 
 EXPOSE 443
 
 # Run Entrypoint

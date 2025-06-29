@@ -1,7 +1,7 @@
 fastapi==0.115.12
 faster-whisper==1.1.1
 fugashi[unidic]==1.4.0
-jamdict==0.1a11.post2
+kotobase==0.2.7
 openai==1.76.2
 pydantic==2.11.4
 python-dotenv==1.1.0

@@ -1,5 +1,6 @@
 #!/bin/sh
 # Entrypoint to generate SSL Certificate at Container Runtime
+# Expects `HOST_LAN_IP` env variable to build certificate
 set -e
 
 CERT_DIR=/etc/nginx/ssl

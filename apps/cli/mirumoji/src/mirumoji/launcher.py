@@ -1,27 +1,41 @@
+"""
+This module defines the `Click` CLI application to automatically
+setup the `Mirumoji` Docker Compose application.
+"""
+
 import click
 import os
 import subprocess
+from subprocess import Popen
 import sys
 import socket
 from textwrap import dedent
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
 
+# -----------------------------
+# --- Pre-defined Constants ---
+
+# Repository URL and Path constants
 MAIN_REPO_SUBDIR = Path("mirumoji_workspace")
 MAIN_REPO_URL = "https://github.com/svdC1/mirumoji.git"
-# Docker image names for local builds
+
+# Docker Image names for local builds
 FRONTEND_LOCAL_IMAGE_NAME = "mirumoji_frontend_local:latest"
 BACKEND_GPU_LOCAL_IMAGE_NAME = "mirumoji_backend_gpu_local:latest"
 BACKEND_CPU_LOCAL_IMAGE_NAME = "mirumoji_backend_cpu_local:latest"
 
-# Relative paths within MAIN_REPO
+# Relative Paths for Dockerfiles within repository
 FRONTEND_DOCKERFILE_RELPATH = Path("apps/frontend/Dockerfile")
-FRONTEND_BUILD_CONTEXT_RELPATH = Path("apps/frontend")
 BACKEND_GPU_DOCKERFILE_RELPATH = Path("apps/backend/Dockerfile")
 BACKEND_CPU_DOCKERFILE_RELPATH = Path("apps/backend/Dockerfile.cpu")
-BACKEND_BUILD_CONTEXT_RELPATH = Path("apps/backend")
 
+# Relative Paths for local build contexts within repository
+BACKEND_BUILD_CONTEXT_RELPATH = Path("apps/backend")
+FRONTEND_BUILD_CONTEXT_RELPATH = Path("apps/frontend")
+
+# Relative Paths for compose files withing repository
 COMPOSE_PREBUILT_CPU_RELPATH = Path("compose/docker-compose.cpu.yaml")
 COMPOSE_PREBUILT_GPU_RELPATH = Path("compose/docker-compose.gpu.yaml")
 COMPOSE_PREBUILT_DOCKER_GPU_RELPATH = Path(
@@ -30,22 +44,74 @@ COMPOSE_PREBUILT_DOCKER_CPU_RELPATH = Path(
     "compose/docker-compose.cpu.dockerpull.yaml")
 COMPOSE_LOCAL_CPU_RELPATH = Path("compose/docker-compose.local.cpu.yaml")
 COMPOSE_LOCAL_GPU_RELPATH = Path("compose/docker-compose.local.gpu.yaml")
+# ---------------------
+# --- Env File Name ---
+
 ENV_FILE_NAME = ".env"
 
-# --- Help Messages ---
+# -----------------------------
+# --- Command Help Messages ---
 BUILD_HELP = "Build Docker images locally (--build) or pull pre-built \
     images from registry. (--pull)"
 
 GPU_HELP = "Use GPU Version of Backend (--gpu) or CPU version (--cpu)"
 REG_HELP = "Pull Images from GitHub Registry (--github-pull) or \
     from Docker Hub (--docker-pull)"
+
+# ------------------------
 # --- Helper Functions ---
 
 
-def get_host_lan_ip():
+def check_git_installed() -> None:
     """
-    Returns the primary LAN IPv4 address of the host machine
-    and loads it as an environment variable
+    Click command helper which checks if `git` is installed
+    in the system.
+    """
+    try:
+        subprocess.run(
+            ["git", "--version"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        error_message = dedent("""\
+        Error: Git is not installed or not in your PATH.
+        Please install Git and ensure it is accessible from your terminal.
+        """)
+        click.secho(error_message, fg="red", err=True)
+        sys.exit(1)
+
+
+def check_docker_running() -> None:
+    """
+    Click command helper which checks if the
+    Docker service/daemon is currently running
+    """
+    try:
+        subprocess.run(
+            ["docker", "info"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        error_message = dedent("""\
+        Error: Docker is not running.
+        Please start Docker Desktop and try again.
+        """)
+        click.secho(error_message, fg="red", err=True)
+        sys.exit(1)
+
+
+def get_host_lan_ip() -> str:
+    """
+    Click command helper which returns the primary
+    LAN IPv4 address of the host machine and loads
+    it as an environment variable.
+
+    Returns:
+      str: The Primary LAN IPv4 address of the host machine
     """
     click.secho("\n--- Getting HOST IPv4 ---", fg="blue")
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -57,7 +123,7 @@ def get_host_lan_ip():
         return ip
     except Exception as e:
         click.secho(
-            f"Error Getting Host IPv4 Address: {e}",
+            f"Error Getting Host IPv4 Address: '{e}'",
             fg="red",
             err=True
         )
@@ -66,26 +132,53 @@ def get_host_lan_ip():
         s.close()
 
 
-def run_command(command_list: List,
+def run_command(command_list: List[str],
                 cwd: Optional[Path] = None,
                 check: bool = True,
-                shell: bool = False
-                ):
+                shell: bool = False,
+                stream: bool = True
+                ) -> Popen[str]:
     """
-    Runs a command, streams output, and handles errors.
+    Click command helper which runs a command as a subprocess,
+    streams its output and handles errors.
+
+    Args:
+      command_list (List[str]): List of command arguments to be executed
+      cwd (Path, optional): Path in which to execute the command from
+      check (bool, optional): When True, if the command returns an error status
+                              code an exception is propagated. Defaults to True
+      shell (bool, optional): When True, concatenate the list of arguments
+                              into a string and run in shell mode. Defaults to
+                              False
+      stream (bool, optional): When True, stream command output to `Click`.
+                               Defaults to True.
+
+    Returns:
+      Popen[str]: Subprocess object with `pid`, `stdin`, `stdout`, `stderr`
+                  and `returncode`
+
+    Raises:
+      subprocess.CalledProcessError: If command raises an error and
+                                     `check=True`
+      Exception: If an unexpected Exception occurs while running the command.
+
     """
 
-    if not shell and not isinstance(command_list, list):
+    if not isinstance(command_list, list):
         click.secho(
-            message="'command_list' must be a list for non-shell commands.",
+            message="'command_list' must be a list.",
             fg='red',
             err=True
         )
         sys.exit(1)
+
+    cmd_str = " ".join(map(str, command_list))
+
+    # Concatenate command for shell
     if shell:
-        cmd_str = command_list
-    else:
-        cmd_str = " ".join(map(str, command_list))
+        command_list = cmd_str
+
+    # Set up CWD
     if not cwd:
         cwd = Path.cwd()
 
@@ -93,6 +186,14 @@ def run_command(command_list: List,
                 fg='cyan')
     click.secho(message=f"Running command: '{cmd_str}'",
                 fg='cyan')
+
+    # If it's a docker command make sure it's running
+    if "docker" in command_list[0]:
+        check_docker_running()
+
+    # If it's a GIT command make sure it's installed
+    if "git" in command_list[0]:
+        check_git_installed()
 
     try:
         process = subprocess.Popen(
@@ -108,8 +209,8 @@ def run_command(command_list: List,
             errors='replace'
         )
 
-        # Stream output
-        if process.stdout:
+        # Stream Output with Click
+        if stream and process.stdout:
             for line in iter(process.stdout.readline, ''):
                 line_content = line.rstrip('\r\n')
                 if line_content:
@@ -123,8 +224,14 @@ def run_command(command_list: List,
         return_code = process.wait()
         if check and return_code != 0:
             # Error message printed after all output has been streamed
-            raise subprocess.CalledProcessError(return_code, cmd_str)
+            raise subprocess.CalledProcessError(return_code,
+                                                cmd_str,
+                                                process.stdout,
+                                                process.stderr
+                                                )
         return process
+
+    # Catch process error and display with Click when check is True
     except subprocess.CalledProcessError as e:
         message = dedent(f"""\
         Error: Command '{e.cmd}' returned non-zero exit status "
@@ -133,43 +240,55 @@ def run_command(command_list: List,
         click.secho(message=message, fg="red", err=True)
         sys.exit(e.returncode or 1)
 
+    # Catch not found command errors
     except FileNotFoundError as e:
         message = dedent(f"""\
-        Error: Command not found: {e.filename}.
+        Error: Command not found: '{e.filename}'.
         Please ensure it's installed and in your PATH.
         """)
         click.secho(message=message, fg='red', err=True)
         sys.exit(1)
+
+    # Catch general exceptions and display with Click
     except Exception as e:
         message = dedent(f"""\
         An unexpected error occurred while trying to run command '{cmd_str}':
-        {e}
+        '{e}'
         """)
         click.secho(message=message, fg='red', err=True)
         sys.exit(1)
 
 
 def ensure_repo(repo_url: str,
-                repo_path: Path):
+                repo_path: Path
+                ) -> None:
     """
-    Ensures the repository is cloned or updated.
+    Click command helper which ensures the repository is cloned or updated.
+
+    Args:
+      repo_url (str): The GitHub repository url
+      repo_path (Path): Where to clone the repo or where to find it for updates
     """
     if not repo_path.is_dir():
         click.secho(
-            message=f"Cloning repository: {repo_url} into {repo_path}...",
+            message=f"Cloning repository: '{repo_url}' into '{repo_path}' ...",
             fg="green"
             )
         run_command(["git", "clone", repo_url, str(repo_path)])
     else:
         click.secho(
-            message=f"Repo {repo_path} already exists. Fetching updates...",
+            message=f"Repo '{repo_path}' already exists. Fetching updates ...",
             fg="green"
             )
         run_command(["git", "fetch", "--all"],
                     cwd=repo_path)
 
         try:
+            # Get Current Remote Branch
             git_rev_parse_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+
+            # Not using `run_command` here to catch the error without sys.exit
+            # GIT installation is already checked by previous commands
             result = subprocess.run(
                 git_rev_parse_cmd,
                 cwd=repo_path,
@@ -181,27 +300,32 @@ def ensure_repo(repo_url: str,
         except subprocess.CalledProcessError:
             current_branch = "HEAD"
 
+        # Handle detached states
         if current_branch == "HEAD":
             click.secho(
                 message="Currently in a detached HEAD state.",
                 fg="yellow"
                 )
             click.secho(
-                message="Attempting to checkout default branch (main)...",
+                message="Attempting to checkout default branch (main) ...",
                 fg="yellow"
                 )
-            # Try checking out 'main'
+
+            # Try checking out 'main' and fail on error
             checkout_main_cmd = ["git", "checkout", "main"]
             run_command(checkout_main_cmd,
                         cwd=repo_path,
-                        check=True)
+                        check=True
+                        )
 
-            result = subprocess.run(
+            # Try getting current branch again and exit on error
+            git_rev_parse_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+
+            result = run_command(
                 git_rev_parse_cmd,
                 cwd=repo_path,
-                text=True,
-                capture_output=True,
-                check=True
+                check=True,
+                stream=False
             )
             current_branch = result.stdout.strip()
 
@@ -210,47 +334,57 @@ def ensure_repo(repo_url: str,
             fg="green"
             )
         run_command(["git", "pull", "origin", current_branch], cwd=repo_path)
-    click.secho("Repository setup complete.", fg="bright_green")
+    click.secho("Repository Setup Complete", fg="bright_green")
 
 
-def check_env_file(expected_vars: List,
-                   env_file_path: Path):
+def check_env_file(expected_vars: List[str],
+                   env_file_path: Path
+                   ) -> None:
     """
-    Checks for .env file and required variables.
+    Click command helper which checks for existence of
+    required `.env` file and its contents.
+
+    Args:
+      expected_vars (List[str]): List of variables that should be present
+      env_file_path (Path): Path to the environment file
     """
     click.secho(
-        message=f"Checking for {ENV_FILE_NAME} file at: {env_file_path}",
+        message=f"Checking for '{ENV_FILE_NAME}' file at: '{env_file_path}'",
         fg="green"
         )
     if not env_file_path.is_file():
         message = dedent(f"""\
-        Error: {ENV_FILE_NAME} file not found at {env_file_path}.
-        Please create it with the variables: {', '.join(expected_vars)}
+        Error: '{ENV_FILE_NAME}' file not found at '{env_file_path}'.
+        Please create it with the variables: '{', '.join(expected_vars)}'
         """)
         click.secho(message=message, fg="red", err=True)
         sys.exit(1)
 
-    click.secho(f"Loading variables from {ENV_FILE_NAME}...", fg="green")
+    click.secho(f"Loading variables from '{ENV_FILE_NAME}' ...", fg="green")
     env_config = dotenv_values(env_file_path)
     missing_vars = [var for var in expected_vars if not env_config.get(var)]
 
     if missing_vars:
         message = dedent(f"""\
-        Error: Missing or empty variables in {env_file_path}:
+        Error: Missing or empty variables in '{env_file_path}':
         {', '.join(missing_vars)}.
         Please ensure all required variables are set:
         {', '.join(expected_vars)}
         """)
         click.secho(message=message, fg="red", err=True)
         sys.exit(1)
+    # Load variables into session environment
     load_dotenv(dotenv_path=env_file_path)
     click.secho(message="Variable Configuration Passed", fg="bright_green")
 
 
-def get_build_locally():
+def get_build_locally() -> bool:
     """
-    Asks for user input on whether to build images locally or pull
-    pre-built images.
+    Click command helper which asks for user input on
+    whether to build images locally or pull pre-built images.
+
+    Returns:
+      bool: True for building locally, False for using pre-built images.
     """
     try:
         click.secho("\n--- Build Configuration ---", fg="blue")
@@ -266,16 +400,20 @@ def get_build_locally():
 
     except Exception as e:
         click.secho(
-            f"Error while selecting configuration options: {e}",
+            f"Error while selecting configuration options: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
 
-def get_gpu_cpu():
+def get_gpu_cpu() -> bool:
     """
-    Asks for user input on whether to use CPU or GPU version.
+    Click command helper which asks for user input on
+    whether to use GPU or CPU version of backend.
+
+    Returns:
+      bool: True for GPU version, False for CPU version
     """
     try:
         click.secho("\n--- Backend Configuration ---", fg="blue")
@@ -292,14 +430,22 @@ def get_gpu_cpu():
 
     except Exception as e:
         click.secho(
-            f"Error while selecting configuration options: {e}",
+            f"Error while selecting configuration options: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
 
-def get_registry():
+def get_registry() -> str:
+    """
+    Click command helper which asks for user input on
+    whether to use pull pre-built images from GitHub
+    Registry or from Docker Hub Registry.
+
+    Returns:
+      str: `GitHub` for GitHub Registry or `DockerHub` for Docker Hub Registry
+    """
     try:
         click.secho("\n--- Registry Configuration ---", fg="blue")
         pull_registry = click.confirm(
@@ -318,21 +464,25 @@ def get_registry():
 
     except Exception as e:
         click.secho(
-            f"Error while selecting registry configuration options: {e}",
+            f"Error while selecting registry configuration options: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
 
-def build_imgs_locally(use_gpu: bool):
+def build_imgs_locally(use_gpu: bool) -> None:
     """
-    Runs the docker build command for the frontend and backend
-    images based on whether CPU or GPU version is chosen.
+    Click command helper which runs the docker build command
+    for the frontend and backend images based on whether CPU or GPU
+    version is chosen.
+
+    Args:
+      use_gpu (bool): True to use GPU version, False to use CPU version
     """
     try:
         click.secho("\n--- Building Docker Images ---", fg="blue")
-        click.secho("\nBuilding frontend image...", fg="green")
+        click.secho("\nBuilding Frontend Image ...", fg="green")
         frontend_build_cmd = [
             "docker",
             "build",
@@ -343,14 +493,14 @@ def build_imgs_locally(use_gpu: bool):
             str(FRONTEND_BUILD_CONTEXT_RELPATH)
         ]
         run_command(frontend_build_cmd)
-        click.secho("Frontend image build complete.", fg="bright_green")
+        click.secho("Frontend Image Build Complete", fg="bright_green")
 
         if use_gpu:
-            click.secho("Building GPU backend image...", fg="green")
+            click.secho("Building GPU Backend Image ...", fg="green")
             backend_image_name = BACKEND_GPU_LOCAL_IMAGE_NAME
             backend_dockerfile_relpath = BACKEND_GPU_DOCKERFILE_RELPATH
         else:
-            click.secho("Building CPU backend image...", fg="green")
+            click.secho("Building CPU Backend Image ...", fg="green")
             backend_image_name = BACKEND_CPU_LOCAL_IMAGE_NAME
             backend_dockerfile_relpath = BACKEND_CPU_DOCKERFILE_RELPATH
 
@@ -364,23 +514,26 @@ def build_imgs_locally(use_gpu: bool):
             str(BACKEND_BUILD_CONTEXT_RELPATH)
         ]
         run_command(backend_build_cmd)
-        click.secho("\nBackend image build complete.", fg="bright_green")
+        click.secho("\nBackend Image Build Complete.", fg="bright_green")
 
     except Exception as e:
         click.secho(
-            f"Error while building local images: {e}",
+            f"Error while building local images: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
 
-def configure_repo():
+def configure_repo() -> Tuple[Path, Path]:
     """
-    Displays a header, sets up the local repository path, clones or
-    updates the repository, sets the working directory to the local repository
-    path and returns both the local repository path and original working
-    directory.
+    Click command helper which displays a header, sets up the local repository
+    path, clones or updates the repository, sets the working directory to the
+    local repository path.
+
+    Returns:
+      Tuple[Path]: contains both the local repository path and the
+                   original working directory.
     """
     try:
         click.secho("--- Mirumoji Launcher ---", fg="magenta")
@@ -390,75 +543,99 @@ def configure_repo():
         original_cwd = current_user_cwd
         # All subsequent paths are relative to repo_path
         os.chdir(repo_path)
-        click.secho(message=f"Changed working directory to: {repo_path}",
+        click.secho(message=f"Changed Working Directory To: '{repo_path}'",
                     fg="blue")
         return (repo_path, original_cwd)
 
     except Exception as e:
         click.secho(
-            f"Error while configuring repository: {e}",
+            f"Error while configuring repository: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
 
-# --- Click CLI structure ---
+# -----------------
+# --- Click CLI ---
+
 @click.group()
 def cli():
-    """Mirumoji Launcher: Setup and run Mirumoji with Docker."""
+    """
+    Mirumoji Launcher: Setup and run Mirumoji with Docker.
+    """
     pass
 
 
 @cli.command()
 @click.option('--build/--pull',
               default=None,
-              help=BUILD_HELP)
+              help=BUILD_HELP
+              )
 @click.option("--gpu/--cpu",
               default=None,
-              help=GPU_HELP)
+              help=GPU_HELP
+              )
 @click.option("--github-pull/--docker-pull",
               default=None,
-              help=REG_HELP)
+              help=REG_HELP
+              )
 @click.option('--no-clear',
               is_flag=True,
               default=False,
-              help="Do not clear the terminal after each step")
-def launch(build, gpu, github_pull, no_clear):
+              help="Do not clear the terminal after each step"
+              )
+def launch(build,
+           gpu,
+           github_pull,
+           no_clear
+           ):
     """
-    Guides through setup, image building (optional), and running Mirumoji.
+    Guides through the Mirumoji application setup with Docker
     """
     # --- Option Config ---
     try:
+        # Build Locally Option / Confirmation
         if build is None:
             build_locally = get_build_locally()
             if not no_clear:
                 click.clear()
         else:
             build_locally = build
+
+        # GPU or CPU Option / Confirmation
         if gpu is None:
             use_gpu = get_gpu_cpu()
             if not no_clear:
                 click.clear()
         else:
             use_gpu = gpu
+
     except Exception as e:
         click.secho(
-            f"\nError while configuring options: {e}",
+            f"\nError while configuring options: '{e}'",
             fg="red",
             err=True
         )
         sys.exit(1)
 
+    # --- Pull Repo ---
     repo_path, original_cwd = configure_repo()
     if not no_clear:
         click.clear()
+
+    # --- Image Configuration ---
     try:
+        # Build Locally
         if build_locally:
             build_imgs_locally(use_gpu=use_gpu)
             if not no_clear:
                 click.clear()
+
+        # Pull pre-built
         else:
+            # --- Option Config ---
+            # Pull from GitHub or DockerHub Option / Confirmation
             if github_pull is None:
                 registry = get_registry()
                 if not no_clear:
@@ -471,22 +648,28 @@ def launch(build, gpu, github_pull, no_clear):
                 registry = reg
             click.secho("\nUsing pre-built images.", fg='green')
 
-        click.secho(f"\n--- Checking {ENV_FILE_NAME} File ---", fg="blue")
+        # --- Environment Configuration ---
+        click.secho(f"\n--- Checking '{ENV_FILE_NAME}' File ---", fg="blue")
         env_file_abs_path = original_cwd / ENV_FILE_NAME
         required_env_vars = ["OPENAI_API_KEY"]
 
+        # CPU version requires Modal keys
         if not use_gpu:
-            # CPU version requires Modal keys
             required_env_vars.extend(["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"])
+
         check_env_file(required_env_vars,
-                       env_file_abs_path)
+                       env_file_abs_path
+                       )
+
         if not no_clear:
             click.clear()
-        # Get Host IPv4
+
+        # --- Get Host IPv4 ---
         HOST_LAN_IP = get_host_lan_ip()
         if not no_clear:
             click.clear()
 
+        # --- Choose Docker Compose ---
         if build_locally:
             if use_gpu:
                 compose_file_relpath = COMPOSE_LOCAL_GPU_RELPATH
@@ -504,9 +687,11 @@ def launch(build, gpu, github_pull, no_clear):
                 else:
                     compose_file_relpath = COMPOSE_PREBUILT_CPU_RELPATH
 
+        # --- Start Application ---
         click.secho("\n--- Running Docker Compose ---", fg="blue")
-        click.secho(f"Using compose file: {compose_file_relpath}",
-                    fg="bright_magenta")
+        click.secho(f"Using Compose File: '{compose_file_relpath}'",
+                    fg="bright_magenta"
+                    )
         docker_compose_cmd = [
             "docker",
             "compose",
@@ -520,6 +705,8 @@ def launch(build, gpu, github_pull, no_clear):
         run_command(docker_compose_cmd)
         if not no_clear:
             click.clear()
+
+        # --- Display Instructions ---
         stop_instructions = dedent(f"""\
 
         --- Accessible at ---
@@ -528,9 +715,9 @@ def launch(build, gpu, github_pull, no_clear):
 
         LAN: 'https://{HOST_LAN_IP}'
 
-        --- Launcher Stop Command ---
+        --- CLI Stop Command ---
 
-        launcher shutdown
+        mirumoji shutdown
 
         --- Docker Stop Command ---
 
@@ -540,7 +727,7 @@ def launch(build, gpu, github_pull, no_clear):
 
     except Exception as e:
         click.secho(
-            f"An unexpected error occurred during the launch process: {e}",
+            f"An unexpected error occurred during the launch process: '{e}'",
             fg="red",
             err=True
         )
@@ -554,18 +741,24 @@ def launch(build, gpu, github_pull, no_clear):
 @cli.command()
 @click.option("--clean/--no-clean",
               default=None,
-              help="Delete Docker Volumes")
+              help="Delete Docker Volumes"
+              )
 @click.option('--no-clear',
               is_flag=True,
               default=False,
-              help="Do not clear the terminal after each step")
+              help="Do not clear the terminal after each step"
+              )
 def shutdown(clean, no_clear):
     """
-    Runs docker compose down on application.
+    Stops application by running Docker Compose Down.
     """
+    # --- Update Repository ---
     repo_path, original_cwd = configure_repo()
     if not no_clear:
         click.clear()
+
+    # --- Option Config ---
+    # Clean Option / Confirmation
     if clean is None:
         delete_volumes = click.confirm(
             text="Delete Data (Docker Volumes) ?",
@@ -587,10 +780,10 @@ def shutdown(clean, no_clear):
         run_command(cmd, cwd=repo_path)
         if not no_clear:
             click.clear()
-        click.secho(message="All Services Stopped.", fg="bright_green")
+        click.secho(message="All Services Stopped", fg="bright_green")
     except Exception as e:
         click.secho(
-            f"An unexpected error occurred during shutdown: {e}",
+            f"An unexpected error occurred during shutdown: '{e}'",
             fg="red",
             err=True
         )

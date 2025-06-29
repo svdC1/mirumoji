@@ -1,3 +1,10 @@
+"""
+This module defines the `AudioTools` class for performing media operations.
+
+Attributes:
+    LOGGER (logging.Logger): Logger object of module.
+"""
+
 import subprocess
 import shutil
 import pathlib
@@ -5,35 +12,53 @@ from typing import Union
 import logging
 from datetime import datetime
 
+LOGGER = logging.getLogger(__name__)
+
 
 class AudioTools:
 
     """
-    Wrapper for FFMPEG to perform simple editing on video and audio
-    files.
+    Perform operations on media using system installed FFMPEG.
+
+    Args:
+      workding_dir (Union[str, pathlib.Path], optional): Default directory to
+                                                         save processed media.
+    Attributes:
+      working_dir (pathlib.Path): Default directory to save processed media.
+      temp (pathlib.Path): Temporary directory for operations created inside
+                           working_dir.
+      ffmpeg (str): System FFmpeg Path.
+      ffprobe (str): System FFprobe Path.
+
     """
 
     def __init__(self,
-                 working_dir: Union[str, pathlib.Path]):
-        """
-        Create instance relating to a specific directory where
-        operations will be performed.
-        """
+                 working_dir: Union[str, pathlib.Path] = None
+                 ) -> None:
 
-        self.logger = logging.getLogger(self.__class__.__name__)
+        # Check if Directory exists, create if it doesn't
+        if not working_dir:
+            working_dir = "audio_tools_wd"
         self.working_dir = pathlib.Path(working_dir).resolve()
         self.working_dir.mkdir(parents=True, exist_ok=True)
+
+        # Setup Temp
         self.temp = (working_dir / pathlib.Path("temp")).resolve()
         self.temp.mkdir(parents=True, exist_ok=True)
+
+        # Search for FFMPEG and FFPROBE with shutil
         self.ffmpeg = shutil.which("ffmpeg")
         self.ffprobe = shutil.which("ffprobe")
         if not self.ffmpeg:
             self.temp.rmdir()
+            LOGGER.error("FFmpeg not found")
             raise EnvironmentError("FFmpeg not found.")
         if not self.ffprobe:
             self.temp.rmdir()
+            LOGGER.error("FFprobe not found")
             raise EnvironmentError("FFprobe not found.")
-        self.logger.debug(f"FFMPEG at : {self.ffmpeg}")
+
+        LOGGER.debug(f"FFMPEG at : {self.ffmpeg}")
 
     def run_command(self,
                     command: list[str],
@@ -44,11 +69,21 @@ class AudioTools:
                     ) -> Union[subprocess.CompletedProcess,
                                None]:
         """
-        Simple wrapper for subprocess execution which returns a completed
-        subprocess instance in case of sucess or returns None and logs error
-        in case of failed subprocess execution.
+        Wrapper for subprocess.run to handle errors and results.
+
+        Args:
+          command (list): The CMD list of the command to be executed.
+          capture_output (bool): passed directly to subprocess.run
+          check (bool): passed directly to subprocess.run
+          cwd (str, optional): The directory in which the command is run.
+          hide_and_log (bool): If True redirect stdout and stderr to
+                               subprocess.DEVNULL and  subprocess.PIPE
+                               respectively.
+        Returns:
+          Union[subprocess.CompletedProcess, None]: The result of
+                                                    subprocess.run or None.
         """
-        self.logger.debug(f"Running Command: {' '.join(command)}")
+        LOGGER.debug(f"Running Command: {' '.join(command)}")
 
         try:
             if hide_and_log:
@@ -66,30 +101,44 @@ class AudioTools:
                                         cwd=cwd)
 
             if capture_output:
-                self.logger.debug(f"STDOUT: {result.stdout}")
-                self.logger.debug(f"STDERR: {result.stderr}")
+                LOGGER.debug(f"STDOUT: {result.stdout}")
+                LOGGER.debug(f"STDERR: {result.stderr}")
 
             return result
 
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"Command Failed: {' '.join(command)}")
+            LOGGER.error(f"Command Failed: {' '.join(command)}")
             if capture_output:
-                self.logger.error(f"STDOUT: {e.stdout}")
-                self.logger.error(f"STDERR: {e.stderr}")
+                LOGGER.error(f"STDOUT: {e.stdout}")
+                LOGGER.error(f"STDERR: {e.stderr}")
                 error_message = e.stderr.decode()
                 timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                 with open(self.working_dir / "error_log.txt",
-                          "w", encoding="utf-8") as log_file:
+                          "w",
+                          encoding="utf-8") as log_file:
                     log_file.write(
                         f"{timestamp} FFmpeg error:\n{error_message}\n\n")
             return None
 
     def to_wav(self,
                input_path: str,
-               output_path: str = None):
+               output_path: str = None
+               ) -> pathlib.Path:
 
+        """
+        Convert file to `.wav` format.
+
+        Args:
+          input_path (str): Path to the file.
+          output_path (str, optional): Optional custom output path, if not
+                                       specified uses the input filename.
+        Returns:
+          pathlib.Path -> The output path of the converted file.
+        """
         ip = pathlib.Path(input_path).resolve()
         op = pathlib.Path(output_path or ip.with_suffix(".wav")).resolve()
+
+        # Use POSIX path style for ffmpeg
         s = ip.as_posix()
         so = op.as_posix()
 
@@ -100,6 +149,7 @@ class AudioTools:
                    "-ac", "2",
                    "-f", "wav",
                    so]
+
         self.run_command(command,
                          capture_output=True,
                          check=True,
@@ -108,17 +158,28 @@ class AudioTools:
 
     def extract_audio(self, input_path: str) -> str:
         """
-        If input is a video container, extract to a temp WAV.
-        Otherwise return the original path.
+        Extract a WAV file from video container. If input file is already an
+        audio file, return the unchanged input file path.
+
+        Args:
+          input_path (str): Path to the file.
+
+        Returns:
+          pathlib.Path: The output path of the converted file.
         """
+
         ext = pathlib.Path(input_path).resolve().suffix
-        audio_exts = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
+        audio_exts = {".wav",
+                      ".mp3",
+                      ".m4a",
+                      ".flac",
+                      ".aac"
+                      }
         if ext in audio_exts:
-            self.logger.debug("Input is audio (%s), no extraction needed", ext)
+            LOGGER.debug(f"Input is audio {ext}, no extraction needed")
             return input_path
 
-        self.logger.info("Extracting audio from video container %s",
-                         input_path)
+        LOGGER.info(f"Extracting audio from video container {input_path}")
         out = pathlib.Path(input_path).resolve().with_suffix(".wav")
         si = pathlib.Path(input_path).resolve().as_posix()
         so = out.as_posix()
@@ -129,7 +190,7 @@ class AudioTools:
         ]
         self.run_command(cmd,
                          hide_and_log=True)
-        self.logger.debug(f"Audio Saved at {so}")
+        LOGGER.debug(f"Audio Saved at {so}")
         return out
 
     def filter_audio(self,
@@ -143,13 +204,13 @@ class AudioTools:
         then writes out a 16 kHz mono WAV ready for Whisper.
 
         Args:
-        input_path:   Path to video (any container) or audio file.
-        output_wav:   Path where the cleaned WAV will be saved.
-        highpass:     Cut everything below this frequency (Hz).
-        lowpass:      Cut everything above this frequency (Hz).
+          input_path (str):   Path to video (any container) or audio file.
+          output_wav (str):   Path where the cleaned WAV will be saved.
+          highpass (int):     Cut everything below this frequency (Hz).
+          lowpass (int):      Cut everything above this frequency (Hz).
 
         Returns:
-        The output_wav path, for chaining into Whisper.
+          str: The output_wav path, for chaining into Whisper.
         """
         i = pathlib.Path(input_path).resolve().as_posix()
         o = pathlib.Path(output_wav).resolve().as_posix()
@@ -174,23 +235,24 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> pathlib.Path | None:
+    ) -> Union[pathlib.Path, None]:
         """
-        Convert any video to MP4 (H.264 + AAC) that streams well in <video>.
+        Convert any video to MP4 (H.264 + AAC).
 
         Args:
-            input_path:      Source file (any container/codec FFmpeg supports).
-            output_path:     Destination .mp4 (defaults to same stem).
-            resolution:      Target canvas WxH. Aspect is preserved.
-            target_bitrate:  Video bitrate (e.g. '2500k').
-            use_nvenc:       True → try NVIDIA NVENC; False → libx264 CPU.
+          input_path (str): Source file (any container/codec FFmpeg supports).
+          output_path (str, optional): Destination .mp4 (defaults to same stem)
+          resolution (str): Target canvas WxH. Aspect is preserved.
+          target_bitrate (str):  Video bitrate (e.g. '2500k').
+          use_nvenc (bool): True → try NVIDIA NVENC; False → libx264 CPU.
 
         Returns:
-            pathlib.Path of the MP4, or None on failure.
+            pathlib.Path: Path of the MP4, or None on failure.
         """
+
         src = pathlib.Path(input_path).resolve()
         if not src.is_file():
-            self.logger.error("to_mp4: %s does not exist", src)
+            LOGGER.error(f"to_mp4: {src} does not exist")
             return None
 
         dst = pathlib.Path(output_path or src.with_suffix(".mp4")).resolve()
@@ -198,8 +260,7 @@ class AudioTools:
         try:
             w, h = map(int, resolution.lower().split("x"))
         except ValueError:
-            self.logger.error("to_mp4: resolution must be 'WxH', got %s",
-                              resolution)
+            LOGGER.error(f"to_mp4: resolution must be 'WxH', got {resolution}")
             return None
 
         # 1) scale to fit, 2) pad to canvas (center)
@@ -230,7 +291,7 @@ class AudioTools:
         if use_nvenc:
             enc_args = [
                 "-c:v", "h264_nvenc",
-                "-preset", "p6",           # quality-speed sweet spot
+                "-preset", "p6",
                 "-rc:v", "vbr",
                 "-b:v", target_bitrate,
                 "-pix_fmt", "yuv420p",
@@ -256,8 +317,8 @@ class AudioTools:
                                       capture_output=True,
                                       hide_and_log=True)
         if result is None or result.returncode != 0:
-            self.logger.error("FFmpeg to_mp4 failed:\n%s", result.stderr)
+            LOGGER.error(f"FFmpeg to_mp4 failed:\n{result.stderr}")
             return None
 
-        self.logger.info("Converted %s → %s", src.name, dst.name)
+        LOGGER.info(f"Converted {src.name} → {dst.name}")
         return dst

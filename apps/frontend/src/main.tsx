@@ -5,13 +5,16 @@ import App from "./App";
 import "./index.css";
 import { Toaster } from "react-hot-toast";
 import { ProfileProvider } from "./contexts/ProfileContext";
+import { SubtitleSettingsProvider } from "./contexts/SubtitleSettingsContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
         <ProfileProvider>
-            <BrowserRouter>
-                <App />
-            </BrowserRouter>
+            <SubtitleSettingsProvider>
+                <BrowserRouter basename={import.meta.env.BASE_URL}>
+                    <App />
+                </BrowserRouter>
+            </SubtitleSettingsProvider>
         </ProfileProvider>
         <Toaster position="top-center" />
     </React.StrictMode>

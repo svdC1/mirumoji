@@ -1,4 +1,3 @@
-// src/components/SettingsDrawer.tsx
 import React, { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -6,6 +5,7 @@ import { apiFetch, ApiError } from "../utils/api";
 import { toastApiError } from "../utils/error_toaster";
 import { formatStaticUrl } from "../utils/file_utils";
 import { ConvertVideoResponse, GenerateSrtResponse } from "../types";
+import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 const API_BASE = "api/";
 export interface Props {
     video: File | null;
@@ -17,6 +17,46 @@ export interface Props {
     showFurigana: boolean;
     onToggleFurigana: () => void;
 }
+
+const comprehensiveVideoAcceptList = [
+    // Common Formats
+    "video/mp4",
+    ".mp4",
+    "video/quicktime",
+    ".mov",
+    "video/x-matroska",
+    ".mkv",
+    "video/webm",
+    ".webm",
+    "video/x-msvideo",
+    ".avi",
+    "video/x-flv",
+    ".flv",
+    "video/x-ms-wmv",
+    ".wmv",
+    "video/mpeg",
+    ".mpeg",
+    ".mpg",
+    "video/x-m4v",
+    ".m4v",
+    // More Specific
+    "video/3gpp",
+    ".3gp",
+    "video/3gpp2",
+    ".3g2",
+    "video/ogg",
+    ".ogv",
+    "video/mp2t",
+    ".ts",
+    // Other formats FFMPEG can handle
+    ".asf",
+    ".divx",
+    ".f4v",
+    ".rmvb",
+    ".vob",
+    ".mts",
+    ".m2ts",
+].join(",");
 
 export default function SettingsDrawer({
     video,
@@ -30,7 +70,8 @@ export default function SettingsDrawer({
 }: Props) {
     const videoInputRef = useRef<HTMLInputElement | null>(null);
     const srtInputRef = useRef<HTMLInputElement | null>(null);
-
+    const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =
+        useSubtitleSettings();
     const [generatedSrtDownloadUrl, setGeneratedSrtDownloadUrl] = useState<
         string | null
     >(null);
@@ -186,6 +227,141 @@ export default function SettingsDrawer({
 
                     <section>
                         <h3 className="text-lg font-semibold text-neutral-200 mb-4">
+                            Subtitle Appearance
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <label
+                                    htmlFor="font-size"
+                                    className="text-neutral-100"
+                                >
+                                    Font Size
+                                </label>
+                                <input
+                                    id="font-size"
+                                    type="range"
+                                    min="12"
+                                    max="48"
+                                    value={subtitleStyle.fontSize}
+                                    onChange={(e) =>
+                                        setSubtitleStyle({
+                                            ...subtitleStyle,
+                                            fontSize: Number(e.target.value),
+                                        })
+                                    }
+                                    className="w-1/2"
+                                />
+                                <span className="text-neutral-300">
+                                    {subtitleStyle.fontSize}px
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <label
+                                    htmlFor="font-color"
+                                    className="text-neutral-100"
+                                >
+                                    Font Color
+                                </label>
+                                <input
+                                    id="font-color"
+                                    type="color"
+                                    value={subtitleStyle.fontColor}
+                                    onChange={(e) =>
+                                        setSubtitleStyle({
+                                            ...subtitleStyle,
+                                            fontColor: e.target.value,
+                                        })
+                                    }
+                                    className="w-12 h-8"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <label
+                                    htmlFor="bg-color"
+                                    className="text-neutral-100"
+                                >
+                                    Background Color
+                                </label>
+                                <input
+                                    id="bg-color"
+                                    type="color"
+                                    value={subtitleStyle.backgroundColor}
+                                    onChange={(e) =>
+                                        setSubtitleStyle({
+                                            ...subtitleStyle,
+                                            backgroundColor: e.target.value,
+                                        })
+                                    }
+                                    className="w-12 h-8"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <label
+                                    htmlFor="bg-opacity"
+                                    className="text-neutral-100"
+                                >
+                                    Background Opacity
+                                </label>
+                                <input
+                                    id="bg-opacity"
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={subtitleStyle.backgroundOpacity}
+                                    onChange={(e) =>
+                                        setSubtitleStyle({
+                                            ...subtitleStyle,
+                                            backgroundOpacity: Number(
+                                                e.target.value
+                                            ),
+                                        })
+                                    }
+                                    className="w-1/2"
+                                />
+                                <span className="text-neutral-300">
+                                    {(
+                                        subtitleStyle.backgroundOpacity * 100
+                                    ).toFixed(0)}
+                                    %
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <label
+                                    htmlFor="position"
+                                    className="text-neutral-100"
+                                >
+                                    Position
+                                </label>
+                                <input
+                                    id="position"
+                                    type="range"
+                                    min="0"
+                                    max="90"
+                                    step="1"
+                                    value={subtitleStyle.position}
+                                    onChange={(e) =>
+                                        setSubtitleStyle({
+                                            ...subtitleStyle,
+                                            position: Number(e.target.value),
+                                        })
+                                    }
+                                    className="w-1/2"
+                                />
+                                <span className="text-neutral-300">
+                                    {subtitleStyle.position}%
+                                </span>
+                            </div>
+                            <button
+                                onClick={resetSubtitleStyle}
+                                className="w-full py-2 bg-gray-600 hover:bg-gray-500 text-white rounded"
+                            >
+                                Reset Styles
+                            </button>
+                        </div>
+                    </section>
+                    <section>
+                        <h3 className="text-lg font-semibold text-neutral-200 mb-4">
                             Subtitle Display
                         </h3>
                         <div className="flex items-center justify-between">
@@ -221,7 +397,7 @@ export default function SettingsDrawer({
                             <input
                                 ref={videoInputRef}
                                 type="file"
-                                accept="video/*"
+                                accept={comprehensiveVideoAcceptList}
                                 onChange={handleVideoChange}
                                 disabled={isBusy}
                                 className="hidden"
