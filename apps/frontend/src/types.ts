@@ -1,4 +1,3 @@
-// src/types.ts
 /* UserPage*/
 export interface GptTemplate {
     id: string;

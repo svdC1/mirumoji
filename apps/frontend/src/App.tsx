@@ -1,5 +1,5 @@
-import React from "react"; // Assuming useEffect is no longer needed
-import { Routes, Route } from "react-router-dom"; // Assuming useLocation is no longer needed
+import React from "react";
+import { Routes, Route } from "react-router-dom";
 import NavigationMenu from "./components/NavigationMenu";
 import HomePage from "./pages/HomePage";
 import PlayerPage from "./pages/PlayerPage";
@@ -7,7 +7,6 @@ import TranscribePage from "./pages/TranscribePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UserPage from "./pages/UserPage";
 import SavedPaged from "./pages/SavedPage";
-
 
 function App() {
     return (

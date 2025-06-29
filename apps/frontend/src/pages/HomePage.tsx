@@ -1,4 +1,3 @@
-// src/pages/HomePage.tsx
 import { Link } from "react-router-dom";
 const ChevronRightIcon = () => (
     <svg

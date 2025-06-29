@@ -1,4 +1,3 @@
-// src/utils/error_toaster.tsx
 import React from "react";
 import toast from "react-hot-toast";
 import { ApiError } from "./api";

@@ -1,4 +1,3 @@
-// src/pages/UserPage.tsx
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
