@@ -18,6 +18,46 @@ export interface Props {
     onToggleFurigana: () => void;
 }
 
+const comprehensiveVideoAcceptList = [
+    // Common Formats
+    "video/mp4",
+    ".mp4",
+    "video/quicktime",
+    ".mov",
+    "video/x-matroska",
+    ".mkv",
+    "video/webm",
+    ".webm",
+    "video/x-msvideo",
+    ".avi",
+    "video/x-flv",
+    ".flv",
+    "video/x-ms-wmv",
+    ".wmv",
+    "video/mpeg",
+    ".mpeg",
+    ".mpg",
+    "video/x-m4v",
+    ".m4v",
+    // More Specific
+    "video/3gpp",
+    ".3gp",
+    "video/3gpp2",
+    ".3g2",
+    "video/ogg",
+    ".ogv",
+    "video/mp2t",
+    ".ts",
+    // Other formats FFMPEG can handle
+    ".asf",
+    ".divx",
+    ".f4v",
+    ".rmvb",
+    ".vob",
+    ".mts",
+    ".m2ts",
+].join(",");
+
 export default function SettingsDrawer({
     video,
     srt,
@@ -221,7 +261,7 @@ export default function SettingsDrawer({
                             <input
                                 ref={videoInputRef}
                                 type="file"
-                                accept="video/*"
+                                accept={comprehensiveVideoAcceptList}
                                 onChange={handleVideoChange}
                                 disabled={isBusy}
                                 className="hidden"
