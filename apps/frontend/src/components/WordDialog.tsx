@@ -40,9 +40,9 @@ export default function WordDialog({
     const key = `${sentence}__${word}`;
     const [data, setData] = useState<any | null>(gptCache.get(key) ?? null);
     const [tab, setTab] = useState<"gpt" | "dict">("dict");
-    const [dictTab, setDictTab] = useState<"jmdict" | "jmnedict" | "kanji">(
-        "jmdict"
-    );
+    const [dictTab, setDictTab] = useState<
+        "jmdict" | "jmnedict" | "kanji" | "examples"
+    >("jmdict");
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
     const [dictData, setDictData] = useState<DictLookup | null | undefined>(
@@ -150,14 +150,40 @@ export default function WordDialog({
                     entry.kanji = entry.kanji.filter(
                         (k) => k.stroke_count !== 99
                     );
+                    entry.jmentries = entry.jmentries.filter(
+                        (jme) =>
+                            (jme.kanji.length !== 0 || jme.kana.length !== 0) &&
+                            jme.senses.length !== 0 &&
+                            jme.senses[0].order !== 99
+                    );
+                    entry.jmnentries = entry.jmnentries.filter(
+                        (jmne) =>
+                            (jmne.kanji.length !== 0 ||
+                                jmne.kana.length !== 0) &&
+                            jmne.gloss.length !== 0 &&
+                            jmne.translation_type !== ""
+                    );
                 }
-                setDictData(entry);
-                if (entry?.jmentries.length === 0) {
-                    if (entry?.jmnentries.length > 0) {
-                        setDictTab("jmnedict");
-                    } else if (entry?.kanji.length > 0) {
-                        setDictTab("kanji");
+                const noEntry =
+                    entry.kanji.length === 0 &&
+                    entry.jmentries.length === 0 &&
+                    entry.jmnentries.length === 0 &&
+                    entry.meanings.length === 0 &&
+                    entry.examples.length === 0 &&
+                    entry.jlpt === "Unknown";
+                if (!noEntry) {
+                    setDictData(entry);
+                    if (entry?.jmentries.length === 0) {
+                        if (entry?.jmnentries.length > 0) {
+                            setDictTab("jmnedict");
+                        } else if (entry?.kanji.length > 0) {
+                            setDictTab("kanji");
+                        } else if (entry?.examples.length > 0) {
+                            setDictTab("examples");
+                        }
                     }
+                } else {
+                    setDictData(null);
                 }
             })
             .catch((e) => {
@@ -451,6 +477,24 @@ ${dictData.meanings.join(", ")}`;
         </div>
     );
 
+    const ExampleDisplay = ({
+        example,
+        key,
+        isLast,
+    }: {
+        example: string;
+        key: number;
+        isLast: boolean;
+    }) => (
+        <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
+            <div className="flex items-center">
+                <div key={key} className="ml-4 mt-1">
+                    <p className="text-neutral-400 text-lg">({example})</p>
+                </div>
+            </div>
+        </div>
+    );
+
     const JmnedictEntryDisplay = ({
         entry,
         isLast,
@@ -500,7 +544,7 @@ ${dictData.meanings.join(", ")}`;
                     <span className="font-semibold text-neutral-400">
                         JLPT:
                     </span>{" "}
-                    {kanjiInfo.jlpt_tanos || "N/A"}
+                    {kanjiInfo.jlpt_tanos || kanjiInfo.jlpt_kanjidic || "N/A"}
                 </p>
                 <div className="col-span-2">
                     <p>
@@ -694,6 +738,18 @@ ${dictData.meanings.join(", ")}`;
                                         Kanji
                                     </button>
                                 )}
+                                {dictData.examples.length > 0 && (
+                                    <button
+                                        className={`flex-1 py-2 text-sm ${
+                                            dictTab === "examples"
+                                                ? "border-b-2 border-teal-400 text-white"
+                                                : "text-neutral-400 hover:text-neutral-200"
+                                        }`}
+                                        onClick={() => setDictTab("examples")}
+                                    >
+                                        Examples
+                                    </button>
+                                )}
                             </div>
                             {dictTab === "jmdict" ? (
                                 <div>
@@ -721,7 +777,7 @@ ${dictData.meanings.join(", ")}`;
                                         />
                                     ))}
                                 </div>
-                            ) : (
+                            ) : dictTab === "kanji" ? (
                                 <div>
                                     {dictData.kanji.map((kanji, i) => (
                                         <KanjiInfoDisplay
@@ -731,6 +787,19 @@ ${dictData.meanings.join(", ")}`;
                                                 i === dictData.kanji.length - 1
                                             }
                                         />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div>
+                                    {dictData.examples.map((ex, i) => (
+                                        <ExampleDisplay
+                                            key={i}
+                                            example={ex}
+                                            isLast={
+                                                i ===
+                                                dictData.examples.length - 1
+                                            }
+                                        ></ExampleDisplay>
                                     ))}
                                 </div>
                             )}
