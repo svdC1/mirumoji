@@ -13,7 +13,7 @@ export interface SubtitleStyle {
     backgroundColor: string;
     backgroundOpacity: number;
     textShadow: string;
-    position: number; // New: Percentage from the bottom
+    position: number;
 }
 
 // Define the context shape
@@ -30,7 +30,7 @@ const defaultSubtitleStyle: SubtitleStyle = {
     backgroundColor: "#000000",
     backgroundOpacity: 0.5,
     textShadow: "1px 1px 2px black",
-    position: 5, // Default: 5% from the bottom
+    position: 5,
 };
 
 // Create the context with a default value
