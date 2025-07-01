@@ -15,8 +15,7 @@ import { toastApiError } from "../utils/apiErrorToaster";
 import { formatStaticUrl } from "../utils/fileUtils";
 import { truncateText } from "../utils/fileUtils";
 import { Clip, BreakdownData, AnkiExportResponse } from "../types/types";
-
-const API_BASE = "api/";
+import { API_BASE } from "../constants/user-page";
 
 /**
  * The SavedPage component.

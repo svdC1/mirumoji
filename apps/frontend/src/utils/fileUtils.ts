@@ -37,9 +37,9 @@ export const getFileExtension = (filenameOrUrl: string | undefined) => {
 };
 
 /**
- * Formats a static URL.
+ * Formats a static URL for the API
  *
- * @param {string} API_BASE The base URL of the API.
+ * @param {string} API_BASE The base URL of the API. (`/` included)
  * @param {string} url The URL to format.
  * @returns {string} The formatted URL.
  */

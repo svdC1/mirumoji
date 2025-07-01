@@ -1,12 +1,11 @@
 /**
- * @fileoverview Provides a high-level utility for creating and saving video clips.
+ * @fileoverview Provides a utility for creating and saving video clips.
  * This module orchestrates the recording process, data preparation, and API submission.
  */
 
 import { recordMediaStream } from "./mediaRecorder";
 import { apiFetch } from "../services/api";
-import { SaveClipResponse } from "../types/types";
-
+import { SaveClipResponse, BreakdownData } from "../types/types";
 /**
  * Creates and saves a video clip by recording a segment from a video element,
  * bundling it with GPT data, and uploading it to the server.
@@ -22,9 +21,10 @@ export async function createAndSaveClip(
     videoElementId: string,
     cueStart: number,
     cueEnd: number,
-    gptData: any,
+    gptData: BreakdownData,
     onProgress: (message: string, type: "success" | "error" | "loading") => void
 ): Promise<void> {
+    // Get Video Element
     const videoElement = document.getElementById(
         videoElementId
     ) as HTMLVideoElement;
@@ -33,12 +33,14 @@ export async function createAndSaveClip(
         throw new Error("Video player not found.");
     }
 
+    // Pad cueEnd 1s to catch eventual phrase cuts
     let adjustedCueEnd = cueEnd + 1.0;
     if (cueStart >= adjustedCueEnd) {
-        onProgress("Invalid clip duration.", "error");
-        throw new Error("Invalid clip duration.");
+        onProgress("Clip start time is after end time.", "error");
+        throw new Error("Clip start time is after end time");
     }
 
+    // Avoid cueEnd getting bigger than video duration due to 1s padding.
     const videoDuration = videoElement.duration;
     if (
         typeof videoDuration === "number" &&
@@ -53,11 +55,13 @@ export async function createAndSaveClip(
             adjustedCueEnd = videoDuration;
         }
     } else {
+        // When video duration is not availalbe such as streams remove the 1s padding.
         adjustedCueEnd = cueEnd;
     }
 
     try {
         onProgress("Recording clip...", "loading");
+        // Get File
         const clipFile = await recordMediaStream(
             videoElement,
             cueStart,
@@ -65,6 +69,8 @@ export async function createAndSaveClip(
         );
 
         onProgress("Uploading clip...", "loading");
+
+        // Request API endpoint to save the clip
         const formData = new FormData();
         formData.append("clip_start_time", cueStart.toString());
         formData.append("clip_end_time", adjustedCueEnd.toString());

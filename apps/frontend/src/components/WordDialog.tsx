@@ -18,6 +18,7 @@ import {
     WordDialogProps,
     DictLookup,
     ApiError,
+    BreakdownData,
 } from "../types/types";
 import { createAndSaveClip } from "../utils/clipCreator";
 import {
@@ -27,7 +28,8 @@ import {
     ExampleDisplay,
 } from "./DictDisplays";
 
-const gptCache = new Map<string, any>();
+// Cache GPT responses for already clicked words
+const gptCache = new Map<string, BreakdownData | null>();
 
 /**
  * The WordDialog component.
@@ -48,14 +50,22 @@ export default function WordDialog({
     videoFile,
     videoUrl,
 }: WordDialogProps) {
+    // Key for Cache
     const key = `${sentence}__${word}`;
-    const [data, setData] = useState<any | null>(gptCache.get(key) ?? null);
+    const [data, setData] = useState<BreakdownData | null>(
+        gptCache.get(key) ?? null
+    );
+    // Main Tabs State
     const [tab, setTab] = useState<"gpt" | "dict">("dict");
+    // Dictionary SubTabs State
     const [dictTab, setDictTab] = useState<
         "jmdict" | "jmnedict" | "kanji" | "examples"
     >("jmdict");
+    // Copied to Clipboard State
     const [copied, setCopied] = useState(false);
+    // Saving Clip State
     const [saving, setSaving] = useState(false);
+    // Dictionary Data from API
     const [dictData, setDictData] = useState<DictLookup | null | undefined>(
         undefined
     );
@@ -74,21 +84,30 @@ export default function WordDialog({
     }, []);
 
     const isMobile = screenWidth < 1380;
+    // Check if loaded on a player context
     const canSaveClip = !!(videoFile || videoUrl);
 
     const fetchGptData = async () => {
+        // Return Cache if existent
         if (gptCache.has(key)) {
-            setData(gptCache.get(key));
-            return gptCache.get(key);
+            const cacheData = gptCache.get(key);
+            if (cacheData) {
+                setData(cacheData);
+                return cacheData;
+            }
         }
+
+        // Configure Data
         let endpointUrl = "/gpt/breakdown";
         let requestBody: any = { sentence, focus: word };
 
         try {
+            // Fetch Profile Custom Template if existent
             const customTemplate = await apiFetch<GptTemplate | null>(
                 "/profiles/gpt_template"
             );
 
+            // Validate Custom Template
             if (
                 customTemplate &&
                 customTemplate.sysMsg &&
@@ -97,6 +116,8 @@ export default function WordDialog({
                 customTemplate.prompt.includes("{focus}")
             ) {
                 endpointUrl = "/gpt/custom_breakdown";
+
+                // Format variables to format expected by API
                 const backendPrompt = customTemplate.prompt
                     .replace(/{sentence}/g, "{0}")
                     .replace(/{focus}/g, "{1}");
@@ -131,12 +152,13 @@ export default function WordDialog({
                 );
             }
         }
-
+        // Request Endpoint
         try {
-            const json = await apiFetch(endpointUrl, {
+            const json = await apiFetch<BreakdownData>(endpointUrl, {
                 method: "POST",
                 body: JSON.stringify(requestBody),
             });
+            // Cache Request
             gptCache.set(key, json);
             setData(json);
             return json;
@@ -157,16 +179,20 @@ export default function WordDialog({
         setDictData(undefined);
         apiWordQuery(word)
             .then((entry) => {
+                // Filter Empty Elements
                 if (entry) {
+                    // Empty element has stroke count of `99`
                     entry.kanji = entry.kanji.filter(
                         (k) => k.stroke_count !== 99
                     );
+                    // Empty element has no `kana` and no `kanji` and one sense with order of `99`
                     entry.jmentries = entry.jmentries.filter(
                         (jme) =>
                             (jme.kanji.length !== 0 || jme.kana.length !== 0) &&
                             jme.senses.length !== 0 &&
                             jme.senses[0].order !== 99
                     );
+                    // Empty element has no `kana`, `kanji` or `gloss` and empty string as translation type
                     entry.jmnentries = entry.jmnentries.filter(
                         (jmne) =>
                             (jmne.kanji.length !== 0 ||
@@ -175,6 +201,7 @@ export default function WordDialog({
                             jmne.translation_type !== ""
                     );
                 }
+                // Empty response has empty lists and jlpt of `Unknown`
                 const noEntry =
                     entry.kanji.length === 0 &&
                     entry.jmentries.length === 0 &&
@@ -184,6 +211,7 @@ export default function WordDialog({
                     entry.jlpt === "Unknown";
                 if (!noEntry) {
                     setDictData(entry);
+                    // Set Default SubTab when common entries aren't available
                     if (entry?.jmentries.length === 0) {
                         if (entry?.jmnentries.length > 0) {
                             setDictTab("jmnedict");
@@ -200,12 +228,15 @@ export default function WordDialog({
             .catch((e) => {
                 console.error("apiWordQuery error", e);
                 setDictData(null);
+                toastApiError(e);
             });
     }, [tab, word]);
 
+    // Copy to Clipboard Functionality
     const handleCopy = () => {
-        // This function will need to be updated to handle the new dictData structure
         let textToCopy = "";
+
+        // Copy GPT Data as string
         if (tab === "gpt" && data) {
             textToCopy = [
                 data.focus.word,
@@ -214,10 +245,9 @@ export default function WordDialog({
                 "",
                 data.gpt_explanation,
             ].join("\n");
+            // Copy Dict Data as JSON String
         } else if (tab === "dict" && dictData) {
-            // Simplified for now, can be expanded
-            textToCopy = `${word}
-${dictData.meanings.join(", ")}`;
+            textToCopy = JSON.stringify(dictData);
         }
         if (textToCopy) {
             navigator.clipboard.writeText(textToCopy).then(() => {
@@ -227,41 +257,43 @@ ${dictData.meanings.join(", ")}`;
         }
     };
 
+    // Save Clip Functionality
     const handleSave = async () => {
+        const clipToastId = "clip-save-toast";
         if (!canSaveClip) {
             toast.error("No video source available");
             return;
         }
         setSaving(true);
-
         try {
             let gptData = data;
             if (!gptData) {
-                toast.loading("Fetching GPT data...", { id: "gpt-fetch" });
+                toast.loading("Fetching GPT data...", { id: clipToastId });
                 gptData = await fetchGptData();
-                toast.dismiss("gpt-fetch");
             }
 
             if (!gptData) {
-                toast.error("Could not fetch GPT data. Please try again.");
+                toast.error("Could not fetch GPT data. Please try again.", {
+                    id: clipToastId,
+                });
                 setSaving(false);
                 return;
             }
 
+            // Handle clipCreator callback on UI
             const onProgress = (
                 message: string,
                 type: "success" | "error" | "loading"
             ) => {
-                const toastId = "clip-save-toast";
                 switch (type) {
                     case "loading":
-                        toast.loading(message, { id: toastId });
+                        toast.loading(message, { id: clipToastId });
                         break;
                     case "success":
-                        toast.success(message, { id: toastId });
+                        toast.success(message, { id: clipToastId });
                         break;
                     case "error":
-                        toast.error(message, { id: toastId });
+                        toast.error(message, { id: clipToastId });
                         break;
                 }
             };
@@ -275,6 +307,8 @@ ${dictData.meanings.join(", ")}`;
             );
         } catch (error) {
             console.error("Failed to save clip from WordDialog:", error);
+            toast.error("Failed to Save Clip", { id: clipToastId });
+            setSaving(false);
         } finally {
             setSaving(false);
         }

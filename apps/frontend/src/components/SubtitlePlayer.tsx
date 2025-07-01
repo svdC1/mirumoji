@@ -31,12 +31,17 @@ export default function SubtitlePlayer({
     videoUrl,
     showFurigana,
 }: SubtitlePlayerProps) {
+    // Video reference
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    // Video Blob URL for Download
     const [blobUrl, setBlobUrl] = useState<string>(() =>
         videoUrl ? videoUrl : URL.createObjectURL(video)
     );
+    // Subtitle Cues
     const [cues, setCues] = useState<Cue[]>([]);
+    // Active Cue Index in the Cues Array
     const [activeIdx, setActiveIdx] = useState<number | null>(null);
+    // Word Dialog Information
     const [dialog, setDialog] = useState<{
         sentence: string;
         word: string;
@@ -46,6 +51,7 @@ export default function SubtitlePlayer({
 
     const { subtitleStyle } = useSubtitleSettings();
 
+    // Set Blob URL
     useEffect(() => {
         if (videoUrl) {
             setBlobUrl(videoUrl);
@@ -71,6 +77,7 @@ export default function SubtitlePlayer({
             const raw = parser.fromSrt(txt.trim());
             try {
                 const tokenizer = await getTokenizer();
+                // Tokenize raw Cues with Kurmoji
                 const processed: Cue[] = raw.map((c) => {
                     const sentence = c.text.replace(/<[^>]+>/g, "").trim();
                     const tokens = tokenizer.tokenize(sentence);
@@ -83,7 +90,8 @@ export default function SubtitlePlayer({
                 });
                 setCues(processed);
             } catch (err) {
-                console.error("Tokenizer failed, falling back", err);
+                console.error("Tokenizer Failed, falling back", err);
+                // Empty Fallback Cue Array Which Splits on Every Character
                 const fallback: Cue[] = raw.map((c) => ({
                     start: toSec(c.startTime),
                     end: toSec(c.endTime),
@@ -110,6 +118,7 @@ export default function SubtitlePlayer({
         })();
     }, [srt]);
 
+    // Sync Cues with Video
     useEffect(() => {
         const v = videoRef.current;
         if (!v) return;
@@ -124,6 +133,7 @@ export default function SubtitlePlayer({
 
     const activeCue = activeIdx !== null ? cues[activeIdx] : null;
 
+    // Set Subtitle CSS Properties based on Style Context
     const computedSubtitleStyle: React.CSSProperties = {
         color: subtitleStyle.fontColor,
         fontSize: `${subtitleStyle.fontSize}px`,
@@ -168,6 +178,7 @@ export default function SubtitlePlayer({
                                 : null;
 
                             return (
+                                // Clickable Subtitle Tokens
                                 <button
                                     key={i}
                                     className="inline-flex flex-col items-center mx-1 group align-bottom hover:text-yellow-300"
@@ -180,11 +191,13 @@ export default function SubtitlePlayer({
                                         });
                                     }}
                                 >
+                                    {/*Furigana*/}
                                     {shouldDisplayFurigana && furiganaText && (
                                         <span className="text-xs text-gray-400 group-hover:text-yellow-300">
                                             {furiganaText}
                                         </span>
                                     )}
+                                    {/*Token*/}
                                     <span className="underline group-hover:text-yellow-300">
                                         {token.surface_form}
                                     </span>
