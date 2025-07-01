@@ -1,26 +1,47 @@
+/**
+ * @fileoverview This component is the user page of the application.
+ * It allows the user to view their profile, files, transcripts, and GPT template.
+ */
+
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
-import { apiFetch, ApiError } from "../utils/api";
+import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
-import { GptTemplate, ProfileFile, ProfileTranscript } from "../types";
+import {
+    GptTemplate,
+    ProfileFile,
+    ProfileTranscript,
+    ApiError,
+} from "../types/types";
 import {
     getFileExtension,
     truncateFilename,
     formatStaticUrl,
-} from "../utils/file_utils";
-const tabs = [
-    { id: "profile", label: "Profile" },
-    { id: "files", label: "Files" },
-    { id: "transcripts", label: "Transcripts" },
-    { id: "gpt-template", label: "GPT Template" },
-];
-const API_BASE = "api/";
-const defaultSysMsg = `You are a Japanese language API that explains the specific nuance of specified word(s) in a Japanese sentence.\r\n\r\nRespond concisely in no more than 100 words.\r\n\r\nSpecified word(s) MUST be in Japanese\r\n\r\nAll other explanation text MUST be in English\r\n\r\nIn your response:\r\n\r\nDO NOT OUTPUT the language name or the word \'nuance\';\r\n\r\nDO NOT OUTPUT the context sentence ;\r\n\r\nDO NOT OUTPUT romaji/furigana or any notes on pronunciation;\r\n\r\nConclude with the specific nuance within the context sentence.`;
-const defaultPrompt = `{sentence}. Explain usage of word : {focus}\r\n`;
+} from "../utils/fileUtils";
+import {
+    tabs,
+    API_BASE,
+    defaultSysMsg,
+    defaultPrompt,
+} from "../constants/user-page";
 
+/**
+ * The UserPage component.
+ *
+ * This component is responsible for the following:
+ * - Displaying the user's profile.
+ * - Displaying the user's files.
+ * - Displaying the user's transcripts.
+ * - Displaying the user's GPT template.
+ * - Allowing the user to delete their files and transcripts.
+ * - Allowing the user to download their transcripts.
+ * - Allowing the user to save, update, and delete their GPT template.
+ *
+ * @returns {JSX.Element} The UserPage component.
+ */
 export default function UserPage() {
     const [activeTab, setActiveTab] = useState<string>("profile");
     const { profileId } = useProfile();

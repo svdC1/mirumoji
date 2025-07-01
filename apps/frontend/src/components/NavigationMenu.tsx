@@ -1,3 +1,8 @@
+/**
+ * @fileoverview This component provides a navigation menu for the application.
+ * It includes a hamburger button, a side panel with navigation links, and a profile manager.
+ */
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -7,6 +12,16 @@ import {
 } from "@heroicons/react/24/outline";
 import { useProfile } from "../contexts/ProfileContext";
 
+/**
+ * The NavigationMenu component.
+ *
+ * This component is responsible for the following:
+ * - Displaying a hamburger button to open the navigation menu.
+ * - Displaying a side panel with navigation links.
+ * - Allowing the user to set, update, and clear their profile.
+ *
+ * @returns {JSX.Element} The NavigationMenu component.
+ */
 export default function NavigationMenu() {
     const { profileId, setProfileId } = useProfile();
     const [open, setOpen] = useState(false);
