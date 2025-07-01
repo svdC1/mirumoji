@@ -3,7 +3,7 @@
  * It includes a GPT-powered explanation, dictionary definitions, and the ability to save a clip of the word being used.
  */
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,17 +15,11 @@ import { apiWordQuery } from "../services/dictApi";
 import { toastApiError } from "../utils/apiErrorToaster";
 import {
     GptTemplate,
-    SaveClipResponse,
     WordDialogProps,
     DictLookup,
-    JMEntry,
-    JMNEntry,
-    KanjiInfo,
     ApiError,
 } from "../types/types";
 import { createAndSaveClip } from "../utils/clipCreator";
-
-import { createRecordingPromise } from "../utils/mediaRecorder";
 import {
     JmdictEntryDisplay,
     JmnedictEntryDisplay,
