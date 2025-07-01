@@ -1,6 +1,19 @@
+/**
+ * @fileoverview This component is the 404 page of the application.
+ */
+
 import React from "react";
 import { Link } from "react-router-dom";
 
+/**
+ * The NotFoundPage component.
+ *
+ * This component is responsible for the following:
+ * - Displaying a 404 error message.
+ * - Providing a link to the home page.
+ *
+ * @returns {JSX.Element} The NotFoundPage component.
+ */
 const NotFoundPage: React.FC = () => {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12 bg-gray-900 text-white">

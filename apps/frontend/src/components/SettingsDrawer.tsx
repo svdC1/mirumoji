@@ -1,22 +1,22 @@
+/**
+ * @fileoverview This component provides a settings drawer for the video player.
+ * It allows the user to load video and subtitle files, generate subtitles,
+ * convert videos to MP4, and customize the appearance of the subtitles.
+ */
+
 import React, { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { apiFetch, ApiError } from "../utils/api";
-import { toastApiError } from "../utils/error_toaster";
-import { formatStaticUrl } from "../utils/file_utils";
-import { ConvertVideoResponse, GenerateSrtResponse } from "../types";
+import { apiFetch } from "../services/api";
+import { toastApiError } from "../utils/apiErrorToaster";
+import { formatStaticUrl } from "../utils/fileUtils";
+import {
+    ConvertVideoResponse,
+    GenerateSrtResponse,
+    SettingsDrawerProps,
+} from "../types/types";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 const API_BASE = "api/";
-export interface Props {
-    video: File | null;
-    srt: File | null;
-    onVideo: (file: File | null) => void;
-    onVideoUrl?: (url: string) => void;
-    onSrt: (file: File | null) => void;
-    onClose: () => void;
-    showFurigana: boolean;
-    onToggleFurigana: () => void;
-}
 
 const comprehensiveVideoAcceptList = [
     // Common Formats
@@ -58,6 +58,18 @@ const comprehensiveVideoAcceptList = [
     ".m2ts",
 ].join(",");
 
+/**
+ * The SettingsDrawer component.
+ *
+ * This component is responsible for the following:
+ * - Allowing the user to load video and subtitle files.
+ * - Generating subtitles from a video file.
+ * - Converting a video file to MP4 format.
+ * - Customizing the appearance of the subtitles.
+ *
+ * @param {SettingsDrawerProps} props The props for the component.
+ * @returns {JSX.Element} The SettingsDrawer component.
+ */
 export default function SettingsDrawer({
     video,
     srt,
@@ -67,7 +79,7 @@ export default function SettingsDrawer({
     onClose,
     showFurigana,
     onToggleFurigana,
-}: Props) {
+}: SettingsDrawerProps): JSX.Element {
     const videoInputRef = useRef<HTMLInputElement | null>(null);
     const srtInputRef = useRef<HTMLInputElement | null>(null);
     const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =

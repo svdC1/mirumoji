@@ -1,3 +1,7 @@
+/**
+ * @fileoverview This file provides a context for managing the subtitle settings.
+ */
+
 import React, {
     createContext,
     useContext,
@@ -6,15 +10,7 @@ import React, {
     ReactNode,
 } from "react";
 
-// Define the shape of the subtitle style settings
-export interface SubtitleStyle {
-    fontSize: number;
-    fontColor: string;
-    backgroundColor: string;
-    backgroundOpacity: number;
-    textShadow: string;
-    position: number;
-}
+import { SubtitleStyle } from "../types/types";
 
 // Define the context shape
 interface SubtitleSettingsContextType {
@@ -38,7 +34,12 @@ const SubtitleSettingsContext = createContext<
     SubtitleSettingsContextType | undefined
 >(undefined);
 
-// Create the provider component
+/**
+ * A provider for the SubtitleSettingsContext.
+ *
+ * @param {{ children: ReactNode }} props The props for the component.
+ * @returns {JSX.Element} The SubtitleSettingsProvider component.
+ */
 export const SubtitleSettingsProvider = ({
     children,
 }: {
@@ -92,7 +93,11 @@ export const SubtitleSettingsProvider = ({
     );
 };
 
-// Create a custom hook for easy context consumption
+/**
+ * A hook for using the SubtitleSettingsContext.
+ *
+ * @returns {SubtitleSettingsContextType} The SubtitleSettingsContext.
+ */
 export const useSubtitleSettings = () => {
     const context = useContext(SubtitleSettingsContext);
     if (context === undefined) {

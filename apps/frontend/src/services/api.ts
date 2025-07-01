@@ -1,17 +1,22 @@
-export class ApiError extends Error {
-    constructor(public status: number, message: string) {
-        super(message);
-    }
-}
+/**
+ * @fileoverview This file contains the apiFetch function, which is a wrapper around the native fetch function.
+ */
+
+import { ApiError } from "../types/types";
 
 const BASE = "api";
 
 /**
  * A fetch replacement that:
- *   Auto-prefixes BASE for relative URLs
- *   Adds X-Profile-ID header if a profile is set in localStorage
- *   Throws ApiError on non-2xx
- *   Parses JSON/text/blob based on content-type
+ *   - Auto-prefixes BASE for relative URLs
+ *   - Adds X-Profile-ID header if a profile is set in localStorage
+ *   - Throws ApiError on non-2xx
+ *   - Parses JSON/text/blob based on content-type
+ *
+ * @param {string} url The URL to fetch.
+ * @param {RequestInit} [opts={}] The options for the fetch request.
+ * @returns {Promise<T>} A promise that resolves to the response data.
+ * @template T
  */
 export async function apiFetch<T = unknown>(
     url: string,

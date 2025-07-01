@@ -1,45 +1,36 @@
+/**
+ * @fileoverview This component is a video player with interactive subtitles.
+ * It displays subtitles on top of the video, and allows the user to click on
+ * words to get more information about them.
+ */
+
 import React, { useEffect, useRef, useState } from "react";
 import SrtParser2 from "srt-parser-2";
-import { getTokenizer } from "../tokenizer";
+import { getTokenizer } from "../services/tokenizer";
 import WordDialog from "./WordDialog";
 import { isKanji, toHiragana } from "../utils/languageUtils";
-import { IpadicFeatures } from "kuromoji";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
+import { IpadicFeatures } from "kuromoji";
+import { Cue, SubtitlePlayerProps } from "../types/types";
+import { toSec, hexToRgba } from "../utils/formatters";
 
-interface Cue {
-    start: number;
-    end: number;
-    tokens: IpadicFeatures[];
-    raw: string;
-}
-
-interface Props {
-    video: File;
-    videoUrl?: string;
-    srt: File | null;
-    showFurigana: boolean;
-}
-
-const toSec = (t: string): number => {
-    const [h, m, rest] = t.split(":");
-    const [s, ms] = rest.split(",");
-    return +h * 3600 + +m * 60 + +s + +ms / 1000;
-};
-
-// Helper function to convert hex to rgba
-const hexToRgba = (hex: string, alpha: number): string => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
+/**
+ * The SubtitlePlayer component.
+ *
+ * This component is responsible for the following:
+ * - Playing a video with subtitles.
+ * - Parsing and displaying subtitles.
+ * - Allowing the user to click on words in the subtitles to get more information.
+ *
+ * @param {SubtitlePlayerProps} props The props for the component.
+ * @returns {JSX.Element} The SubtitlePlayer component.
+ */
 export default function SubtitlePlayer({
     video,
     srt,
     videoUrl,
     showFurigana,
-}: Props) {
+}: SubtitlePlayerProps) {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [blobUrl, setBlobUrl] = useState<string>(() =>
         videoUrl ? videoUrl : URL.createObjectURL(video)

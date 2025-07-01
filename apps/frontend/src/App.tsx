@@ -1,3 +1,8 @@
+/**
+ * @fileoverview This is the root component of the application.
+ * It sets up the main layout and routing.
+ */
+
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import NavigationMenu from "./components/NavigationMenu";
@@ -6,8 +11,14 @@ import PlayerPage from "./pages/PlayerPage";
 import TranscribePage from "./pages/TranscribePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UserPage from "./pages/UserPage";
-import SavedPaged from "./pages/SavedPage";
+import SavedPage from "./pages/SavedPage";
 
+/**
+ * The main application component.
+ *
+ * It renders the navigation menu and sets up the routes for the different pages.
+ * @returns {JSX.Element} The main application component.
+ */
 function App() {
     return (
         <div className="flex flex-col h-screen">
@@ -15,7 +26,7 @@ function App() {
             <main className="flex-1 overflow-auto">
                 <Routes>
                     <Route path="/dashboard" element={<UserPage />} />
-                    <Route path="/saved" element={<SavedPaged />} />
+                    <Route path="/saved" element={<SavedPage />} />
                     <Route path="/transcribe" element={<TranscribePage />} />
                     <Route path="/" element={<HomePage />} />
                     <Route path="/player" element={<PlayerPage />} />

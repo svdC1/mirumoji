@@ -1,3 +1,7 @@
+/**
+ * @fileoverview This file contains the tokenizer for the application.
+ */
+
 import * as kuromoji from "kuromoji";
 export type IpadicFeatures = kuromoji.IpadicFeatures;
 export type KuromojiTokenizer = kuromoji.Tokenizer<IpadicFeatures>;
@@ -13,6 +17,12 @@ if (viteBaseUrl !== "/" && !viteBaseUrl.endsWith("/")) {
 // Otherwise, it should be '/repo_name/dict/'.
 
 const DICT_PATH = viteBaseUrl + "dict/";
+
+/**
+ * Gets the tokenizer.
+ *
+ * @returns {Promise<KuromojiTokenizer>} A promise that resolves to the tokenizer.
+ */
 export function getTokenizer() {
     if (tokPromise) return tokPromise;
 

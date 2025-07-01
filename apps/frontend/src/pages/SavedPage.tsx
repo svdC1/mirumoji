@@ -1,22 +1,34 @@
+/**
+ * @fileoverview This component displays the user's saved clips.
+ * It allows the user to view, delete, and export their clips to Anki.
+ */
+
 import React, { useState, useMemo } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
-import { apiFetch, ApiError } from "../utils/api";
+import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { toastApiError } from "../utils/error_toaster";
-import { formatStaticUrl } from "../utils/file_utils";
-import { truncateText } from "../utils/file_utils";
-import {
-    Clip,
-    BreakdownFocus,
-    BreakdownData,
-    AnkiExportResponse,
-} from "../types";
+import { toastApiError } from "../utils/apiErrorToaster";
+import { formatStaticUrl } from "../utils/fileUtils";
+import { truncateText } from "../utils/fileUtils";
+import { Clip, BreakdownData, AnkiExportResponse } from "../types/types";
 
 const API_BASE = "api/";
+
+/**
+ * The SavedPage component.
+ *
+ * This component is responsible for the following:
+ * - Fetching and displaying the user's saved clips.
+ * - Allowing the user to view the details of a clip.
+ * - Allowing the user to delete a clip.
+ * - Allowing the user to export all clips to an Anki deck.
+ *
+ * @returns {JSX.Element} The SavedPage component.
+ */
 export default function SavedPage() {
     const { profileId } = useProfile();
     const [deletingClipId, setDeletingClipId] = useState<string | null>(null);

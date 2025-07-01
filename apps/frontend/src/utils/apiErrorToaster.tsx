@@ -1,7 +1,17 @@
+/**
+ * @fileoverview This file contains a function for displaying API errors as toasts.
+ */
+
 import React from "react";
 import toast from "react-hot-toast";
-import { ApiError } from "./api";
+import { ApiError } from "../types/types";
 
+/**
+ * Displays an API error as a toast.
+ *
+ * @param {unknown} err The error to display.
+ * @param {string} [toastId] The ID of the toast to update.
+ */
 export function toastApiError(err: unknown, toastId?: string) {
     const opts = toastId ? { id: toastId, duration: 5000 } : { duration: 5000 };
 

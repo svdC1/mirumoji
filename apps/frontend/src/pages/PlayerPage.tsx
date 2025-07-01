@@ -1,8 +1,21 @@
+/**
+ * @fileoverview This component is the player page of the application.
+ */
+
 import React, { useState } from "react";
 import SubtitlePlayer from "../components/SubtitlePlayer";
 import SettingsDrawer from "../components/SettingsDrawer";
 import { Menu } from "lucide-react";
 
+/**
+ * The PlayerPage component.
+ *
+ * This component is responsible for the following:
+ * - Displaying the video player.
+ * - Displaying the settings drawer.
+ *
+ * @returns {JSX.Element} The PlayerPage component.
+ */
 export default function PlayerPage() {
     const [video, setVideo] = useState<File | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
