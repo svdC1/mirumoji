@@ -18,13 +18,10 @@ export function toastApiError(err: unknown, toastId?: string) {
     if (err instanceof ApiError) {
         switch (err.status) {
             case 403:
-                toast.error(
-                    "🚫 Action not allowed or permission denied.",
-                    opts
-                );
+                toast.error("🚫 Not Allowed", opts);
                 return;
             case 404:
-                toast.error("🔍 The requested resource was not found.", opts);
+                toast.error("🔍 Could Not Find Resource", opts);
                 return;
             default:
                 console.error(`API Error ${err.status}:`, err.message, err);
@@ -35,5 +32,5 @@ export function toastApiError(err: unknown, toastId?: string) {
 
     // For non-ApiError types or if err is not an instance of ApiError
     console.error("Unexpected Error:", err);
-    toast.error("⚠️ Unexpected Error. Please try again.", opts);
+    toast.error("⚠️ Unexpected Error", opts);
 }
