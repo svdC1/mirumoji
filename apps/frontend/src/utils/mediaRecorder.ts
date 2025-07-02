@@ -5,6 +5,17 @@
  * It also automatically selects a supported MIME type for MediaRecorder by checking availability.
  */
 
+// Create single shared audio context
+const sharedAudioCtx = new (window.AudioContext ||
+    (window as any).webkitAudioContext)();
+
+// Cache one MediaElementAudioSourceNode per video element since a single <video>
+// may only be connected to one MediaElementSource node in the page’s lifetime.
+const elementSourceMap = new WeakMap<
+    HTMLMediaElement,
+    MediaElementAudioSourceNode
+>();
+
 /**
  * Gets a MediaStream from a video element, using a canvas fallback if necessary.
  * @param {HTMLVideoElement} videoElement - The video element to get a stream from.
@@ -15,6 +26,16 @@ export async function getStream(
     videoElement: HTMLVideoElement,
     endTime: number
 ): Promise<MediaStream> {
+    // Make sure metadata is ready to avoid empty canvas
+    if (videoElement.readyState < 1) {
+        await new Promise<void>((res) =>
+            videoElement.addEventListener("loadedmetadata", () => res(), {
+                once: true,
+            })
+        );
+    }
+
+    // Use native captureStream when browser supports it
     if (typeof videoElement.captureStream === "function") {
         return videoElement.captureStream();
     }
@@ -31,14 +52,21 @@ export async function getStream(
     }
 
     // Capture Audio Separately
-    const audioContext = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-    const sourceNode = audioContext.createMediaElementSource(videoElement);
-    const destinationNode = audioContext.createMediaStreamDestination();
-    sourceNode.connect(destinationNode);
-    sourceNode.connect(audioContext.destination); // Ensure audio plays out if not muted
+    let sourceNode = elementSourceMap.get(videoElement);
+    if (!sourceNode) {
+        // Create node and store it if a cached one doesn't exist
+        sourceNode = sharedAudioCtx.createMediaElementSource(videoElement);
+        elementSourceMap.set(videoElement, sourceNode);
+        // Connect the node to the speakers
+        sourceNode.connect(sharedAudioCtx.destination);
+    }
 
-    const videoTrack = canvas.captureStream().getVideoTracks()[0];
+    const destinationNode = sharedAudioCtx.createMediaStreamDestination();
+    sourceNode.connect(destinationNode);
+
+    // Request video tracks from canvas with a fixed frame rate of 30
+    const videoTrack = canvas.captureStream(30).getVideoTracks()[0];
+    // Get audio track from node
     const audioTrack = destinationNode.stream.getAudioTracks()[0];
 
     // Construct MediaStream from Canvas tracks
@@ -52,7 +80,6 @@ export async function getStream(
             videoElement.currentTime >= endTime
         ) {
             cancelAnimationFrame(animationFrameId);
-            audioContext.close();
             return;
         }
         ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
@@ -170,12 +197,14 @@ export async function recordMediaStream(
         );
     }
 
+    // Store original element state
     const originalTime = videoElement.currentTime;
     const wasPaused = videoElement.paused;
-    const wasMuted = videoElement.muted;
+    const originalVolume = videoElement.volume;
 
     videoElement.currentTime = startTime;
-    videoElement.muted = true; // Mute playback during capture to avoid echo
+    // Set volume to 0 instead of muting to keep decoder alive
+    videoElement.volume = 0;
 
     try {
         await videoElement.play();
@@ -201,12 +230,12 @@ export async function recordMediaStream(
         throw error;
     } finally {
         // Restore video element's state
+        videoElement.currentTime = originalTime;
+        videoElement.volume = originalVolume;
         if (wasPaused) {
             videoElement.pause();
         } else {
             await videoElement.play();
         }
-        videoElement.currentTime = originalTime;
-        videoElement.muted = wasMuted;
     }
 }
