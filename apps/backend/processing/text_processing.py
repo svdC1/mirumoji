@@ -94,7 +94,8 @@ In your response:
                        sentence: str,
                        focus: str,
                        sysMsg: str,
-                       prompt: str
+                       prompt: str,
+                       version: str,
                        ) -> Optional[str]:
         """
         Request an explanation from GPT using custom system message and prompt.
@@ -105,6 +106,7 @@ In your response:
           sysMsg (str): GPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence` and `{1}` = `focus`
+          version (str): GPT model version to use
 
         Returns:
           str: GPT-generated response
@@ -115,7 +117,7 @@ In your response:
         except Exception as e:
             LOGGER.error(f"Couldn't format prompt : {e}")
             return None
-        model = GptModel(self.model_kwargs["version"],
+        model = GptModel(version,
                          sysMsg,
                          self.model_kwargs["from_dotenv"],
                          self.model_kwargs["ApiKey"],
@@ -144,7 +146,8 @@ In your response:
     def explain_sentence_custom(self,
                                 sentence: str,
                                 sysMsg: str,
-                                prompt: str
+                                prompt: str,
+                                version: str,
                                 ) -> Optional[str]:
         """
         Request an explanation from GPT using custom system message and prompt
@@ -155,6 +158,7 @@ In your response:
           sysMsg (str): ChatGPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence`
+          version (str): GPT model version to use
 
         Returns:
             str: GPT-generated response
@@ -164,7 +168,7 @@ In your response:
         except Exception as e:
             LOGGER.error(f"Couldn't format prompt : {e}")
             return None
-        model = GptModel(self.model_kwargs["version"],
+        model = GptModel(version,
                          sysMsg,
                          self.model_kwargs["from_dotenv"],
                          self.model_kwargs["ApiKey"],
@@ -201,7 +205,7 @@ def _query_kotobase(word: str) -> Dict:
         entry = l_result.entries[0]
         if isinstance(entry, JMDictEntryDTO):
             meanings = (
-                [s["gloss"] for s in entry.senses] if entry.senses else []
+                [str(s["gloss"]) for s in entry.senses] if entry.senses else []
                 )
             reading = ",".join(entry.kana) if entry.kana else ""
         elif isinstance(entry, JMNeDictEntryDTO):
@@ -209,6 +213,9 @@ def _query_kotobase(word: str) -> Dict:
                 [entry.translation_type] if entry.translation_type else []
                 )
             reading = ",".join(entry.kana) if entry.kana else ""
+        else:
+            meanings = []
+            reading = ""
     else:
         meanings = []
         reading = ""
@@ -482,7 +489,8 @@ class SentenceBreakdownService:
                        sentence: str,
                        sysMsg: str,
                        prompt: str,
-                       focus: Optional[str] = None
+                       version: str,
+                       focus: Optional[str] = None,
                        ) -> BreakdownResponse:
         """
         Perform a complete sentence breakdown using custom sys_msg and prompt
@@ -493,6 +501,7 @@ class SentenceBreakdownService:
           sysMsg (str): ChatGPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence` and `{1}` = `focus`
+          version (str): GPT model version to use
 
         Returns:
           BreakdownResponse: Includes tokens, word info, and GPT breakdown
@@ -504,7 +513,9 @@ class SentenceBreakdownService:
             gpt_text = self.gpt_explainer.explain_custom(sentence,
                                                          focus,
                                                          sysMsg,
-                                                         prompt)
+                                                         prompt,
+                                                         version
+                                                         )
             f_lemma = focus or ""
             try:
                 info = _query_kotobase(word=f_lemma)
@@ -525,7 +536,9 @@ class SentenceBreakdownService:
         else:
             gpt_text = self.gpt_explainer.explain_sentence_custom(sentence,
                                                                   sysMsg,
-                                                                  prompt)
+                                                                  prompt,
+                                                                  version
+                                                                  )
             focus_data = FocusInfo(
                 word="",
                 reading="",

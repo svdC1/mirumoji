@@ -15,8 +15,10 @@ class CustomBreakdownRequest(BaseModel):
       focus (str, optional): The optinal focus word.
       sysMsg (str): The custom system message for the model.
       prompt (str): The custom prompt for the model.
+      version (str): The custom model version
     """
     sentence: str
     focus: Optional[str] = None
     sysMsg: str
     prompt: str
+    version: str

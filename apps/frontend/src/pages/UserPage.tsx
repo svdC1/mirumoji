@@ -26,6 +26,7 @@ import {
     API_BASE,
     defaultSysMsg,
     defaultPrompt,
+    validGptModels,
 } from "../constants/user-page";
 
 /**
@@ -56,6 +57,7 @@ export default function UserPage() {
     // GPT Template states
     const [gptSysMsg, setGptSysMsg] = useState("");
     const [gptPrompt, setGptPrompt] = useState("");
+    const [gptVersion, setGptVersion] = useState(validGptModels[3]); // Default : gpt-4.1-mini
     const [currentGptTemplate, setCurrentGptTemplate] =
         useState<GptTemplate | null>(null); // Store the fetched template object
     const [isSavingGptTemplate, setIsSavingGptTemplate] = useState(false);
@@ -119,6 +121,7 @@ export default function UserPage() {
         if (gptTemplateData) {
             setGptSysMsg(gptTemplateData.sysMsg);
             setGptPrompt(gptTemplateData.prompt);
+            setGptVersion(gptTemplateData.version);
             setCurrentGptTemplate(gptTemplateData);
         } else if (
             profileId &&
@@ -128,6 +131,7 @@ export default function UserPage() {
             // If no template data but profile active
             setGptSysMsg(defaultSysMsg); // Clear or set to defaults for new template creation
             setGptPrompt(defaultPrompt);
+            setGptVersion(validGptModels[3]);
             setCurrentGptTemplate(null);
         }
     }, [gptTemplateData, profileId, activeTab, gptTemplateLoading]);
@@ -220,6 +224,7 @@ export default function UserPage() {
             const payload: Partial<GptTemplate> = {
                 sysMsg: gptSysMsg,
                 prompt: gptPrompt,
+                version: gptVersion,
             };
             if (currentGptTemplate?.id) {
                 payload.id = currentGptTemplate.id;
@@ -255,10 +260,12 @@ export default function UserPage() {
                 body: JSON.stringify({
                     sysMsg: defaultSysMsg,
                     prompt: defaultPrompt,
+                    version: validGptModels[3],
                 }),
             });
             setGptSysMsg(defaultSysMsg);
             setGptPrompt(defaultPrompt);
+            setGptVersion(validGptModels[3]);
             toast.success("Template reverted to default!");
             mutate(gptTemplateSWRKey);
         } catch (error) {
@@ -277,9 +284,11 @@ export default function UserPage() {
         setIsDeletingGptTemplate(true);
         try {
             await apiFetch(`/profiles/gpt_template`, { method: "DELETE" });
+            mutate(gptTemplateSWRKey, null, { revalidate: false });
             toast.success("Template deleted!");
-            setGptSysMsg("");
-            setGptPrompt("");
+            setGptSysMsg(defaultSysMsg);
+            setGptPrompt(defaultPrompt);
+            setGptVersion(validGptModels[3]);
             setCurrentGptTemplate(null);
             mutate(gptTemplateSWRKey);
         } catch (error) {
@@ -512,6 +521,29 @@ export default function UserPage() {
                                         <code>{"{focus}"}</code> placeholders.
                                     </p>
                                     <div>
+                                        <label
+                                            htmlFor="gptVersion"
+                                            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                                        >
+                                            Model Version
+                                        </label>
+                                        <select
+                                            id="gptVersion"
+                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                            value={gptVersion}
+                                            onChange={(e) =>
+                                                setGptVersion(e.target.value)
+                                            }
+                                        >
+                                            {validGptModels.map((version) => (
+                                                <option
+                                                    key={version}
+                                                    value={version}
+                                                >
+                                                    {version}
+                                                </option>
+                                            ))}
+                                        </select>
                                         <label
                                             htmlFor="gptSysMsg"
                                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"

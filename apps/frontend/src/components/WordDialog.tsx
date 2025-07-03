@@ -112,6 +112,7 @@ export default function WordDialog({
                 customTemplate &&
                 customTemplate.sysMsg &&
                 customTemplate.prompt &&
+                customTemplate.version &&
                 customTemplate.prompt.includes("{sentence}") &&
                 customTemplate.prompt.includes("{focus}")
             ) {
@@ -126,6 +127,7 @@ export default function WordDialog({
                     focus: word,
                     sysMsg: customTemplate.sysMsg,
                     prompt: backendPrompt,
+                    version: customTemplate.version,
                 };
                 console.log(
                     "Using custom GPT template for breakdown (from profile)."
@@ -308,7 +310,6 @@ export default function WordDialog({
         } catch (error) {
             console.error("Failed to save clip from WordDialog:", error);
             toast.error("Failed to Save Clip", { id: clipToastId });
-            setSaving(false);
         } finally {
             setSaving(false);
         }
@@ -436,7 +437,9 @@ export default function WordDialog({
                             </>
                         )
                     ) : dictData === undefined ? (
-                        <p className="text-neutral-400">Loading dictionary…</p>
+                        <p className="italic text-center text-neutral-400">
+                            Loading dictionary…
+                        </p>
                     ) : dictData === null ? (
                         <p className="italic text-neutral-400">
                             No dictionary entry found for "{word}".

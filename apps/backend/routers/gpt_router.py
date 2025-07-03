@@ -101,12 +101,14 @@ async def custom_breakdown(
     log_prefix = f"[Profile: {profile_id}] " if profile_id else ""
     LOGGER.info(
         f"{log_prefix}Custom Breakdown Request: sentence={req.sentence!r} \
-            focus={req.focus!r} sysMsg={req.sysMsg!r} prompt={req.prompt!r}")
+            focus={req.focus!r} sysMsg={req.sysMsg!r} prompt={req.prompt!r}\
+                version={req.version!r}")
     try:
         t0 = time.perf_counter()
         result = breakdown_service.explain_custom(req.sentence,
                                                   req.sysMsg,
                                                   req.prompt,
+                                                  req.version,
                                                   req.focus
                                                   )
         elapsed = (time.perf_counter() - t0) * 1000
@@ -114,13 +116,14 @@ async def custom_breakdown(
         return result
     except Exception as e:
         LOGGER.warning(f"{log_prefix}Custom Breakdown Failed: {e}")
-        cleaned = re.sub(r"[（）]", "", req.sentence)
+        cleaned = re.sub(r"[（）]", "", req.sentence).strip().strip("\n")
         LOGGER.info(f"{log_prefix}Retrying with clean sentence: {cleaned!r}")
         try:
             t0 = time.perf_counter()
             result = breakdown_service.explain_custom(cleaned,
                                                       req.sysMsg,
                                                       req.prompt,
+                                                      req.version,
                                                       req.focus
                                                       )
             elapsed = (time.perf_counter() - t0) * 1000

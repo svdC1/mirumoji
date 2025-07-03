@@ -4,6 +4,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import { ChatBubbleProps } from "../types/types";
 import { isKanji, toHiragana } from "../utils/languageUtils";
 import AudioPlayer from "react-h5-audio-player";
@@ -91,11 +92,9 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                 ) : (
                     msg.text && (
                         <ReactMarkdown
-                            remarkPlugins={[remarkBreaks]}
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
                             className={
-                                msg.isExplanation
-                                    ? "prose dark:prose-invert prose-sm max-w-none border-t border-zinc-700 pt-3 mt-3"
-                                    : "prose dark:prose-invert prose-sm max-w-none"
+                                "prose text-sm max-w-prose whitespace-pre-wrap"
                             }
                         >
                             {msg.text}

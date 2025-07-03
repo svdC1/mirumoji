@@ -1,7 +1,7 @@
 """
 Pydantic Model for the `/gpt/breakdown` response.
 """
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from models.FocusInfo import FocusInfo
 from models.Token import Token
 from typing import List
@@ -21,9 +21,3 @@ class BreakdownResponse(BaseModel):
     focus:  FocusInfo
     tokens:  List[Token]
     gpt_explanation: str
-
-    # Pydantic v2 style config
-    model_config = ConfigDict(
-        populate_by_name=True,
-        extra="ignore"
-    )
