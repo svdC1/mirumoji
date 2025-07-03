@@ -13,6 +13,7 @@ export interface GptTemplate {
     id: string;
     sysMsg: string;
     prompt: string;
+    version: string;
 }
 
 /**

@@ -38,7 +38,7 @@ gpt_router = APIRouter(prefix='/gpt')
 async def breakdown(
     req: BreakdownRequest,
     profile_id: Optional[str] = Depends(get_profile_id_optional)
-) -> Dict:
+) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence.
 
@@ -70,10 +70,7 @@ async def breakdown(
             result = breakdown_service.explain(cleaned, req.focus)
             elapsed = (time.perf_counter() - t0) * 1000
             LOGGER.info(f"{log_prefix}Retry Request Time: {elapsed:.1f} ms")
-            result_dict = result if isinstance(result, dict) \
-                else result.model_dump()
-            result_dict["sentence"] = req.sentence
-            return result_dict
+            return result
         except Exception as e2:
             LOGGER.exception(f"{log_prefix}Retry failed")
             raise HTTPException(
@@ -85,7 +82,7 @@ async def breakdown(
 async def custom_breakdown(
     req: CustomBreakdownRequest,
     profile_id: Optional[str] = Depends(get_profile_id_optional)
-) -> Dict:
+) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence with custom system message
     and prompt.
@@ -104,32 +101,34 @@ async def custom_breakdown(
     log_prefix = f"[Profile: {profile_id}] " if profile_id else ""
     LOGGER.info(
         f"{log_prefix}Custom Breakdown Request: sentence={req.sentence!r} \
-            focus={req.focus!r} sysMsg={req.sysMsg!r} prompt={req.prompt!r}")
+            focus={req.focus!r} sysMsg={req.sysMsg!r} prompt={req.prompt!r}\
+                version={req.version!r}")
     try:
         t0 = time.perf_counter()
         result = breakdown_service.explain_custom(req.sentence,
                                                   req.sysMsg,
                                                   req.prompt,
-                                                  req.focus)
+                                                  req.version,
+                                                  req.focus
+                                                  )
         elapsed = (time.perf_counter() - t0) * 1000
         LOGGER.info(f"{log_prefix}Request Time: {elapsed:.1f} ms")
         return result
     except Exception as e:
         LOGGER.warning(f"{log_prefix}Custom Breakdown Failed: {e}")
-        cleaned = re.sub(r"[（）]", "", req.sentence)
+        cleaned = re.sub(r"[（）]", "", req.sentence).strip().strip("\n")
         LOGGER.info(f"{log_prefix}Retrying with clean sentence: {cleaned!r}")
         try:
             t0 = time.perf_counter()
             result = breakdown_service.explain_custom(cleaned,
                                                       req.sysMsg,
                                                       req.prompt,
-                                                      req.focus)
+                                                      req.version,
+                                                      req.focus
+                                                      )
             elapsed = (time.perf_counter() - t0) * 1000
             LOGGER.info(f"{log_prefix}Retry Request Time: {elapsed:.1f} ms")
-            result_dict = result if isinstance(result, dict) \
-                else result.model_dump()
-            result_dict["sentence"] = req.sentence
-            return result_dict
+            return result
         except Exception as e2:
             LOGGER.exception(f"{log_prefix}Retry failed")
             raise HTTPException(

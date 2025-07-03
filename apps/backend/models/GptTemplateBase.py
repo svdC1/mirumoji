@@ -10,7 +10,9 @@ class GptTemplateBase(BaseModel):
 
     Args:
       sys_msg (str): The GPT's system message
-      prompt (str): Prompt to use for calls.
+      prompt (str): Prompt to use for calls
+      version (str): The GPT model version to use
     """
     sys_msg: str = Field(..., alias="sysMsg")
     prompt: str
+    version: str = Field(default="gpt-4.1-mini")

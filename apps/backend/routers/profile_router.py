@@ -78,7 +78,8 @@ async def get_gpt_template(
                             detail="GPT template not found.")
     return GptTemplateResponse(id=rec.id,
                                sysMsg=rec.sys_msg,
-                               prompt=rec.prompt
+                               prompt=rec.prompt,
+                               version=rec.version
                                )
 
 
@@ -109,7 +110,8 @@ async def upsert_gpt_template(
     values = {
         "profile_id": profile_id,
         "sys_msg": template_data.sys_msg,
-        "prompt": template_data.prompt
+        "prompt": template_data.prompt,
+        "version": template_data.version
         }
     ex = await get_gpt_template_db(profile_id)
     if ex:
@@ -128,7 +130,8 @@ async def upsert_gpt_template(
         await db.execute(gpt_templates.insert().values(**values))
     return GptTemplateResponse(id=tid,
                                sysMsg=values["sys_msg"],
-                               prompt=values["prompt"]
+                               prompt=values["prompt"],
+                               version=values["version"]
                                )
 
 

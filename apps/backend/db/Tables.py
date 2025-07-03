@@ -63,6 +63,10 @@ gpt_templates = Table(
            Text,
            nullable=False
            ),
+    Column("version",
+           String,
+           nullable=False
+           ),
     UniqueConstraint("profile_id",
                      name="uq_profile_template"
                      )

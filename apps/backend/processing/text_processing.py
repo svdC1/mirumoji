@@ -21,6 +21,7 @@ from models.KanjiInfo import KanjiInfo
 from models.WordSense import WordSense
 from models.JMEntry import JMEntry
 from models.JMNEntry import JMNEntry
+from models.BreakdownResponse import BreakdownResponse
 import logging
 
 LOGGER = logging.getLogger(__name__)
@@ -93,7 +94,8 @@ In your response:
                        sentence: str,
                        focus: str,
                        sysMsg: str,
-                       prompt: str
+                       prompt: str,
+                       version: str,
                        ) -> Optional[str]:
         """
         Request an explanation from GPT using custom system message and prompt.
@@ -104,6 +106,7 @@ In your response:
           sysMsg (str): GPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence` and `{1}` = `focus`
+          version (str): GPT model version to use
 
         Returns:
           str: GPT-generated response
@@ -114,7 +117,7 @@ In your response:
         except Exception as e:
             LOGGER.error(f"Couldn't format prompt : {e}")
             return None
-        model = GptModel(self.model_kwargs["version"],
+        model = GptModel(version,
                          sysMsg,
                          self.model_kwargs["from_dotenv"],
                          self.model_kwargs["ApiKey"],
@@ -143,7 +146,8 @@ In your response:
     def explain_sentence_custom(self,
                                 sentence: str,
                                 sysMsg: str,
-                                prompt: str
+                                prompt: str,
+                                version: str,
                                 ) -> Optional[str]:
         """
         Request an explanation from GPT using custom system message and prompt
@@ -154,6 +158,7 @@ In your response:
           sysMsg (str): ChatGPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence`
+          version (str): GPT model version to use
 
         Returns:
             str: GPT-generated response
@@ -163,7 +168,7 @@ In your response:
         except Exception as e:
             LOGGER.error(f"Couldn't format prompt : {e}")
             return None
-        model = GptModel(self.model_kwargs["version"],
+        model = GptModel(version,
                          sysMsg,
                          self.model_kwargs["from_dotenv"],
                          self.model_kwargs["ApiKey"],
@@ -200,7 +205,7 @@ def _query_kotobase(word: str) -> Dict:
         entry = l_result.entries[0]
         if isinstance(entry, JMDictEntryDTO):
             meanings = (
-                [s["gloss"] for s in entry.senses] if entry.senses else []
+                [str(s["gloss"]) for s in entry.senses] if entry.senses else []
                 )
             reading = ",".join(entry.kana) if entry.kana else ""
         elif isinstance(entry, JMNeDictEntryDTO):
@@ -208,6 +213,9 @@ def _query_kotobase(word: str) -> Dict:
                 [entry.translation_type] if entry.translation_type else []
                 )
             reading = ",".join(entry.kana) if entry.kana else ""
+        else:
+            meanings = []
+            reading = ""
     else:
         meanings = []
         reading = ""
@@ -269,17 +277,18 @@ class SentenceBreakdownService:
         Returns:
           list: List of dictionaries containing token information.
         """
-
-        return [{
-            "surface": tok.surface,
-            "kana": tok.feature.kana,
-            "pos": tok.feature.pos1,
-            "lemma": tok.feature.lemma,
-            "cType": tok.feature.cType,
-            "cForm": tok.feature.cForm,
-            "pos_lst": tok.pos.split(",")
-            } for tok in self.tagger(sentence)
-                ]
+        tokens = []
+        for tok in self.tagger(sentence):
+            tokens.append({
+                "surface": tok.surface if tok.surface else "",
+                "kana": tok.feature.kana if tok.feature.kana else "",
+                "pos": tok.feature.pos1 if tok.feature.pos1 else "",
+                "lemma": tok.feature.lemma if tok.feature.lemma else "",
+                "cType": tok.feature.cType if tok.feature.cType else "",
+                "cForm": tok.feature.cForm if tok.feature.cForm else "",
+                "pos_lst": tok.pos.split(",") if tok.pos else []
+            })
+        return tokens
 
     def word_lookup(self, sentence: str) -> List[Dict]:
         """
@@ -418,7 +427,8 @@ class SentenceBreakdownService:
 
     def explain(self,
                 sentence: str,
-                focus: Optional[str] = None) -> Dict:
+                focus: Optional[str] = None
+                ) -> BreakdownResponse:
         """
         Perform a complete Japanese sentence breakdown.
 
@@ -427,7 +437,7 @@ class SentenceBreakdownService:
           focus (str): The key word to generate deeper explanation for.
 
         Returns:
-          dict: Includes tokens, word info, and GPT breakdown
+          BreakdownResponse: Includes tokens, word info, and GPT breakdown
         """
         enriched_tokens = self.word_lookup(sentence)
 
@@ -468,18 +478,20 @@ class SentenceBreakdownService:
                         pos=t["pos"]
                         ) for t in enriched_tokens
                   ]
-        return {
-            "sentence": sentence,
-            "focus": focus_data,
-            "tokens": tokens,
-            "gpt_explanation": gpt_text,
-        }
+
+        return BreakdownResponse(sentence=sentence,
+                                 focus=focus_data,
+                                 tokens=tokens,
+                                 gpt_explanation=gpt_text
+                                 )
 
     def explain_custom(self,
                        sentence: str,
                        sysMsg: str,
                        prompt: str,
-                       focus: Optional[str] = None) -> Dict:
+                       version: str,
+                       focus: Optional[str] = None,
+                       ) -> BreakdownResponse:
         """
         Perform a complete sentence breakdown using custom sys_msg and prompt
 
@@ -489,9 +501,10 @@ class SentenceBreakdownService:
           sysMsg (str): ChatGPT's system message
           prompt (str): GPT's string prompt containing formatters
                         `{0}` = `sentence` and `{1}` = `focus`
+          version (str): GPT model version to use
 
         Returns:
-          dict: Includes tokens, word info, and GPT breakdown
+          BreakdownResponse: Includes tokens, word info, and GPT breakdown
         """
         enriched_tokens = self.word_lookup(sentence)
 
@@ -500,7 +513,9 @@ class SentenceBreakdownService:
             gpt_text = self.gpt_explainer.explain_custom(sentence,
                                                          focus,
                                                          sysMsg,
-                                                         prompt)
+                                                         prompt,
+                                                         version
+                                                         )
             f_lemma = focus or ""
             try:
                 info = _query_kotobase(word=f_lemma)
@@ -521,7 +536,9 @@ class SentenceBreakdownService:
         else:
             gpt_text = self.gpt_explainer.explain_sentence_custom(sentence,
                                                                   sysMsg,
-                                                                  prompt)
+                                                                  prompt,
+                                                                  version
+                                                                  )
             focus_data = FocusInfo(
                 word="",
                 reading="",
@@ -537,9 +554,8 @@ class SentenceBreakdownService:
                         pos=t["pos"]
                         ) for t in enriched_tokens
                   ]
-        return {
-            "sentence": sentence,
-            "focus": focus_data,
-            "tokens": tokens,
-            "gpt_explanation": gpt_text,
-        }
+        return BreakdownResponse(sentence=sentence,
+                                 focus=focus_data,
+                                 tokens=tokens,
+                                 gpt_explanation=gpt_text
+                                 )

@@ -105,7 +105,6 @@ export default function TranscribePage() {
                 const blob = new Blob(chunksRef.current, { type: mimeType });
                 let fileExtension = mimeType.split(/[/;]+/)[1] || "ogg";
                 if (fileExtension === "opus") fileExtension = "webm";
-                // ... (keep other file extension mappings)
                 if (fileExtension === "mp4") fileExtension = "mp4";
                 if (fileExtension === "wav") fileExtension = "wav";
                 if (fileExtension === "aac") fileExtension = "aac";

@@ -4,7 +4,7 @@
  * convert videos to MP4, and customize the appearance of the subtitles.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { apiFetch } from "../services/api";
@@ -14,7 +14,9 @@ import {
     ConvertVideoResponse,
     GenerateSrtResponse,
     SettingsDrawerProps,
+    ProfileFile,
 } from "../types/types";
+import { useProfile } from "../contexts/ProfileContext";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 import { API_BASE } from "../constants/user-page";
 
@@ -82,8 +84,12 @@ export default function SettingsDrawer({
 }: SettingsDrawerProps): JSX.Element {
     // Reference to Video
     const videoInputRef = useRef<HTMLInputElement | null>(null);
+    // Video File Name Display
+    const [videoFileName, setVideoFileName] = useState<string | null>(null);
     // Reference to Subtitles
     const srtInputRef = useRef<HTMLInputElement | null>(null);
+    // Subtitle File Name Display
+    const [srtFileName, setSrtFileName] = useState<string | null>(null);
     // Subtitle Style Context
     const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =
         useSubtitleSettings();
@@ -105,10 +111,33 @@ export default function SettingsDrawer({
     const [generatingSrt, setGeneratingSrt] = useState(false);
     // Converting Video State
     const [convertingVideo, setConvertingVideo] = useState(false);
+    // Get Saved Profile Files
+    const [profileFiles, setProfileFiles] = useState<ProfileFile[]>([]);
+    const { profileId } = useProfile();
+
+    const fetchProfileFiles = async () => {
+        try {
+            const files = await apiFetch<ProfileFile[]>("/profiles/files", {
+                method: "GET",
+            });
+            setProfileFiles(files);
+        } catch (error) {
+            toastApiError(error);
+        }
+    };
+    useEffect(() => {
+        if (activeTab === "loadTab" && profileId) {
+            fetchProfileFiles();
+        }
+    }, [activeTab, profileId]);
 
     const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
         onVideo(file);
+        if (file) {
+            setVideoFileName(file.name);
+        }
+
         if (onVideoUrl && file) {
             onVideoUrl("");
         }
@@ -118,9 +147,31 @@ export default function SettingsDrawer({
 
     const handleSrtChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
+        if (file) {
+            setSrtFileName(file.name);
+        }
         onSrt(file);
     };
 
+    const handleProfileFileSelect = async (file: ProfileFile) => {
+        const fullUrl = formatStaticUrl(API_BASE, file.get_url);
+        if (file.file_type === "mp4") {
+            onVideoUrl?.(fullUrl);
+            setVideoFileName(file.get_url);
+        } else if (file.file_type === "srt") {
+            try {
+                const response = await fetch(fullUrl);
+                const srtContent = await response.text();
+                const srtFile = new File([srtContent], file.file_name, {
+                    type: "application/x-subrip",
+                });
+                onSrt(srtFile);
+                setSrtFileName(srtFile.name);
+            } catch (error) {
+                toast.error("Error loading subtitle file.");
+            }
+        }
+    };
     const handleGenerateSrt = async () => {
         if (!video) return;
         setGeneratingSrt(true);
@@ -146,6 +197,7 @@ export default function SettingsDrawer({
                     { type: "application/x-subrip" }
                 );
                 onSrt(generatedSrtFile);
+                setSrtFileName(generatedSrtFile.name);
                 toast.success("Subtitles Generated!", { id: tId });
                 const blob = new Blob([result.srt_content], {
                     type: "application/x-subrip",
@@ -190,6 +242,7 @@ export default function SettingsDrawer({
                 setConvertedVideoDownloadUrl(
                     formatStaticUrl(API_BASE, result.converted_video_url)
                 );
+                setVideoFileName(result.converted_video_url);
                 toast.success("Conversion complete!", { id: tId });
             } else {
                 throw new Error("Converted video URL not found in response.");
@@ -203,7 +256,10 @@ export default function SettingsDrawer({
 
     // Disable UI request elements while True
     const isBusy = generatingSrt || convertingVideo;
-
+    // Converted videos from profile
+    const videoFiles = profileFiles.filter((f) => f.file_type === "mp4");
+    // Generated SRT files from profile
+    const subtitleFiles = profileFiles.filter((f) => f.file_type === "srt");
     return (
         <motion.aside
             initial={{ width: 0 }}
@@ -264,9 +320,9 @@ export default function SettingsDrawer({
                                 <h3 className="text-lg font-semibold text-center mb-2">
                                     Video
                                 </h3>
-                                {video ? (
+                                {videoFileName ? (
                                     <p className="text-neutral-500 text-center text-base italic truncate">
-                                        {video.name}
+                                        {videoFileName}
                                     </p>
                                 ) : (
                                     <p className="text-neutral-500 text-center text-sm italic">
@@ -279,9 +335,9 @@ export default function SettingsDrawer({
                                 <h3 className="text-lg font-semibold mb-2 text-center">
                                     Subtitles
                                 </h3>
-                                {srt ? (
+                                {srtFileName ? (
                                     <p className="text-neutral-500 text-center text-base truncate">
-                                        {srt.name}
+                                        {srtFileName}
                                     </p>
                                 ) : (
                                     <p className="text-neutral-500 text-center text-sm italic">
@@ -513,6 +569,9 @@ export default function SettingsDrawer({
                     ) : (
                         <section className="space-y-10">
                             <div className="flex flex-col space-y-4">
+                                <h3 className="text-lg font-semibold mb-2 text-center">
+                                    From Device
+                                </h3>
                                 <button
                                     onClick={() =>
                                         videoInputRef.current?.click()
@@ -520,7 +579,9 @@ export default function SettingsDrawer({
                                     disabled={isBusy}
                                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {video ? "Change Video" : "Select Video"}
+                                    {videoFileName
+                                        ? "Change Video"
+                                        : "Select Video"}
                                 </button>
                                 <input
                                     ref={videoInputRef}
@@ -536,7 +597,7 @@ export default function SettingsDrawer({
                                     disabled={isBusy}
                                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {srt
+                                    {srtFileName
                                         ? "Change Subtitles"
                                         : "Select Subtitles"}
                                 </button>
@@ -548,6 +609,63 @@ export default function SettingsDrawer({
                                     disabled={isBusy}
                                     className="hidden"
                                 />
+                            </div>
+                            <div className="flex flex-col space-y-4">
+                                <h3 className="text-lg font-semibold mb-2 text-center">
+                                    From Profile
+                                </h3>
+                                <div className="space-y-2">
+                                    <h4 className="text-md text-center font-semibold text-neutral-300">
+                                        Videos
+                                    </h4>
+                                    <ul className="max-h-32 overflow-y-auto text-sm text-neutral-400 space-y-1">
+                                        {videoFiles.length > 0 ? (
+                                            videoFiles.map((file) => (
+                                                <li
+                                                    key={file.id}
+                                                    onClick={() =>
+                                                        handleProfileFileSelect(
+                                                            file
+                                                        )
+                                                    }
+                                                    className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
+                                                >
+                                                    {file.file_name}
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className=" text-center italic p-1 rounded bg-neutral-800">
+                                                Profile has no videos
+                                            </li>
+                                        )}
+                                    </ul>
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-md text-center font-semibold text-neutral-300">
+                                        Subtitles
+                                    </h4>
+                                    <ul className="max-h-32 overflow-y-auto text-sm text-neutral-400 space-y-1">
+                                        {subtitleFiles.length > 0 ? (
+                                            subtitleFiles.map((file) => (
+                                                <li
+                                                    key={file.id}
+                                                    onClick={() =>
+                                                        handleProfileFileSelect(
+                                                            file
+                                                        )
+                                                    }
+                                                    className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
+                                                >
+                                                    {file.file_name}
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className=" text-center italic p-1 rounded bg-neutral-800">
+                                                Profile has no subtitles
+                                            </li>
+                                        )}
+                                    </ul>
+                                </div>
                             </div>
                         </section>
                     )}

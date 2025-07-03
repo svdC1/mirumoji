@@ -46,16 +46,14 @@ export const JmdictEntryDisplay = ({
  */
 export const ExampleDisplay = ({
     example,
-    key,
     isLast,
 }: {
     example: string;
-    key: number;
     isLast: boolean;
 }) => (
     <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
         <div className="flex items-center">
-            <div key={key} className="ml-4 mt-1">
+            <div className="ml-4 mt-1">
                 <p className="text-neutral-400 text-lg">({example})</p>
             </div>
         </div>
