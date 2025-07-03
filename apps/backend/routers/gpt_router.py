@@ -38,7 +38,7 @@ gpt_router = APIRouter(prefix='/gpt')
 async def breakdown(
     req: BreakdownRequest,
     profile_id: Optional[str] = Depends(get_profile_id_optional)
-) -> Dict:
+) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence.
 
@@ -70,10 +70,7 @@ async def breakdown(
             result = breakdown_service.explain(cleaned, req.focus)
             elapsed = (time.perf_counter() - t0) * 1000
             LOGGER.info(f"{log_prefix}Retry Request Time: {elapsed:.1f} ms")
-            result_dict = result if isinstance(result, dict) \
-                else result.model_dump()
-            result_dict["sentence"] = req.sentence
-            return result_dict
+            return result
         except Exception as e2:
             LOGGER.exception(f"{log_prefix}Retry failed")
             raise HTTPException(
@@ -85,7 +82,7 @@ async def breakdown(
 async def custom_breakdown(
     req: CustomBreakdownRequest,
     profile_id: Optional[str] = Depends(get_profile_id_optional)
-) -> Dict:
+) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence with custom system message
     and prompt.
@@ -110,7 +107,8 @@ async def custom_breakdown(
         result = breakdown_service.explain_custom(req.sentence,
                                                   req.sysMsg,
                                                   req.prompt,
-                                                  req.focus)
+                                                  req.focus
+                                                  )
         elapsed = (time.perf_counter() - t0) * 1000
         LOGGER.info(f"{log_prefix}Request Time: {elapsed:.1f} ms")
         return result
@@ -123,13 +121,11 @@ async def custom_breakdown(
             result = breakdown_service.explain_custom(cleaned,
                                                       req.sysMsg,
                                                       req.prompt,
-                                                      req.focus)
+                                                      req.focus
+                                                      )
             elapsed = (time.perf_counter() - t0) * 1000
             LOGGER.info(f"{log_prefix}Retry Request Time: {elapsed:.1f} ms")
-            result_dict = result if isinstance(result, dict) \
-                else result.model_dump()
-            result_dict["sentence"] = req.sentence
-            return result_dict
+            return result
         except Exception as e2:
             LOGGER.exception(f"{log_prefix}Retry failed")
             raise HTTPException(
