@@ -36,10 +36,10 @@ COPY ./licenses /licenses
 RUN apk add --no-cache openssl
 
 # Copy Entrypoint
-COPY entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/m_frontend_entrypoint.sh
 
 # Make Entrypoint executable
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /usr/local/bin/m_frontend_entrypoint.sh
 
 # Nginx HTTP Redirect 80 -> 443
 EXPOSE 80
@@ -47,4 +47,4 @@ EXPOSE 80
 EXPOSE 443
 
 # Run Entrypoint
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT [ "/usr/local/bin/m_frontend_entrypoint.sh" ]

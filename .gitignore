@@ -179,10 +179,6 @@ temp_uploads/*
 temp/*
 # IDE
 .vscode/*
-# Database/Media
-mirumoji.db
-media_files/*
-data/*
 
 # --- Node / Vite ---
 node_modules/
@@ -211,3 +207,7 @@ ehthumbs.db
 # --- Tests / coverage ---
 coverage/
 *.lcov
+
+# --- Backend Runtime Files ---
+apps/backend/media_files/
+apps/backend/data/
