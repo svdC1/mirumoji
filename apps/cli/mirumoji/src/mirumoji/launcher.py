@@ -10,7 +10,14 @@ from subprocess import Popen
 import sys
 import socket
 from textwrap import dedent
-from typing import Optional, List, Tuple
+from typing import (Optional,
+                    List,
+                    Tuple,
+                    Callable,
+                    TypeVar,
+                    ParamSpec
+                    )
+from functools import wraps
 from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
 
@@ -556,6 +563,36 @@ def configure_repo() -> Tuple[Path, Path]:
         sys.exit(1)
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def clear_wrapper(func: Callable[P, R],
+                  no_clear: bool,
+                  ) -> Callable[P, R]:
+    """
+    Decorator to call a helper function and clean the terminal after execution.
+
+    Args:
+      no_clean (bool, optional): If True, function is run without cleaning
+                                 terminal
+      func (Callable[P, R]): Helper function object
+
+    Returns:
+      Callable[P, R]: Wrapped functional with clear choice applied
+    """
+
+    @wraps(func)
+    def inner(*args: P.args,
+              **kwargs: P.kwargs
+              ) -> R:
+        r = func(*args, **kwargs)
+        if not no_clear:
+            click.clear()
+        return r
+    return inner
+
+
 # -----------------
 # --- Click CLI ---
 
@@ -585,10 +622,10 @@ def cli():
               default=False,
               help="Do not clear the terminal after each step"
               )
-def launch(build,
-           gpu,
-           github_pull,
-           no_clear
+def launch(build: Optional[bool],
+           gpu: Optional[bool],
+           github_pull: Optional[bool],
+           no_clear: bool
            ):
     """
     Guides through the Mirumoji application setup with Docker
@@ -597,17 +634,13 @@ def launch(build,
     try:
         # Build Locally Option / Confirmation
         if build is None:
-            build_locally = get_build_locally()
-            if not no_clear:
-                click.clear()
+            build_locally = clear_wrapper(get_build_locally, no_clear)()
         else:
             build_locally = build
 
         # GPU or CPU Option / Confirmation
         if gpu is None:
-            use_gpu = get_gpu_cpu()
-            if not no_clear:
-                click.clear()
+            use_gpu = clear_wrapper(get_gpu_cpu, no_clear)()
         else:
             use_gpu = gpu
 
@@ -620,26 +653,20 @@ def launch(build,
         sys.exit(1)
 
     # --- Pull Repo ---
-    repo_path, original_cwd = configure_repo()
-    if not no_clear:
-        click.clear()
+    _, original_cwd = clear_wrapper(configure_repo, no_clear)()
 
     # --- Image Configuration ---
     try:
         # Build Locally
         if build_locally:
-            build_imgs_locally(use_gpu=use_gpu)
-            if not no_clear:
-                click.clear()
+            clear_wrapper(build_imgs_locally, no_clear)(use_gpu=use_gpu)
 
         # Pull pre-built
         else:
             # --- Option Config ---
             # Pull from GitHub or DockerHub Option / Confirmation
             if github_pull is None:
-                registry = get_registry()
-                if not no_clear:
-                    click.clear()
+                registry = clear_wrapper(get_registry, no_clear)()
             else:
                 if github_pull:
                     reg = "GitHub"
@@ -657,18 +684,12 @@ def launch(build,
         if not use_gpu:
             required_env_vars.extend(["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"])
 
-        check_env_file(required_env_vars,
-                       env_file_abs_path
-                       )
-
-        if not no_clear:
-            click.clear()
+        clear_wrapper(check_env_file, no_clear)(required_env_vars,
+                                                env_file_abs_path
+                                                )
 
         # --- Get Host IPv4 ---
-        HOST_LAN_IP = get_host_lan_ip()
-        if not no_clear:
-            click.clear()
-
+        HOST_LAN_IP = clear_wrapper(get_host_lan_ip, no_clear)()
         # --- Choose Docker Compose ---
         if build_locally:
             if use_gpu:
@@ -702,9 +723,7 @@ def launch(build,
             "up",
             "-d"
         ]
-        run_command(docker_compose_cmd)
-        if not no_clear:
-            click.clear()
+        clear_wrapper(run_command, no_clear)(docker_compose_cmd)
 
         # --- Display Instructions ---
         stop_instructions = dedent(f"""\
@@ -748,24 +767,22 @@ def launch(build,
               default=False,
               help="Do not clear the terminal after each step"
               )
-def shutdown(clean, no_clear):
+def shutdown(clean: Optional[bool],
+             no_clear: bool
+             ):
     """
     Stops application by running Docker Compose Down.
     """
     # --- Update Repository ---
-    repo_path, original_cwd = configure_repo()
-    if not no_clear:
-        click.clear()
+    repo_path, original_cwd = clear_wrapper(configure_repo, no_clear)()
 
     # --- Option Config ---
     # Clean Option / Confirmation
     if clean is None:
-        delete_volumes = click.confirm(
+        delete_volumes = clear_wrapper(click.confirm, no_clear)(
             text="Delete Data (Docker Volumes) ?",
             default=False
             )
-        if not no_clear:
-            click.clear()
     else:
         delete_volumes = clean
     try:
@@ -777,13 +794,180 @@ def shutdown(clean, no_clear):
                ]
         if delete_volumes:
             cmd.append("-v")
-        run_command(cmd, cwd=repo_path)
-        if not no_clear:
-            click.clear()
+        clear_wrapper(run_command, no_clear)(cmd, cwd=repo_path)
         click.secho(message="All Services Stopped", fg="bright_green")
     except Exception as e:
         click.secho(
             f"An unexpected error occurred during shutdown: '{e}'",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+    finally:
+        os.chdir(original_cwd)
+        click.secho(f"Returned to original working directory: {original_cwd}",
+                    fg="blue")
+
+
+@cli.command()
+@click.option("--gpu/--cpu",
+              default=None,
+              help=GPU_HELP
+              )
+@click.option('--no-clear',
+              is_flag=True,
+              default=False,
+              help="Do not clear the terminal after each step"
+              )
+def launch_local(gpu: Optional[bool],
+                 no_clear: bool
+                 ):
+    """
+    Launch Mirumoji with previously built local images
+    """
+    # --- Option Config ---
+    try:
+        # GPU or CPU Option / Confirmation
+        if gpu is None:
+            use_gpu = clear_wrapper(get_gpu_cpu, no_clear)()
+        else:
+            use_gpu = gpu
+
+    except Exception as e:
+        click.secho(
+            f"\nError while configuring options: '{e}'",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+
+    # Pull Repo
+    _, original_cwd = clear_wrapper(configure_repo, no_clear)()
+    try:
+        # --- Environment Configuration ---
+        click.secho(f"\n--- Checking '{ENV_FILE_NAME}' File ---", fg="blue")
+        env_file_abs_path = original_cwd / ENV_FILE_NAME
+        required_env_vars = ["OPENAI_API_KEY"]
+
+        # CPU version requires Modal keys
+        if not use_gpu:
+            required_env_vars.extend(["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"])
+
+        clear_wrapper(check_env_file, no_clear)(required_env_vars,
+                                                env_file_abs_path
+                                                )
+
+        # --- Get Host IPv4 ---
+        HOST_LAN_IP = clear_wrapper(get_host_lan_ip, no_clear)()
+
+        # --- Choose Docker Compose ---
+        if use_gpu:
+            compose_file_relpath = COMPOSE_LOCAL_GPU_RELPATH
+        else:
+            compose_file_relpath = COMPOSE_LOCAL_CPU_RELPATH
+
+        # --- Start Application ---
+        click.secho("\n--- Running Docker Compose ---", fg="blue")
+        click.secho(f"Using Compose File: '{compose_file_relpath}'",
+                    fg="bright_magenta"
+                    )
+        docker_compose_cmd = [
+            "docker",
+            "compose",
+            "-f",
+            str(compose_file_relpath),
+            "-p",
+            "mirumoji",
+            "up",
+            "-d"
+        ]
+        clear_wrapper(run_command, no_clear)(docker_compose_cmd)
+
+        # --- Display Instructions ---
+        stop_instructions = dedent(f"""\
+
+        --- Accessible at ---
+
+        Local: 'https://localhost'
+
+        LAN: 'https://{HOST_LAN_IP}'
+
+        --- CLI Stop Command ---
+
+        mirumoji shutdown
+
+        --- Docker Stop Command ---
+
+        docker compose -p mirumoji down
+        """)
+        click.secho(message=stop_instructions, fg="bright_green")
+
+    except Exception as e:
+        click.secho(
+            f"An unexpected error occurred during the launch process: '{e}'",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+    finally:
+        os.chdir(original_cwd)
+        click.secho(f"Returned to original working directory: {original_cwd}",
+                    fg="blue")
+
+
+@cli.command()
+@click.option("--gpu/--cpu",
+              default=None,
+              help=GPU_HELP
+              )
+@click.option('--no-clear',
+              is_flag=True,
+              default=False,
+              help="Do not clear the terminal after each step"
+              )
+def build(gpu: Optional[bool],
+          no_clear: bool
+          ):
+    """
+    Build local images only, but don't run application
+    """
+    # --- Option Config ---
+    try:
+        # GPU or CPU Option / Confirmation
+        if gpu is None:
+            use_gpu = clear_wrapper(get_gpu_cpu, no_clear)()
+        else:
+            use_gpu = gpu
+
+    except Exception as e:
+        click.secho(
+            f"\nError while configuring options: '{e}'",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
+
+    # Pull Repo
+    _, original_cwd = clear_wrapper(configure_repo, no_clear)()
+
+    try:
+        clear_wrapper(build_imgs_locally, no_clear)(use_gpu=use_gpu)
+        if use_gpu:
+            click.secho(
+                (f"\nBuilt Images\nFrontend: {FRONTEND_LOCAL_IMAGE_NAME}"
+                 f"\nBACKEND: {BACKEND_GPU_LOCAL_IMAGE_NAME}"),
+                fg="bright_green"
+                )
+        else:
+            click.secho(
+                (f"\nBuilt Images\nFrontend: {FRONTEND_LOCAL_IMAGE_NAME}"
+                 f"\nBACKEND: {BACKEND_CPU_LOCAL_IMAGE_NAME}"),
+                fg="bright_green"
+                )
+
+    except Exception as e:
+        click.secho(
+            f"\nUnexpected error while building images: '{e}'",
             fg="red",
             err=True
         )
