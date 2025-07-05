@@ -241,8 +241,8 @@ def run_command(command_list: List[str],
     # Catch process error and display with Click when check is True
     except subprocess.CalledProcessError as e:
         message = dedent(f"""\
-        Error: Command '{e.cmd}' returned non-zero exit status "
-        {e.returncode}.
+        Error: Command '{e.cmd}' returned non-zero exit status
+        Return Code: '{e.returncode}'
         """)
         click.secho(message=message, fg="red", err=True)
         sys.exit(e.returncode or 1)
@@ -493,6 +493,7 @@ def build_imgs_locally(use_gpu: bool) -> None:
         frontend_build_cmd = [
             "docker",
             "build",
+            "--no-cache",
             "-t",
             FRONTEND_LOCAL_IMAGE_NAME,
             "-f",
@@ -513,6 +514,7 @@ def build_imgs_locally(use_gpu: bool) -> None:
 
         backend_build_cmd = [
             "docker",
+            "--no-cache"
             "build",
             "-t",
             backend_image_name,
