@@ -514,8 +514,8 @@ def build_imgs_locally(use_gpu: bool) -> None:
 
         backend_build_cmd = [
             "docker",
-            "--no-cache"
             "build",
+            "--no-cache",
             "-t",
             backend_image_name,
             "-f",
@@ -578,10 +578,10 @@ def clear_wrapper(func: Callable[P, R],
     Args:
       no_clean (bool, optional): If True, function is run without cleaning
                                  terminal
-      func (Callable[P, R]): Helper function object
+      func (Callable[P,R]): Helper function object
 
     Returns:
-      Callable[P, R]: Wrapped functional with clear choice applied
+      Callable[P,R]: Wrapped function with clear choice applied
     """
 
     @wraps(func)
