@@ -1,9 +1,9 @@
 FROM python:3.11-slim-bookworm
 
-# Set working directory
+# --- Set working directory ---
 WORKDIR /app
 
-# Set env
+# --- Set env ---
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}"
@@ -36,9 +36,11 @@ RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
 RUN python3.11 -m unidic download
 RUN kotobase pull-db
 
-# Copy app code
+# --- Copy backend code ---
 COPY . .
 
-# --- Expose and run ---
+# --- Expose the uvicorn port ---
 EXPOSE 8000
+
+# --- Start uvicorn with host mode ---
 CMD ["python3.11", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
