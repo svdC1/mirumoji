@@ -1,0 +1,21 @@
+{
+    "name": "Mirumoji (GPU)",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "../.."
+    },
+    "runArgs": ["--gpus", "all"],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-vscode.vscode-typescript-next",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "bradlc.vscode-tailwindcss"
+            ]
+        }
+    },
+    "forwardPorts": [8000, 5173]
+}
