@@ -1,5 +1,5 @@
 {
-    "name": "Mirumoji (GPU)",
+    "name": "Mirumoji (CPU)",
     "build": {
         "dockerfile": "Dockerfile",
         "context": "../.."
