@@ -169,9 +169,10 @@ export default function SavedPage() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
             <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold">
-                        Saved Clips for Profile: {profileId}
-                    </h1>
+                    <h1 className="text-3xl font-bold">Saved Clips</h1>
+                    <h2 className="text-2xl font-semibold italic text-neutral-500">
+                        Profile : {profileId}
+                    </h2>
                     {clips && clips.length > 0 && (
                         <button
                             onClick={handleSaveToAnki}
@@ -291,11 +292,15 @@ export default function SavedPage() {
                             set and backend is running.
                         </p>
                     ) : !clips || clips.length === 0 ? (
-                        <p className="text-center text-gray-600 dark:text-gray-400 py-4">
-                            No saved clips found for profile:{" "}
-                            <strong>{profileId}</strong>. Create some from the
-                            Player page!
-                        </p>
+                        <div>
+                            <p className="text-center text-gray-600 dark:text-gray-400 py-4">
+                                Profile <strong>{profileId}</strong> has no
+                                clips.
+                            </p>
+                            <p className="text-center text-gray-600 dark:text-gray-400 py-4">
+                                Create some from the Player page!
+                            </p>
+                        </div>
                     ) : (
                         <div className="grid gap-4 grid-cols-1">
                             {clips.map((clip) => {

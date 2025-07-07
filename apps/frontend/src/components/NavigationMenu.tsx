@@ -162,6 +162,13 @@ export default function NavigationMenu() {
                         >
                             Saved Clips
                         </Link>
+                        <Link
+                            to="/text"
+                            onClick={() => setOpen(false)}
+                            className="w-full text-center px-3 py-2 rounded-md text-white transition-all duration-200 hover:bg-gray-700 block"
+                        >
+                            Analyze Text
+                        </Link>
                     </div>
                 </nav>
             </aside>

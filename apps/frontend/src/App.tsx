@@ -12,7 +12,7 @@ import TranscribePage from "./pages/TranscribePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UserPage from "./pages/UserPage";
 import SavedPage from "./pages/SavedPage";
-
+import TextPage from "./pages/TextPage";
 /**
  * The main application component.
  *
@@ -30,6 +30,7 @@ function App() {
                     <Route path="/transcribe" element={<TranscribePage />} />
                     <Route path="/" element={<HomePage />} />
                     <Route path="/player" element={<PlayerPage />} />
+                    <Route path="/text" element={<TextPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </main>
