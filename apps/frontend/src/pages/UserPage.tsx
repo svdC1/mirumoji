@@ -314,7 +314,7 @@ export default function UserPage() {
                 </h1>
 
                 <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg">
-                    <nav className="flex flex-wrap border-b border-gray-200 dark:border-gray-700">
+                    <nav className="flex flex-wrap -mb-px justify-center space-x-4 border-b border-gray-200 dark:border-gray-700">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
