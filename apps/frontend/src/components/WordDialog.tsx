@@ -11,7 +11,7 @@ import remarkBreaks from "remark-breaks";
 import { Copy, Check, Bookmark } from "lucide-react";
 import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
-import { apiWordQuery } from "../services/dictApi";
+import { apiWordQuery, filterDictLookup } from "../services/dictApi";
 import { toastApiError } from "../utils/apiErrorToaster";
 import {
     GptTemplate,
@@ -181,45 +181,16 @@ export default function WordDialog({
         setDictData(undefined);
         apiWordQuery(word)
             .then((entry) => {
-                // Filter Empty Elements
-                if (entry) {
-                    // Empty element has stroke count of `99`
-                    entry.kanji = entry.kanji.filter(
-                        (k) => k.stroke_count !== 99
-                    );
-                    // Empty element has no `kana` and no `kanji` and one sense with order of `99`
-                    entry.jmentries = entry.jmentries.filter(
-                        (jme) =>
-                            (jme.kanji.length !== 0 || jme.kana.length !== 0) &&
-                            jme.senses.length !== 0 &&
-                            jme.senses[0].order !== 99
-                    );
-                    // Empty element has no `kana`, `kanji` or `gloss` and empty string as translation type
-                    entry.jmnentries = entry.jmnentries.filter(
-                        (jmne) =>
-                            (jmne.kanji.length !== 0 ||
-                                jmne.kana.length !== 0) &&
-                            jmne.gloss.length !== 0 &&
-                            jmne.translation_type !== ""
-                    );
-                }
-                // Empty response has empty lists and jlpt of `Unknown`
-                const noEntry =
-                    entry.kanji.length === 0 &&
-                    entry.jmentries.length === 0 &&
-                    entry.jmnentries.length === 0 &&
-                    entry.meanings.length === 0 &&
-                    entry.examples.length === 0 &&
-                    entry.jlpt === "Unknown";
-                if (!noEntry) {
-                    setDictData(entry);
+                const filteredEntry = filterDictLookup(entry);
+                if (filteredEntry) {
+                    setDictData(filteredEntry);
                     // Set Default SubTab when common entries aren't available
-                    if (entry?.jmentries.length === 0) {
-                        if (entry?.jmnentries.length > 0) {
+                    if (filteredEntry.jmentries.length === 0) {
+                        if (filteredEntry.jmnentries.length > 0) {
                             setDictTab("jmnedict");
-                        } else if (entry?.kanji.length > 0) {
+                        } else if (filteredEntry.kanji.length > 0) {
                             setDictTab("kanji");
-                        } else if (entry?.examples.length > 0) {
+                        } else if (filteredEntry.examples.length > 0) {
                             setDictTab("examples");
                         }
                     }

@@ -13,6 +13,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import UserPage from "./pages/UserPage";
 import SavedPage from "./pages/SavedPage";
 import TextPage from "./pages/TextPage";
+import { DictionaryPage } from "./pages/DictionaryPage";
 /**
  * The main application component.
  *
@@ -31,6 +32,7 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/player" element={<PlayerPage />} />
                     <Route path="/text" element={<TextPage />} />
+                    <Route path="/dictionary" element={<DictionaryPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </main>

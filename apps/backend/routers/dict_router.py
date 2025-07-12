@@ -12,6 +12,7 @@ import logging
 from processing.Processor import Processor
 from utils.env_utils import using_modal
 from models.DictLookup import DictLookup
+from models.DictWildcardLookup import DictWildcardLookup
 
 USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
@@ -62,6 +63,36 @@ async def query_word(word: str = Query(...)) -> DictLookup:
         return r
     except Exception as e:
         LOGGER.exception(f"Failed to query kotobase for word: '{word}'")
+        raise HTTPException(status_code=500,
+                            detail=str(e)
+                            )
+
+
+@dict_router.get("/wildcard", response_model=DictWildcardLookup)
+async def wildcard_query(pattern: str = Query(...)) -> DictWildcardLookup:
+    """
+    Endpoint returning dictionary information for a wildcard pattern lookup
+
+    Args:
+      pattern (str): Sentence to return tokens from.
+
+    Returns:
+      DictWildcardLookup: Pydantic Model containing wildcard pattern lookup
+                          information
+
+    Raises:
+      HTTPException: If lookup fails.
+    """
+    try:
+        # Append final wildcard if wildcard marker not present
+        if ("%" not in pattern) or ("*" not in pattern):
+            pattern += "*"
+        r = breakdown_service.wildcard_lookup(pattern)
+        return r
+    except Exception as e:
+        LOGGER.exception(
+            f"Failed to query kotobase for wildcard pattern: '{pattern}'"
+            )
         raise HTTPException(status_code=500,
                             detail=str(e)
                             )
