@@ -185,7 +185,9 @@ export default function SubtitlePlayer({
                                     onClick={() => {
                                         setDialog({
                                             sentence: activeCue.raw,
-                                            word: token.surface_form,
+                                            word: !(token.basic_form === "*")
+                                                ? token.basic_form
+                                                : token.surface_form,
                                             cueStart: activeCue.start,
                                             cueEnd: activeCue.end,
                                         });

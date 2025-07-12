@@ -215,6 +215,18 @@ export interface DictLookup {
     examples: string[];
 }
 
+/**
+ * The shape of all the information from a wildcard dictionary lookup as
+ * returned by the API endpoint
+ */
+export interface DictWildcardLookup {
+    pattern: string;
+    jmentries: JMEntry[];
+    jmnentries: JMNEntry[];
+    kanji: KanjiInfo[];
+    examples: string[];
+}
+
 /*TranscribePage*/
 
 /**

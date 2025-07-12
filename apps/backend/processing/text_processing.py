@@ -21,6 +21,7 @@ from models.KanjiInfo import KanjiInfo
 from models.WordSense import WordSense
 from models.JMEntry import JMEntry
 from models.JMNEntry import JMNEntry
+from models.DictWildcardLookup import DictWildcardLookup
 from models.BreakdownResponse import BreakdownResponse
 import logging
 
@@ -176,6 +177,34 @@ In your response:
                          )
         result = model.request(prompt)
         return result['response']
+
+
+@lru_cache(maxsize=1024)
+def _query_kotobase_wildcard(pattern: str) -> Dict:
+    """
+    Wrapper for `kotobase.Kotobase.lookup` with lru cache and result
+    processing for wildcard pattern
+
+    Args:
+        pattern (str): Wilcard pattern
+
+    Returns:
+        dict: Extracted pattern information.
+    """
+    l_result = Kotobase().lookup(word=pattern,
+                                 wildcard=True,
+                                 include_names=True,
+                                 sentence_limit=5
+                                 )
+    examples = (
+        [st.text for st in l_result.examples] if l_result.examples else []
+        )
+    split_entries = l_result.filter_entries()
+    return {"result": l_result,
+            "examples": examples,
+            "jmdict": split_entries["jmdict"],
+            "jmnedict": split_entries["jmnedict"]
+            }
 
 
 @lru_cache(maxsize=1024)
@@ -422,6 +451,107 @@ class SentenceBreakdownService:
             kanji=kanji_lst,
             meanings=meanings,
             jlpt=jlpt,
+            examples=examples
+            )
+
+    def wildcard_lookup(self,
+                        pattern: str
+                        ) -> DictWildcardLookup:
+        """
+        Perform a kotobase search for a wildcard pattern and
+        return results formatted into a pydantic model
+
+        Args:
+          pattern (str): The wildcard pattern
+
+        Returns:
+          DictWildcardLookup: Pydantic model containing kotobase info
+
+        """
+        query = _query_kotobase_wildcard(pattern=pattern)
+        result: LookupResult
+        result = query["result"]
+        default_sense = [WordSense(order=99, pos="", gloss="")]
+        default_jmentry = JMEntry(rank=99,
+                                  kana=[],
+                                  kanji=[],
+                                  senses=default_sense
+                                  )
+        default_jmnentry = JMNEntry(kana=[],
+                                    kanji=[],
+                                    translation_type="",
+                                    gloss=[]
+                                    )
+        default_kanjiinfo = KanjiInfo(
+                    literal="",
+                    grade=None,
+                    stroke_count=99,
+                    meanings=[],
+                    onyomi=[],
+                    kunyomi=[],
+                    jlpt_kanjidic=None,
+                    jlpt_tanos=None
+                    )
+        jmentries = []
+        jmnentries = []
+        kanji_lst = []
+        examples = query["examples"]
+        # Build Entries
+        if result.entries:
+            for entry in result.entries:
+                if isinstance(entry, JMDictEntryDTO):
+                    # Senses
+                    if entry.senses:
+                        jm_senses = [WordSense(order=sense["order"],
+                                               pos=sense["pos"],
+                                               gloss=sense["gloss"]
+                                               ) for sense in entry.senses
+                                     ]
+                    else:
+                        jm_senses = [WordSense(order=99, pos="", gloss="")]
+                    # Other Fields
+                    jm_kana = entry.kana
+                    jm_kanji = entry.kanji
+                    jm_rank = entry.rank
+                    jmentries.append(JMEntry(rank=jm_rank,
+                                             kana=jm_kana,
+                                             kanji=jm_kanji,
+                                             senses=jm_senses
+                                             ))
+                elif isinstance(entry, JMNeDictEntryDTO):
+                    jmne_kana = entry.kana
+                    jmne_kanji = entry.kanji
+                    jmne_tt = entry.translation_type
+                    jmne_gloss = entry.gloss
+                    jmnentries.append(JMNEntry(
+                        kana=jmne_kana,
+                        kanji=jmne_kanji,
+                        translation_type=jmne_tt,
+                        gloss=jmne_gloss))
+        else:
+            jmentries.append(default_jmentry)
+            jmnentries.append(default_jmnentry)
+        # Build KanjiInfo
+        if result.kanji:
+            for k in result.kanji:
+                kanji_lst.append(KanjiInfo(
+                    literal=k.literal,
+                    grade=k.grade,
+                    stroke_count=k.stroke_count,
+                    meanings=k.meanings,
+                    onyomi=k.onyomi,
+                    kunyomi=k.kunyomi,
+                    jlpt_kanjidic=k.jlpt_kanjidic,
+                    jlpt_tanos=k.jlpt_tanos))
+        else:
+            kanji_lst.append(default_kanjiinfo)
+
+        # Build Final Model
+        return DictWildcardLookup(
+            pattern=pattern,
+            jmentries=jmentries,
+            jmnentries=jmnentries,
+            kanji=kanji_lst,
             examples=examples
             )
 

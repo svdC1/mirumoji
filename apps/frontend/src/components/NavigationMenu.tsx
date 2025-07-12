@@ -169,6 +169,13 @@ export default function NavigationMenu() {
                         >
                             Analyze Text
                         </Link>
+                        <Link
+                            to="/dictionary"
+                            onClick={() => setOpen(false)}
+                            className="w-full text-center px-3 py-2 rounded-md text-white transition-all duration-200 hover:bg-gray-700 block"
+                        >
+                            Dictionary
+                        </Link>
                     </div>
                 </nav>
             </aside>
