@@ -55,7 +55,7 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                   context: . # Build context is the repo root
-                  file: ./.devcontainer/build/Dockerfile.gpu # Path to the Dockerfile
+                  file: ./.devcontainer/dockerfiles/Dockerfile.gpu # Path to the Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step
