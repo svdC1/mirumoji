@@ -1,6 +1,6 @@
 {
     "name": "Mirumoji (CPU)",
-    "image": "docker.io/svdC1/mirumoji_dev:cpu-latest",
+    "image": "docker.io/svdc1/mirumoji_dev:cpu-latest",
     "customizations": {
         "vscode": {
             "extensions": [

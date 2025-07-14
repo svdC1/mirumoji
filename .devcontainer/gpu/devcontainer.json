@@ -1,6 +1,6 @@
 {
     "name": "Mirumoji (GPU)",
-    "image": "docker.io/svdC1/mirumoji_dev:gpu-latest",
+    "image": "docker.io/svdc1/mirumoji_dev:gpu-latest",
     "runArgs": ["--gpus", "all"],
     "customizations": {
         "vscode": {
