@@ -9,10 +9,10 @@ Attributes:
 import logging
 import shutil
 import uuid
+import aiofiles
 from pathlib import Path
 from fastapi import (APIRouter,
                      UploadFile,
-                     File,
                      Form,
                      Depends,
                      HTTPException,
@@ -43,7 +43,7 @@ processor = Processor(save_path=TEMP_DIR,
 
 @audio_router.post("/transcribe_from_audio")
 async def transcribe_from_audio(
-    file: UploadFile = File(...),
+    file: UploadFile,
     clean_audio_str: str = Form("false", alias="clean_audio"),
     gpt_explain_str: str = Form("false", alias="gpt_explain"),
     profile_id: str = Depends(ensure_profile_exists),
@@ -93,8 +93,9 @@ async def transcribe_from_audio(
     audio_to_process_loc = tmp_uploaded_audio_loc
 
     try:
-        with open(tmp_uploaded_audio_loc, "wb+") as f_obj:
-            shutil.copyfileobj(file.file, f_obj)
+        async with aiofiles.open(tmp_uploaded_audio_loc, "wb+") as f_obj:
+            content = await file.read()
+            await f_obj.write(content)
         LOGGER.info(
             f"Temp audio for transcription: '{tmp_uploaded_audio_loc}'")
 
@@ -105,7 +106,8 @@ async def transcribe_from_audio(
             cleaned_audio_name = f"cleaned_{op_id}_{original_filename}.wav"
             cleaned_audio_tmp_loc = op_tmp_dir / cleaned_audio_name
 
-            cleaned_path_str = audio_tools.filter_audio(
+            cleaned_path_str = await asyncio.to_thread(
+                audio_tools.filter_audio,
                 input_path=str(tmp_uploaded_audio_loc),
                 output_wav=str(cleaned_audio_tmp_loc),
             )
