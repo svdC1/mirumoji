@@ -326,3 +326,92 @@ class AudioTools:
 
         LOGGER.info(f"Converted '{src.name}' → '{dst.name}'")
         return dst
+
+    def to_webm(
+        self,
+        input_path: str,
+        output_path: str | None = None,
+        resolution: str = "1280x720",
+        target_bitrate: str = "2500k",
+        use_nvenc: bool = False,
+    ) -> Union[pathlib.Path, None]:
+        """
+        Convert any video to WebM (VP9 + Opus).
+
+        Args:
+          input_path (str): Source file (any container/codec FFmpeg supports).
+          output_path (str, optional): Destination (defaults to same stem)
+          resolution (str): Target canvas WxH. Aspect is preserved.
+          target_bitrate (str):  Video bitrate (e.g. '2500k').
+          use_nvenc (bool): True → try NVIDIA NVENC; False → libvpx-vp9 CPU.
+
+        Returns:
+            pathlib.Path: Path of the WebM, or None on failure.
+        """
+
+        src = pathlib.Path(input_path).resolve()
+        if not src.is_file():
+            LOGGER.error(f"Input '{src}' does not exist")
+            return None
+
+        dst = pathlib.Path(output_path or src.with_suffix(".webm")).resolve()
+
+        try:
+            w, h = map(int, resolution.lower().split("x"))
+        except ValueError:
+            LOGGER.error(f"Resolution must be 'WxH', got '{resolution}'")
+            return None
+
+        # 1) scale to fit, 2) pad to canvas (center)
+        vf = (
+            f"scale=w={w}:h={h}:force_original_aspect_ratio=decrease,"
+            f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
+        )
+        cpu_enc = [
+                "-c:v", "libvpx-vp9",
+                "-b:v", target_bitrate,
+                "-deadline", "good",
+            ]
+        cpu_cmd = [
+            self.ffmpeg, "-y",
+            "-i", src.as_posix(),
+            "-vf", vf,
+            *cpu_enc,
+            "-c:a", "libopus",
+            "-b:a", "128k",
+            dst.as_posix(),
+        ]
+
+        # ---------- choose encoder ----------
+        if use_nvenc:
+            enc_args = [
+                "-c:v", "vp9_nvenc",
+                "-rc:v", "vbr",
+                "-b:v", target_bitrate,
+            ]
+        else:
+            enc_args = cpu_enc
+
+        cmd = [
+            self.ffmpeg, "-y",
+            "-i", src.as_posix(),
+            "-vf", vf,
+            *enc_args,
+            "-c:a", "libopus",
+            "-b:a", "128k",
+            dst.as_posix(),
+        ]
+        LOGGER.info(f"Converting with use_nvenc='{use_nvenc}'")
+        result = self.run_command(cmd, capture_output=True, hide_and_log=True)
+        # Retry with normal args in case of NVENC error
+        if result.returncode != 0 and use_nvenc:
+            LOGGER.info("Retrying without NVENC")
+            result = self.run_command(cpu_cmd,
+                                      capture_output=True,
+                                      hide_and_log=True)
+        if result is None or result.returncode != 0:
+            LOGGER.error(f"FFmpeg to_webm failed:\n'{result.stderr}'")
+            return None
+
+        LOGGER.info(f"Converted '{src.name}' → '{dst.name}'")
+        return dst

@@ -9,6 +9,7 @@ Attributes:
 import logging
 import uuid
 import aiofiles
+import asyncio
 import json
 from fastapi import (APIRouter,
                      Depends,
@@ -24,6 +25,7 @@ from models.ClipResponse import ClipResponse
 from models.ProfileFileResponse import ProfileFileResponse
 from models.ProfileTranscriptResponse import ProfileTranscriptResponse
 from models.AnkiExportResponse import AnkiExportResponse
+from processing.audio_processing import AudioTools
 from typing import Optional, List
 import pathlib
 from db.db import (get_db,
@@ -212,12 +214,34 @@ async def save_video_clip(
 
     # Copy file to directory
     fname = f"{uuid.uuid4()}_{video_clip.filename}"
+    webm_fname = pathlib.Path(fname).with_suffix(".webm")
     loc = p_path / fname
+    webm_loc = loc.with_suffix(".webm")
     rel_path = pathlib.Path("profiles") / profile_id / "clips" / fname
     try:
         async with aiofiles.open(loc, "wb+") as f:
             content = await video_clip.read()
             await f.write(content)
+
+        # Convert to WebM for Anki Compatibility
+        try:
+            LOGGER.info(f"Converting Clip to WEBM {loc} -> {webm_loc}")
+            audio_tools = AudioTools(working_dir=p_path)
+            await asyncio.to_thread(
+                audio_tools.to_webm,
+                input_path=str(loc),
+                output_path=str(webm_loc),
+                use_nvenc=True
+                )
+        except Exception as e:
+            LOGGER.exception(
+                f"Failed to convert {loc} to WEBM : {e}'; Falling back to \
+                    original format")
+        if webm_loc.exists():
+            rel_path = (
+                pathlib.Path("profiles") / profile_id / "clips" / webm_fname
+                    )
+            fname = webm_fname
 
         # Save info in Database
         gpt_j = json.loads(gpt_breakdown_response)
