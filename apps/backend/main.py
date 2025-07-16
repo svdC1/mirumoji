@@ -39,11 +39,12 @@ elif LOGGING_LEVEL == "CRITICAL":
 else:
     LOGGING_LEVEL = logging.INFO
 
-logging.basicConfig(level=LOGGING_LEVEL,
-                    format="{asctime}||{levelname}||{name}||{message}",
-                    style="{",
-                    datefmt="%H:%M:%S"
-                    )
+logging.basicConfig(
+    level=LOGGING_LEVEL,
+    format="{asctime}||{levelname}||{name}:{funcName}||{message}",
+    style="{",
+    datefmt="%H:%M:%S[%z]"
+    )
 LOGGER = logging.getLogger(__name__)
 
 # ───────────────────────────────────────────────────────────

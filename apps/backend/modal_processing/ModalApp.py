@@ -52,7 +52,7 @@ env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
     gpu=MODAL_GPU,
     timeout=600,
     include_source=True,
-    secrets=env_secrets
+    secrets=[env_secrets]
 )
 def transcribe_srt_job(media_fp: Union[str, Path]
                        ) -> Union[str, None]:
