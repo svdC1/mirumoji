@@ -25,7 +25,8 @@ script_dir = Path(__file__).resolve().parent
 project_root_dir = script_dir.parent
 media_files_path = project_root_dir / "media_files"
 media_files_path.mkdir(parents=True,
-                       exist_ok=True)
+                       exist_ok=True
+                       )
 
 LOGGER.info(f"Config Image + Mount {media_files_path} at /root/media_files")
 # Build media_files on modal container startup
@@ -40,23 +41,26 @@ app = modal.App(
     "mirumoji-gpu",
     image=mirumoji_image
 )
+
+# Create Secret from local environment variables
+env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
+
 # --- End Modal Setup ---
 
 
 @app.function(
     gpu=MODAL_GPU,
     timeout=600,
-    include_source=True
+    include_source=True,
+    secrets=env_secrets
 )
-def transcribe_srt_job(OPENAI_API_KEY: str,
-                       media_fp: Union[str, Path]
+def transcribe_srt_job(media_fp: Union[str, Path]
                        ) -> Union[str, None]:
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
     and returns SRT string.
 
     Args:
-      OPENAI_API_KEY (str): OpenAI API key for fixing transcription.
       media_fp (Union[str, Path]): Path to the video for transcription.
 
     Returns:
@@ -74,7 +78,7 @@ def transcribe_srt_job(OPENAI_API_KEY: str,
         fwhisper = FWhisperWrapper()
 
         gpt_model_kwargs = {
-            "ApiKey": OPENAI_API_KEY,
+            "ApiKey": os.environ["OPENAI_API_KEY"],
             "from_dotenv": False
         }
         srt_result_string = fwhisper.transcribe_to_srt(

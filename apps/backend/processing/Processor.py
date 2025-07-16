@@ -161,8 +161,8 @@ class Processor:
         async with self.modal_app.run():
             media_fp = Path(media_fp).as_posix()
             return await self.transcribe_srt_job.remote.aio(
-                OPENAI_API_KEY=self.API_KEYS["OPENAI_API_KEY"],
-                media_fp=media_fp)
+                media_fp=media_fp
+                )
 
     async def modal_transcribe_to_str(self,
                                       audio_fp: Union[str, Path]
