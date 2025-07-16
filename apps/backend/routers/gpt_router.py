@@ -52,9 +52,9 @@ async def breakdown(
     Raises:
       HTTPException: Status code 500 if breakdown fails.
     """
-    log_prefix = f"[Profile: {profile_id}] " if profile_id else ""
+    log_prefix = f"[Profile: '{profile_id}'] " if profile_id else ""
     LOGGER.info(f"{log_prefix}Breakdown Request: \
-        sentence={req.sentence!r} focus={req.focus!r}")
+        sentence='{req.sentence!r}' focus='{req.focus!r}'")
     try:
         t0 = time.perf_counter()
         result = breakdown_service.explain(req.sentence, req.focus)
@@ -62,9 +62,9 @@ async def breakdown(
         LOGGER.info(f"{log_prefix}Request Time: {elapsed:.1f} ms")
         return result
     except Exception as e:
-        LOGGER.warning(f"{log_prefix}Breakdown Failed: {e}")
+        LOGGER.warning(f"{log_prefix}Breakdown Failed: '{e}'")
         cleaned = re.sub(r"[（）]", "", req.sentence)
-        LOGGER.info(f"{log_prefix}Retrying with clean sentence: {cleaned!r}")
+        LOGGER.info(f"{log_prefix}Retrying with clean sentence: '{cleaned!r}'")
         try:
             t0 = time.perf_counter()
             result = breakdown_service.explain(cleaned, req.focus)
@@ -98,11 +98,11 @@ async def custom_breakdown(
     Raises:
       HTTPException: Status code 500 if breakdown fails.
     """
-    log_prefix = f"[Profile: {profile_id}] " if profile_id else ""
+    log_prefix = f"[Profile: '{profile_id}'] " if profile_id else ""
     LOGGER.info(
-        f"{log_prefix}Custom Breakdown Request: sentence={req.sentence!r} \
-            focus={req.focus!r} sysMsg={req.sysMsg!r} prompt={req.prompt!r}\
-                version={req.version!r}")
+        f"{log_prefix}Custom Breakdown Request: sentence='{req.sentence!r}' \
+            focus='{req.focus!r}' sysMsg='{req.sysMsg!r}'\
+                prompt='{req.prompt!r}' version='{req.version!r}'")
     try:
         t0 = time.perf_counter()
         result = breakdown_service.explain_custom(req.sentence,
@@ -115,9 +115,9 @@ async def custom_breakdown(
         LOGGER.info(f"{log_prefix}Request Time: {elapsed:.1f} ms")
         return result
     except Exception as e:
-        LOGGER.warning(f"{log_prefix}Custom Breakdown Failed: {e}")
+        LOGGER.warning(f"{log_prefix}Custom Breakdown Failed: '{e}'")
         cleaned = re.sub(r"[（）]", "", req.sentence).strip().strip("\n")
-        LOGGER.info(f"{log_prefix}Retrying with clean sentence: {cleaned!r}")
+        LOGGER.info(f"{log_prefix}Retrying with clean sentence: '{cleaned!r}'")
         try:
             t0 = time.perf_counter()
             result = breakdown_service.explain_custom(cleaned,

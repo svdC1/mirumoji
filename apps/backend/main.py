@@ -4,8 +4,10 @@ and manages application lifecycle.
 
 Attributes:
   LOGGER (logging.Logger): Root Logging object.
+  LOGGING_LEVEL (str): Level for the Logging object.
 """
 import logging
+import os
 from typing import AsyncGenerator, Any
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,10 +22,29 @@ from routers.video_router import video_router
 from routers.profile_router import profile_router
 from contextlib import asynccontextmanager
 from db.db import connect_db, disconnect_db, DATABASE_URL
+from utils.env_utils import using_modal
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(levelname)8s %(name)s | %(message)s",
-                    )
+LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO")
+
+if LOGGING_LEVEL == "INFO":
+    LOGGING_LEVEL = logging.INFO
+elif LOGGING_LEVEL == "WARNING":
+    LOGGING_LEVEL = logging.WARNING
+elif LOGGING_LEVEL == "ERROR":
+    LOGGING_LEVEL = logging.ERROR
+elif LOGGING_LEVEL == "DEBUG":
+    LOGGING_LEVEL = logging.DEBUG
+elif LOGGING_LEVEL == "CRITICAL":
+    LOGGING_LEVEL = logging.CRITICAL
+else:
+    LOGGING_LEVEL = logging.INFO
+
+logging.basicConfig(
+    level=LOGGING_LEVEL,
+    format="{asctime}||{levelname}||{name}:{funcName}||{message}",
+    style="{",
+    datefmt="%H:%M:%S[%z]"
+    )
 LOGGER = logging.getLogger(__name__)
 
 # ───────────────────────────────────────────────────────────
@@ -102,5 +123,6 @@ app.include_router(profile_router)
 
 
 LOGGER.info(f"Database URL: {DATABASE_URL}")
+LOGGER.info(f"USING_MODAL={using_modal()}")
 LOGGER.info("Setup Complete")
-LOGGER.info(f"Serving {Path('media_files').resolve()} at '/media'.")
+LOGGER.info(f"Serving '{Path('media_files').resolve()}' at '/media'.")
