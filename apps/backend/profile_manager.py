@@ -63,16 +63,16 @@ async def ensure_profile_exists(
             insert_query = profiles.insert().values(id=profile_id,
                                                     name=profile_id)
             await db.execute(insert_query)
-            LOGGER.info(f"Implicitly created profile with ID: {profile_id}")
+            LOGGER.info(f"Implicitly created profile with ID: '{profile_id}'")
         except Exception as e:
-            LOGGER.exception(f"Error creating profile {profile_id}: {e}")
+            LOGGER.exception(f"Error creating profile '{profile_id}': '{e}'")
 
             # Check if it was created by another request in the meantime
             profile_check_after_error = await db.fetch_one(query)
             if not profile_check_after_error:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Could not create or find profile {profile_id}.")
+                    detail=f"Could not create or find profile '{profile_id}'.")
     return profile_id
 
 
@@ -104,15 +104,15 @@ async def get_profile_id_optional(
                                                     name=profile_id)
             await db.execute(insert_query)
             LOGGER.info(f"Implicitly created profile with\
-                ID (optional context): {profile_id}")
+                ID (optional context): '{profile_id}'")
         except Exception:
-            LOGGER.exception(f"Error creating profile {profile_id}")
+            LOGGER.exception(f"Error creating profile '{profile_id}'")
 
             # Check again in case of race condition
             profile_check_after_error = await db.fetch_one(query)
             if not profile_check_after_error:
                 LOGGER.exception(f"Could not find or create profile \
-                    {profile_id} after error.")
+                    '{profile_id}' after error.")
                 return None
 
     return profile_id

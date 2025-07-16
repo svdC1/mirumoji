@@ -187,6 +187,6 @@ class AnkiExporter:
         pkg = genanki.Package(self.deck,
                               self.media_files)
         pkg.write_to_file(output_path)
-        _notes = f"#Notes -> {len(self.deck.notes)};"
-        _media = f"#Media -> {len(self.media_files)};"
-        LOGGER.info(f"Anki Package -> {output_path};{_notes}{_media}")
+        _notes = f"#Notes -> '{len(self.deck.notes)}';"
+        _media = f"#Media -> '{len(self.media_files)}';"
+        LOGGER.info(f"Anki Package -> '{output_path}';{_notes}{_media}")
