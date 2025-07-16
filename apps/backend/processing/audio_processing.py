@@ -154,6 +154,7 @@ class AudioTools:
                          capture_output=True,
                          check=True,
                          hide_and_log=True)
+        LOGGER.info(f"Converted to WAV {s} → {so}")
         return op
 
     def extract_audio(self, input_path: str) -> str:
@@ -176,7 +177,7 @@ class AudioTools:
                       ".aac"
                       }
         if ext in audio_exts:
-            LOGGER.debug(f"Input is audio {ext}, no extraction needed")
+            LOGGER.info(f"Input is audio {ext}, no extraction needed")
             return input_path
 
         LOGGER.info(f"Extracting audio from video container {input_path}")
@@ -190,7 +191,7 @@ class AudioTools:
         ]
         self.run_command(cmd,
                          hide_and_log=True)
-        LOGGER.debug(f"Audio Saved at {so}")
+        LOGGER.info(f"Extracted audio from {si} → {so}")
         return out
 
     def filter_audio(self,
@@ -225,7 +226,9 @@ class AudioTools:
             "-ar", "16000",
             o
         ]
+        LOGGER.info("Filtering audio")
         self.run_command(cmd, hide_and_log=True)
+        LOGGER.info(f"Filtered {i} → {o}")
         return output_wav
 
     def to_mp4(
@@ -252,7 +255,7 @@ class AudioTools:
 
         src = pathlib.Path(input_path).resolve()
         if not src.is_file():
-            LOGGER.error(f"to_mp4: {src} does not exist")
+            LOGGER.error(f"Input '{src}' does not exist")
             return None
 
         dst = pathlib.Path(output_path or src.with_suffix(".mp4")).resolve()
@@ -260,7 +263,7 @@ class AudioTools:
         try:
             w, h = map(int, resolution.lower().split("x"))
         except ValueError:
-            LOGGER.error(f"to_mp4: resolution must be 'WxH', got {resolution}")
+            LOGGER.error(f"Resolution must be 'WxH', got '{resolution}'")
             return None
 
         # 1) scale to fit, 2) pad to canvas (center)
@@ -309,16 +312,17 @@ class AudioTools:
             "-movflags", "+faststart",
             dst.as_posix(),
         ]
-
+        LOGGER.info(f"Converting with use_nvenc='{use_nvenc}'")
         result = self.run_command(cmd, capture_output=True, hide_and_log=True)
         # Retry with normal args in case of NVENC error
         if result.returncode != 0 and use_nvenc:
+            LOGGER.info("Retrying without NVENC")
             result = self.run_command(cpu_cmd,
                                       capture_output=True,
                                       hide_and_log=True)
         if result is None or result.returncode != 0:
-            LOGGER.error(f"FFmpeg to_mp4 failed:\n{result.stderr}")
+            LOGGER.error(f"FFmpeg to_mp4 failed:\n'{result.stderr}'")
             return None
 
-        LOGGER.info(f"Converted {src.name} → {dst.name}")
+        LOGGER.info(f"Converted '{src.name}' → '{dst.name}'")
         return dst

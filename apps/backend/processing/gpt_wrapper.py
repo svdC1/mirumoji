@@ -289,7 +289,7 @@ class GptModel:
         info = json.loads(info)
 
         gpt_model = GptModel(version=info["model"],
-                             system_msg=info["sys_msg"],
+                             system_msg=info["raw_sys_msg"],
                              from_dotenv=info["from_dotenv"],
                              ApiKey=info["raw_ApiKey"],
                              max_context=info["window_token_limit"]
@@ -306,4 +306,5 @@ class GptModel:
         Returns:
           str: JSON string of serialized object.
         """
-        return json.dumps(self.info, skipkeys=True)
+        info_copy = {k: v for k, v in self.info.items() if k != "client"}
+        return json.dumps(info_copy)
