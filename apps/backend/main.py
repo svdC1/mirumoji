@@ -41,7 +41,7 @@ else:
 
 logging.basicConfig(
     level=LOGGING_LEVEL,
-    format="{asctime}||{levelname}||{name}:{funcName}||{message}",
+    format="{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
     style="{",
     datefmt="%H:%M:%S[%z]"
     )

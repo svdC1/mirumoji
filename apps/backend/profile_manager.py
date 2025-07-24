@@ -7,12 +7,12 @@ Attributes:
 """
 
 from fastapi import Header, HTTPException, Depends, status
-from db.db import get_db
-from db.Tables import profiles
+from db.db import DbManager
 import logging
 from typing import Optional
 
 LOGGER = logging.getLogger(__name__)
+db_manager = DbManager()
 
 
 async def get_profile_id_from_header(
@@ -55,20 +55,24 @@ async def ensure_profile_exists(
             detail="X-Profile-ID header is required for this operation."
         )
 
-    db = await get_db()
-    query = profiles.select().where(profiles.c.id == profile_id)
-    profile = await db.fetch_one(query)
+    profile = await db_manager.read("profiles",
+                                    {"profile_id": profile_id},
+                                    fetch_one=True
+                                    )
     if not profile:
         try:
-            insert_query = profiles.insert().values(id=profile_id,
-                                                    name=profile_id)
-            await db.execute(insert_query)
+            values = {"id": profile_id, "name": profile_id}
+            await db_manager.create("profiles", values)
             LOGGER.info(f"Implicitly created profile with ID: '{profile_id}'")
         except Exception as e:
             LOGGER.exception(f"Error creating profile '{profile_id}': '{e}'")
 
             # Check if it was created by another request in the meantime
-            profile_check_after_error = await db.fetch_one(query)
+            profile_check_after_error = await db_manager.read(
+                "profiles",
+                {"profile_id": profile_id},
+                fetch_one=True
+                )
             if not profile_check_after_error:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -95,21 +99,25 @@ async def get_profile_id_optional(
         return None
 
     # If header is provided, ensure profile exists (or create it)
-    db = await get_db()
-    query = profiles.select().where(profiles.c.id == profile_id)
-    profile = await db.fetch_one(query)
+    profile = await db_manager.read("profiles",
+                                    {"profile_id": profile_id},
+                                    fetch_one=True
+                                    )
     if not profile:
         try:
-            insert_query = profiles.insert().values(id=profile_id,
-                                                    name=profile_id)
-            await db.execute(insert_query)
+            values = {"id": profile_id, "name": profile_id}
+            await db_manager.create("profiles", values)
             LOGGER.info(f"Implicitly created profile with\
                 ID (optional context): '{profile_id}'")
         except Exception:
             LOGGER.exception(f"Error creating profile '{profile_id}'")
 
             # Check again in case of race condition
-            profile_check_after_error = await db.fetch_one(query)
+            profile_check_after_error = await db_manager.read(
+                "profiles",
+                {"profile_id": profile_id},
+                fetch_one=True
+                )
             if not profile_check_after_error:
                 LOGGER.exception(f"Could not find or create profile \
                     '{profile_id}' after error.")

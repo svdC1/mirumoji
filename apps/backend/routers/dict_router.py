@@ -10,14 +10,12 @@ Attributes:
 from fastapi import APIRouter, Query, HTTPException
 import logging
 from processing.Processor import Processor
-from utils.env_utils import using_modal
 from models.DictLookup import DictLookup
 from models.DictWildcardLookup import DictWildcardLookup
 
-USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
 dict_router = APIRouter(prefix="/dict")
-processor = Processor(use_modal=USING_MODAL)
+processor = Processor()
 breakdown_service = processor.sentence_breakdown_service
 
 
