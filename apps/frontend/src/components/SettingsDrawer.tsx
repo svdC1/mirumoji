@@ -85,12 +85,8 @@ export default function SettingsDrawer({
 }: SettingsDrawerProps): JSX.Element {
     // Reference to Video
     const videoInputRef = useRef<HTMLInputElement | null>(null);
-    // Video File Name Display
-    const [videoFileName, setVideoFileName] = useState<string | null>(null);
     // Reference to Subtitles
     const srtInputRef = useRef<HTMLInputElement | null>(null);
-    // Subtitle File Name Display
-    const [srtFileName, setSrtFileName] = useState<string | null>(null);
     // Subtitle Style Context
     const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =
         useSubtitleSettings();
@@ -114,8 +110,15 @@ export default function SettingsDrawer({
     const [convertingVideo, setConvertingVideo] = useState(false);
     // Get Saved Profile Files
     const [profileFiles, setProfileFiles] = useState<ProfileFile[]>([]);
+    // Set Profile Context
     const { profileId } = useProfile();
-    const { clearPlayerState } = usePlayer();
+    const {
+        videoFileName,
+        setVideoFileName,
+        srtFileName,
+        setSrtFileName,
+        clearPlayerState,
+    } = usePlayer();
 
     const fetchProfileFiles = async () => {
         try {

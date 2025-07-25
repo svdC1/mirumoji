@@ -62,10 +62,12 @@ export default function SubtitlePlayer({
         }
     }, [video, videoUrl]);
 
+    // Load video when blobUrl changes
     useEffect(() => {
         videoRef.current?.load();
     }, [blobUrl]);
 
+    // Parse SRT file and tokenize cues
     useEffect(() => {
         (async () => {
             if (!srt) {
@@ -144,6 +146,10 @@ export default function SubtitlePlayer({
         textShadow: subtitleStyle.textShadow,
         bottom: `${subtitleStyle.position}%`,
     };
+    // Set Furigana CSS Properties based on Style Context
+    const computedFuriganaStyle: React.CSSProperties = {
+        fontSize: `${Math.trunc(subtitleStyle.fontSize / 2.5)}px`,
+    };
 
     return (
         <div className="relative w-full flex flex-col items-center">
@@ -195,12 +201,15 @@ export default function SubtitlePlayer({
                                 >
                                     {/*Furigana*/}
                                     {shouldDisplayFurigana && furiganaText && (
-                                        <span className="text-xs text-gray-400 group-hover:text-yellow-300">
+                                        <span
+                                            className=" text-gray-400 group-hover:text-yellow-300"
+                                            style={computedFuriganaStyle}
+                                        >
                                             {furiganaText}
                                         </span>
                                     )}
                                     {/*Token*/}
-                                    <span className="underline group-hover:text-yellow-300">
+                                    <span className="group-hover:text-yellow-300">
                                         {token.surface_form}
                                     </span>
                                 </button>

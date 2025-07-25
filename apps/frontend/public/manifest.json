@@ -1,22 +1,37 @@
 {
     "short_name": "Mirumoji",
     "name": "Mirumoji",
+    "description": "Interactive Japanese language video player",
     "icons": [
         {
             "src": "/icons/icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
         },
         {
             "src": "/icons/icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "maskable"
         }
     ],
     "start_url": "/",
+    "id": "/",
     "display": "standalone",
     "background_color": "#000000",
-    "theme_color": "#10B981"
+    "theme_color": "#10B981",
+    "screenshots": [
+        {
+            "src": "/screenshots/desktop_screenshot.png",
+            "sizes": "2862x1872",
+            "type": "image/png",
+            "form_factor": "wide"
+        },
+        {
+            "src": "/screenshots/mobile_screenshot.png",
+            "sizes": "1290x2796",
+            "type": "image/png"
+        }
+    ]
 }

@@ -103,7 +103,7 @@ export default function NavigationMenu() {
                         value={profileInput}
                         onChange={(e) => setProfileInput(e.target.value)}
                         placeholder="Enter Profile Name"
-                        className="w-full px-3 py-2 text-sm text-white bg-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 text-center text-sm text-white bg-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
                     <button
                         onClick={handleSetProfile}

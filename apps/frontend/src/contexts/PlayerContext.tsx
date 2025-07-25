@@ -10,23 +10,16 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
 /**
  * @interface PlayerContextState
  * Defines the shape of the data stored in the PlayerContext.
- * @property {File | null} video - The currently loaded video file.
- * @property {(file: File | null) => void} setVideo - Function to set the video file.
- * @property {File | null} srt - The currently loaded SRT subtitle file.
- * @property {(file: File | null) => void} setSrt - Function to set the SRT file.
- * @property {string | null} videoUrl - The URL of a video (used for profile-loaded or converted videos).
- * @property {(url: string | null) => void} setVideoUrl - Function to set the video URL.
- * @property {boolean} drawerOpen - The visibility state of the settings drawer.
- * @property {(open: boolean) => void} setDrawerOpen - Function to toggle the settings drawer.
- * @property {boolean} showFurigana - The visibility state of furigana on subtitles.
- * @property {(show: boolean) => void} setShowFurigana - Function to toggle furigana visibility.
- * @property {() => void} clearPlayerState - Function to reset the player state to its initial values.
  */
 interface PlayerContextState {
     video: File | null;
     setVideo: (file: File | null) => void;
+    videoFileName: string | null;
+    setVideoFileName: (name: string | null) => void;
     srt: File | null;
     setSrt: (file: File | null) => void;
+    srtFileName: string | null;
+    setSrtFileName: (name: string | null) => void;
     videoUrl: string | null;
     setVideoUrl: (url: string | null) => void;
     drawerOpen: boolean;
@@ -36,16 +29,8 @@ interface PlayerContextState {
     clearPlayerState: () => void;
 }
 
-/**
- * The React Context object for the player state.
- */
 const PlayerContext = createContext<PlayerContextState | undefined>(undefined);
 
-/**
- * @interface PlayerProviderProps
- * Defines the props for the PlayerProvider component.
- * @property {ReactNode} children - The child components that the provider will wrap.
- */
 interface PlayerProviderProps {
     children: ReactNode;
 }
@@ -58,28 +43,35 @@ interface PlayerProviderProps {
  */
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [video, setVideo] = useState<File | null>(null);
+    const [videoFileName, setVideoFileName] = useState<string | null>(null);
     const [srt, setSrt] = useState<File | null>(null);
+    const [srtFileName, setSrtFileName] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [showFurigana, setShowFurigana] = useState<boolean>(true);
 
     /**
      * Resets all player-related state to their initial default values.
-     * This function can be called to manually clear the player session.
      */
     const clearPlayerState = () => {
         setVideo(null);
+        setVideoFileName(null);
         setSrt(null);
+        setSrtFileName(null);
         setVideoUrl(null);
-        setDrawerOpen(true); // Reset drawer to be open
+        setDrawerOpen(true);
         setShowFurigana(true);
     };
 
     const value = {
         video,
         setVideo,
+        videoFileName,
+        setVideoFileName,
         srt,
         setSrt,
+        srtFileName,
+        setSrtFileName,
         videoUrl,
         setVideoUrl,
         drawerOpen,
@@ -98,8 +90,6 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
 /**
  * A custom hook for consuming the PlayerContext.
- * This hook simplifies accessing the context's state and ensures that the
- * consumer component is within a PlayerProvider.
  * @throws {Error} If the hook is used outside of a PlayerProvider.
  * @returns {PlayerContextState} The state and actions from the PlayerContext.
  */
