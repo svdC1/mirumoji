@@ -139,7 +139,7 @@ export default function HomePage() {
                 </section>
 
                 {/* Footer */}
-                <footer className="text-center py-16 border-t border-slate-700/50">
+                <footer className="flex flex-col items-center py-16 border-t border-slate-700/50">
                     <p className="text-gray-500 text-sm">
                         © {new Date().getFullYear()} svdC1
                     </p>

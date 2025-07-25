@@ -55,7 +55,9 @@ export const ExampleDisplay = ({
     <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
         <div className="flex items-center">
             <div className="ml-4 mt-1">
-                <p className="text-neutral-400 text-lg">({example})</p>
+                <p className="text-neutral-400 text-lg text-center">
+                    ({example})
+                </p>
             </div>
         </div>
     </div>

@@ -350,9 +350,9 @@ export default function UserPage() {
                                     "Set a profile to view your files."
                                 )
                             ) : filesLoading ? (
-                                <p>Loading files…</p>
+                                <p className="text-center">Loading files…</p>
                             ) : filesError ? (
-                                <p className="text-red-500">
+                                <p className="text-red-500 text-center">
                                     Error loading files.
                                 </p>
                             ) : files && files.length > 0 ? (
@@ -397,7 +397,9 @@ export default function UserPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p>No files found for this profile.</p>
+                                <p className="text-center">
+                                    No files found for this profile.
+                                </p>
                             ))}
                         {activeTab === "transcripts" &&
                             (!profileId ? (
@@ -405,9 +407,11 @@ export default function UserPage() {
                                     "Set a profile to view your transcripts."
                                 )
                             ) : transcriptsLoading ? (
-                                <p>Loading transcripts…</p>
+                                <p className="text-center">
+                                    Loading transcripts…
+                                </p>
                             ) : transcriptsError ? (
-                                <p className="text-red-500">
+                                <p className="text-red-500 text-center">
                                     Error loading transcripts.
                                 </p>
                             ) : transcripts && transcripts.length > 0 ? (
@@ -497,7 +501,9 @@ export default function UserPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p>No transcripts found for this profile.</p>
+                                <p className="text-center">
+                                    No transcripts found for this profile.
+                                </p>
                             ))}
 
                         {activeTab === "gpt-template" &&
@@ -506,10 +512,12 @@ export default function UserPage() {
                                     "Set a profile to manage GPT templates."
                                 )
                             ) : gptTemplateLoading ? (
-                                <p>Loading GPT Template...</p>
+                                <p className="text-center">
+                                    Loading GPT Template...
+                                </p>
                             ) : gptTemplateError &&
                               (gptTemplateError as ApiError).status !== 404 ? (
-                                <p className="text-red-500">
+                                <p className="text-red-500 text-center">
                                     Error loading GPT Template.
                                 </p>
                             ) : (

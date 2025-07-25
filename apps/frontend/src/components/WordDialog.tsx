@@ -412,7 +412,7 @@ export default function WordDialog({
                             Loading dictionary…
                         </p>
                     ) : dictData === null ? (
-                        <p className="italic text-neutral-400">
+                        <p className="italic text-neutral-400 text-center">
                             No dictionary entry found for "{word}".
                         </p>
                     ) : (

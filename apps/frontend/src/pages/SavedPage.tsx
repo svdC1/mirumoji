@@ -292,12 +292,12 @@ export default function SavedPage() {
                             set and backend is running.
                         </p>
                     ) : !clips || clips.length === 0 ? (
-                        <div>
-                            <p className="text-center text-gray-600 dark:text-gray-400 py-4">
+                        <div className="text-center">
+                            <p className="text-gray-600 dark:text-gray-400 py-4">
                                 Profile <strong>{profileId}</strong> has no
                                 clips.
                             </p>
-                            <p className="text-center text-gray-600 dark:text-gray-400 py-4">
+                            <p className="text-gray-600 dark:text-gray-400 py-4">
                                 Create some from the Player page!
                             </p>
                         </div>

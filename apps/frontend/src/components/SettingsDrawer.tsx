@@ -18,6 +18,7 @@ import {
 } from "../types/types";
 import { useProfile } from "../contexts/ProfileContext";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
+import { usePlayer } from "../contexts/PlayerContext";
 import { API_BASE } from "../constants/user-page";
 
 const comprehensiveVideoAcceptList = [
@@ -84,12 +85,8 @@ export default function SettingsDrawer({
 }: SettingsDrawerProps): JSX.Element {
     // Reference to Video
     const videoInputRef = useRef<HTMLInputElement | null>(null);
-    // Video File Name Display
-    const [videoFileName, setVideoFileName] = useState<string | null>(null);
     // Reference to Subtitles
     const srtInputRef = useRef<HTMLInputElement | null>(null);
-    // Subtitle File Name Display
-    const [srtFileName, setSrtFileName] = useState<string | null>(null);
     // Subtitle Style Context
     const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =
         useSubtitleSettings();
@@ -113,7 +110,15 @@ export default function SettingsDrawer({
     const [convertingVideo, setConvertingVideo] = useState(false);
     // Get Saved Profile Files
     const [profileFiles, setProfileFiles] = useState<ProfileFile[]>([]);
+    // Set Profile Context
     const { profileId } = useProfile();
+    const {
+        videoFileName,
+        setVideoFileName,
+        srtFileName,
+        setSrtFileName,
+        clearPlayerState,
+    } = usePlayer();
 
     const fetchProfileFiles = async () => {
         try {
@@ -270,7 +275,7 @@ export default function SettingsDrawer({
         >
             <div className="flex flex-col h-full">
                 <div className="flex justify-center space-x-5 items-center px-6 py-4 border-b border-neutral-700">
-                    <h2 className="text-xl font-semibold text-neutral-100">
+                    <h2 className="text-xl font-semibold text-neutral-100 text-center flex-1">
                         Settings
                     </h2>
                     <button
@@ -367,6 +372,13 @@ export default function SettingsDrawer({
                                     {convertingVideo
                                         ? "Converting…"
                                         : "Convert Video to MP4"}
+                                </button>
+                                <button
+                                    onClick={clearPlayerState}
+                                    disabled={isBusy}
+                                    className="w-full py-2 bg-red-600 text-white rounded hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Reset Player
                                 </button>
                             </div>
                             {generatedSrtDownloadUrl && (

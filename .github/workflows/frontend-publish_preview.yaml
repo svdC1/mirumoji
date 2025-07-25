@@ -34,6 +34,10 @@ jobs:
 
             - name: Build for GitHub Pages
               run: cd ./apps/frontend && npx vite build --base "/${{ github.event.repository.name }}/"
+
+            - name: Copy 404.html to dist
+              run: cp ./apps/frontend/404.html ./apps/frontend/dist/404.html
+
             - name: Setup Pages
               uses: actions/configure-pages@v4
 
