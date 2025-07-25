@@ -56,7 +56,7 @@ async def ensure_profile_exists(
         )
 
     profile = await db_manager.read("profiles",
-                                    {"profile_id": profile_id},
+                                    {"id": profile_id},
                                     fetch_one=True
                                     )
     if not profile:
@@ -70,7 +70,7 @@ async def ensure_profile_exists(
             # Check if it was created by another request in the meantime
             profile_check_after_error = await db_manager.read(
                 "profiles",
-                {"profile_id": profile_id},
+                {"id": profile_id},
                 fetch_one=True
                 )
             if not profile_check_after_error:
@@ -100,7 +100,7 @@ async def get_profile_id_optional(
 
     # If header is provided, ensure profile exists (or create it)
     profile = await db_manager.read("profiles",
-                                    {"profile_id": profile_id},
+                                    {"id": profile_id},
                                     fetch_one=True
                                     )
     if not profile:
@@ -115,7 +115,7 @@ async def get_profile_id_optional(
             # Check again in case of race condition
             profile_check_after_error = await db_manager.read(
                 "profiles",
-                {"profile_id": profile_id},
+                {"id": profile_id},
                 fetch_one=True
                 )
             if not profile_check_after_error:
