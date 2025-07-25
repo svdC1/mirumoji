@@ -11,17 +11,17 @@
         // Store it in sessionStorage.
         sessionStorage.setItem('redirectPath', path);
 
-        // Redirect to the base URL of the application.
+        // Redirect to the base URL of the GitHub Pages application.
         // The script in the main app will handle the rest.
-        window.location.href = import.meta.env.BASE_URL || '/';
+        window.location.href = "/mirumoji/"
     </script>
 </head>
 
 <body>
-    <p>If you are not redirected automatically, follow this <a id="redirect-link" href="/">link to the home page</a>.
+    <p>If you are not redirected automatically, follow this <a id="redirect-link" href="/mirumoji/">link to the home page</a>.
     </p>
     <script>
-        document.getElementById('redirect-link').href = import.meta.env.BASE_URL || '/';
+        document.getElementById('redirect-link').href = "/mirumoji/";
     </script>
 </body>
 

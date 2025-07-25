@@ -433,7 +433,7 @@ async def delete_profile_file(
                             detail="X-Profile-ID header is required."
                             )
     filter = {"id": fileId, "profile_id": profile_id}
-    file_r = db_manager.read("profile_files", filter, fetch_one=True)
+    file_r = await db_manager.read("profile_files", filter, fetch_one=True)
     if not file_r:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="File record not found."
@@ -459,10 +459,10 @@ async def delete_profile_file(
     elif file_r.file_type == "audio_source":
         # Delete related transcript
         transcript_filter = {"audio_file_path": file_r.file_path}
-        res = db_manager.update("profile_transcripts",
-                                transcript_filter,
-                                values={"audio_file_path": None}
-                                )
+        res = await db_manager.update("profile_transcripts",
+                                      transcript_filter,
+                                      values={"audio_file_path": None}
+                                      )
         if res > 0:
             LOGGER.info(
                 f"Cleared path in transcripts for '{file_r.file_path}'")
