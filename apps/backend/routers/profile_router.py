@@ -28,13 +28,7 @@ from models.AnkiExportResponse import AnkiExportResponse
 from processing.audio_processing import AudioTools
 from typing import Optional, List
 import pathlib
-from db.db import (get_db,
-                   get_gpt_template_db)
-from db.Tables import (gpt_templates,
-                       clips,
-                       profile_files,
-                       profile_transcripts
-                       )
+from db.db import DbManager
 from profile_manager import ensure_profile_exists
 from utils.anki_utils import AnkiExporter
 
@@ -47,6 +41,8 @@ profile_router = APIRouter(prefix='/profiles',
 BASE_MEDIA_PATH = pathlib.Path("media_files")
 TEMP_MEDIA_PATH = BASE_MEDIA_PATH / "temp"
 TEMP_MEDIA_PATH.mkdir(parents=True, exist_ok=True)
+
+db_manager = DbManager()
 
 
 # --- GPT Template Management ---
@@ -72,7 +68,10 @@ async def get_gpt_template(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    rec = await get_gpt_template_db(profile_id)
+    rec = await db_manager.read("gpt_templates",
+                                {"profile_id": profile_id},
+                                fetch_one=True
+                                )
     if not rec:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="GPT template not found.")
@@ -106,28 +105,25 @@ async def upsert_gpt_template(
     if not profile_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required.")
-    db = await get_db()
     values = {
         "profile_id": profile_id,
         "sys_msg": template_data.sys_msg,
         "prompt": template_data.prompt,
         "version": template_data.version
         }
-    ex = await get_gpt_template_db(profile_id)
+    ex = await db_manager.read("gpt_templates",
+                               {"profile_id": profile_id},
+                               fetch_one=True
+                               )
     if ex:
         # Update current template
-        await db.execute((gpt_templates
-                          .update()
-                          .where(gpt_templates.c.id == ex.id)
-                          .values(**values)
-                          )
-                         )
+        await db_manager.update("gpt_templates", {"id": ex.id}, values)
         tid = ex.id
     else:
         # Create new template
         tid = str(uuid.uuid4())
         values["id"] = tid
-        await db.execute(gpt_templates.insert().values(**values))
+        await db_manager.create("gpt_templates", values)
     return GptTemplateResponse(id=tid,
                                sysMsg=values["sys_msg"],
                                prompt=values["prompt"],
@@ -156,12 +152,7 @@ async def delete_gpt_template(
     if not profile_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required.")
-    db = await get_db()
-    res = await db.execute((gpt_templates
-                            .delete()
-                            .where(gpt_templates.c.profile_id == profile_id)
-                            )
-                           )
+    res = await db_manager.delete("gpt_templates", {"profile_id": profile_id})
     if res == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="GPT template not found.")
@@ -247,33 +238,28 @@ async def save_video_clip(
         gpt_j = json.loads(gpt_breakdown_response)
         s_time = float(clip_start_time)
         e_time = float(clip_end_time)
-        db = await get_db()
         c_id = str(uuid.uuid4())
-        await db.execute((
-            clips
-            .insert()
-            .values(
-                id=c_id,
-                profile_id=profile_id,
-                clip_start_time=s_time,
-                clip_end_time=e_time,
-                gpt_breakdown_response=gpt_j,
-                video_clip_path=str(rel_path),
-                original_video_file_name=original_video_file_name,
-                original_video_url=original_video_url)
-            ))
+        values = {
+            "id": c_id,
+            "profile_id": profile_id,
+            "clip_start_time": s_time,
+            "clip_end_time": e_time,
+            "gpt_breakdown_response": gpt_j,
+            "video_clip_path": str(rel_path),
+            "original_video_file_name": original_video_file_name,
+            "original_video_url": original_video_url
+        }
+        await db_manager.create("clips", values)
 
         # Also save to files
-        await db.execute((
-            profile_files
-            .insert()
-            .values(
-                id=str(uuid.uuid4()),
-                profile_id=profile_id,
-                file_name=video_clip.filename,
-                file_path=str(rel_path),
-                file_type="video_clip")
-            ))
+        files_values = {
+            "id": str(uuid.uuid4()),
+            "profile_id": profile_id,
+            "file_name": video_clip.filename,
+            "file_path": str(rel_path),
+            "file_type": "video_clip"
+        }
+        await db_manager.create("profile_files", files_values)
 
         return {"success": True,
                 "message": "Clip saved successfully.",
@@ -320,17 +306,12 @@ async def get_saved_clips(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    query = (clips
-             .select()
-             .where(clips.c.profile_id == profile_id)
-             .order_by(clips.c.created_at.desc())
-             )
+    c_lst = await db_manager.read("clips", {"profile_id": profile_id})
     return [
         ClipResponse(id=c.id,
                      get_url=f"/media/{c.video_clip_path}",
                      breakdown_response=json.dumps(c.gpt_breakdown_response)
-                     ) for c in await db.fetch_all(query)
+                     ) for c in c_lst
         ]
 
 
@@ -359,34 +340,22 @@ async def delete_saved_clip(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    clip_r = await db.fetch_one(
-        (clips
-         .select()
-         .where(clips.c.id == clipId)
-         .where(clips.c.profile_id == profile_id)
-         )
-        )
+    filter = {"id": clipId, "profile_id": profile_id}
+    clip_r = await db_manager.read("clips",
+                                   filter,
+                                   fetch_one=True
+                                   )
 
     if not clip_r:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Clip not found."
                             )
-    await db.execute(
-        (clips
-         .delete()
-         .where(clips.c.id == clipId)
-         .where(clips.c.profile_id == profile_id)
-         )
-        )
+    await db_manager.delete("clips", filter)
 
-    await db.execute(
-        (profile_files
-         .delete()
-         .where(profile_files.c.file_path == clip_r.video_clip_path)
-         .where(profile_files.c.profile_id == profile_id)
-         )
-        )
+    files_filter = {"file_path": clip_r.video_clip_path,
+                    "profile_id": profile_id}
+
+    await db_manager.delete("profile_files", files_filter)
     fp = BASE_MEDIA_PATH / clip_r.video_clip_path
 
     if isinstance(fp, pathlib.Path) and fp.exists():
@@ -426,12 +395,7 @@ async def get_profile_files(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    query = (profile_files
-             .select()
-             .where(profile_files.c.profile_id == profile_id)
-             .order_by(profile_files.c.created_at.desc())
-             )
+    f_lst = await db_manager.read("profile_files", {"profile_id": profile_id})
     return [
         ProfileFileResponse(id=f.id,
                             file_name=f.file_name,
@@ -439,7 +403,7 @@ async def get_profile_files(
                             file_type=f.file_type,
                             created_at=f.created_at.isoformat() if
                             f.created_at else None
-                            ) for f in await db.fetch_all(query)
+                            ) for f in f_lst
             ]
 
 
@@ -468,19 +432,13 @@ async def delete_profile_file(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    file_r = await db.fetch_one((
-        profile_files
-        .select()
-        .where(profile_files.c.id == fileId)
-        .where(profile_files.c.profile_id == profile_id)
-        ))
+    filter = {"id": fileId, "profile_id": profile_id}
+    file_r = db_manager.read("profile_files", filter, fetch_one=True)
     if not file_r:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="File record not found."
                             )
-    await db.execute(profile_files.delete().where(profile_files.c.id == fileId)
-                     )
+    await db_manager.delete("profile_files", filter)
     fp = BASE_MEDIA_PATH / file_r.file_path
     if isinstance(fp, pathlib.Path) and fp.exists():
         try:
@@ -493,21 +451,18 @@ async def delete_profile_file(
 
     if file_r.file_type == "video_clip":
         # Delete related saved clip
-        res = await db.execute((
-            clips
-            .delete()
-            .where(clips.c.video_clip_path == file_r.file_path)
-              ))
+        filter_clip = {"video_clip_path": file_r.file_path}
+
+        res = await db_manager.delete("clips", filter_clip)
         if res > 0:
             LOGGER.info(f"Del assoc. clip for '{file_r.file_path}'")
     elif file_r.file_type == "audio_source":
         # Delete related transcript
-        res = await db.execute((
-            profile_transcripts
-            .update()
-            .where(profile_transcripts.c.audio_file_path == file_r.file_path)
-            .values(audio_file_path=None)
-            ))
+        transcript_filter = {"audio_file_path": file_r.file_path}
+        res = db_manager.update("profile_transcripts",
+                                transcript_filter,
+                                values={"audio_file_path": None}
+                                )
         if res > 0:
             LOGGER.info(
                 f"Cleared path in transcripts for '{file_r.file_path}'")
@@ -541,14 +496,10 @@ async def get_profile_transcripts(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    query = (profile_transcripts
-             .select()
-             .where(profile_transcripts.c.profile_id == profile_id)
-             .order_by(profile_transcripts.c.created_at.desc())
-             )
     res_trans = []
-    for t in await db.fetch_all(query):
+    for t in await db_manager.read("profile_transcripts",
+                                   {"profile_id": profile_id}
+                                   ):
         url = f"/media/{t.audio_file_path}" if t.audio_file_path else None
         res_trans.append(
             ProfileTranscriptResponse(
@@ -588,35 +539,24 @@ async def delete_profile_transcript(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
-    db = await get_db()
-    trans_r = await db.fetch_one((
-        profile_transcripts
-        .select()
-        .where(profile_transcripts.c.id == transcriptId)
-        .where(profile_transcripts.c.profile_id == profile_id)
-        ))
-
+    filter = {"id": transcriptId, "profile_id": profile_id}
+    trans_r = await db_manager.read("profile_transcripts",
+                                    filter,
+                                    fetch_one=True
+                                    )
     if not trans_r:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Transcript not found."
                             )
 
-    await db.execute((
-        profile_transcripts
-        .delete()
-        .where(profile_transcripts.c.id == transcriptId)
-        ))
+    await db_manager.delete("profile_transcripts", filter)
 
     LOGGER.info(f"Deleted transcript {transcriptId}")
     if trans_r.audio_file_path:
         # Delete file if it exists
         aud_path = trans_r.audio_file_path
-        res = await db.execute((
-            profile_files
-            .delete()
-            .where(profile_files.c.file_path == aud_path)
-            .where(profile_files.c.profile_id == profile_id)
-            ))
+        file_filter = {"file_path": aud_path, "profile_id": profile_id}
+        res = await db_manager.delete("profile_files", file_filter)
         if res > 0:
             LOGGER.info(f"Del assoc. profile_files for: '{aud_path}'")
             fp_aud = BASE_MEDIA_PATH / aud_path
@@ -661,13 +601,9 @@ async def export_anki_deck(
                             detail="X-Profile-ID header is required."
                             )
     # Get Clips
-    db = await get_db()
-    query = (clips
-             .select()
-             .where(clips.c.profile_id == profile_id)
-             .order_by(clips.c.created_at.desc())
-             )
-    clip_lst = [c for c in await db.fetch_all(query)]
+    clip_lst = [
+        c for c in await db_manager.read("clips", {"profile_id": profile_id})
+        ]
     anki = AnkiExporter()
     for c in clip_lst:
         breakdown = c.gpt_breakdown_response

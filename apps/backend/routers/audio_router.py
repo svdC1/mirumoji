@@ -20,9 +20,7 @@ from fastapi import (APIRouter,
                      )
 from processing.audio_processing import AudioTools
 from profile_manager import ensure_profile_exists
-from db.db import get_db
-from db.Tables import (profile_transcripts,
-                       profile_files)
+from db.db import DbManager
 from processing.Processor import Processor
 from utils.env_utils import using_modal
 import asyncio
@@ -36,9 +34,8 @@ BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
-processor = Processor(save_path=TEMP_DIR,
-                      use_modal=USING_MODAL
-                      )
+processor = Processor(save_path=TEMP_DIR)
+db_manager = DbManager()
 
 
 @audio_router.post("/transcribe_from_audio")
@@ -182,38 +179,29 @@ async def transcribe_from_audio(
                         explanation."
 
         # 5. Save Data to Database
-        db = await get_db()
         transcript_id = str(uuid.uuid4())
-
-        ins_transcript_q = (
-            profile_transcripts
-            .insert()
-            .values(
-                id=transcript_id,
-                profile_id=profile_id,
-                original_file_name=original_filename,
-                transcript=plain_text_transcript,
-                gpt_explanation=gpt_explanation_text,
-                audio_file_path=str(rel_audio_path_db),
-                ))
-        await db.execute(ins_transcript_q)
+        values = {
+            "id": transcript_id,
+            "profile_id": profile_id,
+            "original_file_name": original_filename,
+            "transcript": plain_text_transcript,
+            "gpt_explanation": gpt_explanation_text,
+            "audio_file_path": str(rel_audio_path_db)
+        }
+        await db_manager.create("profile_transcripts", values)
         LOGGER.info(f"Transcript '{transcript_id}' (plain text) \
             saved (Profile: '{profile_id}')")
         # Also insert into Files table.
         audio_file_rec_id = str(uuid.uuid4())
-        ins_audio_file_q = (
-            profile_files
-            .insert()
-            .values(
-                id=audio_file_rec_id,
-                profile_id=profile_id,
-                file_name=original_filename,
-                file_path=str(rel_audio_path_db),
-                file_type="audio_source",
-                related_transcript_id=transcript_id,
-                )
-            )
-        await db.execute(ins_audio_file_q)
+        file_values = {
+            "id": audio_file_rec_id,
+            "profile_id": profile_id,
+            "file_name": original_filename,
+            "file_path": str(rel_audio_path_db),
+            "file_type": "audio_source",
+            "related_transcript_id": transcript_id
+        }
+        await db_manager.create("profile_files", file_values)
         LOGGER.info(f"Audio source record '{audio_file_rec_id}'\
             saved (Profile: '{profile_id}')")
 

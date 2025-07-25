@@ -13,7 +13,7 @@ import logging
 from processing.text_processing import SentenceBreakdownService
 from processing.audio_processing import AudioTools
 from dotenv import load_dotenv
-from utils.env_utils import check_env
+from utils.env_utils import check_env, using_modal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,6 @@ class Processor:
     Args:
       save_path (Union[str, Path, None], optional): Optional Path to be used
                                                     as working directory.
-      use_modal (bool): Wether to use Modal or not (CPU or GPU) version.
       gpt_version (str): Which GPT version to use for OpenAI integration.
       dotenv_path (Union[str, Path, None], optional): Optional Path to look
                                                       for .env file
@@ -47,7 +46,6 @@ class Processor:
     def __init__(
         self,
         save_path: Union[str, Path, None] = None,
-        use_modal: bool = False,
         gpt_version: str = "gpt-4.1-mini",
         dotenv_path: Union[str, Path, None] = None,
         whisper_kwargs: Dict = {},
@@ -56,6 +54,8 @@ class Processor:
         MODAL_TOKEN_SECRET: Optional[str] = None
     ) -> None:
 
+        # Check MODAL
+        use_modal = using_modal()
         # Configure Save Path
         if not save_path:
             self.save_path = TemporaryDirectory(ignore_cleanup_errors=True)

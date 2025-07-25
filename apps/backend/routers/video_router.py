@@ -19,8 +19,7 @@ import asyncio
 import aiofiles
 from profile_manager import ensure_profile_exists
 import shutil
-from db.db import get_db
-from db.Tables import profile_files
+from db.db import DbManager
 import uuid
 from utils.env_utils import using_modal
 from processing.audio_processing import AudioTools
@@ -31,10 +30,9 @@ video_router = APIRouter(prefix="/video")
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
-processor = Processor(save_path=BASE_MEDIA_DIR,
-                      use_modal=USING_MODAL
-                      )
+processor = Processor(save_path=BASE_MEDIA_DIR)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
+db_manager = DbManager()
 
 
 @video_router.post("/generate_srt")
@@ -141,20 +139,14 @@ async def generate_srt(
         LOGGER.info(f"SRT content generated for profile '{profile_id}'")
 
         # 5. Save metadata
-        db = await get_db()
         vid_rec_id = str(uuid.uuid4())
-        ins_vid_query = (
-            profile_files
-            .insert()
-            .values(
-                id=vid_rec_id,
-                profile_id=profile_id,
-                file_name=srt_fp.name,
-                file_path=str(relative_srt_fp),
-                file_type="srt"
-                )
-            )
-        await db.execute(ins_vid_query)
+        values = {"id": vid_rec_id,
+                  "profile_id": profile_id,
+                  "file_name": srt_fp.name,
+                  "file_path": str(relative_srt_fp),
+                  "file_type": "srt"
+                  }
+        await db_manager.create("profile_files", values)
         LOGGER.info(
             f"SRT record saved for profile '{profile_id}'"
         )
@@ -273,21 +265,15 @@ async def convert_to_mp4(
         LOGGER.info(f"Video converted to '{final_conv_stored_loc}'")
 
         # 3. Save metadata for converted files to DB
-        db = await get_db()
         conv_rec_id = str(uuid.uuid4())
-
-        ins_conv_q = (
-            profile_files
-            .insert()
-            .values(
-                id=conv_rec_id,
-                profile_id=profile_id,
-                file_name=conv_stored_fname,
-                file_path=str(rel_conv_db_path),
-                file_type="mp4"
-                )
-            )
-        await db.execute(ins_conv_q)
+        values = {
+            "id": conv_rec_id,
+            "profile_id": profile_id,
+            "file_name": conv_stored_fname,
+            "file_path": str(rel_conv_db_path),
+            "file_type": "mp4"
+        }
+        await db_manager.create("profile_files", values)
         LOGGER.info(
             f"Converted video records saved for profile:'{profile_id}'"
         )
