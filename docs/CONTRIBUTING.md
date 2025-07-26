@@ -14,6 +14,8 @@
 
 > Make sure you have [`VSCode`](https://code.visualstudio.com/), [`Docker Desktop`](https://docs.docker.com/desktop/) and the [`VSCode Dev Containers Extension`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) installed.
 
+> Make sure Docker Desktop is running.
+
 #### Clone Repository
 
 ```bash
@@ -37,6 +39,8 @@ code mirumoji
 > A prompt will appear allowing you to choose between starting up the `Mirumoji (GPU)` development container _(~30GB Uncompressed)_ and the `Mirumoji (CPU)` development container _(~5.5GB Uncompressed)_.
 
 > Choose the `GPU` option if your machine has an `NVIDIA GPU`, otherwise choose the `CPU` option.
+
+> The first startup might take a few minutes since the development image needs to be pulled from the repository
 
 #### Running the Backend
 

@@ -7,6 +7,8 @@ WORKDIR /workspace
 ENV PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}" \
     PIP_NO_CACHE_DIR=1\
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video \
     NODE_VERSION=22.0.0
 
 
