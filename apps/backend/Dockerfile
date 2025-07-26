@@ -8,7 +8,9 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}" \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
 
 # --- Install System Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
