@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 import logging
 from processing.text_processing import SentenceBreakdownService
 from processing.audio_processing import AudioTools
+from tqdm.auto import tqdm
 from dotenv import load_dotenv
 from utils.env_utils import check_env, using_modal
 
@@ -198,10 +199,18 @@ class Processor:
             video_fp = Path(video_fp).as_posix()
             outpath = Path(outpath).as_posix()
             try:
-                async for chunk in self.video_conversion_job.remote_gen.aio(
-                       video_fp=video_fp):
-                    with open(outpath, "ab") as f_out:
-                        f_out.write(chunk)
+                with tqdm(unit='B',
+                          unit_scale=True,
+                          unit_divisor=1024,
+                          desc="Receiving Converted Video"
+                          ) as pbar:
+                    async for chunk in (
+                        self.video_conversion_job.remote_gen.aio(
+                            video_fp=video_fp)
+                                        ):
+                        with open(outpath, "ab") as f_out:
+                            f_out.write(chunk)
+                        pbar.update(len(chunk))
                 LOGGER.info("Finished receiving converted video")
                 return Path(outpath)
             except Exception as e:

@@ -1,9 +1,11 @@
 """
-This module defines helper functions to create / connect with the Mirumoji
-database.
+This module defines helper functions to create, connect and manage the Mirumoji
+database for storing profile information using the `databases` and `SQLAlchemy`
+modules with SQLite3.
 
 Attributes:
-  DATABASE_URL (str): `SQLite` database URL.
+  DATABASE_URL (str): `SQLite` database URL acquired from environment variable.
+                       Defaults to `sqlite:///./data/mirumoji.db`
   METADATA (MetaData): `sqlachemy` `MetaData` object for database.
   database (Database): `Database` object.
   engine (Engine): `SQLAlchemy` `Engine` object for database
@@ -26,6 +28,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 path_data = project_root / "data"
 path_data.mkdir(parents=True, exist_ok=True)
+# Create / Connect to Database
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/mirumoji.db")
 database = Database(DATABASE_URL)
 METADATA = METADATA
@@ -252,3 +255,18 @@ class DbManager:
             return await db.fetch_one(q)
 
         return await self._column_value_filter(table_name, filter_dict)
+
+    async def execute(self,
+                      q: Any
+                      ) -> Any:
+        """
+        Wrapper for executing an arbitrary query
+
+        Args:
+          q (Any): Query to execute
+
+        Returns:
+          Any: return value of `Database.execute`
+        """
+        db = await get_db()
+        return await db.execute(q)
