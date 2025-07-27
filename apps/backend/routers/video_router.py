@@ -159,10 +159,10 @@ async def generate_srt(
         # Propagate Exceptions
         raise
     except Exception as e:
-        LOGGER.exception(
-            f"Error generating SRT for '{video_file.filename}'\
-                 profile:  '{profile_id}'"
-        )
+        LOGGER.exception((
+            f"Error generating SRT for '{video_file.filename}'"
+            f"profile: '{profile_id}'"
+        ))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during SRT generation: '{str(e)}'",
@@ -174,8 +174,8 @@ async def generate_srt(
                 shutil.rmtree(op_tmp_dir)
                 LOGGER.info(f"Cleaned temp dir: '{op_tmp_dir}'")
             except OSError as e_os:
-                LOGGER.error(f"Error cleaning temp dir \
-                    '{op_tmp_dir}': '{e_os}'")
+                LOGGER.error((f"Error cleaning temp dir"
+                              f"'{op_tmp_dir}': '{e_os}'"))
 
 
 @video_router.post("/convert_to_mp4")

@@ -216,7 +216,7 @@ async def save_video_clip(
 
         # Convert to WebM for Anki Compatibility
         try:
-            LOGGER.info(f"Converting Clip to WEBM {loc} -> {webm_loc}")
+            LOGGER.info(f"Converting Clip to WEBM '{loc}' -> '{webm_loc}'")
             audio_tools = AudioTools(working_dir=p_path)
             await asyncio.to_thread(
                 audio_tools.to_webm,
@@ -225,9 +225,9 @@ async def save_video_clip(
                 use_nvenc=True
                 )
         except Exception as e:
-            LOGGER.exception(
-                f"Failed to convert {loc} to WEBM : {e}'; Falling back to \
-                    original format")
+            LOGGER.exception((
+                f"Failed to convert '{loc}' to WEBM : '{e}';"
+                f"Falling back to original format"))
         if webm_loc.exists():
             rel_path = (
                 pathlib.Path("profiles") / profile_id / "clips" / webm_fname
@@ -551,7 +551,7 @@ async def delete_profile_transcript(
 
     await db_manager.delete("profile_transcripts", filter)
 
-    LOGGER.info(f"Deleted transcript {transcriptId}")
+    LOGGER.info(f"Deleted transcript '{transcriptId}'")
     if trans_r.audio_file_path:
         # Delete file if it exists
         aud_path = trans_r.audio_file_path

@@ -109,8 +109,8 @@ async def transcribe_from_audio(
                 output_wav=str(cleaned_audio_tmp_loc),
             )
             if not cleaned_path_str or not Path(cleaned_path_str).exists():
-                LOGGER.error(f"Audio cleaning failed for \
-                    '{tmp_uploaded_audio_loc}'")
+                LOGGER.error((f"Audio cleaning failed for"
+                              f"'{tmp_uploaded_audio_loc}'"))
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Audio cleaning process failed.",
@@ -141,10 +141,10 @@ async def transcribe_from_audio(
                 audio_path=str(final_audio_storage_loc)
             )
         if not transcription_data or "text" not in transcription_data:
-            LOGGER.error(
-                f"Transcription (to_str) failed or gave invalid\
-                    result for '{final_audio_storage_loc}'"
-            )
+            LOGGER.error((
+                f"Transcription (to_str) failed or gave invalid"
+                f"result for '{final_audio_storage_loc}'"
+            ))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Audio transcription failed to produce text.",
@@ -152,22 +152,21 @@ async def transcribe_from_audio(
         # 4. Optinal GPT Explanation
         # The plain_text_transcript is what will be returned in the API
         plain_text_transcript = transcription_data["text"]
-        LOGGER.info(f"Plain text transcript \
-            generated for profile '{profile_id}'")
+        LOGGER.info(f"Transcripted generated for profile '{profile_id}'")
         gpt_explanation_text = None
         if do_gpt_explain:
             if not plain_text_transcript.strip():
-                LOGGER.warning(f"Skipping GPT for\
-                    empty transcript (Profile: '{profile_id}')")
-                gpt_explanation_text = "Transcript content empty,\
-                    no explanation."
+                LOGGER.warning((f"Skipping GPT for empty transcript"
+                               f"(Profile: '{profile_id}')"))
+                gpt_explanation_text = (
+                    "Transcript content empty, no explanation.")
             else:
                 gpt_explainer = (
                     processor.sentence_breakdown_service.gpt_explainer
                     )
                 try:
-                    LOGGER.info(f"Generating GPT \
-                        explanation (Profile: '{profile_id}')")
+                    LOGGER.info((f"Generating GPT explanation"
+                                 f"(Profile: '{profile_id}')"))
                     gpt_explanation_text = gpt_explainer.explain_sentence(
                         sentence=plain_text_transcript
                     )
@@ -175,8 +174,8 @@ async def transcribe_from_audio(
                         generated (Profile: '{profile_id}')")
                 except Exception as e_gpt:
                     LOGGER.error(f"GPT explanation failed: '{e_gpt}'")
-                    gpt_explanation_text = "Failed to generate GPT \
-                        explanation."
+                    gpt_explanation_text = (
+                        "Failed to generate GPT explanation.")
 
         # 5. Save Data to Database
         transcript_id = str(uuid.uuid4())
@@ -189,8 +188,8 @@ async def transcribe_from_audio(
             "audio_file_path": str(rel_audio_path_db)
         }
         await db_manager.create("profile_transcripts", values)
-        LOGGER.info(f"Transcript '{transcript_id}' (plain text) \
-            saved (Profile: '{profile_id}')")
+        LOGGER.info((f"Transcript '{transcript_id}' saved"
+                     f"(Profile: '{profile_id}')"))
         # Also insert into Files table.
         audio_file_rec_id = str(uuid.uuid4())
         file_values = {
@@ -202,8 +201,8 @@ async def transcribe_from_audio(
             "related_transcript_id": transcript_id
         }
         await db_manager.create("profile_files", file_values)
-        LOGGER.info(f"Audio source record '{audio_file_rec_id}'\
-            saved (Profile: '{profile_id}')")
+        LOGGER.info((f"Audio source record '{audio_file_rec_id}'"
+                    f"saved (Profile: '{profile_id}')"))
 
         return {
             "transcript": plain_text_transcript,
@@ -214,16 +213,17 @@ async def transcribe_from_audio(
         # Propagate Exceptions
         raise
     except Exception as e:
-        LOGGER.exception(
-            f"Error in transcribe_from_audio (Profile: '{profile_id}', \
-                File: '{original_filename}')"
-        )
+        LOGGER.exception((
+            f"Error in transcribe_from_audio"
+            f"(Profile: '{profile_id}', File: '{original_filename}')"
+        ))
         if final_audio_storage_loc.exists():
             try:
                 final_audio_storage_loc.unlink()
             except OSError as ose:
-                LOGGER.error(f"Could not remove\
-                '{final_audio_storage_loc}': '{ose}'")
+                LOGGER.error((f"Could not remove"
+                              f"'{final_audio_storage_loc}': '{ose}'"
+                              ))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to transcribe audio: '{str(e)}'",
