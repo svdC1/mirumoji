@@ -1,6 +1,6 @@
 ## Description
 
-> **Summary of the changes and context**
+> **Summary of the changes**
 
 ## Issue
 
@@ -9,6 +9,8 @@
 ## Type of Change
 
 > -   [ ] **Bug Fix**
+
+> -   [ ] **Optimization**
 
 > -   [ ] **New feature**
 
