@@ -43,8 +43,11 @@ class AudioTools:
         self.working_dir.mkdir(parents=True, exist_ok=True)
 
         # Setup Temp
-        self.temp = (working_dir / pathlib.Path("temp")).resolve()
+        self.temp = (self.working_dir / pathlib.Path("temp")
+                     ).resolve()
         self.temp.mkdir(parents=True, exist_ok=True)
+        self.log_dir = pathlib.Path.home() / ".mirumoji_logs"
+        self.log_dir.mkdir(exist_ok=True)
 
         # Search for FFMPEG and FFPROBE with shutil
         self.ffmpeg = shutil.which("ffmpeg")
@@ -101,20 +104,20 @@ class AudioTools:
                                         cwd=cwd)
 
             if capture_output:
-                LOGGER.debug(f"STDOUT: {result.stdout}")
-                LOGGER.debug(f"STDERR: {result.stderr}")
+                LOGGER.debug(f"STDOUT: '{result.stdout}'")
+                LOGGER.debug(f"STDERR: '{result.stderr}'")
 
             return result
 
         except subprocess.CalledProcessError as e:
             LOGGER.error(f"Command Failed: {' '.join(command)}")
             if capture_output:
-                LOGGER.error(f"STDOUT: {e.stdout}")
-                LOGGER.error(f"STDERR: {e.stderr}")
+                LOGGER.error(f"STDOUT: '{e.stdout}'")
+                LOGGER.error(f"STDERR: '{e.stderr}'")
                 error_message = e.stderr.decode()
                 timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                with open(self.working_dir / "error_log.txt",
-                          "w",
+                with open(self.log_dir / "ffmpeg_error.log",
+                          "a",
                           encoding="utf-8") as log_file:
                     log_file.write(
                         f"{timestamp} FFmpeg error:\n{error_message}\n\n")
@@ -154,7 +157,7 @@ class AudioTools:
                          capture_output=True,
                          check=True,
                          hide_and_log=True)
-        LOGGER.info(f"Converted to WAV {s} → {so}")
+        LOGGER.info(f"Converted to WAV '{s}' → '{so}'")
         return op
 
     def extract_audio(self, input_path: str) -> str:
@@ -177,10 +180,10 @@ class AudioTools:
                       ".aac"
                       }
         if ext in audio_exts:
-            LOGGER.info(f"Input is audio {ext}, no extraction needed")
+            LOGGER.info(f"Input is audio '{ext}', no extraction needed")
             return input_path
 
-        LOGGER.info(f"Extracting audio from video container {input_path}")
+        LOGGER.info(f"Extracting audio from video container '{input_path}'")
         out = pathlib.Path(input_path).resolve().with_suffix(".wav")
         si = pathlib.Path(input_path).resolve().as_posix()
         so = out.as_posix()
@@ -191,7 +194,7 @@ class AudioTools:
         ]
         self.run_command(cmd,
                          hide_and_log=True)
-        LOGGER.info(f"Extracted audio from {si} → {so}")
+        LOGGER.info(f"Extracted audio from '{si}' → '{so}'")
         return out
 
     def filter_audio(self,
@@ -228,7 +231,7 @@ class AudioTools:
         ]
         LOGGER.info("Filtering audio")
         self.run_command(cmd, hide_and_log=True)
-        LOGGER.info(f"Filtered {i} → {o}")
+        LOGGER.info(f"Filtered '{i}' → '{o}'")
         return output_wav
 
     def to_mp4(

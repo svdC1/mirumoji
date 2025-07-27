@@ -10,6 +10,7 @@ from openai.types.chat.chat_completion import ChatCompletion
 from dotenv import dotenv_values, load_dotenv
 import logging
 import os
+import time
 from typing import Optional, Dict, Generator, Any
 import json
 
@@ -80,23 +81,27 @@ class GptModel:
 
             else:
                 LOGGER.error(
-                    "Must provide ApiKey or enable from_dotenv to create \
-                        client"
+                    ("Must provide ApiKey or enable from_dotenv to create"
+                     "client"
+                     )
                     )
-                raise Exception(
-                    "Must provide ApiKey or enable from_dotenv to create \
-                        client")
+                raise Exception((
+                    "Must provide ApiKey or enable from_dotenv to create"
+                    "client"
+                        )
+                                )
 
             self.client = OpenAI(api_key=key)
 
             if version not in GptModel.MODEL_VERSIONS:
-                LOGGER.error(
-                    f"Model version provided is not supported, got {version};\
-                        Expected one of {GptModel.MODEL_VERSIONS}"
-                    )
-                raise Exception(
-                    f"Model version provided is not supported, got {version};\
-                        Expected one of {GptModel.MODEL_VERSIONS}")
+                LOGGER.error((
+                    f"Model version provided is not supported, got '{version}'"
+                    f"Expected one of {GptModel.MODEL_VERSIONS}"
+                    ))
+                raise Exception((
+                    f"Model version provided is not supported, got '{version}'"
+                    f"Expected one of {GptModel.MODEL_VERSIONS}"
+                     ))
             else:
                 model = version
             if system_msg == 'default':
@@ -190,9 +195,13 @@ class GptModel:
             raise Exception('Max Context Exceeded')
         try:
             msgs = self.info["messages"]
+            s_t = time.perf_counter()
             result = self.info["client"].chat.completions.create(
                 model=self.info["model"],
                 messages=msgs)
+            e_t = time.perf_counter()
+            elapsed = (e_t - s_t) * 1000
+            LOGGER.info(f"Request Time: {elapsed:.1f} ms")
             f_result = GptModel._process_output(result)
             self.info["requests_info"].append(f_result)
             self.info["outputs"].append(f_result['output'])

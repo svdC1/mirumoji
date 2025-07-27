@@ -19,8 +19,9 @@ from sqlalchemy import (MetaData,
                         UniqueConstraint,
                         JSON,
                         Float,
-                        DateTime)
-import datetime
+                        DateTime,
+                        func
+                        )
 
 METADATA = MetaData()
 # ---------------------
@@ -105,7 +106,7 @@ profile_transcripts = Table(
            ),
     Column("created_at",
            DateTime,
-           default=lambda: datetime.datetime.now()
+           server_default=func.now()
            )
 )
 # ---------------------------
@@ -139,7 +140,7 @@ profile_files = Table(
            ),
     Column("created_at",
            DateTime,
-           default=lambda: datetime.datetime.now()
+           server_default=func.now()
            ),
     Column("related_transcript_id",
            String,
@@ -191,7 +192,7 @@ clips = Table(
            ),
     Column("created_at",
            DateTime,
-           default=lambda: datetime.datetime.now()
+           server_default=func.now()
            ),
 )
 # ------------------------------

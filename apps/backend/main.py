@@ -7,7 +7,6 @@ Attributes:
   LOGGING_LEVEL (str): Level for the Logging object.
 """
 import logging
-import os
 from typing import AsyncGenerator, Any
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,28 +22,10 @@ from routers.profile_router import profile_router
 from contextlib import asynccontextmanager
 from db.db import connect_db, disconnect_db, DATABASE_URL
 from utils.env_utils import using_modal
+from utils.logging_utils import setup_logging
 
-LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO")
 
-if LOGGING_LEVEL == "INFO":
-    LOGGING_LEVEL = logging.INFO
-elif LOGGING_LEVEL == "WARNING":
-    LOGGING_LEVEL = logging.WARNING
-elif LOGGING_LEVEL == "ERROR":
-    LOGGING_LEVEL = logging.ERROR
-elif LOGGING_LEVEL == "DEBUG":
-    LOGGING_LEVEL = logging.DEBUG
-elif LOGGING_LEVEL == "CRITICAL":
-    LOGGING_LEVEL = logging.CRITICAL
-else:
-    LOGGING_LEVEL = logging.INFO
-
-logging.basicConfig(
-    level=LOGGING_LEVEL,
-    format="{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
-    style="{",
-    datefmt="%H:%M:%S[%z]"
-    )
+setup_logging()
 LOGGER = logging.getLogger(__name__)
 
 # ───────────────────────────────────────────────────────────

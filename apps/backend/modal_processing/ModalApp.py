@@ -4,8 +4,11 @@ in Modal's container.
 
 Attributes:
   LOGGER (logging.Logger): Module's logging object.
-  MODAL_IMAGE (str): Docker Repository URL for pre-built Image.
-  GPU (str): Which Modal GPU to use from environment variable, defaults to A10G
+  MODAL_IMAGE (str): Docker Repository URL for pre-built Image acquired from
+                     environment variable. Defaults to
+                    `docker.io/svdc1/mirumoji-modal-gpu:latest`
+  GPU (str): Which Modal GPU to use from environment variable.
+             Defaults to `A10G`
 """
 
 from typing import Union, Generator
@@ -18,7 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 LOGGER = logging.getLogger(__name__)
 MODAL_IMAGE = os.getenv("MODAL_IMAGE",
-                        "docker.io/svdc1/mirumoji-modal-gpu:latest")
+                        "docker.io/svdc1/mirumoji-modal-gpu:latest"
+                        )
 MODAL_GPU = os.getenv("MODAL_GPU", "A10G")
 # --- Modal Setup ---
 script_dir = Path(__file__).resolve().parent
@@ -28,7 +32,7 @@ media_files_path.mkdir(parents=True,
                        exist_ok=True
                        )
 
-LOGGER.info(f"Config Image + Mount {media_files_path} at /root/media_files")
+LOGGER.info(f"Config Image + Mount '{media_files_path}' at /root/media_files")
 # Build media_files on modal container startup
 mirumoji_image = (modal.Image.from_registry(MODAL_IMAGE)
                   .add_local_dir(media_files_path,
@@ -73,7 +77,7 @@ def transcribe_srt_job(media_fp: Union[str, Path]
                         format="{levelname}-{name}-{message}"
                         )
 
-    LOGGER.info(f"transcribe_srt_job started for media: {media_fp}")
+    LOGGER.info(f"transcribe_srt_job started for media: '{media_fp}'")
     try:
         fwhisper = FWhisperWrapper()
 
@@ -90,13 +94,13 @@ def transcribe_srt_job(media_fp: Union[str, Path]
             )
 
         if srt_result_string:
-            LOGGER.info(f"Generated SRT For: {media_fp}")
+            LOGGER.info(f"Generated SRT For: '{media_fp}'")
             return srt_result_string
         else:
-            LOGGER.warning(f"SRT Transcription Failed For: {media_fp}")
+            LOGGER.warning(f"SRT Transcription Failed For: '{media_fp}'")
             return None
     except Exception as e:
-        LOGGER.error(f"Error in transcribe_srt_job for {media_fp}: {e}",
+        LOGGER.error(f"Error in transcribe_srt_job for '{media_fp}': '{e}'",
                      exc_info=True)
         return None
 
@@ -125,9 +129,9 @@ def video_conversion_job(video_fp: Union[str, Path],
                         )
 
     from processing.audio_processing import AudioTools
-    LOGGER.info(f"video_conversion_job started for video: {video_fp}")
+    LOGGER.info(f"video_conversion_job started for video: '{video_fp}'")
     tmp_p = Path.cwd() / "tmp"
-    LOGGER.info(f"Using temporary directory for video conversion: {tmp_p}")
+    LOGGER.info(f"Using temporary directory for video conversion: '{tmp_p}'")
 
     audio_tools = AudioTools(working_dir=tmp_p)
 
@@ -135,7 +139,7 @@ def video_conversion_job(video_fp: Union[str, Path],
     outp_local = tmp_p / f"{input_p.stem}_converted.mp4"
 
     try:
-        LOGGER.info(f"Converting {video_fp} to {outp_local} using NVENC.")
+        LOGGER.info(f"Converting '{video_fp}' to '{outp_local}' using NVENC.")
         result_p = audio_tools.to_mp4(
             input_path=str(video_fp),
             output_path=str(outp_local),
@@ -143,7 +147,7 @@ def video_conversion_job(video_fp: Union[str, Path],
         )
 
         if result_p and result_p.exists() and result_p.stat().st_size > 0:
-            LOGGER.info(f"Converted video to: {result_p}")
+            LOGGER.info(f"Converted video to: '{result_p}'")
             video_bytes = result_p.read_bytes()
             LOGGER.info(
                 f"Returning {len(video_bytes)} bytes for converted video.")
@@ -154,14 +158,14 @@ def video_conversion_job(video_fp: Union[str, Path],
                     if not chunk:
                         break
                     yield chunk
-            LOGGER.info(f"Finished streaming video bytes for: {result_p}")
+            LOGGER.info(f"Finished streaming video bytes for: '{result_p}'")
         else:
             e = f"Video conversion failed or produced an \
-                empty file for: {video_fp}"
+                empty file for: '{video_fp}'"
             LOGGER.error(e)
             raise Exception(e)
     except Exception as e:
-        LOGGER.error(f"Error in video_conversion_job for {video_fp}: {e}",
+        LOGGER.error(f"Error in video_conversion_job for '{video_fp}': '{e}'",
                      exc_info=True)
         raise e
 
