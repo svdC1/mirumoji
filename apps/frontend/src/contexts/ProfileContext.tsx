@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file provides a context for managing the user's profile.
+ * @packageDocumentation This file provides a context for managing the user's profile.
  */
 
 import React, {
@@ -16,7 +16,7 @@ import React, {
  * @property {string | null} profileId The ID of the current profile.
  * @property {(id: string | null) => void} setProfileId A function for setting the current profile ID.
  */
-interface ProfileContextType {
+export interface ProfileContextType {
     profileId: string | null;
     setProfileId: (id: string | null) => void;
 }

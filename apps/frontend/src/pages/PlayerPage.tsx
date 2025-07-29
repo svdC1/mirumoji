@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the player page of the application.
+ * @packageDocumentation This component is the player page of the application.
  * It integrates the settings drawer and the main subtitle player, using the
  * global PlayerContext to manage and persist player state across navigation.
  */

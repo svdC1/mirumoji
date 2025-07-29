@@ -86,6 +86,7 @@ def stream_response_with_task(
     Streams a long‐running task’s output file over HTTP without timing out
     by running `task_func` in a background thread while yielding a space
     every `keepalive_interval` seconds to keep proxies alive.
+
     Args:
       path (pathlib.Path): The path to the function's resulting file.
       task_func (Callable[[], None]): The function which generates the file.

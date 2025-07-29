@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component provides a navigation menu for the application.
+ * @packageDocumentation This component provides a navigation menu for the application.
  * It includes a hamburger button, a side panel with navigation links, and a profile manager.
  */
 

@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the transcribe page of the application.
+ * @packageDocumentation This component is the transcribe page of the application.
  * It allows the user to record or upload audio and have it transcribed.
  */
 

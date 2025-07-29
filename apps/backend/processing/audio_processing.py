@@ -22,7 +22,8 @@ class AudioTools:
 
     Args:
       workding_dir (Union[str, pathlib.Path], optional): Default directory to
-                                                         save processed media.
+                                                         save processed media
+
     Attributes:
       working_dir (pathlib.Path): Default directory to save processed media.
       temp (pathlib.Path): Temporary directory for operations created inside
@@ -82,6 +83,7 @@ class AudioTools:
           hide_and_log (bool): If True redirect stdout and stderr to
                                subprocess.DEVNULL and  subprocess.PIPE
                                respectively.
+
         Returns:
           Union[subprocess.CompletedProcess, None]: The result of
                                                     subprocess.run or None.
@@ -135,6 +137,7 @@ class AudioTools:
           input_path (str): Path to the file.
           output_path (str, optional): Optional custom output path, if not
                                        specified uses the input filename.
+
         Returns:
           pathlib.Path -> The output path of the converted file.
         """

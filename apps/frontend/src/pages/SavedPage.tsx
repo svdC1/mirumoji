@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component displays the user's saved clips.
+ * @packageDocumentation This component displays the user's saved clips.
  * It allows the user to view, delete, and export their clips to Anki.
  */
 

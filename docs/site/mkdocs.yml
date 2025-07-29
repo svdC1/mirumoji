@@ -1,0 +1,75 @@
+site_name: mirumoji
+site_url: https://svdc1.github.io/mirumoji_docs
+site_dir: site_html
+repo_url: https://github.com/svdC1/mirumoji
+repo_name: svdC1/mirumoji
+docs_dir: docs_md
+theme:
+  name: material
+  font:
+    code: Roboto Mono
+  features:
+    - header.autohide
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - navigation.sections
+    - navigation.tabs
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - scheme: slate
+      primary: black
+      accent: deep purple
+
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://docs.sqlalchemy.org/en/20/objects.inv
+          options:
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            docstring_style: google
+            docstring_options:
+              warn_unknown_params: false
+            docstring_section_style: table
+            show_root_full_path: false
+            show_object_full_path: false
+            show_root_members_full_path: false
+            show_source: false
+          paths:
+            [
+              "../../apps/backend/main.py",
+              "../../apps/backend/profile_manager.py",
+              "../../apps/backend/db",
+              "../../apps/backend/modal_processing",
+              "../../apps/backend/models",
+              "../../apps/backend/processing",
+              "../../apps/backend/routers",
+              "../../apps/backend/utils",
+            ]
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.magiclink

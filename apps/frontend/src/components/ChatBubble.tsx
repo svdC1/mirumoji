@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component displays a chat bubble.
+ * @packageDocumentation This component displays a chat bubble.
  */
 
 import ReactMarkdown from "react-markdown";

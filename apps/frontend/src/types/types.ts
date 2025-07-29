@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains all the type definitions for the application.
+ * @packageDocumentation This file contains all the type definitions for the application.
  */
 
 import { Tokenizer, IpadicFeatures } from "kuromoji";

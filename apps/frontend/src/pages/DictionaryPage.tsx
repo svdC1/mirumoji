@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains the DictionaryPage component, which allows users to search the dictionary
+ * @packageDocumentation This file contains the DictionaryPage component, which allows users to search the dictionary
  * for words and kanji using wildcard patterns. It displays results in a tabbed interface and shows
  * detailed information when a result is selected.
  */

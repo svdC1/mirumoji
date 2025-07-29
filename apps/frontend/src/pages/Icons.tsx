@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains the icon components.
+ * @packageDocumentation This file contains the icon components.
  */
 
 export const GitHubIcon = () => (

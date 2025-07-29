@@ -18,6 +18,10 @@
 
 > View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
 
+# Documentation
+
+> Access full [`Documentantion`](https://svdc1.github.io/mirumoji_docs)
+
 # Features
 
 ## **Interactive Video Player**
@@ -74,7 +78,7 @@
 
 > Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://www.docker.com/) images and are set up to work with Docker Compose.
 
-> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://github.com/svdC1/mirumoji/wiki/Setup-Guide)**
+> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://svdc1.github.io/mirumoji_docs)**
 
 > You can also choose to [`build`](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
 

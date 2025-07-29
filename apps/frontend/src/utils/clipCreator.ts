@@ -1,5 +1,5 @@
 /**
- * @fileoverview Provides a utility for creating and saving video clips.
+ * @packageDocumentation Provides a utility for creating and saving video clips.
  * This module orchestrates the recording process, data preparation, and API submission.
  */
 

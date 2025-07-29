@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains functions for querying the dictionary API.
+ * @packageDocumentation This file contains functions for querying the dictionary API.
  */
 
 import { apiFetch } from "../services/api";
@@ -88,7 +88,7 @@ export function filterDictLookup(
  * Filters empty placeholders from a `DictWildcardLookup` response object
  * and returns `null` in case the response object is considered empty
  *
- * @param {DictWildcardLookup} dictWildcardLookup The DictWildcardLookup object
+ * @param {DictWildcardLookup} dictLookup The DictWildcardLookup object
  * @returns {DictLookup | null} The filtered object or null
  */
 export function filterDictWildcardLookup(

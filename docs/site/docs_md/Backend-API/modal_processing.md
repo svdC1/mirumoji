@@ -1,0 +1,3 @@
+# Modal Configuration
+
+::: ModalApp

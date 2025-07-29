@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the text analyzer page of the application.
+ * @packageDocumentation This component is the text analyzer page of the application.
  * It allows the user to input a text and have it tokenized and displayed with furigana.
  * The user can then click on the tokens to get more information about them.
  */

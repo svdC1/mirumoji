@@ -1,5 +1,5 @@
 /**
- * @fileoverview This is the root component of the application.
+ * @packageDocumentation This is the root component of the application.
  * It sets up the main layout and routing, and wraps the application
  * in necessary context providers.
  */

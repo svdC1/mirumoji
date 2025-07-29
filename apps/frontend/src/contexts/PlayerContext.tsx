@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file defines the context for managing the state of the video player.
+ * @packageDocumentation This file defines the context for managing the state of the video player.
  * It allows the player's state (e.g., loaded video, subtitles, settings) to persist
  * across component mounts and unmounts, enabling navigating
  * between pages.
@@ -11,7 +11,7 @@ import React, { createContext, useContext, useState, ReactNode } from "react";
  * @interface PlayerContextState
  * Defines the shape of the data stored in the PlayerContext.
  */
-interface PlayerContextState {
+export interface PlayerContextState {
     video: File | null;
     setVideo: (file: File | null) => void;
     videoFileName: string | null;
@@ -31,7 +31,11 @@ interface PlayerContextState {
 
 const PlayerContext = createContext<PlayerContextState | undefined>(undefined);
 
-interface PlayerProviderProps {
+/**
+ * @interface PlayerProviderProps
+ * Defines the shape of the Player Provider Props
+ */
+export interface PlayerProviderProps {
     children: ReactNode;
 }
 

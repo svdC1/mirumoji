@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the 404 page of the application.
+ * @packageDocumentation This component is the 404 page of the application.
  */
 
 import React from "react";
