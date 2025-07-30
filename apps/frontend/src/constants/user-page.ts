@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains constants for the user page.
+ * @packageDocumentation This file contains constants for the user page.
  */
 
 export const tabs = [

@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains specialized components for displaying different types of dictionary data,
+ * @packageDocumentation This file contains specialized components for displaying different types of dictionary data,
  * such as JMdict entries, proper noun entries, and Kanji information.
  */
 
@@ -41,7 +41,6 @@ export const JmdictEntryDisplay = ({
  * Displays an example sentence.
  * @param {object} props - The component props.
  * @param {string} props.example - The example sentence text.
- * @param {number} props.key - The unique key for the component.
  * @param {boolean} props.isLast - True if this is the last item in a list, to omit the bottom border.
  * @returns {JSX.Element} The rendered example.
  */

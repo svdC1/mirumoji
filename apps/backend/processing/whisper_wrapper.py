@@ -81,7 +81,7 @@ class FWhisperWrapper:
         Args:
           audio_path (str): The path to the file.
 
-        Return:
+        Returns:
           str: The same audio path from input or None if path is not valid.
         """
         audio_path = Path(audio_path).resolve()
@@ -104,6 +104,7 @@ class FWhisperWrapper:
           source (str): Unaltered Transcription
           gpt_model_kwargs (dict): Additonal keyword arguments to pass to
                                    GptModel
+
         Returns:
           str: The formatted response from the OpenAI model.
         """
@@ -142,6 +143,7 @@ class FWhisperWrapper:
                                  generator instead.
           add_kwargs (dict): Addition keyword arguments for FasterWhisper
                              model.
+
         Returns:
           dict: The segment objects returned by FasterWhisper
                 (contains .start, .end, .text and optionally .words)
@@ -230,6 +232,7 @@ class FWhisperWrapper:
           gpt_model_kwargs (dict): Additional keyword arguments for GptModel
           transcribe_kwargs (dict): Addition keyword arguments for the
                                     transcribe function.
+
         Returns:
           str: Either the file output path or the SRT string if string_result
                is True

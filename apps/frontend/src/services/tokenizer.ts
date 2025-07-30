@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains the tokenizer for the application.
+ * @packageDocumentation This file contains the tokenizer for the application.
  */
 
 import * as kuromoji from "kuromoji";

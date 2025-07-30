@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is a video player with interactive subtitles.
+ * @packageDocumentation This component is a video player with interactive subtitles.
  * It displays subtitles on top of the video, and allows the user to click on
  * words to get more information about them.
  */

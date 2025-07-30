@@ -18,6 +18,10 @@
 
 > View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
 
+# Documentation
+
+> Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
+
 # Features
 
 ## **Interactive Video Player**
@@ -31,6 +35,18 @@
 ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
 
 > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
+
+## **Dictionary**
+
+![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
+
+> Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
+
+## **Text Analyzer**
+
+![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
+
+> Copy and paste text for tokenized output with furigana and clickable words.
 
 ## **OpenAI Integration**
 
@@ -74,9 +90,9 @@
 
 > Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://www.docker.com/) images and are set up to work with Docker Compose.
 
-> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://github.com/svdC1/mirumoji/wiki/Setup-Guide)**
+> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://svdc1.github.io/mirumoji_docs)**
 
-> You can also choose to [`build`](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
+> You can also choose to [`build`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) the images locally with the Dockerfiles provided.
 
 ---
 

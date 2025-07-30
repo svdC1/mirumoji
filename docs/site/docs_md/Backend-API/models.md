@@ -1,0 +1,20 @@
+# Pydantic Models
+::: AnkiExportResponse.AnkiExportResponse
+::: BreakdownRequest.BreakdownRequest
+::: BreakdownResponse.BreakdownResponse
+::: ChatRequest.ChatRequest
+::: ClipResponse.ClipResponse
+::: CustomBreakdownRequest.CustomBreakdownRequest
+::: ClipResponse.ClipResponse
+::: DictLookup.DictLookup
+::: DictWildcardLookup.DictWildcardLookup
+::: FocusInfo.FocusInfo
+::: GptTemplateBase.GptTemplateBase
+::: GptTemplateResponse.GptTemplateResponse
+::: JMEntry.JMEntry
+::: JMNEntry.JMNEntry
+::: KanjiInfo.KanjiInfo
+::: ProfileFileResponse.ProfileFileResponse
+::: ProfileTranscriptResponse.ProfileTranscriptResponse
+::: Token.Token
+::: WordSense.WordSense

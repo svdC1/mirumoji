@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the home page of the application.
+ * @packageDocumentation This component is the home page of the application.
  */
 
 import { Link } from "react-router-dom";

@@ -8,7 +8,6 @@ Attributes:
 
 import logging
 import uuid
-import aiofiles
 import asyncio
 import json
 from fastapi import (APIRouter,
@@ -31,6 +30,7 @@ import pathlib
 from db.db import DbManager
 from profile_manager import ensure_profile_exists
 from utils.anki_utils import AnkiExporter
+from utils.file_utils import save_upload_file
 
 LOGGER = logging.getLogger(__name__)
 
@@ -210,9 +210,7 @@ async def save_video_clip(
     webm_loc = loc.with_suffix(".webm")
     rel_path = pathlib.Path("profiles") / profile_id / "clips" / fname
     try:
-        async with aiofiles.open(loc, "wb+") as f:
-            content = await video_clip.read()
-            await f.write(content)
+        await save_upload_file(video_clip, loc)
 
         # Convert to WebM for Anki Compatibility
         try:

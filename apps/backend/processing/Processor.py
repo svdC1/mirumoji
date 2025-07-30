@@ -184,7 +184,7 @@ class Processor:
     async def modal_convert_to_mp4(self,
                                    video_fp: Union[str, Path],
                                    outpath: Union[str, Path]
-                                   ):
+                                   ) -> Path:
         """
         Call Modal function to convert a video to MP4 format.
 

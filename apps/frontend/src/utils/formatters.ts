@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains formatter functions.
+ * @packageDocumentation This file contains formatter functions.
  */
 
 /**

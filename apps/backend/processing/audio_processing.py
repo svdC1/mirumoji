@@ -22,7 +22,8 @@ class AudioTools:
 
     Args:
       workding_dir (Union[str, pathlib.Path], optional): Default directory to
-                                                         save processed media.
+                                                         save processed media
+
     Attributes:
       working_dir (pathlib.Path): Default directory to save processed media.
       temp (pathlib.Path): Temporary directory for operations created inside
@@ -82,6 +83,7 @@ class AudioTools:
           hide_and_log (bool): If True redirect stdout and stderr to
                                subprocess.DEVNULL and  subprocess.PIPE
                                respectively.
+
         Returns:
           Union[subprocess.CompletedProcess, None]: The result of
                                                     subprocess.run or None.
@@ -104,23 +106,40 @@ class AudioTools:
                                         cwd=cwd)
 
             if capture_output:
-                LOGGER.debug(f"STDOUT: '{result.stdout}'")
-                LOGGER.debug(f"STDERR: '{result.stderr}'")
-
+                stdout_log = f"STDOUT: '{result.stdout}'"
+                stderr_log = f"STDERR: '{result.stderr}'"
+                LOGGER.debug(stdout_log)
+                LOGGER.debug(stderr_log)
+                try:
+                    timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+                    with open(self.log_dir / "ffmpeg.log",
+                              "a+",
+                              encoding="utf-8") as log_file:
+                        log_file.write((
+                            f"{timestamp} FFmpeg error:"
+                            f"\n{stdout_log}\n{stderr_log}\n"
+                            ))
+                except Exception:
+                    return None
             return result
 
         except subprocess.CalledProcessError as e:
             LOGGER.error(f"Command Failed: {' '.join(command)}")
+            stdout_log = f"STDOUT: '{e.stdout}'"
+            stderr_log = f"STDERR: '{e.stderr}'"
+            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
             if capture_output:
-                LOGGER.error(f"STDOUT: '{e.stdout}'")
-                LOGGER.error(f"STDERR: '{e.stderr}'")
-                error_message = e.stderr.decode()
-                timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                with open(self.log_dir / "ffmpeg_error.log",
-                          "a",
+                LOGGER.error(stdout_log)
+                LOGGER.error(stderr_log)
+            try:
+                with open(self.log_dir / "ffmpeg.log",
+                          "a+",
                           encoding="utf-8") as log_file:
-                    log_file.write(
-                        f"{timestamp} FFmpeg error:\n{error_message}\n\n")
+                    log_file.write((
+                        f"{timestamp} FFmpeg error:"
+                        f"\n{stdout_log}\n{stderr_log}\n"))
+            except Exception:
+                return None
             return None
 
     def to_wav(self,
@@ -135,8 +154,9 @@ class AudioTools:
           input_path (str): Path to the file.
           output_path (str, optional): Optional custom output path, if not
                                        specified uses the input filename.
+
         Returns:
-          pathlib.Path -> The output path of the converted file.
+          pathlib.Path: The output path of the converted file.
         """
         ip = pathlib.Path(input_path).resolve()
         op = pathlib.Path(output_path or ip.with_suffix(".wav")).resolve()

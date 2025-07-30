@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component provides a settings drawer for the video player.
+ * @packageDocumentation This component provides a settings drawer for the video player.
  * It allows the user to load video and subtitle files, generate subtitles,
  * convert videos to MP4, and customize the appearance of the subtitles.
  */

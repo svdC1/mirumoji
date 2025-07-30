@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component displays a chat bubble.
+ * @packageDocumentation This component displays a chat bubble.
  */
 
 import ReactMarkdown from "react-markdown";
@@ -62,6 +62,9 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                                 token.reading &&
                                 token.surface_form !== token.reading &&
                                 token.surface_form.split("").some(isKanji);
+                            const lookupForm = !(token.basic_form === "*")
+                                ? token.basic_form
+                                : token.surface_form;
                             const furiganaText = showFurigana
                                 ? toHiragana(token.reading!)
                                 : null;
@@ -71,10 +74,7 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                                     key={i}
                                     className="inline-flex flex-col items-center mx-1 group align-bottom"
                                     onClick={() =>
-                                        onWordClick(
-                                            rawSentence,
-                                            token.surface_form
-                                        )
+                                        onWordClick(rawSentence, lookupForm)
                                     }
                                 >
                                     {showFurigana && furiganaText && (

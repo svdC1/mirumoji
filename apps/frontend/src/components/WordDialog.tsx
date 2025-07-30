@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component displays a dialog with information about a word.
+ * @packageDocumentation This component displays a dialog with information about a word.
  * It includes a GPT-powered explanation, dictionary definitions, and the ability to save a clip of the word being used.
  */
 

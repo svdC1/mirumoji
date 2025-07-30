@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the text analyzer page of the application.
+ * @packageDocumentation This component is the text analyzer page of the application.
  * It allows the user to input a text and have it tokenized and displayed with furigana.
  * The user can then click on the tokens to get more information about them.
  */
@@ -163,7 +163,11 @@ const TextPage: React.FC = () => {
             {selectedToken && (
                 <WordDialog
                     sentence={text}
-                    word={selectedToken.surface_form}
+                    word={
+                        !(selectedToken.basic_form === "*")
+                            ? selectedToken.basic_form
+                            : selectedToken.surface_form
+                    }
                     onClose={handleCloseDialog}
                     cueStart={0}
                     cueEnd={0}

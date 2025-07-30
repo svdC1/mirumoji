@@ -1,5 +1,5 @@
 /**
- * @fileoverview Provides a cross-browser utility for recording a MediaStream from an HTMLVideoElement.
+ * @packageDocumentation Provides a cross-browser utility for recording a MediaStream from an HTMLVideoElement.
  * It uses the native `captureStream` on the `HTMLVideoElement` iself where available and falls back to
  * a `HTMLCanvasElement` based approach for browsers like iOS Safari that do not support it.
  * It also automatically selects a supported MIME type for MediaRecorder by checking availability.

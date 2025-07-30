@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains a function for displaying API errors as toasts.
+ * @packageDocumentation This file contains a function for displaying API errors as toasts.
  */
 
 import React from "react";

@@ -1,5 +1,5 @@
 /**
- * @fileoverview This component is the user page of the application.
+ * @packageDocumentation This component is the user page of the application.
  * It allows the user to view their profile, files, transcripts, and GPT template.
  */
 

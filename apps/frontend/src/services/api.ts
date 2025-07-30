@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains the apiFetch function, which is a wrapper around the native fetch function.
+ * @packageDocumentation This file contains the apiFetch function, which is a wrapper around the native fetch function.
  */
 
 import { ApiError } from "../types/types";

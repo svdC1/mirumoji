@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file provides a context for managing the subtitle settings.
+ * @packageDocumentation This file provides a context for managing the subtitle settings.
  */
 
 import React, {
@@ -12,8 +12,11 @@ import React, {
 
 import { SubtitleStyle } from "../types/types";
 
-// Define the context shape
-interface SubtitleSettingsContextType {
+/**
+ * @interface SubtitleSettingsContextType
+ * Shape of the Subtitle Settings Context
+ */
+export interface SubtitleSettingsContextType {
     subtitleStyle: SubtitleStyle;
     setSubtitleStyle: (style: SubtitleStyle) => void;
     resetSubtitleStyle: () => void;

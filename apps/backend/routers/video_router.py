@@ -22,6 +22,7 @@ import shutil
 from db.db import DbManager
 import uuid
 from utils.env_utils import using_modal
+from utils.file_utils import save_upload_file
 from processing.audio_processing import AudioTools
 from processing.Processor import Processor
 USING_MODAL = using_modal()
@@ -75,9 +76,7 @@ async def generate_srt(
 
     try:
         # 1. Save uploaded video to operation's temp dir
-        async with aiofiles.open(tmp_vid_upload_loc, "wb+") as f_obj:
-            content = await video_file.read()
-            await f_obj.write(content)
+        await save_upload_file(video_file, tmp_vid_upload_loc)
         LOGGER.info(f"Temp video for SRT: '{tmp_vid_upload_loc}'")
 
         # 2. Init AudioTools with operation's temp dir
@@ -226,9 +225,7 @@ async def convert_to_mp4(
 
     try:
         # 1. Save uploaded video to temp location
-        async with aiofiles.open(tmp_uploaded_vid_loc, "wb+") as f_obj:
-            content = await video_file.read()
-            await f_obj.write(content)
+        await save_upload_file(video_file, tmp_uploaded_vid_loc)
         LOGGER.info(f"Temp video for conversion: '{tmp_uploaded_vid_loc}'")
 
         # 2. Convert video, saving to final converted location

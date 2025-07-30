@@ -1,5 +1,5 @@
 /**
- * @fileoverview This file contains utility functions for working with Japanese characters.
+ * @packageDocumentation This file contains utility functions for working with Japanese characters.
  */
 
 /**
