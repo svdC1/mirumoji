@@ -51,7 +51,7 @@ jobs:
               run: cd ./apps/frontend && npm run docs:generate
 
             - name: Build MkDocs site
-              run: cd ./docs/site && mkdocs build -f docs/site/mkdocs.yml
+              run: cd ./docs/site && mkdocs build
 
             # --- Combine and Deploy ---
             - name: Prepare combined artifact
