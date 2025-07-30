@@ -116,13 +116,16 @@ class AudioTools:
             if capture_output:
                 LOGGER.error(f"STDOUT: '{e.stdout}'")
                 LOGGER.error(f"STDERR: '{e.stderr}'")
-                error_message = e.stderr.decode()
-                timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            error_message = e.stderr.decode()
+            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            try:
                 with open(self.log_dir / "ffmpeg_error.log",
                           "a",
                           encoding="utf-8") as log_file:
                     log_file.write(
                         f"{timestamp} FFmpeg error:\n{error_message}\n\n")
+            except Exception:
+                return None
             return None
 
     def to_wav(self,
