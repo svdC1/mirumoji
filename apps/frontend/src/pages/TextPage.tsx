@@ -163,7 +163,11 @@ const TextPage: React.FC = () => {
             {selectedToken && (
                 <WordDialog
                     sentence={text}
-                    word={selectedToken.surface_form}
+                    word={
+                        !(selectedToken.basic_form === "*")
+                            ? selectedToken.basic_form
+                            : selectedToken.surface_form
+                    }
                     onClose={handleCloseDialog}
                     cueStart={0}
                     cueEnd={0}
