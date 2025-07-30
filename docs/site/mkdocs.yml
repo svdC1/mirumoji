@@ -46,7 +46,7 @@ plugins:
             show_source: false
           paths:
             [
-              "../../apps/backend/main.py",
+              "../../apps/backend/",
               "../../apps/backend/profile_manager.py",
               "../../apps/backend/db",
               "../../apps/backend/modal_processing",
