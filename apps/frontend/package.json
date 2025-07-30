@@ -1,6 +1,6 @@
 {
     "name": "mirumoji-ui",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "private": true,
     "type": "module",
     "scripts": {
@@ -49,8 +49,8 @@
         "typedoc-plugin-markdown": "^4.7.1",
         "typedoc-plugin-mdn-links": "^5.0.6",
         "typedoc-plugin-rename-defaults": "^0.7.3",
-        "typedoc-plugin-extras":"^4.0.1",
+        "typedoc-plugin-extras": "^4.0.1",
         "typedoc-plugin-no-inherit": "^1.6.1",
-        "prettier":"^3.6.2"
+        "prettier": "^3.6.2"
     }
 }
