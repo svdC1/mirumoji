@@ -18,6 +18,10 @@
 
 > View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
 
+# Documentation
+
+> Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
+
 # Features
 
 ## **Interactive Video Player**
@@ -31,6 +35,18 @@
 ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
 
 > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
+
+## **Dictionary**
+
+![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
+
+> Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
+
+## **Text Analyzer**
+
+![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
+
+> Copy and paste text for tokenized output with furigana and clickable words.
 
 ## **OpenAI Integration**
 

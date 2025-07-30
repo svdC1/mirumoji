@@ -9,7 +9,6 @@ Attributes:
 import logging
 import shutil
 import uuid
-import aiofiles
 from pathlib import Path
 from fastapi import (APIRouter,
                      UploadFile,
@@ -23,6 +22,7 @@ from profile_manager import ensure_profile_exists
 from db.db import DbManager
 from processing.Processor import Processor
 from utils.env_utils import using_modal
+from utils.file_utils import save_upload_file
 import asyncio
 
 USING_MODAL = using_modal()
@@ -90,9 +90,7 @@ async def transcribe_from_audio(
     audio_to_process_loc = tmp_uploaded_audio_loc
 
     try:
-        async with aiofiles.open(tmp_uploaded_audio_loc, "wb+") as f_obj:
-            content = await file.read()
-            await f_obj.write(content)
+        await save_upload_file(file, tmp_uploaded_audio_loc)
         LOGGER.info(
             f"Temp audio for transcription: '{tmp_uploaded_audio_loc}'")
 

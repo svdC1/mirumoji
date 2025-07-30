@@ -20,7 +20,7 @@
 
 # Documentation
 
-> Access full [`Documentantion`](https://svdc1.github.io/mirumoji_docs)
+> Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
 
 # Features
 
@@ -35,6 +35,18 @@
 ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
 
 > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
+
+## **Dictionary**
+
+![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
+
+> Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
+
+## **Text Analyzer**
+
+![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
+
+> Copy and paste text for tokenized output with furigana and clickable words.
 
 ## **OpenAI Integration**
 
@@ -80,7 +92,7 @@
 
 > The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://svdc1.github.io/mirumoji_docs)**
 
-> You can also choose to [`build`](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
+> You can also choose to [`build`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) the images locally with the Dockerfiles provided.
 
 ---
 
