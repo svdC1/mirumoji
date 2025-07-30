@@ -142,7 +142,7 @@ class AudioTools:
                                        specified uses the input filename.
 
         Returns:
-          pathlib.Path -> The output path of the converted file.
+          pathlib.Path: The output path of the converted file.
         """
         ip = pathlib.Path(input_path).resolve()
         op = pathlib.Path(output_path or ip.with_suffix(".wav")).resolve()
