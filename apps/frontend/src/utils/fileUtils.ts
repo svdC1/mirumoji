@@ -61,3 +61,50 @@ export const truncateText = (text: string | undefined, maxLength = 50) => {
     }
     return text;
 };
+
+export const uploadFile = (
+    file: File,
+    url: string,
+    onProgress: (percent: number) => void
+): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        const uploadId = `${file.name}-${Date.now()}`;
+        const xhr = new XMLHttpRequest();
+
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("X-Upload-ID", uploadId);
+        xhr.setRequestHeader("X-File-Name", file.name);
+        
+        // This is crucial for FastAPI to not wait for the whole body
+        // and to correctly handle the stream.
+        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                onProgress(percentComplete);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    resolve(response);
+                } catch (e) {
+                    reject(new Error("Failed to parse server response."));
+                }
+            } else {
+                reject(new Error(xhr.statusText));
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error("Network Error"));
+        };
+
+        xhr.send(file);
+    });
+};
+

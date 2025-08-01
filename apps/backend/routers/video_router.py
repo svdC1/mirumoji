@@ -9,11 +9,9 @@ Attributes:
 import logging
 from pathlib import Path
 from fastapi import (APIRouter,
-                     File,
-                     UploadFile,
                      Depends,
                      HTTPException,
-                     status
+                     status,
                      )
 import asyncio
 import aiofiles
@@ -22,9 +20,10 @@ import shutil
 from db.db import DbManager
 import uuid
 from utils.env_utils import using_modal
-from utils.file_utils import save_upload_file
+from utils.file_utils import get_stream_file
 from processing.audio_processing import AudioTools
 from processing.Processor import Processor
+
 USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
@@ -38,14 +37,14 @@ db_manager = DbManager()
 
 @video_router.post("/generate_srt")
 async def generate_srt(
-    video_file: UploadFile,
+    video_file: Path = Depends(get_stream_file),
     profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     POST endpoint for generating an SRT string from a video file.
 
     Args:
-      video_file (UploadFile): File uploaded passed through endpoint.
+      video_file (Path): Path of where the streamed file was saved
       profile_id (str): Profile ID from Header.
 
     Returns:
@@ -62,7 +61,7 @@ async def generate_srt(
         )
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = Path(TEMP_DIR / f"gen_srt_{profile_id}_{op_id}")
+    op_tmp_dir = Path(TEMP_DIR / video_file.parent)
     srt_dir = PROFILES_DIR / profile_id / "subtitles"
     srt_dir.mkdir(parents=True, exist_ok=True)
     srt_fp = (srt_dir / f"{op_id}.srt")
@@ -72,11 +71,11 @@ async def generate_srt(
     op_tmp_dir.mkdir(parents=True, exist_ok=True)
 
     # Temporary location for the uploaded video within the operation's temp dir
-    tmp_vid_upload_loc = op_tmp_dir / video_file.filename
+    tmp_vid_upload_loc = video_file
 
     try:
         # 1. Save uploaded video to operation's temp dir
-        await save_upload_file(video_file, tmp_vid_upload_loc)
+
         LOGGER.info(f"Temp video for SRT: '{tmp_vid_upload_loc}'")
 
         # 2. Init AudioTools with operation's temp dir
@@ -179,14 +178,14 @@ async def generate_srt(
 
 @video_router.post("/convert_to_mp4")
 async def convert_to_mp4(
-    video_file: UploadFile = File(...),
+    video_file: Path = Depends(get_stream_file),
     profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     POST endpoint for converting a video file to MP4 format.
 
     Args:
-      video_file (UploadFile): File uploaded passed through endpoint.
+      video_file (Path): Path where the streamed file was saved
       profile_id (str): Profile ID from Header.
 
     Returns:
@@ -203,18 +202,18 @@ async def convert_to_mp4(
         )
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = TEMP_DIR / f"convert_mp4_{profile_id}_{op_id}"
+    op_tmp_dir = TEMP_DIR / video_file.parent
     op_tmp_dir.mkdir(parents=True, exist_ok=True)
 
     # Temp location for the initially uploaded file
-    tmp_uploaded_vid_loc = op_tmp_dir / video_file.filename
+    tmp_uploaded_vid_loc = video_file
 
     # Final storage paths
     prof_conv_dir = PROFILES_DIR / profile_id / "converted"
     prof_conv_dir.mkdir(parents=True, exist_ok=True)
 
     # Using unique names for stored files
-    conv_fname_stem = Path(video_file.filename).stem
+    conv_fname_stem = video_file.stem
     conv_stored_fname = f"{conv_fname_stem}_{op_id[:8]}_converted.mp4"
 
     final_conv_stored_loc = prof_conv_dir / conv_stored_fname
@@ -225,7 +224,6 @@ async def convert_to_mp4(
 
     try:
         # 1. Save uploaded video to temp location
-        await save_upload_file(video_file, tmp_uploaded_vid_loc)
         LOGGER.info(f"Temp video for conversion: '{tmp_uploaded_vid_loc}'")
 
         # 2. Convert video, saving to final converted location
@@ -286,10 +284,10 @@ async def convert_to_mp4(
         # Propagate Exceptions
         raise
     except Exception as e:
-        LOGGER.exception(
-            f"Error converting '{video_file.filename}'\
-                for profile '{profile_id}'"
-        )
+        LOGGER.exception((
+            f"Error converting '{video_file.stem}'"
+            f"for profile '{profile_id}'"
+        ))
         # Attempt to clean up partially created files
         for loc in [final_conv_stored_loc]:
             if loc.exists():
