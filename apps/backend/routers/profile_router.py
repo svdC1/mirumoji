@@ -14,9 +14,8 @@ from fastapi import (APIRouter,
                      Depends,
                      HTTPException,
                      status,
-                     UploadFile,
-                     Form,
-                     Path
+                     Header,
+                     Path as FastAPIPath
                      )
 from models.GptTemplateResponse import GptTemplateResponse
 from models.GptTemplateBase import GptTemplateBase
@@ -26,11 +25,12 @@ from models.ProfileTranscriptResponse import ProfileTranscriptResponse
 from models.AnkiExportResponse import AnkiExportResponse
 from processing.audio_processing import AudioTools
 from typing import Optional, List
-import pathlib
+from pathlib import Path
+import urllib.parse
 from db.db import DbManager
 from profile_manager import ensure_profile_exists
 from utils.anki_utils import AnkiExporter
-from utils.file_utils import save_upload_file
+from utils.file_utils import get_stream_file
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ profile_router = APIRouter(prefix='/profiles',
                            dependencies=[Depends(ensure_profile_exists)]
                            )
 
-BASE_MEDIA_PATH = pathlib.Path("media_files")
+BASE_MEDIA_PATH = Path("media_files")
 TEMP_MEDIA_PATH = BASE_MEDIA_PATH / "temp"
 TEMP_MEDIA_PATH.mkdir(parents=True, exist_ok=True)
 
@@ -166,13 +166,13 @@ async def delete_gpt_template(
                      status_code=status.HTTP_201_CREATED
                      )
 async def save_video_clip(
-    video_clip: UploadFile,
-    profile_id: str = Depends(ensure_profile_exists),
-    clip_start_time: str = Form(...),
-    clip_end_time: str = Form(...),
-    gpt_breakdown_response: str = Form(...),
-    original_video_file_name: Optional[str] = Form(None),
-    original_video_url: Optional[str] = Form(None)
+    video_clip: Path = Depends(get_stream_file),
+    profile_id: str = Header(..., alias="X-Profile-ID"),
+    clip_start_time: str = Header(...),
+    clip_end_time: str = Header(...),
+    gpt_breakdown_response: str = Header(...),
+    original_video_file_name: Optional[str] = Header(None),
+    original_video_url: Optional[str] = Header(None)
 ) -> dict:
     """
     POST endpoint for saving a new clip for the active profile
@@ -182,7 +182,7 @@ async def save_video_clip(
       clip_start_time (str): Original video clip start time.
       clip_end_time (str): Original video clip end time.
       gpt_breakdown_response (str): JSON string of `BreakdownResponse` model.
-      video_clip (UploadFile): Clip file sent through endpoint.
+      video_clip (Path): Clip file sent through endpoint.
       original_video_file_name (str, optional): Original video's name
       original_video_url (str, optional): URL where FastAPI is serving the
                                           original video's static file.
@@ -199,18 +199,19 @@ async def save_video_clip(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required."
                             )
+    await ensure_profile_exists(profile_id)
     # Create directory in media_files
     p_path = BASE_MEDIA_PATH / "profiles" / profile_id / "clips"
     p_path.mkdir(parents=True, exist_ok=True)
 
     # Copy file to directory
-    fname = f"{uuid.uuid4()}_{video_clip.filename}"
-    webm_fname = pathlib.Path(fname).with_suffix(".webm")
+    fname = f"{uuid.uuid4()}_{video_clip.name}"
+    webm_fname = Path(fname).with_suffix(".webm")
     loc = p_path / fname
     webm_loc = loc.with_suffix(".webm")
-    rel_path = pathlib.Path("profiles") / profile_id / "clips" / fname
+    rel_path = Path("profiles") / profile_id / "clips" / fname
     try:
-        await save_upload_file(video_clip, loc)
+        loc = video_clip
 
         # Convert to WebM for Anki Compatibility
         try:
@@ -228,12 +229,13 @@ async def save_video_clip(
                 f"Falling back to original format"))
         if webm_loc.exists():
             rel_path = (
-                pathlib.Path("profiles") / profile_id / "clips" / webm_fname
+                Path("profiles") / profile_id / "clips" / webm_fname
                     )
             fname = webm_fname
 
         # Save info in Database
-        gpt_j = json.loads(gpt_breakdown_response)
+        decoded_gpt_response = urllib.parse.unquote(gpt_breakdown_response)
+        gpt_j = json.loads(decoded_gpt_response)
         s_time = float(clip_start_time)
         e_time = float(clip_end_time)
         c_id = str(uuid.uuid4())
@@ -253,7 +255,7 @@ async def save_video_clip(
         files_values = {
             "id": str(uuid.uuid4()),
             "profile_id": profile_id,
-            "file_name": video_clip.filename,
+            "file_name": video_clip.name,
             "file_path": str(rel_path),
             "file_type": "video_clip"
         }
@@ -317,7 +319,7 @@ async def get_saved_clips(
                        status_code=status.HTTP_200_OK
                        )
 async def delete_saved_clip(
-    clipId: str = Path(...),
+    clipId: str = FastAPIPath(...),
     profile_id: str = Depends(ensure_profile_exists)
 ) -> dict:
     """
@@ -356,7 +358,7 @@ async def delete_saved_clip(
     await db_manager.delete("profile_files", files_filter)
     fp = BASE_MEDIA_PATH / clip_r.video_clip_path
 
-    if isinstance(fp, pathlib.Path) and fp.exists():
+    if isinstance(fp, Path) and fp.exists():
         try:
             fp.unlink()
             LOGGER.info(f"Deleted: '{fp}'")
@@ -409,7 +411,7 @@ async def get_profile_files(
                        status_code=status.HTTP_200_OK
                        )
 async def delete_profile_file(
-    fileId: str = Path(...),
+    fileId: str = FastAPIPath(...),
     profile_id: str = Depends(ensure_profile_exists)
 ) -> dict:
     """
@@ -438,7 +440,7 @@ async def delete_profile_file(
                             )
     await db_manager.delete("profile_files", filter)
     fp = BASE_MEDIA_PATH / file_r.file_path
-    if isinstance(fp, pathlib.Path) and fp.exists():
+    if isinstance(fp, Path) and fp.exists():
         try:
             fp.unlink()
             LOGGER.info(f"Deleted file: '{fp}'")
@@ -516,7 +518,7 @@ async def get_profile_transcripts(
                        status_code=status.HTTP_200_OK
                        )
 async def delete_profile_transcript(
-    transcriptId: str = Path(...),
+    transcriptId: str = FastAPIPath(...),
     profile_id: str = Depends(ensure_profile_exists)
 ) -> dict:
     """
@@ -558,7 +560,7 @@ async def delete_profile_transcript(
         if res > 0:
             LOGGER.info(f"Del assoc. profile_files for: '{aud_path}'")
             fp_aud = BASE_MEDIA_PATH / aud_path
-            if isinstance(fp_aud, pathlib.Path) and fp_aud.exists():
+            if isinstance(fp_aud, Path) and fp_aud.exists():
                 try:
                     fp_aud.unlink()
                     LOGGER.info(f"Del audio file: '{fp_aud}'")

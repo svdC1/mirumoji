@@ -34,7 +34,7 @@ export default function SavedPage() {
     const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
     const [isGeneratingAnki, setIsGeneratingAnki] = useState<boolean>(false);
 
-    const clipsSWRKey = profileId ? `/profiles/clips` : null;
+    const clipsSWRKey = profileId ? `profiles/clips` : null;
 
     const {
         data: clips,
@@ -73,7 +73,7 @@ export default function SavedPage() {
         setDeletingClipId(clipId);
         const toastId = toast.loading("Deleting clip...");
         try {
-            await apiFetch(`/profiles/clips/${clipId}`, { method: "DELETE" });
+            await apiFetch(`profiles/clips/${clipId}`, { method: "DELETE" });
             toast.success("Clip deleted!", { id: toastId });
             mutate(clipsSWRKey);
             if (selectedClip && selectedClip.id === clipId) {
@@ -104,7 +104,7 @@ export default function SavedPage() {
 
         try {
             const ankiDetails = await apiFetch<AnkiExportResponse>(
-                "/profiles/anki_export",
+                "profiles/anki_export",
                 { method: "GET" }
             );
 

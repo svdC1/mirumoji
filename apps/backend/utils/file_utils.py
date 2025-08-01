@@ -72,10 +72,15 @@ async def get_stream_file(request: Request,
     Raises:
       HTTPException: If upload fails or headers are not present
     """
-    temp_file_path = TEMP_DIR / f"{upload_id}" / f"{file_name}"
+    temp_dir = TEMP_DIR / f"{upload_id}"
+    temp_dir.mkdir(parents=True,
+                   exist_ok=True
+                   )
+    temp_file_path = temp_dir / f"{file_name}"
     try:
         await save_upload_file(request,
                                temp_file_path
                                )
+        return temp_file_path
     except Exception as e:
         HTTPException(status_code=400, detail=f"{e}")

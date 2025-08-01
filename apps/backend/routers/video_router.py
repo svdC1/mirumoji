@@ -12,6 +12,7 @@ from fastapi import (APIRouter,
                      Depends,
                      HTTPException,
                      status,
+                     Header
                      )
 import asyncio
 import aiofiles
@@ -38,7 +39,7 @@ db_manager = DbManager()
 @video_router.post("/generate_srt")
 async def generate_srt(
     video_file: Path = Depends(get_stream_file),
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: str = Header(..., alias="X-Profile-ID")
 ) -> dict:
     """
     POST endpoint for generating an SRT string from a video file.
@@ -59,6 +60,7 @@ async def generate_srt(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="X-Profile-ID header is required.",
         )
+    await ensure_profile_exists(profile_id)
 
     op_id = str(uuid.uuid4())
     op_tmp_dir = Path(TEMP_DIR / video_file.parent)
@@ -179,7 +181,7 @@ async def generate_srt(
 @video_router.post("/convert_to_mp4")
 async def convert_to_mp4(
     video_file: Path = Depends(get_stream_file),
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: str = Header(..., alias="X-Profile-ID")
 ) -> dict:
     """
     POST endpoint for converting a video file to MP4 format.
@@ -200,7 +202,7 @@ async def convert_to_mp4(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="X-Profile-ID header is required.",
         )
-
+    await ensure_profile_exists(profile_id)
     op_id = str(uuid.uuid4())
     op_tmp_dir = TEMP_DIR / video_file.parent
     op_tmp_dir.mkdir(parents=True, exist_ok=True)

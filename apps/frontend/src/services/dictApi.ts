@@ -12,7 +12,7 @@ import { DictLookup, DictWildcardLookup } from "../types/types";
  * @returns {Promise<DictLookup>} A promise that resolves to the dictionary lookup data.
  */
 export async function apiWordQuery(word: string): Promise<DictLookup> {
-    const result = apiFetch<DictLookup>(`/dict/word?word=${word}`, {
+    const result = apiFetch<DictLookup>(`dict/word?word=${word}`, {
         method: "GET",
     });
     return result;
@@ -28,7 +28,7 @@ export async function apiWildcardQuery(
     pattern: string
 ): Promise<DictWildcardLookup> {
     const result = apiFetch<DictWildcardLookup>(
-        `/dict/wildcard?pattern=${pattern}`,
+        `dict/wildcard?pattern=${pattern}`,
         {
             method: "GET",
         }

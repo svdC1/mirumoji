@@ -11,7 +11,7 @@ import {
     useEffect,
 } from "react";
 import { toast } from "react-hot-toast";
-import { apiFetch } from "../services/api";
+import { uploadFile } from "../services/api";
 import AudioPlayer from "react-h5-audio-player";
 import "react-h5-audio-player/lib/styles.css";
 import { getTokenizer } from "../services/tokenizer";
@@ -19,7 +19,8 @@ import { Tokenizer, IpadicFeatures } from "kuromoji";
 import WordDialog from "../components/WordDialog";
 import { Message, TranscriptionResponse, ApiError } from "../types/types";
 import ChatBubble from "../components/ChatBubble";
-
+import { useProfile } from "../contexts/ProfileContext";
+import { API_BASE } from "../constants/user-page";
 /**
  * The TranscribePage component.
  *
@@ -48,6 +49,7 @@ export default function TranscribePage() {
         word: string;
     } | null>(null);
 
+    const { profileId } = useProfile();
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const chunksRef = useRef<BlobPart[]>([]);
@@ -170,6 +172,7 @@ export default function TranscribePage() {
         if (!fileToSend) return;
 
         setSending(true);
+        const tId = toast.loading("Uploading...");
         const loaderId = `loader-${Date.now()}`;
         const userMessageId = `user-${Date.now() + 1}`;
 
@@ -185,16 +188,21 @@ export default function TranscribePage() {
         ]);
 
         try {
-            const form = new FormData();
-            form.append("file", fileToSend, fileToSend.name);
-            form.append("clean_audio", String(cleanAudio));
-            form.append("gpt_explain", String(gptExplain));
-
-            const result = await apiFetch<TranscriptionResponse>(
-                "/audio/transcribe_from_audio",
-                {
-                    method: "POST",
-                    body: form,
+            const headers = {
+                "X-Clean-Audio": String(cleanAudio),
+                "X-Gpt-Explain": String(gptExplain),
+            };
+            const result = await uploadFile<TranscriptionResponse>(
+                fileToSend,
+                "audio/transcribe_from_audio",
+                headers,
+                (progress: number) => {
+                    toast.loading(`Uploading... ${progress.toFixed(0)}%`, {
+                        id: tId,
+                    });
+                },
+                () => {
+                    toast.dismiss(tId);
                 }
             );
 

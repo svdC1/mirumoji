@@ -65,14 +65,14 @@ export default function UserPage() {
 
     // SWR fetch keys - will use profileId
     const filesSWRKey =
-        profileId && activeTab === "files" ? `/profiles/files` : null;
+        profileId && activeTab === "files" ? `profiles/files` : null;
     const transcriptsSWRKey =
         profileId && activeTab === "transcripts"
-            ? `/profiles/transcripts`
+            ? `profiles/transcripts`
             : null;
     const gptTemplateSWRKey =
         profileId && activeTab === "gpt-template"
-            ? `/profiles/gpt_template`
+            ? `profiles/gpt_template`
             : null;
 
     // Fetch files
@@ -143,7 +143,7 @@ export default function UserPage() {
         }
         setDeletingFileId(fileId);
         try {
-            await apiFetch(`/profiles/files/${fileId}`, { method: "DELETE" });
+            await apiFetch(`profiles/files/${fileId}`, { method: "DELETE" });
             toast.success("File deleted!");
             mutate(filesSWRKey);
         } catch (err: any) {
@@ -161,7 +161,7 @@ export default function UserPage() {
         }
         setDeletingTranscriptId(transcriptId);
         try {
-            await apiFetch(`/profiles/transcripts/${transcriptId}`, {
+            await apiFetch(`profiles/transcripts/${transcriptId}`, {
                 method: "DELETE",
             });
             toast.success("Transcript deleted.");
@@ -230,7 +230,7 @@ export default function UserPage() {
                 payload.id = currentGptTemplate.id;
             }
 
-            await apiFetch(`/profiles/gpt_template`, {
+            await apiFetch(`profiles/gpt_template`, {
                 method: method,
                 body: JSON.stringify(payload),
             });
@@ -255,7 +255,7 @@ export default function UserPage() {
         }
         setIsSavingGptTemplate(true);
         try {
-            await apiFetch(`/profiles/gpt_template`, {
+            await apiFetch(`profiles/gpt_template`, {
                 method: "POST",
                 body: JSON.stringify({
                     sysMsg: defaultSysMsg,
@@ -283,7 +283,7 @@ export default function UserPage() {
         }
         setIsDeletingGptTemplate(true);
         try {
-            await apiFetch(`/profiles/gpt_template`, { method: "DELETE" });
+            await apiFetch(`profiles/gpt_template`, { method: "DELETE" });
             mutate(gptTemplateSWRKey, null, { revalidate: false });
             toast.success("Template deleted!");
             setGptSysMsg(defaultSysMsg);
@@ -607,8 +607,8 @@ export default function UserPage() {
                                             {isSavingGptTemplate
                                                 ? "Saving..."
                                                 : currentGptTemplate
-                                                ? "Update Template"
-                                                : "Create Template"}
+                                                  ? "Update Template"
+                                                  : "Create Template"}
                                         </button>
                                         {currentGptTemplate && (
                                             <>

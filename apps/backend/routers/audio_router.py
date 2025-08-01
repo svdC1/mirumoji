@@ -11,8 +11,7 @@ import shutil
 import uuid
 from pathlib import Path
 from fastapi import (APIRouter,
-                     UploadFile,
-                     Form,
+                     Header,
                      Depends,
                      HTTPException,
                      status
@@ -22,7 +21,7 @@ from profile_manager import ensure_profile_exists
 from db.db import DbManager
 from processing.Processor import Processor
 from utils.env_utils import using_modal
-from utils.file_utils import save_upload_file
+from utils.file_utils import get_stream_file
 import asyncio
 
 USING_MODAL = using_modal()
@@ -40,16 +39,16 @@ db_manager = DbManager()
 
 @audio_router.post("/transcribe_from_audio")
 async def transcribe_from_audio(
-    file: UploadFile,
-    clean_audio_str: str = Form("false", alias="clean_audio"),
-    gpt_explain_str: str = Form("false", alias="gpt_explain"),
-    profile_id: str = Depends(ensure_profile_exists),
+    file: Path = Depends(get_stream_file),
+    clean_audio_str: str = Header("false", alias="X-Clean-Audio"),
+    gpt_explain_str: str = Header("false", alias="X-Gpt-Explain"),
+    profile_id: str = Header(..., alias="X-Profile-ID"),
 ) -> dict:
     """
     POST endpoint for transcribing an audio file using faster whisper.
 
     Args:
-      file (UploadFile): File uploaded passed through endpoint.
+      file (Path): Path where streamed file was saved
       clean_audio_str (str): Whether to filter the audio or not.
       gpt_explain_str (str): Whether to call OpenAI API for explanation.
       profile_id (str): Profile ID from Header.
@@ -66,31 +65,31 @@ async def transcribe_from_audio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="X-Profile-ID header is required.",
         )
+    await ensure_profile_exists(profile_id)
 
     # 1. Prepare Save Paths
     do_clean_audio = clean_audio_str.lower() == "true"
     do_gpt_explain = gpt_explain_str.lower() == "true"
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = TEMP_DIR / f"transcribe_audio_{profile_id}_{op_id}"
+    op_tmp_dir = TEMP_DIR / file.parent
     op_tmp_dir.mkdir(parents=True,
                      exist_ok=True)
 
     prof_audio_dir = PROFILES_DIR / profile_id / "audios"
     prof_audio_dir.mkdir(parents=True, exist_ok=True)
 
-    original_filename = file.filename
+    original_filename = file.name
     persistent_audio_fname = f"{op_id}_{original_filename}"
     final_audio_storage_loc = prof_audio_dir / persistent_audio_fname
     rel_audio_path_db = (
         Path("profiles") / profile_id / "audios" / persistent_audio_fname
     )
 
-    tmp_uploaded_audio_loc = op_tmp_dir / original_filename
+    tmp_uploaded_audio_loc = file
     audio_to_process_loc = tmp_uploaded_audio_loc
 
     try:
-        await save_upload_file(file, tmp_uploaded_audio_loc)
         LOGGER.info(
             f"Temp audio for transcription: '{tmp_uploaded_audio_loc}'")
 
