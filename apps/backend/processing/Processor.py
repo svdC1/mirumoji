@@ -214,7 +214,7 @@ class Processor:
                                 to_mp4_kwargs=to_mp4_kwargs
                                 )
                         ):
-                            f_out.write(chunk)
+                            await f_out.write(chunk)
                             pbar.update(len(chunk))
                 LOGGER.info("Finished receiving converted video")
                 return Path(outpath)
