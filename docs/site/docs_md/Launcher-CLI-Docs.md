@@ -1,4 +1,5 @@
 # Launcher CLI Reference
+
 ## Introduction
 
 > The Mirumoji Command-Line-Interface is a convenience program for automatically running the Docker Compose application. It's made available either as a [`Python Package`](https://pypi.org/project/mirumoji/) or as [`Standalone Executable`](https://github.com/svdC1/mirumoji/releases/latest) in the Releases section of the repository
@@ -10,23 +11,24 @@
 ## Commands
 
 ### `launch`
+
 > Launches the Docker Compose application.
 
 #### Steps Performed
 
-> - Verifies options which were not passed as options flags.
+> -   Verifies options which were not passed as options flags.
 >
-> - Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
+> -   Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
 >
-> - Pulls pre-built images from repository, or builds images locally depending on option chosen.
+> -   Pulls pre-built images from repository, or builds images locally depending on option chosen.
 >
-> - Confirms existence of `.env` file inside the directory in which the command is run and checks presence of required API keys.
+> -   Confirms existence of `.env` file inside the directory in which the command is run and checks presence of required API keys.
 >
-> - Extracts the Local IPv4 of the machine running the command in order to create certificates for serving over HTTPS.
+> -   Extracts the Local IPv4 of the machine running the command in order to create certificates for serving over HTTPS.
 >
-> - Starts Docker Compose Application using the correct `docker-compose.yaml` file according to options.
+> -   Starts Docker Compose Application using the correct `docker-compose.yaml` file according to options.
 >
-> - Prints Local and LAN web addresses where the application is running.
+> -   Prints Local and LAN web addresses where the application is running.
 
 #### Options
 
@@ -39,22 +41,24 @@
 > `--no-clear` &rarr; To stop clearing the terminal screen after each stage during command execution. Default behavior is to clear the screen to avoid clutter.
 
 ---
+
 ### `launch-local`
+
 > Launches the Docker Compose application using previously built local images
 
 #### Steps Performed
 
-> - Verifies options which were not passed as options flags.
+> -   Verifies options which were not passed as options flags.
 >
-> - Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
+> -   Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
 >
-> - Confirms existence of `.env` file inside the directory in which the command is run and checks presence of required API keys.
+> -   Confirms existence of `.env` file inside the directory in which the command is run and checks presence of required API keys.
 >
-> - Extracts the Local IPv4 of the machine running the command in order to create certificates for serving over HTTPS.
+> -   Extracts the Local IPv4 of the machine running the command in order to create certificates for serving over HTTPS.
 >
-> - Starts Docker Compose Application using the correct `docker-compose.yaml` file according to options.
+> -   Starts Docker Compose Application using the correct `docker-compose.yaml` file according to options.
 >
-> - Prints Local and LAN web addresses where the application is running.
+> -   Prints Local and LAN web addresses where the application is running.
 
 #### Options
 
@@ -63,16 +67,18 @@
 > `--no-clear` &rarr; To stop clearing the terminal screen after each stage during command execution. Default behavior is to clear the screen to avoid clutter.
 
 ---
+
 ### `build`
+
 > Builds images locally without running the application
 
 #### Steps Performed
 
-> - Verifies options which were not passed as options flags.
+> -   Verifies options which were not passed as options flags.
 >
-> - Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
+> -   Clones the mirumoji repository into a `mirumoji_workspace` inside the directory in which the command is run.
 >
-> - Runs Docker Build according to specified options
+> -   Runs Docker Build according to specified options
 
 #### Options
 
@@ -83,13 +89,14 @@
 ---
 
 ### `shutdown`
+
 > Stops the Docker Compose Application
 
 #### Steps Performed
-> - Verifies options which were not passed as options flags.
+
+> -   Verifies options which were not passed as options flags.
 >
-> - Runs appropriate Docker Compose command to stop application.
->
+> -   Runs appropriate Docker Compose command to stop application.
 
 #### Options
 

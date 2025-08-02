@@ -7,7 +7,7 @@ This guide explains how to run Mirumoji on your local machine using Docker Compo
 Before you begin, ensure you have the following installed on your system:
 
 -   **Docker Desktop:**
-    - Install [`Docker Desktop`](https://www.docker.com/products/docker-desktop/)
+    -   Install [`Docker Desktop`](https://www.docker.com/products/docker-desktop/)
 
 ### _When Running With Local GPU_
 
@@ -23,6 +23,7 @@ using your local GPU.
 ## Setup Instructions
 
 1.  **Clone the Repository**
+
 ```bash
 git clone https://github.com/svdC1/mirumoji.git
 cd mirumoji
@@ -47,33 +48,42 @@ cd mirumoji
         MODAL_TOKEN_ID=***
         MODAL_TOKEN_SECRET=***
         ```
+
 ## Running the Application
 
 1.  **Open your terminal or command prompt.**
 2.  **Navigate to the repo directory**
 3.  **Run the following commands based on your setup choice:**
 
-    - CPU + Modal
+    -   CPU + Modal
+
     ```bash
     docker compose -f compose/docker-compose.cpu.yaml up -d
     ```
-    - Local GPU
+
+    -   Local GPU
+
     ```bash
     docker compose -f compose/docker-compose.gpu.yaml up -d
     ```
- -   This command will download the necessary Docker images (if you don't have them already), build the containers, and start them in detached mode (`-d`), meaning they will run in the background.
- -   The first time you run this, downloading the images might take a while, especially the GPU backend image, depending on your internet connection.
 
- - **Note :**
-> To pull images from Docker Hub (`docker.io`) instead of GitHub Registry (`ghcr.io`)
->    - CPU + Modal
->    ```bash
->    docker compose -f compose/docker-compose.cpu.dockerpull.yaml up -d
->    ```
->    - Local GPU
->    ```bash
->    docker compose -f compose/docker-compose.gpu.dockerpull.yaml up -d
->    ```
+-   This command will download the necessary Docker images (if you don't have them already), build the containers, and start them in detached mode (`-d`), meaning they will run in the background.
+-   The first time you run this, downloading the images might take a while, especially the GPU backend image, depending on your internet connection.
+
+-   **Note :**
+    > To pull images from Docker Hub (`docker.io`) instead of GitHub Registry (`ghcr.io`)
+    >
+    > -   CPU + Modal
+    >
+    > ```bash
+    > docker compose -f compose/docker-compose.cpu.dockerpull.yaml up -d
+    > ```
+    >
+    > -   Local GPU
+    >
+    > ```bash
+    > docker compose -f compose/docker-compose.gpu.dockerpull.yaml up -d
+    > ```
 
 ## Accessing the Application
 
@@ -98,11 +108,14 @@ To stop the application and remove the containers:
 2.  **Navigate to the repo directory**
 3.  **Run the command:**
 
-    - CPU + Modal
+    -   CPU + Modal
+
     ```bash
     docker compose -f compose/docker-compose.cpu.yaml down
     ```
-    - Local GPU
+
+    -   Local GPU
+
     ```bash
     docker compose -f compose/docker-compose.gpu.yaml down
     ```
