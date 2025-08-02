@@ -351,20 +351,13 @@ async def delete_saved_clip(
 
     await db_manager.delete("profile_files", files_filter)
     fp = clip_r.video_clip_path
-
-    if isinstance(fp, Path) and fp.exists():
-        try:
-            await MEDIA_FILE_HANDLER.delete_file(fp, check=True)
-            LOGGER.info(f"Deleted: '{fp}'")
-        except OSError as e:
-            LOGGER.error(f"Error deleting '{fp}': '{e}'")
-            return {"success": False,
-                    "message": f"Error deleting '{fp}': '{e}'"
-                    }
-    else:
-        LOGGER.warning(f"Not found for del: '{fp}'")
+    try:
+        await MEDIA_FILE_HANDLER.delete_file(fp, check=True)
+        LOGGER.info(f"Deleted: '{fp}'")
+    except OSError as e:
+        LOGGER.error(f"Error deleting '{fp}': '{e}'")
         return {"success": False,
-                "message": f"Not found for del: '{fp}'"
+                "message": f"Error deleting '{fp}': '{e}'"
                 }
     return {"success": True,
             "message": "Clip deleted successfully."
@@ -440,19 +433,13 @@ async def delete_profile_file(
                             )
     await db_manager.delete("profile_files", filter)
     fp = file_r.file_path
-    if isinstance(fp, Path) and fp.exists():
-        try:
-            await MEDIA_FILE_HANDLER.delete_file(fp, check=True)
-            LOGGER.info(f"Deleted file: '{fp}'")
-        except OSError as e:
-            LOGGER.error(f"Error deleting '{fp}': '{e}'")
-            return {"success": False,
-                    "message": f"Error deleting '{fp}': '{e}'"
-                    }
-    else:
-        LOGGER.warning(f"File not found for del: '{fp}'")
+    try:
+        await MEDIA_FILE_HANDLER.delete_file(fp, check=True)
+        LOGGER.info(f"Deleted file: '{fp}'")
+    except OSError as e:
+        LOGGER.error(f"Error deleting '{fp}': '{e}'")
         return {"success": False,
-                "message": f"File not found for del: '{fp}'"
+                "message": f"Error deleting '{fp}': '{e}'"
                 }
 
     if file_r.file_type == "video_clip":
@@ -566,19 +553,13 @@ async def delete_profile_transcript(
         if res > 0:
             LOGGER.info(f"Del assoc. profile_files for: '{aud_path}'")
             fp_aud = aud_path
-            if isinstance(fp_aud, Path) and fp_aud.exists():
-                try:
-                    await MEDIA_FILE_HANDLER.delete_file(fp_aud, check=True)
-                    LOGGER.info(f"Del audio file: '{fp_aud}'")
-                except OSError as e:
-                    LOGGER.error(f"Err del audio '{fp_aud}': '{e}'")
-                    return {"success": False,
-                            "message": f"Err del audio '{fp_aud}': '{e}'"
-                            }
-            else:
-                LOGGER.warning(f"Audio file not found for del: '{fp_aud}'")
+            try:
+                await MEDIA_FILE_HANDLER.delete_file(fp_aud, check=True)
+                LOGGER.info(f"Del audio file: '{fp_aud}'")
+            except OSError as e:
+                LOGGER.error(f"Err del audio '{fp_aud}': '{e}'")
                 return {"success": False,
-                        "message": f"Audio file not found for del: '{fp_aud}'"
+                        "message": f"Err del audio '{fp_aud}': '{e}'"
                         }
         else:
             LOGGER.warning((
@@ -639,5 +620,6 @@ async def export_anki_deck(
     pkg_fn = f"{uuid.uuid4()}_saved_deck.apkg"
     outpath = anki_dir / pkg_fn
     anki.export(str(outpath))
-    media_path = Path("media") / MEDIA_FILE_HANDLER.get_relative_path(outpath)
+    media_path = str(
+        Path("media") / MEDIA_FILE_HANDLER.get_relative_path(outpath))
     return AnkiExportResponse(anki_deck_url=media_path)

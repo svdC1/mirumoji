@@ -44,6 +44,9 @@ export const getFileExtension = (filenameOrUrl: string | undefined) => {
  * @returns {string} The formatted URL.
  */
 export const formatStaticUrl = (API_BASE: string, url: string) => {
+    if (url.startsWith("/")) {
+        url = url.slice(0, 0) + url.slice(1);
+    }
     return `${API_BASE}${url}`;
 };
 
