@@ -212,7 +212,7 @@ async def save_video_clip(
         # Convert to WebM for Anki Compatibility
         try:
             LOGGER.info(f"Converting Clip to WEBM '{loc}' -> '{webm_loc}'")
-            audio_tools = AudioTools(working_dir=p_path)
+            audio_tools = AudioTools()
             await asyncio.to_thread(
                 audio_tools.to_webm,
                 input_path=str(loc),

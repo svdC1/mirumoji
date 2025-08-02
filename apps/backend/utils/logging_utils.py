@@ -4,9 +4,8 @@ This module defines a helper function for configuring the backend's logging.
 
 import logging
 import sys
-import os
-from pathlib import Path
 from tqdm.auto import tqdm
+from utils.constants import LOG_DIR, LOGGING_LEVEL
 
 
 class TqdmStreamHandler(logging.StreamHandler):
@@ -29,7 +28,6 @@ def setup_logging() -> None:
     """
     Configure the root logger to include custom formatting and handlers
     """
-    LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO").upper()
     level = getattr(logging, LOGGING_LEVEL, logging.INFO)
 
     # Get the root logger
@@ -47,9 +45,8 @@ def setup_logging() -> None:
     )
 
     # Create and add handlers
-    log_dir = Path.home() / ".mirumoji_logs"
-    log_dir.mkdir(exist_ok=True)
-    log_file = str((log_dir / "backend.log").resolve())
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = str((LOG_DIR / "backend.log").resolve())
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)

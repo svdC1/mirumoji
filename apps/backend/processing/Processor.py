@@ -8,13 +8,14 @@ Attributes:
 
 from typing import Optional, Union, Dict
 from pathlib import Path
-from tempfile import TemporaryDirectory
 import logging
+import aiofiles
 from processing.text_processing import SentenceBreakdownService
 from processing.audio_processing import AudioTools
 from tqdm.auto import tqdm
 from dotenv import load_dotenv
 from utils.env_utils import check_env, using_modal
+from utils.constants import TEMP_DIR
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,8 +26,6 @@ class Processor:
     instances from the `processing` module and manage Modal interaction.
 
     Args:
-      save_path (Union[str, Path, None], optional): Optional Path to be used
-                                                    as working directory.
       gpt_version (str): Which GPT version to use for OpenAI integration.
       dotenv_path (Union[str, Path, None], optional): Optional Path to look
                                                       for .env file
@@ -46,7 +45,6 @@ class Processor:
     """
     def __init__(
         self,
-        save_path: Union[str, Path, None] = None,
         gpt_version: str = "gpt-4.1-mini",
         dotenv_path: Union[str, Path, None] = None,
         whisper_kwargs: Dict = {},
@@ -57,14 +55,9 @@ class Processor:
 
         # Check MODAL
         use_modal = using_modal()
-        # Configure Save Path
-        if not save_path:
-            self.save_path = TemporaryDirectory(ignore_cleanup_errors=True)
-        else:
-            self.save_path = Path(save_path).resolve()
-            if not self.save_path.is_dir():
-                LOGGER.error(f"Dir: '{save_path}' does not exist")
-                raise FileNotFoundError(f"Dir: '{save_path}' does not exist")
+        # Configure Temp Path
+        self.temp = TEMP_DIR
+        self.temp.mkdir(parents=True, exist_ok=True)
 
         # Configure API Keys
         load_dotenv(dotenv_path=dotenv_path)
@@ -90,10 +83,7 @@ class Processor:
         self.sentence_breakdown_service = SentenceBreakdownService(gpt_version,
                                                                    gpt_kwargs)
         # Audio Tools
-        if not save_path:
-            self.audio_tools = AudioTools(self.save_path.name)
-        else:
-            self.audio_tools = AudioTools(self.save_path)
+        self.audio_tools = AudioTools()
 
         # Whisper
         if use_modal:
@@ -114,7 +104,6 @@ class Processor:
             self.fwhisper = FWhisperWrapper(**whisper_kwargs)
 
         # Save attrs
-        self.save_path_input = save_path
         self.use_modal = use_modal
         self.gpt_version = gpt_version
         self.dotenv_path = dotenv_path
@@ -125,9 +114,7 @@ class Processor:
         LOGGER.info("Processor Initialized")
 
     def __str__(self) -> str:
-        if isinstance(self.save_path, TemporaryDirectory):
-            return str(Path(self.save_path.name).resolve())
-        return str(Path(self.save_path).resolve())
+        return self.__repr__()
 
     def __repr__(self) -> str:
         args = {
@@ -143,18 +130,20 @@ class Processor:
         arg_s = ','.join([f"{k}={v}" for k, v in args.items()])
         return f"Processor({arg_s})"
 
-    def __del__(self) -> None:
-        if isinstance(self.save_path, TemporaryDirectory):
-            self.save_path.cleanup()
-
     async def modal_transcribe_to_srt(self,
-                                      media_fp: Union[str, Path]
+                                      media_fp: Union[str, Path],
+                                      transcribe_kwargs: dict = {},
+                                      fix_with_chat_gpt: bool = True
                                       ) -> Union[str, None]:
         """
         Call Modal function to transcribe video to SRT
 
         Args:
           media_fp (Union[str, Path]): Path to the video to transcribe.
+          transcribe_kwargs (dict, optional): Additional arguments for
+                                              `FWhisperWrapper.transcribe`
+          fix_with_chat_gpt (bool, optional): If `True` request ChatGPT to fix
+                                              transcription. Defaults to True
 
         Returns:
           str: Formatted SRT transcription string.
@@ -162,28 +151,40 @@ class Processor:
         async with self.modal_app.run():
             media_fp = Path(media_fp).as_posix()
             return await self.transcribe_srt_job.remote.aio(
-                media_fp=media_fp
+                media_fp=media_fp,
+                fwhisper_kwargs=self.whisper_kwargs,
+                transcribe_kwargs=transcribe_kwargs,
+                fix_with_chat_gpt=fix_with_chat_gpt
+
                 )
 
     async def modal_transcribe_to_str(self,
-                                      audio_fp: Union[str, Path]
+                                      audio_fp: Union[str, Path],
+                                      transcribe_kwargs: dict = {}
                                       ) -> Union[str, None]:
         """
         Call Modal function to transcribe audio to string.
 
         Args:
             audio_fp (Union[str, Path]): Path to the audio to transcribe.
+            transcribe_kwargs (dict, optional): Additional arguments for
+                                                `FWhisperWrapper.transcribe`
 
         Returns:
             str: String transcription.
         """
-        with self.modal_app.run():
+        async with self.modal_app.run():
             audio_fp = Path(audio_fp).as_posix()
-            return self.transcribe_to_string_job.remote(audio_fp=audio_fp)
+            return await self.transcribe_to_string_job.remote.aio(
+                audio_fp=audio_fp,
+                fwhisper_kwargs=self.whisper_kwargs,
+                transcribe_kwargs=transcribe_kwargs
+                )
 
     async def modal_convert_to_mp4(self,
                                    video_fp: Union[str, Path],
-                                   outpath: Union[str, Path]
+                                   outpath: Union[str, Path],
+                                   to_mp4_kwargs: dict = {}
                                    ) -> Path:
         """
         Call Modal function to convert a video to MP4 format.
@@ -191,11 +192,13 @@ class Processor:
         Args:
           video_fp (Union[str, Path]): Path to the video to convert.
           outpath (Union[str, Path]): Where to save the received video stream.
+          to_mp4_kwargs (dict, optional): Additional arguments for
+                                          `AudioTools.to_mp4`.
 
         Returns:
           Path: The path to converted video from `outpath`.
         """
-        with self.modal_app.run():
+        async with self.modal_app.run():
             video_fp = Path(video_fp).as_posix()
             outpath = Path(outpath).as_posix()
             try:
@@ -204,15 +207,17 @@ class Processor:
                           unit_divisor=1024,
                           desc="Receiving Converted Video"
                           ) as pbar:
-                    async for chunk in (
-                        self.video_conversion_job.remote_gen.aio(
-                            video_fp=video_fp)
-                                        ):
-                        with open(outpath, "ab") as f_out:
+                    async with aiofiles.open(outpath, "ab") as f_out:
+                        async for chunk in (
+                            self.video_conversion_job.remote_gen.aio(
+                                video_fp=video_fp,
+                                to_mp4_kwargs=to_mp4_kwargs
+                                )
+                        ):
                             f_out.write(chunk)
-                        pbar.update(len(chunk))
+                            pbar.update(len(chunk))
                 LOGGER.info("Finished receiving converted video")
                 return Path(outpath)
             except Exception as e:
-                LOGGER.exception(f"Error Converting Video: {e}")
+                LOGGER.exception(f"Error Converting Video: '{e}'")
                 return None

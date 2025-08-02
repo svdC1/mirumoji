@@ -15,30 +15,10 @@ import srt
 import datetime
 from pathlib import Path
 from processing.gpt_wrapper import GptModel
+from utils.constants import FWHISPER_GPT_DEFAULT_SYS_MSG
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_SYS_MSG = """You are an expert subtitle editor for Japanese anime.
-You understand:
-  - Conversational Japanese, character names, honorifics onomatopoeia and \
-      scene-specific slang.
-  - How to pick the correct Kanji/Kana from phonetic transcriptions based on\
-      context.
-  - Natural sentence flow and typical timing for subtitles.
-
- Your job is to **clean only the text** of each SRT cue:
-   • Fix mis-recognized Kanji or Kana.
-   • Merge cues that split a single sentence (new cue’s start = earlier, \
-       end = later).
-   • Remove any pure gibberish or repeated song-lyric artifacts.
-   • Insert correct punctuation (。？！、) and adjust spacing.
-
-**You must not**:
-  - Change any start/end timestamps.
-  - Renumber beyond simple sequential order.
-  - Add or remove cues (only merge as above).
-  - Add any commentary or explanations.
-
-Output **only** the cleaned `.srt` file content."""
+DEFAULT_SYS_MSG = FWHISPER_GPT_DEFAULT_SYS_MSG
 
 
 class FWhisperWrapper:
@@ -88,9 +68,8 @@ class FWhisperWrapper:
         if audio_path.is_file():
             return str(audio_path)
         else:
-            LOGGER.error(f"Transcribe Failed : Path : {audio_path} \
-                is invalid.\
-                ")
+            LOGGER.error(
+                f"Transcribe Failed : Path '{audio_path}' is invalid.")
             return None
 
     def gpt_fix_srt(self,
@@ -152,8 +131,6 @@ class FWhisperWrapper:
         audio_path = self._check_input(audio_path)
 
         if not audio_path:
-            LOGGER.error(
-                "Error during transcription: audio path provided is invalid")
             return None
 
         add_kwds = {
@@ -181,9 +158,10 @@ class FWhisperWrapper:
                 tt = time.perf_counter() - elapsed
                 return {'obj': segments,
                         'info': info,
-                        'elapsed': tt}
+                        'elapsed': tt
+                        }
         except Exception as e:
-            LOGGER.exception(f"Transcription Failed :{e}")
+            LOGGER.exception(f"Transcription Failed : '{e}' ")
             return None
 
     def transcribe_to_str(self,
@@ -242,8 +220,9 @@ class FWhisperWrapper:
             if opath.suffix != '.srt':
                 output_path = str(opath.with_suffix(".srt"))
         except Exception as e:
-            LOGGER.error(f"Error cleaning output path : {e}")
-            return None
+            LOGGER.error(f"Error resolving output path : '{e}'")
+            if not string_result:
+                return None
         try:
             segments = self.transcribe(audio_path, **transcribe_kwargs)
             segments = segments['obj']
@@ -256,7 +235,7 @@ class FWhisperWrapper:
                                               end=end,
                                               content=seg.text))
         except Exception as e:
-            LOGGER.error(f"Error when generating SRT: {e}")
+            LOGGER.error(f"Error when generating SRT: '{e}'")
             return None
 
         if fix_with_chat_gpt:
@@ -264,6 +243,7 @@ class FWhisperWrapper:
                 rsrt = self.gpt_fix_srt(srt.compose(subtitles),
                                         gpt_model_kwargs)
                 if not rsrt:
+                    LOGGER.error("Error fixing subtitles with ChatGPT")
                     return None
 
                 if string_result:
@@ -294,5 +274,5 @@ class FWhisperWrapper:
                 LOGGER.info("Generated SRT")
                 return output_path
             except Exception as e:
-                LOGGER.exception(f"Failed to save SRT File : {e}")
+                LOGGER.exception(f"Failed to save SRT File : '{e}'")
                 return None

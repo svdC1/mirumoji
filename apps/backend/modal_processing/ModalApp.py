@@ -15,28 +15,27 @@ from typing import Union, Generator
 import modal
 import os
 import logging
+from utils.constants import MODAL_GPU, MODAL_IMAGE, BASE_MEDIA_DIR
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 LOGGER = logging.getLogger(__name__)
-MODAL_IMAGE = os.getenv("MODAL_IMAGE",
-                        "docker.io/svdc1/mirumoji-modal-gpu:latest"
-                        )
-MODAL_GPU = os.getenv("MODAL_GPU", "A10G")
 # --- Modal Setup ---
 script_dir = Path(__file__).resolve().parent
 project_root_dir = script_dir.parent
-media_files_path = project_root_dir / "media_files"
+media_files_path = project_root_dir / str(BASE_MEDIA_DIR)
 media_files_path.mkdir(parents=True,
                        exist_ok=True
                        )
 
-LOGGER.info(f"Config Image + Mount '{media_files_path}' at /root/media_files")
+LOGGER.info(
+    f"Config Image + Mount '{media_files_path}' at /root/{str(BASE_MEDIA_DIR)}"
+    )
 # Build media_files on modal container startup
 mirumoji_image = (modal.Image.from_registry(MODAL_IMAGE)
                   .add_local_dir(media_files_path,
-                                 remote_path="/root/media_files")
+                                 remote_path=f"/root/{str(BASE_MEDIA_DIR)}")
                   )
 
 LOGGER.info("Configured.")
@@ -58,7 +57,10 @@ env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
     include_source=True,
     secrets=[env_secrets]
 )
-def transcribe_srt_job(media_fp: Union[str, Path]
+def transcribe_srt_job(media_fp: Union[str, Path],
+                       fwhisper_kwargs: dict = {},
+                       transcribe_kwargs: dict = {},
+                       fix_with_chat_gpt: bool = True
                        ) -> Union[str, None]:
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
@@ -66,6 +68,12 @@ def transcribe_srt_job(media_fp: Union[str, Path]
 
     Args:
       media_fp (Union[str, Path]): Path to the video for transcription.
+      fwhisper_kwargs (dict, optional): Additional arguments for
+                                        `FWhisperWrapper`
+      transcribe_kwargs (dict, optional): Additional arguments for
+                                          `FWhisperWrapper.transcribe`
+      fix_with_chat_gpt (bool, optional): If `True` request ChatGPT to fix
+                                          transcription. Defaults to True
 
     Returns:
       str: Transcription in form of SRT string.
@@ -79,7 +87,7 @@ def transcribe_srt_job(media_fp: Union[str, Path]
 
     LOGGER.info(f"transcribe_srt_job started for media: '{media_fp}'")
     try:
-        fwhisper = FWhisperWrapper()
+        fwhisper = FWhisperWrapper(**fwhisper_kwargs)
 
         gpt_model_kwargs = {
             "ApiKey": os.environ["OPENAI_API_KEY"],
@@ -89,8 +97,9 @@ def transcribe_srt_job(media_fp: Union[str, Path]
             audio_path=str(media_fp),
             output_path=" ",
             string_result=True,
-            fix_with_chat_gpt=True,
-            gpt_model_kwargs=gpt_model_kwargs
+            fix_with_chat_gpt=fix_with_chat_gpt,
+            gpt_model_kwargs=gpt_model_kwargs,
+            transcribe_kwargs=transcribe_kwargs
             )
 
         if srt_result_string:
@@ -112,6 +121,7 @@ def transcribe_srt_job(media_fp: Union[str, Path]
     is_generator=True
 )
 def video_conversion_job(video_fp: Union[str, Path],
+                         to_mp4_kwargs: dict = {}
                          ) -> Generator[bytes, None, None]:
     """
     Converts video_fp to MP4 using NVENC and returns the
@@ -119,6 +129,8 @@ def video_conversion_job(video_fp: Union[str, Path],
 
     Args:
       video_fp (Union[str, Path]): Path to the video for conversion.
+      to_mp4_kwargs (dict, optional): Additional arguments for
+                                      `AudioTools.to_mp4`.
 
     Yields:
       bytes: The converted video chunks.
@@ -133,18 +145,18 @@ def video_conversion_job(video_fp: Union[str, Path],
     tmp_p = Path.cwd() / "tmp"
     LOGGER.info(f"Using temporary directory for video conversion: '{tmp_p}'")
 
-    audio_tools = AudioTools(working_dir=tmp_p)
+    audio_tools = AudioTools()
 
     input_p = Path(video_fp)
     outp_local = tmp_p / f"{input_p.stem}_converted.mp4"
 
     try:
         LOGGER.info(f"Converting '{video_fp}' to '{outp_local}' using NVENC.")
-        result_p = audio_tools.to_mp4(
-            input_path=str(video_fp),
-            output_path=str(outp_local),
-            use_nvenc=True
-        )
+        to_mp4_kwargs.update(input_path=str(video_fp),
+                             output_path=str(outp_local),
+                             use_nvenc=True
+                             )
+        result_p = audio_tools.to_mp4(**to_mp4_kwargs)
 
         if result_p and result_p.exists() and result_p.stat().st_size > 0:
             LOGGER.info(f"Converted video to: '{result_p}'")
@@ -160,8 +172,8 @@ def video_conversion_job(video_fp: Union[str, Path],
                     yield chunk
             LOGGER.info(f"Finished streaming video bytes for: '{result_p}'")
         else:
-            e = f"Video conversion failed or produced an \
-                empty file for: '{video_fp}'"
+            e = (f"Video conversion failed or produced an "
+                 f"empty file for: '{video_fp}'")
             LOGGER.error(e)
             raise Exception(e)
     except Exception as e:
@@ -176,12 +188,18 @@ def video_conversion_job(video_fp: Union[str, Path],
     include_source=True
 )
 def transcribe_to_string_job(audio_fp: Union[str, Path],
+                             fwhisper_kwargs: dict = {},
+                             transcribe_kwargs: dict = {}
                              ) -> Union[str, None]:
     """
     Transcribe audio to string using Faster Whisper.
 
     Args:
       audio_fp (Union[str, Path]): Path to the audio for transcription.
+      fwhisper_kwargs (dict, optional): Additional arguments for
+                                        `FWhisperWrapper`
+      transcribe_kwargs (dict, optional): Additional arguments for
+                                          `FWhisperWrapper.transcribe`
 
     Returns:
       str: Transcription in form of string.
@@ -191,5 +209,6 @@ def transcribe_to_string_job(audio_fp: Union[str, Path],
                         style="{",
                         format="{levelname}-{name}-{message}"
                         )
-    fwhisper = FWhisperWrapper()
-    return fwhisper.transcribe_to_str(audio_fp)
+    fwhisper = FWhisperWrapper(**fwhisper_kwargs)
+    return fwhisper.transcribe_to_str(audio_fp,
+                                      transcribe_kwargs=transcribe_kwargs)

@@ -28,7 +28,7 @@ USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
 MEDIA_FILE_HANDLER = MediaFileHandler()
-processor = Processor(save_path=MEDIA_FILE_HANDLER.temp_path)
+processor = Processor()
 db_manager = DbManager()
 
 
@@ -73,12 +73,13 @@ async def generate_srt(
         LOGGER.info(f"Temp video for SRT: '{tmp_vid_upload_loc}'")
 
         # 2. Init AudioTools with operation's temp dir
-        audio_tools = AudioTools(working_dir=op_tmp_dir)
+        audio_tools = AudioTools()
 
         # 3. Extract audio
         extracted_audio_fpath = await asyncio.to_thread(
             audio_tools.extract_audio,
-            input_path=str(tmp_vid_upload_loc)
+            input_path=str(tmp_vid_upload_loc),
+            output_path=str(tmp_vid_upload_loc.with_suffix(".wav"))
         )
         if not extracted_audio_fpath or not Path(extracted_audio_fpath
                                                  ).exists():
@@ -211,8 +212,6 @@ async def convert_to_mp4(
         # If MODAL env variables are available use MODAL
         if USING_MODAL:
             LOGGER.info("Conversion sent to Modal")
-            tmp_uploaded_vid_loc = MEDIA_FILE_HANDLER.get_modal_path(
-                tmp_uploaded_vid_loc)
             LOGGER.info(f"Video Filepath:'{tmp_uploaded_vid_loc}'")
             LOGGER.info(f"Output Path: '{final_conv_stored_loc}'")
             conv_path_obj = await processor.modal_convert_to_mp4(
@@ -226,7 +225,7 @@ async def convert_to_mp4(
             LOGGER.info("Running Locally")
             LOGGER.info(f"Video Filepath:'{tmp_uploaded_vid_loc}'")
             LOGGER.info(f"Output Path: '{final_conv_stored_loc}'")
-            audio_tools = AudioTools(working_dir=op_tmp_dir)
+            audio_tools = AudioTools()
             conv_path_obj = await asyncio.to_thread(
                 audio_tools.to_mp4,
                 input_path=str(tmp_uploaded_vid_loc),

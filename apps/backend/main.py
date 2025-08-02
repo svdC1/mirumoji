@@ -12,13 +12,14 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from pathlib import Path
 from routers.gpt_router import gpt_router
 from routers.audio_router import audio_router
 from routers.health_router import health_router
 from routers.dict_router import dict_router
 from routers.video_router import video_router
 from routers.profile_router import profile_router
+import asyncio
+import shutil
 from contextlib import asynccontextmanager
 from db.db import connect_db, disconnect_db, DATABASE_URL
 from utils.env_utils import using_modal
@@ -49,7 +50,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     LOGGER.info(f"Storage ensured at: '{MEDIA_FILE_HANDLER.base_path}'")
     yield
     await disconnect_db()
-    await MEDIA_FILE_HANDLER.clean_temp()
+    await asyncio.to_thread(shutil.rmtree,
+                            MEDIA_FILE_HANDLER.temp_path,
+                            ignore_errors=True
+                            )
 
 
 app = FastAPI(
@@ -59,7 +63,7 @@ app = FastAPI(
 )
 
 app.mount("/media",
-          StaticFiles(directory=Path("media_files").resolve()),
+          StaticFiles(directory=MEDIA_FILE_HANDLER.base_path),
           name="media")
 
 origins = ["*"]

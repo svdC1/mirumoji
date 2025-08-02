@@ -14,10 +14,11 @@ from fastapi import (Request,
 from tqdm.auto import tqdm
 import asyncio
 import shutil
+from utils.constants import (BASE_MEDIA_DIR,
+                             TEMP_DIR
+                             )
 
 LOGGER = logging.getLogger(__name__)
-BASE_MEDIA_DIR = Path("media_files")
-TEMP_DIR = BASE_MEDIA_DIR / "temp"
 
 
 async def save_upload_file(request: Request,
@@ -94,10 +95,6 @@ class MediaFileHandler:
     """
     Handles file and path manipulations within the media_files directory.
 
-    Args:
-      media_path (str, optional): Name of the media_directory, relative to
-                                  project root. Defaults to `media_files`
-
     Attributes:
       project_root (Path): The root directory of the project.
       base_path (Path): The absolute local path to `media_files`.
@@ -106,9 +103,8 @@ class MediaFileHandler:
       modal_media_path (Path): The relative path to 'media_files' in Modal
     """
 
-    def __init__(self,
-                 media_path: str = "media_files"
-                 ) -> None:
+    def __init__(self) -> None:
+        media_path = str(BASE_MEDIA_DIR)
         # File = system_path/root/utils/file_utils -> system_path/root/
         self.project_root = Path(__file__).resolve().parent.parent
         # system_path/root/media_files

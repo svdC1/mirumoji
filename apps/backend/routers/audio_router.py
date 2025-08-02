@@ -28,7 +28,7 @@ USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
 audio_router = APIRouter(prefix="/audio")
 MEDIA_FILE_HANDLER = MediaFileHandler()
-processor = Processor(save_path=MEDIA_FILE_HANDLER.temp_path)
+processor = Processor()
 db_manager = DbManager()
 
 
@@ -87,7 +87,7 @@ async def transcribe_from_audio(
         # 2. Optional Pre-processing
         if do_clean_audio:
             # Filter with AudioTools.filter_audio
-            audio_tools = AudioTools(working_dir=op_tmp_dir)
+            audio_tools = AudioTools()
             cleaned_audio_name = f"cleaned_{op_id}_{original_filename}.wav"
             cleaned_audio_tmp_loc = op_tmp_dir / cleaned_audio_name
 
