@@ -296,8 +296,15 @@ class AudioTools:
                 "-crf", "23",
                 "-pix_fmt", "yuv420p",
             ]
+        # Set longer analyzeduration and probesize for complex video files
+        input_args = [
+            "-analyzeduration", "20M",  # 20 million microseconds = 20 seconds
+            "-probesize", "50M",       # 50 megabytes
+        ]
+
         cpu_cmd = [
             self.ffmpeg, "-y",
+            *input_args,
             "-i", src.as_posix(),
             "-vf", vf,
             *cpu_enc,
@@ -321,6 +328,7 @@ class AudioTools:
 
         cmd = [
             self.ffmpeg, "-y",
+            *input_args,
             "-i", src.as_posix(),
             "-vf", vf,
             *enc_args,
@@ -389,8 +397,15 @@ class AudioTools:
                 "-b:v", target_bitrate,
                 "-deadline", "good",
             ]
+        # Set longer analyzeduration and probesize for complex video files
+        input_args = [
+            "-analyzeduration", "20M",  # 20 million microseconds = 20 seconds
+            "-probesize", "50M",       # 50 megabytes
+        ]
+
         cpu_cmd = [
             self.ffmpeg, "-y",
+            *input_args,
             "-i", src.as_posix(),
             "-vf", vf,
             *cpu_enc,
@@ -411,6 +426,7 @@ class AudioTools:
 
         cmd = [
             self.ffmpeg, "-y",
+            *input_args,
             "-i", src.as_posix(),
             "-vf", vf,
             *enc_args,

@@ -143,6 +143,7 @@ def video_conversion_job(video_fp: Union[str, Path],
     from processing.audio_processing import AudioTools
     LOGGER.info(f"video_conversion_job started for video: '{video_fp}'")
     tmp_p = Path.cwd() / "tmp"
+    tmp_p.mkdir(parents=True, exist_ok=True)
     LOGGER.info(f"Using temporary directory for video conversion: '{tmp_p}'")
 
     audio_tools = AudioTools()
