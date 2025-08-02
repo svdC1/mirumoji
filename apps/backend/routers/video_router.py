@@ -17,22 +17,18 @@ from fastapi import (APIRouter,
 import asyncio
 import aiofiles
 from profile_manager import ensure_profile_exists
-import shutil
 from db.db import DbManager
 import uuid
 from utils.env_utils import using_modal
-from utils.file_utils import get_stream_file
+from utils.file_utils import get_stream_file, MediaFileHandler
 from processing.audio_processing import AudioTools
 from processing.Processor import Processor
 
 USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
-BASE_MEDIA_DIR = Path("media_files")
-PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
-TEMP_DIR = BASE_MEDIA_DIR / "temp"
-processor = Processor(save_path=BASE_MEDIA_DIR)
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+MEDIA_FILE_HANDLER = MediaFileHandler()
+processor = Processor(save_path=MEDIA_FILE_HANDLER.temp_path)
 db_manager = DbManager()
 
 
@@ -63,14 +59,10 @@ async def generate_srt(
     await ensure_profile_exists(profile_id)
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = Path(TEMP_DIR / video_file.parent)
-    srt_dir = PROFILES_DIR / profile_id / "subtitles"
-    srt_dir.mkdir(parents=True, exist_ok=True)
+    op_tmp_dir = MEDIA_FILE_HANDLER.get_temp_dir(video_file.parent.name)
+    srt_dir = MEDIA_FILE_HANDLER.get_profile_dir(profile_id, "subtitles")
     srt_fp = (srt_dir / f"{op_id}.srt")
-    relative_srt_fp = (
-        Path("profiles") / profile_id / "subtitles" / f"{op_id}.srt"
-        )
-    op_tmp_dir.mkdir(parents=True, exist_ok=True)
+    relative_srt_fp = MEDIA_FILE_HANDLER.get_relative_path(srt_fp)
 
     # Temporary location for the uploaded video within the operation's temp dir
     tmp_vid_upload_loc = video_file
@@ -102,13 +94,8 @@ async def generate_srt(
         if USING_MODAL:
             LOGGER.info("Conversion sent to Modal")
             LOGGER.info(f"Local Filepath: '{extracted_audio_fpath}'")
-            # Fix path for Internal Mounted Modal Container
-            parts = Path(extracted_audio_fpath).parts
-            # Local Path ->
-            # local/path/(media_files/temp/gen_srt_{profile_id}_{op_id}/{video_file.filename})
-            # parts[-4:] ->
-            # media_files/temp/gen_srt_{profile_id}_{op_id}/{video_file.filename}
-            extracted_audio_fpath = Path(*parts[-4:])
+            extracted_audio_fpath = MEDIA_FILE_HANDLER.get_modal_path(
+                extracted_audio_fpath)
             LOGGER.info(
                 f"Media Filepath Adapted for Modal: '{extracted_audio_fpath}'")
             srt_result = await processor.modal_transcribe_to_srt(
@@ -160,7 +147,7 @@ async def generate_srt(
         raise
     except Exception as e:
         LOGGER.exception((
-            f"Error generating SRT for '{video_file.filename}'"
+            f"Error generating SRT for '{video_file.name}'"
             f"profile: '{profile_id}'"
         ))
         raise HTTPException(
@@ -169,13 +156,8 @@ async def generate_srt(
         )
     finally:
         # 6. Clean up temp operation directory
-        if op_tmp_dir.exists():
-            try:
-                shutil.rmtree(op_tmp_dir)
-                LOGGER.info(f"Cleaned temp dir: '{op_tmp_dir}'")
-            except OSError as e_os:
-                LOGGER.error((f"Error cleaning temp dir"
-                              f"'{op_tmp_dir}': '{e_os}'"))
+        await MEDIA_FILE_HANDLER.delete_dir(
+            MEDIA_FILE_HANDLER.get_relative_path(op_tmp_dir))
 
 
 @video_router.post("/convert_to_mp4")
@@ -204,15 +186,13 @@ async def convert_to_mp4(
         )
     await ensure_profile_exists(profile_id)
     op_id = str(uuid.uuid4())
-    op_tmp_dir = TEMP_DIR / video_file.parent
-    op_tmp_dir.mkdir(parents=True, exist_ok=True)
+    op_tmp_dir = MEDIA_FILE_HANDLER.get_temp_dir(video_file.parent.name)
 
     # Temp location for the initially uploaded file
     tmp_uploaded_vid_loc = video_file
 
     # Final storage paths
-    prof_conv_dir = PROFILES_DIR / profile_id / "converted"
-    prof_conv_dir.mkdir(parents=True, exist_ok=True)
+    prof_conv_dir = MEDIA_FILE_HANDLER.get_profile_dir(profile_id, "converted")
 
     # Using unique names for stored files
     conv_fname_stem = video_file.stem
@@ -220,9 +200,8 @@ async def convert_to_mp4(
 
     final_conv_stored_loc = prof_conv_dir / conv_stored_fname
 
-    rel_conv_db_path = (
-       Path("profiles") / profile_id / "converted" / conv_stored_fname
-    )
+    rel_conv_db_path = MEDIA_FILE_HANDLER.get_relative_path(
+        final_conv_stored_loc)
 
     try:
         # 1. Save uploaded video to temp location
@@ -232,6 +211,8 @@ async def convert_to_mp4(
         # If MODAL env variables are available use MODAL
         if USING_MODAL:
             LOGGER.info("Conversion sent to Modal")
+            tmp_uploaded_vid_loc = MEDIA_FILE_HANDLER.get_modal_path(
+                tmp_uploaded_vid_loc)
             LOGGER.info(f"Video Filepath:'{tmp_uploaded_vid_loc}'")
             LOGGER.info(f"Output Path: '{final_conv_stored_loc}'")
             conv_path_obj = await processor.modal_convert_to_mp4(
@@ -287,14 +268,14 @@ async def convert_to_mp4(
         raise
     except Exception as e:
         LOGGER.exception((
-            f"Error converting '{video_file.stem}'"
+            f"Error converting '{video_file.name}'"
             f"for profile '{profile_id}'"
         ))
         # Attempt to clean up partially created files
         for loc in [final_conv_stored_loc]:
             if loc.exists():
                 try:
-                    loc.unlink()
+                    await MEDIA_FILE_HANDLER.delete_file(loc, check=True)
                 except OSError:
                     LOGGER.error(f"Could not remove '{loc}'")
         raise HTTPException(
@@ -305,8 +286,8 @@ async def convert_to_mp4(
         # 5. Clean up temp operation directory
         if op_tmp_dir.exists():
             try:
-                shutil.rmtree(op_tmp_dir)
-                LOGGER.info(f"Cleaned temp dir: '{op_tmp_dir}'")
+                await MEDIA_FILE_HANDLER.delete_dir(
+                    MEDIA_FILE_HANDLER.get_relative_path(op_tmp_dir))
             except OSError as e_os:
                 LOGGER.error(
                     f"Error cleaning temp dir '{op_tmp_dir}': '{e_os}'")

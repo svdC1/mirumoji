@@ -7,7 +7,6 @@ Attributes:
 """
 
 import logging
-import shutil
 import uuid
 from pathlib import Path
 from fastapi import (APIRouter,
@@ -21,19 +20,15 @@ from profile_manager import ensure_profile_exists
 from db.db import DbManager
 from processing.Processor import Processor
 from utils.env_utils import using_modal
-from utils.file_utils import get_stream_file
+from utils.file_utils import get_stream_file, MediaFileHandler
 import asyncio
 
 USING_MODAL = using_modal()
 
 LOGGER = logging.getLogger(__name__)
 audio_router = APIRouter(prefix="/audio")
-
-BASE_MEDIA_DIR = Path("media_files")
-PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
-TEMP_DIR = BASE_MEDIA_DIR / "temp"
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
-processor = Processor(save_path=TEMP_DIR)
+MEDIA_FILE_HANDLER = MediaFileHandler()
+processor = Processor(save_path=MEDIA_FILE_HANDLER.temp_path)
 db_manager = DbManager()
 
 
@@ -72,19 +67,15 @@ async def transcribe_from_audio(
     do_gpt_explain = gpt_explain_str.lower() == "true"
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = TEMP_DIR / file.parent
-    op_tmp_dir.mkdir(parents=True,
-                     exist_ok=True)
+    op_tmp_dir = MEDIA_FILE_HANDLER.get_temp_dir(file.parent.name)
 
-    prof_audio_dir = PROFILES_DIR / profile_id / "audios"
-    prof_audio_dir.mkdir(parents=True, exist_ok=True)
+    prof_audio_dir = MEDIA_FILE_HANDLER.get_profile_dir(profile_id, "audios")
 
     original_filename = file.name
     persistent_audio_fname = f"{op_id}_{original_filename}"
     final_audio_storage_loc = prof_audio_dir / persistent_audio_fname
-    rel_audio_path_db = (
-        Path("profiles") / profile_id / "audios" / persistent_audio_fname
-    )
+    rel_audio_path_db = MEDIA_FILE_HANDLER.get_relative_path(
+        final_audio_storage_loc)
 
     tmp_uploaded_audio_loc = file
     audio_to_process_loc = tmp_uploaded_audio_loc
@@ -115,7 +106,8 @@ async def transcribe_from_audio(
             audio_to_process_loc = Path(cleaned_path_str)
             LOGGER.info(f"Audio cleaned: '{audio_to_process_loc}'")
 
-        shutil.copyfile(audio_to_process_loc, final_audio_storage_loc)
+        await MEDIA_FILE_HANDLER.copy_file(audio_to_process_loc,
+                                           rel_audio_path_db)
         LOGGER.info(
             f"Audio ({'cleaned' if do_clean_audio else 'original'}) "
             f"copied to persistent: '{final_audio_storage_loc}'"
@@ -124,6 +116,8 @@ async def transcribe_from_audio(
         # When MODAL env variables are available use MODAL
         if USING_MODAL:
             LOGGER.info("Conversion sent to Modal")
+            final_audio_storage_loc = MEDIA_FILE_HANDLER.get_modal_path(
+                final_audio_storage_loc)
             LOGGER.info(f"Audio Filepath: '{final_audio_storage_loc}'")
             transcription_data = await processor.modal_transcribe_to_str(
                 audio_fp=str(final_audio_storage_loc)
@@ -216,7 +210,9 @@ async def transcribe_from_audio(
         ))
         if final_audio_storage_loc.exists():
             try:
-                final_audio_storage_loc.unlink()
+                await MEDIA_FILE_HANDLER.delete_file(
+                    MEDIA_FILE_HANDLER.get_relative_path(
+                        final_audio_storage_loc))
             except OSError as ose:
                 LOGGER.error((f"Could not remove"
                               f"'{final_audio_storage_loc}': '{ose}'"
@@ -229,7 +225,8 @@ async def transcribe_from_audio(
         # 6. Delete temp data
         if op_tmp_dir.exists():
             try:
-                shutil.rmtree(op_tmp_dir)
+                await MEDIA_FILE_HANDLER.delete_dir(
+                    MEDIA_FILE_HANDLER.get_relative_path(op_tmp_dir))
             except OSError as e_os:
                 LOGGER.error(
                     f"Error cleaning temp dir '{op_tmp_dir}': '{e_os}'")

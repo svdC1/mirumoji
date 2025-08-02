@@ -95,7 +95,8 @@ class MediaFileHandler:
     Handles file and path manipulations within the media_files directory.
 
     Args:
-      media_path (str): Name of the media_directory, relative to project root
+      media_path (str, optional): Name of the media_directory, relative to
+                                  project root. Defaults to `media_files`
 
     Attributes:
       project_root (Path): The root directory of the project.
@@ -135,6 +136,7 @@ class MediaFileHandler:
         Returns:
           Path: The absolute path to the created temporary directory.
         """
+        # system_local/root/media_files/temp/`name`
         temp_dir = self.temp_path / name
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
@@ -156,6 +158,7 @@ class MediaFileHandler:
         Returns:
           Path: The absolute path to the moved file.
         """
+        # system_local/root/media_files/`dest_relative`
         dest_path = self.base_path / dest_relative
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(shutil.move, str(src), str(dest_path))
@@ -178,6 +181,7 @@ class MediaFileHandler:
         Returns:
           Path: The absolute path to the new file.
         """
+        # system_local/root/media_files/`dest_relative`
         dest_path = self.base_path / dest_relative
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(shutil.copy, str(src), str(dest_path))
@@ -185,7 +189,8 @@ class MediaFileHandler:
         return dest_path
 
     async def delete_file(self,
-                          file_path_relative: Union[str, Path]
+                          file_path_relative: Union[str, Path],
+                          check=False
                           ) -> None:
         """
         Deletes a single file located relative to the media base.
@@ -194,18 +199,27 @@ class MediaFileHandler:
           file_path_relative (Union[str, Path]): The path of the file to
                                                  delete, relative to the
                                                  media directory.
-
+          check (bool, optional): If True, raise error on failure, otherwise
+                                  skip. Defaults to False
         Raises:
-          OSError: If the file cannot be deleted.
+          OSError: If the file cannot be deleted and `check=True`
         """
+        # system_local/root/media_files/`file_path_relative`
         path = self.base_path / file_path_relative
         if path.exists() and path.is_file():
             try:
-                await asyncio.to_thread(path.unlink)
+                if check:
+                    missing_ok = False
+                else:
+                    missing_ok = True
+                await asyncio.to_thread(path.unlink,
+                                        missing_ok=missing_ok)
                 LOGGER.info(f"Deleted file: '{path}'")
             except OSError as e:
-                LOGGER.error(f"Error deleting file '{path}': '{e}'")
-                raise
+                if check:
+                    raise
+                else:
+                    LOGGER.error(f"Error deleting file '{path}': '{e}'")
 
     async def delete_dir(self,
                          dir_path_relative: Union[str, Path]
@@ -221,6 +235,7 @@ class MediaFileHandler:
         Raises:
           OSError: If the directory cannot be deleted.
         """
+        # system_local/root/media_files/`dir_path_relative`
         path = self.base_path / dir_path_relative
         if path.exists() and path.is_dir():
             try:
@@ -244,6 +259,7 @@ class MediaFileHandler:
         Returns:
           Path: The absolute path to the profile-specific subdirectory.
         """
+        # system_local/root/media_files/profiles/`profile_id`/`subfolder`
         profile_dir = self.profiles_path / profile_id / subfolder
         profile_dir.mkdir(parents=True, exist_ok=True)
         return profile_dir
@@ -261,6 +277,8 @@ class MediaFileHandler:
         Returns:
           Path: The path relative to the media directory.
         """
+        # full_path = system_local/root/media_files/some_folder/some_file ->
+        # return = some_folder/some_file
         return Path(full_path).relative_to(self.base_path)
 
     def get_modal_path(self,
@@ -275,7 +293,9 @@ class MediaFileHandler:
         Returns:
           Path: A path relative to the project root, suitable for Modal.
         """
-        relative_path = Path(local_path).relative_to(self.base_path)
+        # full_path = system_local/root/media_files/some_folder/some_file ->
+        # return = media_files/some_folder/some_file
+        relative_path = self.get_relative_path(local_path)
         return self.modal_media_path / relative_path
 
     async def write_file(self,
@@ -306,3 +326,25 @@ class MediaFileHandler:
         except IOError as e:
             LOGGER.error(f"Error writing to file '{path}': '{e}'")
             raise
+
+    async def clean_temp(self,
+                         check=False
+                         ) -> None:
+        """
+        Tries to delete all files in temp folder and recreate it
+
+        Args:
+          check (bool, optional): If `True` raise errors if directory couldn't
+                                  be deleted, otherwise skip. Defaults to False
+
+        Raises:
+          OSError: If `check=True` and there's an error deleting the directory
+        """
+        try:
+            self.delete_dir("temp")
+            self.temp_path.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            if check:
+                raise
+            else:
+                LOGGER.error(f"Error deleting '{self.temp_path}': '{e}'")

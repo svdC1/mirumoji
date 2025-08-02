@@ -23,10 +23,11 @@ from contextlib import asynccontextmanager
 from db.db import connect_db, disconnect_db, DATABASE_URL
 from utils.env_utils import using_modal
 from utils.logging_utils import setup_logging
-
+from utils.file_utils import MediaFileHandler
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)
+MEDIA_FILE_HANDLER = MediaFileHandler()
 
 # ───────────────────────────────────────────────────────────
 # App setup
@@ -45,13 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
       Any: Application
     """
     await connect_db()
-    media_files = Path("media_files/profiles").resolve()
-    media_files.mkdir(exist_ok=True)
-    media_files_tmp = Path("media_files/temp").resolve()
-    media_files_tmp.mkdir(exist_ok=True)
-    LOGGER.info(f"Storage ensured at: '{media_files.parent}'")
+    LOGGER.info(f"Storage ensured at: '{MEDIA_FILE_HANDLER.base_path}'")
     yield
     await disconnect_db()
+    await MEDIA_FILE_HANDLER.clean_temp()
 
 
 app = FastAPI(
@@ -106,4 +104,4 @@ app.include_router(profile_router)
 LOGGER.info(f"Database URL: {DATABASE_URL}")
 LOGGER.info(f"USING_MODAL={using_modal()}")
 LOGGER.info("Setup Complete")
-LOGGER.info(f"Serving '{Path('media_files').resolve()}' at '/media'.")
+LOGGER.info(f"Serving '{MEDIA_FILE_HANDLER.base_path}' at '/media'.")
