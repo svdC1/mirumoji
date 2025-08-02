@@ -90,7 +90,7 @@
 
 > Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://www.docker.com/) images and are set up to work with Docker Compose.
 
-> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://svdc1.github.io/mirumoji_docs)**
+> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](https://svdc1.github.io/mirumoji/docs/Setup-Guide)**
 
 > You can also choose to [`build`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) the images locally with the Dockerfiles provided.
 

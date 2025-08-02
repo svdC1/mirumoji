@@ -4,7 +4,7 @@
  */
 
 import { recordMediaStream } from "./mediaRecorder";
-import { apiFetch } from "../services/api";
+import { uploadFile } from "../services/api";
 import { SaveClipResponse, BreakdownData } from "../types/types";
 /**
  * Creates and saves a video clip by recording a segment from a video element,
@@ -60,7 +60,7 @@ export async function createAndSaveClip(
     }
 
     try {
-        onProgress("Recording clip...", "loading");
+        onProgress("Recording...", "loading");
         // Get File
         const clipFile = await recordMediaStream(
             videoElement,
@@ -68,23 +68,30 @@ export async function createAndSaveClip(
             adjustedCueEnd
         );
 
-        onProgress("Uploading clip...", "loading");
+        onProgress("Uploading...", "loading");
 
         // Request API endpoint to save the clip
-        const formData = new FormData();
-        formData.append("clip_start_time", cueStart.toString());
-        formData.append("clip_end_time", adjustedCueEnd.toString());
-        formData.append("gpt_breakdown_response", JSON.stringify(gptData));
-        formData.append("video_clip", clipFile, clipFile.name);
+        const headers = {
+            "clip-start-time": cueStart.toString(),
+            "clip-end-time": adjustedCueEnd.toString(),
+            "gpt-breakdown-response": encodeURIComponent(
+                JSON.stringify(gptData)
+            ),
+            "original-video-file-name": videoElement.currentSrc,
+            "original-video-url": videoElement.currentSrc,
+        };
 
-        const response = await apiFetch<SaveClipResponse>(
-            "/profiles/clips/save",
-            {
-                method: "POST",
-                body: formData,
+        const response = await uploadFile<SaveClipResponse>(
+            clipFile,
+            "profiles/clips/save",
+            headers,
+            (progress: number) => {
+                onProgress(`Uploading... ${progress.toFixed(0)}%`, "loading");
+            },
+            () => {
+                onProgress("Saving...", "loading");
             }
         );
-
         if (response.success) {
             onProgress(response.message || "Clip saved!", "success");
         } else {

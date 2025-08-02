@@ -34,7 +34,7 @@ export default function SavedPage() {
     const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
     const [isGeneratingAnki, setIsGeneratingAnki] = useState<boolean>(false);
 
-    const clipsSWRKey = profileId ? `/profiles/clips` : null;
+    const clipsSWRKey = profileId ? `profiles/clips` : null;
 
     const {
         data: clips,
@@ -73,7 +73,7 @@ export default function SavedPage() {
         setDeletingClipId(clipId);
         const toastId = toast.loading("Deleting clip...");
         try {
-            await apiFetch(`/profiles/clips/${clipId}`, { method: "DELETE" });
+            await apiFetch(`profiles/clips/${clipId}`, { method: "DELETE" });
             toast.success("Clip deleted!", { id: toastId });
             mutate(clipsSWRKey);
             if (selectedClip && selectedClip.id === clipId) {
@@ -104,7 +104,7 @@ export default function SavedPage() {
 
         try {
             const ankiDetails = await apiFetch<AnkiExportResponse>(
-                "/profiles/anki_export",
+                "profiles/anki_export",
                 { method: "GET" }
             );
 
@@ -187,7 +187,7 @@ export default function SavedPage() {
                 </div>
 
                 {selectedClip && parsedBreakdownData && (
-                    <div className="mb-8 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+                    <div className="flex flex-col mb-8 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
                         <video
                             key={formatStaticUrl(
                                 API_BASE,
@@ -261,7 +261,7 @@ export default function SavedPage() {
                         )}
                         <button
                             onClick={() => setSelectedClip(null)}
-                            className="mt-4 px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-md"
+                            className="mt-4 self-center px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-md"
                         >
                             Close Details
                         </button>
@@ -273,7 +273,7 @@ export default function SavedPage() {
                     !clipsError &&
                     clips &&
                     clips.length > 0 && (
-                        <div className="mb-8 p-6 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+                        <div className=" mb-8 p-6 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
                             <p>
                                 Select a clip from the list below to view its
                                 details and video.

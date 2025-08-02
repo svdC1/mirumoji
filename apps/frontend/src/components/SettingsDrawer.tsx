@@ -7,7 +7,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { apiFetch } from "../services/api";
+import { apiFetch, uploadFile } from "../services/api";
 import { toastApiError } from "../utils/apiErrorToaster";
 import { formatStaticUrl } from "../utils/fileUtils";
 import {
@@ -180,19 +180,23 @@ export default function SettingsDrawer({
     const handleGenerateSrt = async () => {
         if (!video) return;
         setGeneratingSrt(true);
-        const tId = toast.loading("Generating...");
+        const tId = toast.loading("Uploading...");
         try {
-            const formData = new FormData();
-            formData.append("video_file", video, video.name);
-
             // Send Request
-            const result = await apiFetch<GenerateSrtResponse>(
-                "/video/generate_srt",
-                {
-                    method: "POST",
-                    body: formData,
+            const result = await uploadFile<GenerateSrtResponse>(
+                video,
+                "video/generate_srt",
+                {},
+                (progress: number) => {
+                    toast.loading(`Uploading... ${progress.toFixed(0)}%`, {
+                        id: tId,
+                    });
+                },
+                () => {
+                    toast.loading("Generating...", { id: tId });
                 }
             );
+            toast.loading("Generating...", { id: tId });
 
             if (result.srt_content) {
                 // Create SRT File from string response
@@ -228,15 +232,19 @@ export default function SettingsDrawer({
             return;
         }
         setConvertingVideo(true);
-        const tId = toast.loading("Converting...");
+        const tId = toast.loading("Uploading...");
         try {
-            const formData = new FormData();
-            formData.append("video_file", video, video.name);
-            const result = await apiFetch<ConvertVideoResponse>(
-                "/video/convert_to_mp4",
-                {
-                    method: "POST",
-                    body: formData,
+            const result = await uploadFile<ConvertVideoResponse>(
+                video,
+                "video/convert_to_mp4",
+                {},
+                (progress: number) => {
+                    toast.loading(`Uploading... ${progress.toFixed(0)}%`, {
+                        id: tId,
+                    });
+                },
+                () => {
+                    toast.loading("Converting...", { id: tId });
                 }
             );
 

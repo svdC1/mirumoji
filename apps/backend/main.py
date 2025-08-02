@@ -12,21 +12,23 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from pathlib import Path
 from routers.gpt_router import gpt_router
 from routers.audio_router import audio_router
 from routers.health_router import health_router
 from routers.dict_router import dict_router
 from routers.video_router import video_router
 from routers.profile_router import profile_router
+import asyncio
+import shutil
 from contextlib import asynccontextmanager
 from db.db import connect_db, disconnect_db, DATABASE_URL
 from utils.env_utils import using_modal
 from utils.logging_utils import setup_logging
-
+from utils.file_utils import MediaFileHandler
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)
+MEDIA_FILE_HANDLER = MediaFileHandler()
 
 # ───────────────────────────────────────────────────────────
 # App setup
@@ -45,13 +47,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
       Any: Application
     """
     await connect_db()
-    media_files = Path("media_files/profiles").resolve()
-    media_files.mkdir(exist_ok=True)
-    media_files_tmp = Path("media_files/temp").resolve()
-    media_files_tmp.mkdir(exist_ok=True)
-    LOGGER.info(f"Storage ensured at: '{media_files.parent}'")
+    LOGGER.info(f"Storage ensured at: '{MEDIA_FILE_HANDLER.base_path}'")
     yield
     await disconnect_db()
+    await asyncio.to_thread(shutil.rmtree,
+                            MEDIA_FILE_HANDLER.temp_path,
+                            ignore_errors=True
+                            )
 
 
 app = FastAPI(
@@ -61,7 +63,7 @@ app = FastAPI(
 )
 
 app.mount("/media",
-          StaticFiles(directory=Path("media_files").resolve()),
+          StaticFiles(directory=MEDIA_FILE_HANDLER.base_path),
           name="media")
 
 origins = ["*"]
@@ -106,4 +108,4 @@ app.include_router(profile_router)
 LOGGER.info(f"Database URL: {DATABASE_URL}")
 LOGGER.info(f"USING_MODAL={using_modal()}")
 LOGGER.info("Setup Complete")
-LOGGER.info(f"Serving '{Path('media_files').resolve()}' at '/media'.")
+LOGGER.info(f"Serving '{MEDIA_FILE_HANDLER.base_path}' at '/media'.")

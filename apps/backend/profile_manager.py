@@ -107,8 +107,8 @@ async def get_profile_id_optional(
         try:
             values = {"id": profile_id, "name": profile_id}
             await db_manager.create("profiles", values)
-            LOGGER.info(f"Implicitly created profile with\
-                ID (optional context): '{profile_id}'")
+            LOGGER.info((f"Implicitly created profile with ID "
+                         f"(optional context): '{profile_id}'"))
         except Exception:
             LOGGER.exception(f"Error creating profile '{profile_id}'")
 
@@ -119,8 +119,8 @@ async def get_profile_id_optional(
                 fetch_one=True
                 )
             if not profile_check_after_error:
-                LOGGER.exception(f"Could not find or create profile \
-                    '{profile_id}' after error.")
+                LOGGER.exception((f"Could not find or create profile"
+                                  f" '{profile_id}' after error."))
                 return None
 
     return profile_id

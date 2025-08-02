@@ -7,10 +7,11 @@ Attributes:
 
 import subprocess
 import shutil
-import pathlib
-from typing import Union
+from pathlib import Path
+from typing import Union, Optional
 import logging
 from datetime import datetime
+from utils.constants import TEMP_DIR, LOG_DIR
 
 LOGGER = logging.getLogger(__name__)
 
@@ -20,45 +21,29 @@ class AudioTools:
     """
     Perform operations on media using system installed FFMPEG.
 
-    Args:
-      workding_dir (Union[str, pathlib.Path], optional): Default directory to
-                                                         save processed media
-
     Attributes:
-      working_dir (pathlib.Path): Default directory to save processed media.
-      temp (pathlib.Path): Temporary directory for operations created inside
-                           working_dir.
+      log_dir (Path): Application's log directory
       ffmpeg (str): System FFmpeg Path.
       ffprobe (str): System FFprobe Path.
 
     """
 
-    def __init__(self,
-                 working_dir: Union[str, pathlib.Path] = None
-                 ) -> None:
+    def __init__(self) -> None:
 
-        # Check if Directory exists, create if it doesn't
-        if not working_dir:
-            working_dir = "audio_tools_wd"
-        self.working_dir = pathlib.Path(working_dir).resolve()
-        self.working_dir.mkdir(parents=True, exist_ok=True)
+        # Check if Temp Directory exists, create if it doesn't
 
-        # Setup Temp
-        self.temp = (self.working_dir / pathlib.Path("temp")
-                     ).resolve()
+        self.temp = TEMP_DIR.resolve()
         self.temp.mkdir(parents=True, exist_ok=True)
-        self.log_dir = pathlib.Path.home() / ".mirumoji_logs"
-        self.log_dir.mkdir(exist_ok=True)
+        self.log_dir = LOG_DIR
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Search for FFMPEG and FFPROBE with shutil
         self.ffmpeg = shutil.which("ffmpeg")
         self.ffprobe = shutil.which("ffprobe")
         if not self.ffmpeg:
-            self.temp.rmdir()
             LOGGER.error("FFmpeg not found")
             raise EnvironmentError("FFmpeg not found.")
         if not self.ffprobe:
-            self.temp.rmdir()
             LOGGER.error("FFprobe not found")
             raise EnvironmentError("FFprobe not found.")
 
@@ -66,26 +51,29 @@ class AudioTools:
 
     def run_command(self,
                     command: list[str],
-                    capture_output: bool = False,
+                    capture_output: bool = True,
                     check: bool = False,
-                    cwd: str = None,
+                    cwd: Optional[str] = None,
                     hide_and_log: bool = False
-                    ) -> Union[subprocess.CompletedProcess,
-                               None]:
+                    ) -> Optional[subprocess.CompletedProcess]:
         """
         Wrapper for subprocess.run to handle errors and results.
 
         Args:
           command (list): The CMD list of the command to be executed.
-          capture_output (bool): passed directly to subprocess.run
-          check (bool): passed directly to subprocess.run
+          capture_output (bool, optional): Wether to redirect stdout and
+                                           stderr to `subprocess.PIPE`.
+                                           Defaults to True
+          check (bool, optional): Wether to raise exception on subprocess
+                                  error. Defaults to False
           cwd (str, optional): The directory in which the command is run.
+                               Defaults to None
           hide_and_log (bool): If True redirect stdout and stderr to
-                               subprocess.DEVNULL and  subprocess.PIPE
+                               subprocess.DEVNULL and subprocess.PIPE
                                respectively.
 
         Returns:
-          Union[subprocess.CompletedProcess, None]: The result of
+          Optional[subprocess.CompletedProcess]: The result of
                                                     subprocess.run or None.
         """
         LOGGER.debug(f"Running Command: {' '.join(command)}")
@@ -119,19 +107,23 @@ class AudioTools:
                             f"{timestamp} FFmpeg error:"
                             f"\n{stdout_log}\n{stderr_log}\n"
                             ))
-                except Exception:
+                except Exception as e:
+                    LOGGER.error(f"Error writing FFMPEG Log: '{e}'")
                     return None
             return result
 
         except subprocess.CalledProcessError as e:
             LOGGER.error(f"Command Failed: {' '.join(command)}")
-            stdout_log = f"STDOUT: '{e.stdout}'"
-            stderr_log = f"STDERR: '{e.stderr}'"
-            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
             if capture_output:
+                stdout_log = f"STDOUT: '{e.stdout}'"
+                stderr_log = f"STDERR: '{e.stderr}'"
+                timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                 LOGGER.error(stdout_log)
                 LOGGER.error(stderr_log)
             try:
+                stdout_log = f"STDOUT: '{e.stdout}'"
+                stderr_log = f"STDERR: '{e.stderr}'"
+                timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
                 with open(self.log_dir / "ffmpeg.log",
                           "a+",
                           encoding="utf-8") as log_file:
@@ -139,27 +131,27 @@ class AudioTools:
                         f"{timestamp} FFmpeg error:"
                         f"\n{stdout_log}\n{stderr_log}\n"))
             except Exception:
+                LOGGER.error(f"Error writing FFMPEG Log: '{e}'")
                 return None
             return None
 
     def to_wav(self,
                input_path: str,
-               output_path: str = None
-               ) -> pathlib.Path:
+               output_path: str
+               ) -> Path:
 
         """
         Convert file to `.wav` format.
 
         Args:
           input_path (str): Path to the file.
-          output_path (str, optional): Optional custom output path, if not
-                                       specified uses the input filename.
+          output_path (str): output path
 
         Returns:
-          pathlib.Path: The output path of the converted file.
+          Path: The output path of the converted file.
         """
-        ip = pathlib.Path(input_path).resolve()
-        op = pathlib.Path(output_path or ip.with_suffix(".wav")).resolve()
+        ip = Path(input_path).resolve()
+        op = Path(output_path).resolve()
 
         # Use POSIX path style for ffmpeg
         s = ip.as_posix()
@@ -180,19 +172,21 @@ class AudioTools:
         LOGGER.info(f"Converted to WAV '{s}' → '{so}'")
         return op
 
-    def extract_audio(self, input_path: str) -> str:
+    def extract_audio(self, input_path: str,
+                      output_path: str) -> str:
         """
         Extract a WAV file from video container. If input file is already an
         audio file, return the unchanged input file path.
 
         Args:
           input_path (str): Path to the file.
+          output_path (str): Output path
 
         Returns:
-          pathlib.Path: The output path of the converted file.
+          Path: The output path of the converted file.
         """
 
-        ext = pathlib.Path(input_path).resolve().suffix
+        ext = Path(input_path).resolve().suffix
         audio_exts = {".wav",
                       ".mp3",
                       ".m4a",
@@ -204,8 +198,8 @@ class AudioTools:
             return input_path
 
         LOGGER.info(f"Extracting audio from video container '{input_path}'")
-        out = pathlib.Path(input_path).resolve().with_suffix(".wav")
-        si = pathlib.Path(input_path).resolve().as_posix()
+        out = Path(output_path).resolve()
+        si = Path(input_path).resolve().as_posix()
         so = out.as_posix()
         cmd = [
             self.ffmpeg, "-y", "-i", si,
@@ -236,8 +230,8 @@ class AudioTools:
         Returns:
           str: The output_wav path, for chaining into Whisper.
         """
-        i = pathlib.Path(input_path).resolve().as_posix()
-        o = pathlib.Path(output_wav).resolve().as_posix()
+        i = Path(input_path).resolve().as_posix()
+        o = Path(output_wav).resolve().as_posix()
         cmd = [
             self.ffmpeg,
             "-y",
@@ -261,7 +255,7 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> Union[pathlib.Path, None]:
+    ) -> Union[Path, None]:
         """
         Convert any video to MP4 (H.264 + AAC).
 
@@ -273,15 +267,15 @@ class AudioTools:
           use_nvenc (bool): True → try NVIDIA NVENC; False → libx264 CPU.
 
         Returns:
-            pathlib.Path: Path of the MP4, or None on failure.
+            Path: Path of the MP4, or None on failure.
         """
 
-        src = pathlib.Path(input_path).resolve()
+        src = Path(input_path).resolve()
         if not src.is_file():
             LOGGER.error(f"Input '{src}' does not exist")
             return None
 
-        dst = pathlib.Path(output_path or src.with_suffix(".mp4")).resolve()
+        dst = Path(output_path or src.with_suffix(".mp4")).resolve()
 
         try:
             w, h = map(int, resolution.lower().split("x"))
@@ -357,7 +351,7 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> Union[pathlib.Path, None]:
+    ) -> Union[Path, None]:
         """
         Convert any video to WebM (VP9 + Opus).
 
@@ -369,15 +363,15 @@ class AudioTools:
           use_nvenc (bool): True → try NVIDIA NVENC; False → libvpx-vp9 CPU.
 
         Returns:
-            pathlib.Path: Path of the WebM, or None on failure.
+            Path: Path of the WebM, or None on failure.
         """
 
-        src = pathlib.Path(input_path).resolve()
+        src = Path(input_path).resolve()
         if not src.is_file():
             LOGGER.error(f"Input '{src}' does not exist")
             return None
 
-        dst = pathlib.Path(output_path or src.with_suffix(".webm")).resolve()
+        dst = Path(output_path or src.with_suffix(".webm")).resolve()
 
         try:
             w, h = map(int, resolution.lower().split("x"))
