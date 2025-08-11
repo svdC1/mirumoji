@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "2.2.4"
+version = "2.3.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "CLI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."
@@ -17,7 +17,14 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
-dependencies = ["click", "python-dotenv"]
+dependencies = [
+    "click",
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "python-socketio[asyncio]",
+    "flaskwebgui",
+]
 
 [project.scripts]
 mirumoji = "mirumoji.launcher:cli"
