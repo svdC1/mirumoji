@@ -46,23 +46,27 @@ router = APIRouter(prefix="/api")
 # --- Stream Helper ---
 
 
-async def _stream_gen(gen: Generator[str, str, Popen[str]]
-                      ) -> AsyncGenerator[str, str]:
+def _stream_gen(gen: Generator[str, str, Popen[str]]
+                ) -> Generator[str, None, None]:
     """
-    Formats a generator's output for event-stream
+    Formats a generator's output for an event-stream.
 
     Args:
-      gen (Generator[str,str,Popen[str]]): Generator from `core.run_command`
+      gen (Generator[str, str, Popen[str]]): A generator from
+                                             `core.run_command`.
 
     Yields:
-      str: Generator's stdout
+      str: The generator's output, formatted for SSE.
     """
-    while True:
-        try:
-            yield f"data: {next(gen)}\n\n"
-        except StopIteration:
-            yield "event: done\ndata:\n\n"
-            break
+    try:
+        for line in gen:
+            yield f"data: {line}\\n\\n"
+        yield "event: done\\ndata: \\n\\n"
+    except Exception as e:
+        LOGGER.error(f"Error in stream generator: {e}")
+        # Send an error message to the client before closing
+        yield f"data: Stream Error: {e}\\n\\n"
+        yield "event: done\\ndata: \\n\\n"
 
 
 @router.get("/dockerRunning")
@@ -79,7 +83,7 @@ async def check_docker() -> Dict[str, bool]:
             return {"status": True}
         else:
             return {"status": False}
-    except CalledProcessError:
+    except (CalledProcessError, FileNotFoundError):
         return {"status": False}
 
 
@@ -108,7 +112,7 @@ async def start_app(request: StartRequest) -> StreamingResponse:
     """
     try:
         # Configure IP
-        get_host_lan_ip()
+        lan_ip = get_host_lan_ip()
         # Configure Environment
         os.environ["OPENAI_API_KEY"] = request.OPENAI_API_KEY
         if not request.gpu:
@@ -137,14 +141,21 @@ async def start_app(request: StartRequest) -> StreamingResponse:
                     compose_file = (
                         REPO_DIR / COMPOSE_PREBUILT_DOCKER_CPU_RELPATH
                         )
+
+        # Combine Generators to Return LAN IP
+        def _combined_generator():
+            docker_gen = docker_compose("up",
+                                        name_only=False,
+                                        command_flags=["-d"],
+                                        docker_compose_file=compose_file
+                                        )
+            yield from docker_gen
+            yield f"LAN Access URL: https://{lan_ip}"
+            yield "Local Access URL: https://localhost"
+
         # Build Response
         stream = StreamingResponse(
-            content=_stream_gen(docker_compose("up",
-                                               name_only=False,
-                                               command_flags=["-d"],
-                                               docker_compose_file=compose_file
-                                               )
-                                ),
+            content=_stream_gen(_combined_generator()),
             status_code=200,
             media_type="text/event-stream"
         )
@@ -197,43 +208,42 @@ async def build_imgs(request: BuildRequest) -> StreamingResponse:
     Returns:
       StreamingResponse: Docker command's stdout
     """
-    async def _build_stream() -> AsyncGenerator[str, str]:
+
+    async def _build_stream() -> AsyncGenerator[str, None]:
         # Build Frontend
         frontend_dockerfile = REPO_DIR / FRONTEND_DOCKERFILE_RELPATH
         frontend_context = REPO_DIR / FRONTEND_BUILD_CONTEXT_RELPATH
-        frontend = build_img(image_name=FRONTEND_LOCAL_IMAGE_NAME,
-                             dockerfile=frontend_dockerfile,
-                             build_context=frontend_context
-                             )
-        while True:
-            try:
-                yield await f"data: {next(frontend)}\n\n"
-            except StopAsyncIteration:
-                yield "data: Frontend Image Built !\n\n"
-                break
+
+        frontend_gen = build_img(image_name=FRONTEND_LOCAL_IMAGE_NAME,
+                                 dockerfile=frontend_dockerfile,
+                                 build_context=frontend_context
+                                 )
+        for line in frontend_gen:
+            yield f"data: {line}\\n\\n"
+        yield "data: Frontend Image Built!\\n\\n"
+
         # Build Backend
         backend_context = REPO_DIR / BACKEND_BUILD_CONTEXT_RELPATH
         if request.gpu:
             backend_dockerfile = REPO_DIR / BACKEND_GPU_DOCKERFILE_RELPATH
-            backend_image_name = REPO_DIR / BACKEND_GPU_LOCAL_IMAGE_NAME
+            backend_image_name = BACKEND_GPU_LOCAL_IMAGE_NAME
         else:
             backend_dockerfile = REPO_DIR / BACKEND_CPU_DOCKERFILE_RELPATH
-            backend_image_name = REPO_DIR / BACKEND_CPU_LOCAL_IMAGE_NAME
+            backend_image_name = BACKEND_CPU_LOCAL_IMAGE_NAME
 
-        backend = build_img(image_name=backend_image_name,
-                            dockerfile=backend_dockerfile,
-                            build_context=backend_context
-                            )
-        while True:
-            try:
-                yield await f"data: {next(backend)}\n\n"
-            except StopAsyncIteration:
-                yield "data: Backend Image Built !\n\n"
-                yield "event: done\ndata:\n\n"
+        backend_gen = build_img(image_name=backend_image_name,
+                                dockerfile=backend_dockerfile,
+                                build_context=backend_context
+                                )
+        for line in backend_gen:
+            yield f"data: {line}\\n\\n"
+
+        yield "data: Backend Image Built!\\n\\n"
+        yield "event: done\\ndata: \\n\\n"
+
     try:
-        # Build Stream
         stream = StreamingResponse(
-            content=_build_stream,
+            content=_build_stream(),
             status_code=200,
             media_type="text/event-stream"
         )
