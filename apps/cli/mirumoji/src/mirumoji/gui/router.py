@@ -8,8 +8,7 @@ from subprocess import Popen, CalledProcessError
 import logging
 import os
 from typing import (Generator,
-                    Dict,
-                    AsyncGenerator
+                    Dict
                     )
 
 from core import (docker_running,
@@ -70,7 +69,7 @@ def _stream_gen(gen: Generator[str, str, Popen[str]]
 
 
 @router.get("/dockerRunning")
-async def check_docker() -> Dict[str, bool]:
+def check_docker() -> Dict[str, bool]:
     """
     GET endpoint which checks if Docker deamon is running
 
@@ -88,7 +87,7 @@ async def check_docker() -> Dict[str, bool]:
 
 
 @router.get("/hasGPU")
-async def has_gpu() -> Dict[str, bool]:
+def has_gpu() -> Dict[str, bool]:
     """
     GET endpoint which checks if the system has an NVIDIA GPU installed
 
@@ -99,7 +98,7 @@ async def has_gpu() -> Dict[str, bool]:
 
 
 @router.post("/start")
-async def start_app(request: StartRequest) -> StreamingResponse:
+def start_app(request: StartRequest) -> StreamingResponse:
     """
     POST endpoint which starts the mirumoji application by running docker
     compose up command and streaming back the process's stdout.
@@ -166,7 +165,7 @@ async def start_app(request: StartRequest) -> StreamingResponse:
 
 
 @router.post("/stop")
-async def stop_app(request: StopRequest) -> StreamingResponse:
+def stop_app(request: StopRequest) -> StreamingResponse:
     """
     POST endpoint which stops the mirumoji application by running docker
     compose down command and streaming back the process's stdout.
@@ -197,7 +196,7 @@ async def stop_app(request: StopRequest) -> StreamingResponse:
 
 
 @router.post("/build")
-async def build_imgs(request: BuildRequest) -> StreamingResponse:
+def build_imgs(request: BuildRequest) -> StreamingResponse:
     """
     POST endpoint which builds the mirumoji Docker images locally by running
     docker build command and streaming back the process's stdout.
@@ -209,7 +208,7 @@ async def build_imgs(request: BuildRequest) -> StreamingResponse:
       StreamingResponse: Docker command's stdout
     """
 
-    async def _build_stream() -> AsyncGenerator[str, None]:
+    def _build_stream() -> Generator[str, None, None]:
         # Build Frontend
         frontend_dockerfile = REPO_DIR / FRONTEND_DOCKERFILE_RELPATH
         frontend_context = REPO_DIR / FRONTEND_BUILD_CONTEXT_RELPATH
