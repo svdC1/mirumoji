@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const checkAppStatus = async () => {
         try {
-            // Use a specific port for the health check
+            // Hit main application API's health status endpoint
             const healthCheckUrl = 'https://localhost/api/health/status';
 
             const response = await fetch(healthCheckUrl, { method: 'GET', signal: AbortSignal.timeout(4000) });
@@ -101,8 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             setAppStatus('Not Ready', 'text-yellow-400');
-            // If the app is consistently not ready, we can assume it's stopped.
-            // This also handles cases where the fetch fails due to network errors.
+            // Handle cases where the fetch fails due to network errors.
         }
     };
 
@@ -202,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setButtonsDisabled(true);
         isDockerRunning = false;
         try {
-            // This is a non-stream call, so we don't need the full fetchData logic
+            // Simple fetch since it's a non-stream call
             const response = await fetch('/api/dockerRunning');
             const dockerData = await response.json();
             isDockerRunning = dockerData.status;

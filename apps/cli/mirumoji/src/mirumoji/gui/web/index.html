@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mirumoji Launcher</title>
+    <!--CSS Configuration-->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         #logs::-webkit-scrollbar {
@@ -100,14 +101,17 @@
             transform: translateX(20px);
         }
     </style>
+    <!--End CSS Configuration-->
 </head>
 
 <body class="bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased text-center">
     <div class="container mx-auto p-4 max-w-5xl">
+        <!--Header-->
         <header class="mb-4">
             <h1 class="text-4xl font-bold">Mirumoji Launcher</h1>
         </header>
-
+        <!--End Header-->
+        <!--Navigation-->
         <nav class="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6">
             <div class="flex justify-center border-b border-gray-300 dark:border-gray-700">
                 <button id="nav-launcher"
@@ -116,11 +120,13 @@
                     class="nav-link text-lg font-semibold py-3 px-6 -mb-px focus:outline-none">Configuration</button>
             </div>
         </nav>
-
+        <!--End Navigation-->
         <main>
+            <!--Launcher Tab-->
             <div id="launcher-section">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                        <!--Action Buttons-->
                         <h2 class="text-2xl font-bold mb-4">Controls</h2>
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <button id="start-btn"
@@ -134,6 +140,8 @@
                             class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Build
                             Locally</button>
                     </div>
+                    <!--End Action Buttons-->
+                    <!--System Info Section-->
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
                         <div class="flex justify-center items-center mb-4 relative">
                             <h2 class="text-2xl font-bold">System Info</h2>
@@ -156,6 +164,8 @@
                         </p>
                     </div>
                 </div>
+                <!--End System Info Section-->
+                <!--Hidden Host Link Container-->
                 <div id="open-app-container"
                     class="hidden mt-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-center relative">
                     <button id="dismiss-btn"
@@ -176,12 +186,15 @@
                             LAN</a>
                     </div>
                 </div>
+                <!--End Hidden Host Link Container-->
             </div>
-
+            <!--End Launcher Tab-->
+            <!--Configuration Tab-->
             <div id="config-section" class="hidden">
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
                     <h2 class="text-2xl font-bold mb-6">Application Settings</h2>
                     <div class="space-y-6 max-w-md mx-auto">
+                        <!--Repository Form-->
                         <div>
                             <label for="repository-select"
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image
@@ -192,6 +205,8 @@
                                 <option>DockerHub</option>
                             </select>
                         </div>
+                        <!--End Reposiotry Form-->
+                        <!--OpenAI Api Key Form-->
                         <div>
                             <label for="openai-key"
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">OpenAI API
@@ -200,6 +215,8 @@
                                 class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 placeholder="sk-...">
                         </div>
+                        <!--End OpenAI Api Key Form-->
+                        <!--Modal Form-->
                         <div>
                             <label for="modal-id"
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modal Token ID
@@ -216,7 +233,9 @@
                                 class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 placeholder="ts-...">
                         </div>
+                        <!--End Modal Form-->
                         <hr class="my-4 border-gray-300 dark:border-gray-700">
+                        <!--Option Switches-->
                         <div class="space-y-4">
                             <label class="switch-label">
                                 <span class="ml-3 block text-sm font-semibold text-gray-900 dark:text-gray-100">Use
@@ -244,12 +263,13 @@
                                     </div>
                                 </label>
                             </div>
+                            <!--End Option Switches-->
                         </div>
                     </div>
                 </div>
             </div>
         </main>
-
+        <!--Log Area Footer-->
         <footer class="mt-6">
             <div class="bg-gray-900 dark:bg-black rounded-lg shadow-2xl overflow-hidden">
                 <div
@@ -258,11 +278,14 @@
                     <button id="clear-logs-btn"
                         class="absolute right-2 text-xs bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900">Clear</button>
                 </div>
+                <!--Log Container-->
                 <div id="logs" class="h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto">
                     <span class="text-gray-400">Awaiting output...</span><span class="cursor"></span>
                 </div>
+                <!--End Log Container-->
             </div>
         </footer>
+        <!--End Log Area Footer-->
     </div>
     <script src="/main.js"></script>
 </body>

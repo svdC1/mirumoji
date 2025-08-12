@@ -22,7 +22,7 @@ dependencies = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
-    "python-socketio[asyncio]",
+    "python-socketio",
     "flaskwebgui",
 ]
 

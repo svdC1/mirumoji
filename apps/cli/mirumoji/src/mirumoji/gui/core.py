@@ -38,6 +38,7 @@ def git_installed() -> subprocess.CompletedProcess[str]:
             capture_output=True,
             text=True
         )
+        LOGGER.info("Git Installed")
         return git_check
     except subprocess.CalledProcessError as e:
         LOGGER.error(
@@ -66,6 +67,7 @@ def docker_running() -> subprocess.CompletedProcess[str]:
              capture_output=True,
              text=True
              )
+        LOGGER.info("Docker is Running")
         return p
     except subprocess.CalledProcessError as e:
         LOGGER.error((
@@ -87,8 +89,10 @@ def has_nvidia_gpu() -> bool:
     if platform.system() in ["Windows", "Linux"]:
         try:
             subprocess.check_output("nvidia-smi", shell=True)
+            LOGGER.info("NVIDIA GPU Detected")
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
+            LOGGER.info("No NVIDIA GPU Detected")
             return False
     return False
 
@@ -119,9 +123,12 @@ def has_nvidia_container_toolkit() -> bool:
                     "nvidia/cuda:12.3.0-base-ubuntu22.04",
                     "nvidia-smi"
                     ]
+        LOGGER.info("Starting Nvidia Container Toolkit Test")
         run_command(gpu_test, stream=False)
         return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError as e:
+        LOGGER.info((f"NVIDIA Container Toolkit Test Failed: '{e.stderr}';"
+                     f"Return Code:'{e.returncode}'"))
         return False
 
 
@@ -313,6 +320,7 @@ def run_command(command_list: List[str],
             )
 
             if process.stdout:
+                yield f"Running Command: `{cmd_str}`"
                 for line in iter(process.stdout.readline, ''):
                     line_content = line.strip()
                     if line_content:
@@ -331,7 +339,9 @@ def run_command(command_list: List[str],
             return process
         except subprocess.CalledProcessError as e:
             LOGGER.error(
-                (f"Error: Command '{e.cmd}' returned non-zero exit status "
+                (f"Error: Command '{e.cmd}' returned non-zero exit status; "
+                 f"stderr: {e.stderr}; "
+                 f"stdout: {e.stdout}; "
                  f"Return Code: '{e.returncode}'")
             )
             if check:
@@ -452,7 +462,7 @@ def docker_compose(compose_command: str,
     try:
         return run_command(cmd, stream=True)
     except Exception as e:
-        LOGGER.error(f"Error running command {cmd}: '{e}'")
+        LOGGER.error(f"Error running compose command '{cmd}': '{e}'")
         raise
 
 
