@@ -1,12 +1,12 @@
-name: Attach Builds to GitHub Release
+name: Package GUI and Attach to GitHub Release
 
 on:
     release:
-        types: [published] # Trigger only when a release is published via the UI
+        types: [published]
 
 jobs:
-    build_executables:
-        name: Build on ${{ matrix.os_name }}
+    build_gui_executables:
+        name: Build GUI on ${{ matrix.os_name }}
         runs-on: ${{ matrix.os_image }}
         strategy:
             fail-fast: false
@@ -15,18 +15,18 @@ jobs:
                     - os_image: ubuntu-latest
                       os_name: Linux
                       asset_name_suffix: linux
-                      executable_name_base: mirumoji-launcher
-                      final_executable_name: mirumoji-launcher
+                      executable_name_base: mirumoji-gui
+                      final_executable_name: mirumoji-gui
                     - os_image: macos-latest
                       os_name: macOS
                       asset_name_suffix: macos
-                      executable_name_base: mirumoji-launcher
-                      final_executable_name: mirumoji-launcher
+                      executable_name_base: mirumoji-gui
+                      final_executable_name: mirumoji-gui
                     - os_image: windows-latest
                       os_name: Windows
                       asset_name_suffix: windows
-                      executable_name_base: mirumoji-launcher
-                      final_executable_name: mirumoji-launcher.exe
+                      executable_name_base: mirumoji-gui
+                      final_executable_name: mirumoji-gui.exe
         env:
             PYTHON_VERSION: "3.11"
 
@@ -39,20 +39,33 @@ jobs:
               with:
                   python-version: ${{ env.PYTHON_VERSION }}
 
-            - name: Install dependencies
+            - name: Install GUI dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install click python-dotenv
-                  pip install pyinstaller
+                  pip install pyinstaller fastapi "uvicorn[standard]" python-dotenv flaskwebgui
 
-            - name: Build executable with PyInstaller
-              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean apps/cli/mirumoji/src/mirumoji/launcher.py
-
-            - name: List dist directory contents (Post-PyInstaller)
-              if: always()
+            - name: Build executable for Windows
+              if: matrix.os_name == 'Windows'
               run: |
-                  echo "Listing contents of ./dist/ for ${{ matrix.os_name }}"
-                  ls -R ./dist/
+                  pyinstaller --name ${{ matrix.executable_name_base }} \
+                  --onefile \
+                  --windowed \
+                  --clean \
+                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" \
+                  apps/cli/mirumoji/src/mirumoji/gui/main.py
+
+            - name: Build executable for Linux/macOS
+              if: matrix.os_name != 'Windows'
+              run: |
+                  pyinstaller --name ${{ matrix.executable_name_base }} \
+                  --onefile \
+                  --clean \
+                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" \
+                  apps/cli/mirumoji/src/mirumoji/gui/main.py
+
+            - name: List dist directory contents
+              if: always()
+              run: ls -R ./dist/
 
             - name: Archive executable
               uses: actions/upload-artifact@v4
@@ -61,13 +74,12 @@ jobs:
                   path: dist/${{ matrix.final_executable_name }}
                   if-no-files-found: error
 
-    upload_assets_to_release:
-        name: Upload Assets to Existing Release
-        needs: build_executables
+    upload_assets:
+        name: Upload GUI Assets to Release
+        needs: build_gui_executables
         runs-on: ubuntu-latest
-        # This job now uses the context from the 'release' event
         permissions:
-            contents: write # Required to write assets to releases
+            contents: write
 
         steps:
             - name: Download all build artifacts
@@ -75,7 +87,7 @@ jobs:
               with:
                   path: artifacts
 
-            - name: List downloaded artifacts (Crucial for Debugging)
+            - name: List downloaded artifacts
               run: ls -R artifacts
 
             - name: Upload Windows Asset
@@ -83,9 +95,9 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ github.event.release.upload_url }} # Get upload_url from the trigger event
-                  asset_path: ./artifacts/mirumoji-launcher-windows/mirumoji-launcher.exe
-                  asset_name: mirumoji-launcher-windows.exe
+                  upload_url: ${{ github.event.release.upload_url }}
+                  asset_path: ./artifacts/mirumoji-gui-windows/mirumoji-gui.exe
+                  asset_name: mirumoji-gui-windows.exe
                   asset_content_type: application/vnd.microsoft.portable-executable
 
             - name: Upload Linux Asset
@@ -94,8 +106,8 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ github.event.release.upload_url }}
-                  asset_path: ./artifacts/mirumoji-launcher-linux/mirumoji-launcher
-                  asset_name: mirumoji-launcher-linux
+                  asset_path: ./artifacts/mirumoji-gui-linux/mirumoji-gui
+                  asset_name: mirumoji-gui-linux
                   asset_content_type: application/octet-stream
 
             - name: Upload macOS Asset
@@ -104,6 +116,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ github.event.release.upload_url }}
-                  asset_path: ./artifacts/mirumoji-launcher-macos/mirumoji-launcher
-                  asset_name: mirumoji-launcher-macos
+                  asset_path: ./artifacts/mirumoji-gui-macos/mirumoji-gui
+                  asset_name: mirumoji-gui-macos
                   asset_content_type: application/octet-stream
