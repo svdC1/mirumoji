@@ -7,20 +7,20 @@
         <!--CSS Configuration-->
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            #logs::-webkit-scrollbar {
+            .logs-container::-webkit-scrollbar {
                 width: 8px;
             }
 
-            #logs::-webkit-scrollbar-track {
+            .logs-container::-webkit-scrollbar-track {
                 background: #111827;
             }
 
-            #logs::-webkit-scrollbar-thumb {
+            .logs-container::-webkit-scrollbar-thumb {
                 background-color: #4b5563;
                 border-radius: 4px;
             }
 
-            #logs::-webkit-scrollbar-thumb:hover {
+            .logs-container::-webkit-scrollbar-thumb:hover {
                 background-color: #6b7280;
             }
 
@@ -417,15 +417,18 @@
                             <span class="text-sm font-semibold text-gray-300"
                                 >LOGS</span
                             >
+                            <button
+                                id="clear-app-logs-btn"
+                                class="absolute right-2 text-xs bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900"
+                            >
+                                Clear
+                            </button>
                         </div>
                         <!--App Log Container-->
                         <div
                             id="dockerAppLogContainer"
-                            class="h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
-                        >
-                            <span class="text-gray-400">Awaiting output...</span
-                            ><span id="app-logs-cursor class="cursor"></span>
-                        </div>
+                            class="logs-container h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
+                        ></div>
                         <!--End App Log Container-->
                     </div>
                     <!--End App Logs Tab-->
@@ -452,11 +455,8 @@
                     <!--Log Container-->
                     <div
                         id="logs"
-                        class="h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
-                    >
-                        <span class="text-gray-400">Awaiting output...</span
-                        ><span class="cursor"></span>
-                    </div>
+                        class="logs-container h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
+                    ></div>
                     <!--End Log Container-->
                 </div>
             </footer>

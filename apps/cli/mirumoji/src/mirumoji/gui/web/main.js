@@ -1,194 +1,166 @@
+"use strict";
+
 document.addEventListener("DOMContentLoaded", () => {
-    // --- State ---
-    let isDockerRunning = false;
-
-    // --- Navigation ---
-    const navLauncher = document.getElementById("nav-launcher");
-    const navConfig = document.getElementById("nav-config");
-    const launcherSection = document.getElementById("launcher-section");
-    const configSection = document.getElementById("config-section");
-    const logsSection = document.getElementById("appLogs-section");
-    const navLogs = document.getElementById("logsTab");
-    const navDocumentation = document.getElementById("documentationButton");
-    const footerLogs = document.getElementById("footerLogs");
-
-    const setActiveTab = (activeTab) => {
-        const tabs = [navLauncher, navConfig, navLogs];
-        tabs.forEach((tab) => {
-            if (tab === activeTab) {
-                tab.classList.add(
-                    "border-b-2",
-                    "border-indigo-500",
-                    "text-indigo-500"
-                );
-                tab.classList.remove("text-gray-500");
-            } else {
-                tab.classList.remove(
-                    "border-b-2",
-                    "border-indigo-500",
-                    "text-indigo-500"
-                );
-                tab.classList.add("text-gray-500");
-            }
-        });
+    // --- State Management ---
+    const state = {
+        isDockerRunning: false,
+        streamController: null,
+        appStatus: "Unknown",
     };
 
-    navLauncher.addEventListener("click", () => {
-        launcherSection.classList.remove("hidden");
-        footerLogs.classList.remove("hidden");
-        configSection.classList.add("hidden");
-        logsSection.classList.add("hidden");
-        setActiveTab(navLauncher);
-    });
-
-    navDocumentation.addEventListener("click", () => {
-        window.open("https://svdc1.github.io/mirumoji/docs", "_blank").focus();
-    });
-
-    navLogs.addEventListener("click", () => {
-        logsSection.classList.remove("hidden");
-        footerLogs.classList.add("hidden");
-        configSection.classList.add("hidden");
-        launcherSection.classList.add("hidden");
-        setActiveTab(navLogs);
-    });
-    navConfig.addEventListener("click", () => {
-        configSection.classList.remove("hidden");
-        footerLogs.classList.remove("hidden");
-        launcherSection.classList.add("hidden");
-        logsSection.classList.add("hidden");
-        setActiveTab(navConfig);
-    });
-
-    // --- UI Elements ---
-    const startBtn = document.getElementById("start-btn");
-    const stopBtn = document.getElementById("stop-btn");
-    const startAppLogStreamBtn = document.getElementById(
-        "startAppLogStreamBtn"
-    );
-    const stopAppLogStreamBtn = document.getElementById("stopAppLogStreamBtn");
-    const appLogContainer = document.getElementById("dockerAppLogContainer");
-    const buildBtn = document.getElementById("build-btn");
-    const refreshBtn = document.getElementById("refresh-btn");
-    const clearLogsBtn = document.getElementById("clear-logs-btn");
-    const dismissBtn = document.getElementById("dismiss-btn");
-    const appStatusText = document.getElementById("app-status-text");
-    const logs = document.getElementById("logs");
-    const systemInfo = document.getElementById("system-info");
-    const gpuOption = document.getElementById("gpu-option");
-    const openAppContainer = document.getElementById("open-app-container");
-    const openLocalBtn = document.getElementById("open-local-btn");
-    const openLanBtn = document.getElementById("open-lan-btn");
-
-    // Config form elements
-    const localBuildCheckbox = document.getElementById("local-build-checkbox");
-    const cleanStopCheckbox = document.getElementById("clean-stop-checkbox");
-    const repositorySelect = document.getElementById("repository-select");
-    const openaiKeyInput = document.getElementById("openai-key");
-    const modalIdInput = document.getElementById("modal-id");
-    const modalSecretInput = document.getElementById("modal-secret");
-    const gpuCheckbox = document.getElementById("gpu-checkbox");
-
-    // Fetch Abort Controller
-    let abortController = new AbortController();
-
-    const allButtons = [startBtn, stopBtn, buildBtn, refreshBtn, clearLogsBtn];
-
-    // --- Core Functions ---
-    const setButtonsDisabled = (disabled) => {
-        allButtons.forEach((button) => (button.disabled = disabled));
+    // --- UI Element Cache ---
+    const ui = {
+        nav: {
+            launcher: document.getElementById("nav-launcher"),
+            config: document.getElementById("nav-config"),
+            logs: document.getElementById("logsTab"),
+            documentation: document.getElementById("documentationButton"),
+        },
+        sections: {
+            launcher: document.getElementById("launcher-section"),
+            config: document.getElementById("config-section"),
+            appLogs: document.getElementById("appLogs-section"),
+            footerLogs: document.getElementById("footerLogs"),
+        },
+        buttons: {
+            start: document.getElementById("start-btn"),
+            stop: document.getElementById("stop-btn"),
+            build: document.getElementById("build-btn"),
+            refresh: document.getElementById("refresh-btn"),
+            clearLogs: document.getElementById("clear-logs-btn"),
+            clearAppLogs: document.getElementById("clear-app-logs-btn"),
+            dismiss: document.getElementById("dismiss-btn"),
+            startAppLogStream: document.getElementById("startAppLogStreamBtn"),
+            stopAppLogStream: document.getElementById("stopAppLogStreamBtn"),
+        },
+        containers: {
+            systemInfo: document.getElementById("system-info"),
+            appStatus: document.getElementById("app-status-text"),
+            logs: document.getElementById("logs"),
+            appLogs: document.getElementById("dockerAppLogContainer"),
+            openApp: document.getElementById("open-app-container"),
+        },
+        links: {
+            openLocal: document.getElementById("open-local-btn"),
+            openLan: document.getElementById("open-lan-btn"),
+        },
+        inputs: {
+            localBuild: document.getElementById("local-build-checkbox"),
+            cleanStop: document.getElementById("clean-stop-checkbox"),
+            repository: document.getElementById("repository-select"),
+            openaiKey: document.getElementById("openai-key"),
+            modalId: document.getElementById("modal-id"),
+            modalSecret: document.getElementById("modal-secret"),
+            gpu: document.getElementById("gpu-checkbox"),
+            gpuOption: document.getElementById("gpu-option"),
+        },
     };
 
-    const showError = (message, showContainer = logs) => {
-        showContainer.innerHTML = `<p class="text-red-500 font-bold">Error: ${message}</p>`;
-    };
+    // --- Log Manager ---
+    const createLogManager = (container) => {
+        let cursor = null;
 
-    const setAppStatus = (
-        status,
-        color = "text-gray-700 dark:text-gray-300"
-    ) => {
-        appStatusText.textContent = status;
-        appStatusText.className = `text-lg font-semibold ${color}`;
-    };
+        const createCursor = () => {
+            const span = document.createElement("span");
+            span.className = "cursor";
+            return span;
+        };
 
-    const checkAppStatus = async () => {
-        try {
-            // Hit main application API's health status endpoint
-            const healthCheckUrl = "https://localhost/api/health/status";
+        const init = () => {
+            container.innerHTML = "";
+            const initialMsg = document.createElement("span");
+            initialMsg.className = "text-gray-400";
+            initialMsg.textContent = "Awaiting output...";
+            cursor = createCursor();
+            container.append(initialMsg, cursor);
+        };
 
-            const response = await fetch(healthCheckUrl, {
-                method: "GET",
-            });
+        const clear = () => {
+            init();
+            const logEntry = document.createElement("p");
+            logEntry.className = "text-gray-400";
+            logEntry.innerHTML = "&gt; Logs cleared.";
+            append(logEntry, false);
+        };
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.status === "ok") {
-                    setAppStatus("Running", "text-green-400");
-                    return "Running";
-                } else {
-                    setAppStatus("Unhealthy", "text-yellow-400");
-                    return "Unhealthy";
+        const append = (element, scroll = true) => {
+            if (cursor) {
+                cursor.insertAdjacentElement("beforebegin", element);
+                if (scroll) {
+                    container.scrollTop = container.scrollHeight;
                 }
             } else {
-                setAppStatus("Not Ready", "text-yellow-400");
-                return "Not Ready";
+                container.appendChild(element);
             }
-        } catch (error) {
-            setAppStatus("Not Ready", "text-yellow-400");
-            // Handle cases where the fetch fails due to network errors.
-        }
+        };
+
+        const showError = (message) => {
+            container.innerHTML = "";
+            const errorP = document.createElement("p");
+            errorP.className = "text-red-500 font-bold";
+            errorP.textContent = `Error: ${message}`;
+            cursor = createCursor();
+            container.append(errorP, cursor);
+        };
+
+        init();
+        return { init, clear, append, showError };
     };
 
-    /**
-     * Fetches data from the API.
-     * @param {string} url - The URL to fetch.
-     * @param {object} options - The options for the fetch request.
-     * @param {boolean} stream - Whether to stream the response.
-     * @param {HTMLElement} streamContainer - Container to include stream logs
-     * @param {boolean} disableButtons - Whether to disable buttons while fetch is running
-     * @returns {Promise<any>} - The JSON response or a promise that resolves when streaming is complete.
-     */
-    async function fetchData(
-        url,
-        options,
-        stream = false,
-        streamContainer = logs,
-        disableButtons = true
-    ) {
-        // Disable all buttons and hide open app container if visible
-        if (disableButtons) {
-            setButtonsDisabled(true);
-        }
-        openAppContainer.classList.add("hidden");
+    const mainLogManager = createLogManager(ui.containers.logs);
+    const appLogManager = createLogManager(ui.containers.appLogs);
 
-        // If stream display connecting message
-        if (stream) {
-            streamContainer.innerHTML =
-                '<span class="text-gray-400">Connecting to stream...</span><span class="cursor"></span>';
-        }
-
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(
-                    `API error! status: ${response.status}; message: ${errorData.message}; url: ${errorData.url}; body: ${errorData.body}`
-                );
+    // --- API Service ---
+    const api = {
+        async fetch(url, options = {}) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(
+                        `API error! status: ${response.status}; message: ${
+                            errorData.message
+                        }; url: ${errorData.url}; body: ${JSON.stringify(
+                            errorData.body
+                        )}`
+                    );
+                }
+                return response.json();
+            } catch (error) {
+                console.error("Fetch error:", error);
+                mainLogManager.showError(error.message);
+                throw error;
             }
+        },
+        async stream(url, options, logManager) {
+            state.streamController = new AbortController();
+            options.signal = state.streamController.signal;
 
-            if (stream) {
-                streamContainer.innerHTML = ""; // Clear logs on successful connection
+            setButtonsDisabled(true);
+            logManager.init();
+            const connectingMsg = document.createElement("p");
+            connectingMsg.className = "text-gray-400";
+            connectingMsg.textContent = "> Connecting to stream...";
+            logManager.append(connectingMsg);
+
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${errorData.message}`);
+                }
+
+                logManager.init(); // Clear on successful connection
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
                 const processText = async ({ done, value }) => {
                     if (done) {
-                        streamContainer.innerHTML +=
-                            '<p class="text-green-400 font-bold">> Stream finished.</p>';
-                        streamContainer.scrollTop = logs.scrollHeight;
-                        if (disableButtons) {
-                            setButtonsDisabled(false);
-                        }
+                        const doneMsg = document.createElement("p");
+                        doneMsg.className = "text-green-400 font-bold";
+                        doneMsg.textContent = "> Stream finished.";
+                        logManager.append(doneMsg);
                         return;
                     }
 
@@ -199,247 +171,279 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     for (const eventStr of events) {
                         if (eventStr.includes("event: done")) {
-                            if (disableButtons) {
-                                setButtonsDisabled(false);
-                            }
-                            return; // Stop processing
+                            return;
                         }
                         if (eventStr.startsWith("data:")) {
                             const data = eventStr.substring(5).trim();
-                            // Check for special URL data
                             if (data.startsWith("LAN Access URL:")) {
-                                openLanBtn.href = data.substring(16).trim();
+                                ui.links.openLan.href = data
+                                    .substring(16)
+                                    .trim();
                             } else if (data.startsWith("Local Access URL:")) {
-                                openLocalBtn.href = data.substring(18).trim();
+                                ui.links.openLocal.href = data
+                                    .substring(18)
+                                    .trim();
                             } else {
                                 const logEntry = document.createElement("p");
                                 logEntry.innerHTML = `&gt; ${data}`;
-                                streamContainer.appendChild(logEntry);
+                                logManager.append(logEntry);
                             }
                         }
                     }
-                    streamContainer.scrollTop = streamContainer.scrollHeight;
                     return reader.read().then(processText);
                 };
-                return reader.read().then(processText);
-            }
-            return await response.json();
-        } catch (error) {
-            if (error.name === "AbortError") {
-                console.log("Fetch Aborted", error.message);
-            } else {
-                console.error("Fetch error:", error);
-                showError(error.message);
-                throw error;
-            }
-        } finally {
-            if (disableButtons) {
+                await reader.read().then(processText);
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    logManager.showError(error.message);
+                    throw error;
+                } else {
+                    const abortMsg = document.createElement("p");
+                    abortMsg.className = "text-yellow-400 font-bold";
+                    abortMsg.textContent = "> Stream stopped by user.";
+                    logManager.append(abortMsg);
+                }
+            } finally {
                 setButtonsDisabled(false);
+                state.streamController = null;
             }
+        },
+    };
+
+    // --- UI Functions ---
+    const setButtonsDisabled = (disabled) => {
+        Object.values(ui.buttons).forEach((button) => {
+            if (button) button.disabled = disabled;
+        });
+    };
+
+    const setAppStatus = (
+        status,
+        color = "text-gray-700 dark:text-gray-300"
+    ) => {
+        state.appStatus = status;
+        ui.containers.appStatus.textContent = status;
+        ui.containers.appStatus.className = `text-lg font-semibold ${color}`;
+    };
+
+    const setActiveTab = (activeTabId) => {
+        Object.values(ui.nav).forEach((tab) => {
+            const isActive = tab.id === activeTabId;
+            tab.classList.toggle("border-b-2", isActive);
+            tab.classList.toggle("border-indigo-500", isActive);
+            tab.classList.toggle("text-indigo-500", isActive);
+            tab.classList.toggle("text-gray-500", !isActive);
+        });
+
+        Object.values(ui.sections).forEach((section) => {
+            section.classList.add("hidden");
+        });
+
+        if (activeTabId === "nav-launcher") {
+            ui.sections.launcher.classList.remove("hidden");
+            ui.sections.footerLogs.classList.remove("hidden");
+        } else if (activeTabId === "nav-config") {
+            ui.sections.config.classList.remove("hidden");
+            ui.sections.footerLogs.classList.remove("hidden");
+        } else if (activeTabId === "logsTab") {
+            ui.sections.appLogs.classList.remove("hidden");
+        }
+    };
+
+    // --- Core Logic ---
+    async function checkAppStatus() {
+        try {
+            const response = await fetch("https://localhost/api/health/status");
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === "ok") {
+                    setAppStatus("Running", "text-green-400");
+                } else {
+                    setAppStatus("Unhealthy", "text-yellow-400");
+                }
+            } else {
+                setAppStatus("Not Ready", "text-yellow-400");
+            }
+        } catch {
+            setAppStatus("Not Ready", "text-yellow-400");
         }
     }
 
-    // --- Initial Data Loading ---
     async function loadSystemInfo() {
-        systemInfo.innerHTML = "<p>Checking...</p>";
+        ui.containers.systemInfo.innerHTML = "<p>Checking...</p>";
         setButtonsDisabled(true);
-        isDockerRunning = false;
         try {
-            const dockerData = await fetchData(
-                "/api/dockerRunning",
-                { method: "GET" },
-                false
-            );
-            isDockerRunning = dockerData.status;
+            const [dockerData, gpuData] = await Promise.all([
+                api.fetch("/api/dockerRunning"),
+                api.fetch("/api/hasGPU"),
+            ]);
 
-            const gpuData = await fetchData(
-                "/api/hasGPU",
-                { method: "GET" },
-                false
-            );
+            state.isDockerRunning = dockerData.status;
 
-            let dockerStatus = dockerData.status
+            const dockerStatus = dockerData.status
                 ? '<span class="text-green-400">Ready</span>'
                 : '<span class="text-red-400">Not Running</span>';
-            let gpuStatus = gpuData.status
+            const gpuStatus = gpuData.status
                 ? '<span class="text-green-400">Available</span>'
                 : '<span class="text-red-400">Not Detected</span>';
 
-            systemInfo.innerHTML = `
-                <div>
-                    <p class="font-bold">Docker</p>
-                    <p>${dockerStatus}</p>
-                </div>
-                <div>
-                    <p class="font-bold">NVIDIA GPU</p>
-                    <p>${gpuStatus}</p>
-                </div>
+            ui.containers.systemInfo.innerHTML = `
+                <div><p class="font-bold">Docker</p><p>${dockerStatus}</p></div>
+                <div><p class="font-bold">NVIDIA GPU</p><p>${gpuStatus}</p></div>
             `;
 
-            if (gpuData.status) {
-                gpuOption.classList.remove("hidden");
-            } else {
-                gpuOption.classList.add("hidden");
-                gpuCheckbox.checked = false;
+            ui.inputs.gpuOption.classList.toggle("hidden", !gpuData.status);
+            if (!gpuData.status) {
+                ui.inputs.gpu.checked = false;
             }
             await checkAppStatus();
         } catch (error) {
-            systemInfo.innerHTML =
+            ui.containers.systemInfo.innerHTML =
                 '<p class="text-red-500">Error Fetching System Info</p>';
         } finally {
             setButtonsDisabled(false);
         }
     }
 
-    // --- Event Listeners ---
-    clearLogsBtn.addEventListener("click", () => {
-        logs.innerHTML =
-            '<span class="text-gray-400"> > Logs cleared.</span><span class="cursor"></span>';
-    });
-
-    dismissBtn.addEventListener("click", () => {
-        openAppContainer.classList.add("hidden");
-    });
-
-    startBtn.addEventListener("click", () => {
-        if (!isDockerRunning) {
-            showError(
-                "Docker is not running. Please start Docker Desktop and refresh."
-            );
-            return;
-        }
-
-        const useGpu = gpuCheckbox.checked;
-        const modalId = modalIdInput.value;
-        const modalSecret = modalSecretInput.value;
-        const openAIKey = openaiKeyInput.value;
-
-        if (!openAIKey) {
-            showError(
-                "Please enter your OpenAI API Key in the Configuration section."
-            );
-            setActiveTab(navConfig);
-            configSection.classList.remove("hidden");
-            logsSection.classList.add("hidden");
-            launcherSection.classList.add("hidden");
-            logs.focus();
-            return;
-        }
-
-        if (!useGpu && (!modalId || !modalSecret)) {
-            showError(
-                "For CPU mode, both Modal Token ID and Modal Token Secret are required."
-            );
-            setActiveTab(navConfig);
-            configSection.classList.remove("hidden");
-            logsSection.classList.add("hidden");
-            launcherSection.classList.add("hidden");
-            logs.focus();
-            return;
-        }
-
-        const requestBody = {
-            gpu: useGpu,
-            local: localBuildCheckbox.checked,
-            repository: repositorySelect.value,
-            OPENAI_API_KEY: openAIKey,
-            MODAL_TOKEN_ID: modalId,
-            MODAL_TOKEN_SECRET: modalSecret,
-        };
-
-        fetchData(
-            "/api/start",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody),
-            },
-            true
+    // --- Event Handlers ---
+    function setupEventListeners() {
+        ui.nav.launcher.addEventListener("click", () =>
+            setActiveTab("nav-launcher")
         );
-    });
-
-    stopBtn.addEventListener("click", () => {
-        if (!isDockerRunning) {
-            showError(
-                "Docker is not running. Please start Docker Desktop and refresh."
-            );
-            return;
-        }
-        fetchData(
-            "/api/stop",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ clean: cleanStopCheckbox.checked }),
-            },
-            true
+        ui.nav.config.addEventListener("click", () =>
+            setActiveTab("nav-config")
         );
-    });
-
-    buildBtn.addEventListener("click", () => {
-        if (!isDockerRunning) {
-            showError(
-                "Docker is not running. Please start Docker Desktop and refresh."
-            );
-            return;
-        }
-        const requestBody = {
-            gpu: gpuCheckbox.checked,
-        };
-        fetchData(
-            "/api/build",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestBody),
-            },
-            true
+        ui.nav.logs.addEventListener("click", () => setActiveTab("logsTab"));
+        ui.nav.documentation.addEventListener("click", () =>
+            window.open("https://svdc1.github.io/mirumoji/docs", "_blank")
         );
-    });
 
-    refreshBtn.addEventListener("click", () => {
-        loadSystemInfo();
-    });
+        ui.buttons.clearLogs.addEventListener("click", () =>
+            mainLogManager.clear()
+        );
+        ui.buttons.clearAppLogs.addEventListener("click", () =>
+            appLogManager.clear()
+        );
+        ui.buttons.dismiss.addEventListener("click", () =>
+            ui.containers.openApp.classList.add("hidden")
+        );
+        ui.buttons.refresh.addEventListener("click", loadSystemInfo);
 
-    startAppLogStreamBtn.addEventListener("click", () => {
-        if (!isDockerRunning) {
-            showError(
-                "Docker is not running. Please start Docker Desktop and refresh.",
-                appLogContainer
-            );
-            return;
-        }
-        checkAppStatus().then((value) => {
-            if (value && value !== "Running") {
-                showError("App is not Running", appLogContainer);
+        ui.buttons.start.addEventListener("click", () => {
+            if (!state.isDockerRunning) {
+                mainLogManager.showError(
+                    "Docker is not running. Please start Docker and refresh."
+                );
                 return;
             }
+
+            const openAIKey = ui.inputs.openaiKey.value;
+            if (!openAIKey) {
+                mainLogManager.showError(
+                    "Please enter your OpenAI API Key in the Configuration tab."
+                );
+                setActiveTab("nav-config");
+                return;
+            }
+            if (
+                !ui.inputs.gpu.checked &&
+                (!ui.inputs.modalId.value || !ui.inputs.modalSecret.value)
+            ) {
+                mainLogManager.showError(
+                    "For CPU mode, both Modal Token ID and Secret are required."
+                );
+                setActiveTab("nav-config");
+                return;
+            }
+
+            const body = {
+                gpu: ui.inputs.gpu.checked,
+                local: ui.inputs.localBuild.checked,
+                repository: ui.inputs.repository.value,
+                OPENAI_API_KEY: openAIKey,
+                MODAL_TOKEN_ID: ui.inputs.modalId.value,
+                MODAL_TOKEN_SECRET: ui.inputs.modalSecret.value,
+            };
+
+            api.stream(
+                "/api/start",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                },
+                mainLogManager
+            ).then(() => {
+                ui.containers.openApp.classList.remove("hidden");
+                checkAppStatus();
+            });
         });
-        abortController = new AbortController();
 
-        fetchData(
-            "/api/logs",
-            { method: "GET", signal: abortController.signal },
-            true,
-            appLogContainer,
-            false
-        );
-    });
+        ui.buttons.stop.addEventListener("click", () => {
+            if (!state.isDockerRunning) {
+                mainLogManager.showError(
+                    "Docker is not running. Please start Docker and refresh."
+                );
+                return;
+            }
+            api.stream(
+                "/api/stop",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        clean: ui.inputs.cleanStop.checked,
+                    }),
+                },
+                mainLogManager
+            ).then(checkAppStatus);
+        });
 
-    stopAppLogStreamBtn.addEventListener("click", () => {
-        if (!isDockerRunning) {
-            showError(
-                "Docker is not running. Please start Docker Desktop and refresh.",
-                appLogContainer
+        ui.buttons.build.addEventListener("click", () => {
+            if (!state.isDockerRunning) {
+                mainLogManager.showError(
+                    "Docker is not running. Please start Docker and refresh."
+                );
+                return;
+            }
+            api.stream(
+                "/api/build",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ gpu: ui.inputs.gpu.checked }),
+                },
+                mainLogManager
             );
-            return;
-        }
-        abortController.abort("Stopped by User");
-        appLogContainer.innerHTML =
-            '<p class="text-green-400 font-bold">> Stream finished.</p>';
-    });
+        });
 
-    // --- Initial Setup ---
-    setActiveTab(navLauncher);
-    loadSystemInfo();
+        ui.buttons.startAppLogStream.addEventListener("click", () => {
+            if (!state.isDockerRunning) {
+                appLogManager.showError(
+                    "Docker is not running. Please start Docker and refresh."
+                );
+                return;
+            }
+            if (state.appStatus !== "Running") {
+                appLogManager.showError("Application is not running.");
+                return;
+            }
+            api.stream("/api/logs", { method: "GET" }, appLogManager);
+        });
+
+        ui.buttons.stopAppLogStream.addEventListener("click", () => {
+            if (state.streamController) {
+                state.streamController.abort();
+            }
+        });
+    }
+
+    // --- Initialization ---
+    function init() {
+        setActiveTab("nav-launcher");
+        setupEventListeners();
+        loadSystemInfo();
+    }
+
+    init();
 });
