@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Mirumoji Launcher</title>
+        <!--CSS Configuration-->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .logs-container::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            .logs-container::-webkit-scrollbar-track {
+                background: #111827;
+            }
+
+            .logs-container::-webkit-scrollbar-thumb {
+                background-color: #4b5563;
+                border-radius: 4px;
+            }
+
+            .logs-container::-webkit-scrollbar-thumb:hover {
+                background-color: #6b7280;
+            }
+
+            .cursor::after {
+                content: "_";
+                animation: blink 1s step-end infinite;
+            }
+
+            @keyframes blink {
+                from,
+                to {
+                    color: transparent;
+                }
+
+                50% {
+                    color: #a5b4fc;
+                }
+            }
+
+            input,
+            select {
+                text-align: left;
+            }
+
+            /* Toggle Switch CSS */
+            .switch-label {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+            }
+
+            .switch {
+                position: relative;
+                display: inline-block;
+                width: 44px;
+                height: 24px;
+            }
+
+            .switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: #ccc;
+                transition: 0.4s;
+                border-radius: 24px;
+            }
+
+            .slider:before {
+                position: absolute;
+                content: "";
+                height: 16px;
+                width: 16px;
+                left: 4px;
+                bottom: 4px;
+                background-color: white;
+                transition: 0.4s;
+                border-radius: 50%;
+            }
+
+            input:checked + .slider {
+                background-color: #4f46e5;
+            }
+
+            /* indigo-600 */
+            input:checked + .slider:before {
+                transform: translateX(20px);
+            }
+        </style>
+        <!--End CSS Configuration-->
+    </head>
+
+    <body
+        class="bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased text-center"
+    >
+        <div class="container mx-auto p-4 max-w-5xl">
+            <!--Header-->
+            <header class="mb-4">
+                <h1 class="text-4xl font-bold">Mirumoji Launcher</h1>
+            </header>
+            <!--End Header-->
+
+            <!--Navigation-->
+            <nav class="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6">
+                <div
+                    class="flex justify-center border-b border-gray-300 dark:border-gray-700"
+                >
+                    <button
+                        id="nav-launcher"
+                        class="nav-link text-lg font-semibold py-3 px-6 -mb-px focus:outline-none"
+                    >
+                        Launcher
+                    </button>
+                    <button
+                        id="nav-config"
+                        class="nav-link text-lg font-semibold py-3 px-6 -mb-px focus:outline-none"
+                    >
+                        Configuration
+                    </button>
+                    <button
+                        id="logsTab"
+                        class="nav-link text-lg font-semibold py-3 px-6 -mb-px focus:outline-none"
+                    >
+                        App Logs
+                    </button>
+                    <button
+                        id="documentationButton"
+                        class="nav-link text-lg font-semibold py-3 px-6 -mb-px focus:outline-none text-gray-500"
+                    >
+                        Documentation
+                    </button>
+                </div>
+            </nav>
+            <!--End Navigation-->
+
+            <main>
+                <!--Launcher Tab-->
+                <div id="launcher-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div
+                            class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
+                        >
+                            <!--Action Buttons-->
+                            <h2 class="text-2xl font-bold mb-4">Controls</h2>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <button
+                                    id="start-btn"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Start App
+                                </button>
+                                <button
+                                    id="stop-btn"
+                                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Stop App
+                                </button>
+                            </div>
+                            <button
+                                id="build-btn"
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Build Locally
+                            </button>
+                        </div>
+                        <!--End Action Buttons-->
+                        <!--System Info Section-->
+                        <div
+                            class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
+                        >
+                            <div
+                                class="flex justify-center items-center mb-4 relative"
+                            >
+                                <h2 class="text-2xl font-bold">System Info</h2>
+                                <button
+                                    id="refresh-btn"
+                                    class="absolute right-0 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-bold p-2 rounded-full shadow transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <svg
+                                        class="w-4 h-4"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                        <path
+                                            fill-rule="evenodd"
+                                            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566z"
+                                            clip-rule="evenodd"
+                                        ></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div
+                                id="system-info"
+                                class="space-y-4 text-gray-700 dark:text-gray-300"
+                            >
+                                <p>Loading...</p>
+                            </div>
+                            <hr
+                                class="my-4 border-gray-300 dark:border-gray-700"
+                            />
+                            <h3 class="text-xl font-bold mb-2">App Status</h3>
+                            <p
+                                id="app-status-text"
+                                class="text-lg font-semibold text-gray-700 dark:text-gray-300"
+                            >
+                                Unknown
+                            </p>
+                        </div>
+                    </div>
+                    <!--End System Info Section-->
+                    <!--Hidden Host Link Container-->
+                    <div
+                        id="open-app-container"
+                        class="hidden mt-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-center relative"
+                    >
+                        <button
+                            id="dismiss-btn"
+                            class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 focus:outline-none"
+                        >
+                            <svg
+                                class="w-6 h-6"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"
+                                ></path>
+                            </svg>
+                        </button>
+                        <h2 class="text-2xl font-bold mb-4">
+                            Access Your Application
+                        </h2>
+                        <div class="flex justify-center space-x-4">
+                            <a
+                                id="open-local-btn"
+                                href="#"
+                                target="_blank"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105"
+                                >Open Local</a
+                            >
+                            <a
+                                id="open-lan-btn"
+                                href="#"
+                                target="_blank"
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105"
+                                >Open LAN</a
+                            >
+                        </div>
+                    </div>
+                    <!--End Hidden Host Link Container-->
+                </div>
+                <!--End Launcher Tab-->
+                <!--Configuration Tab-->
+                <div id="config-section" class="hidden">
+                    <div
+                        class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
+                    >
+                        <h2 class="text-2xl font-bold mb-6">
+                            Application Settings
+                        </h2>
+                        <div class="space-y-6 max-w-md mx-auto">
+                            <!--Repository Form-->
+                            <div>
+                                <label
+                                    for="repository-select"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                    >Image Repository</label
+                                >
+                                <select
+                                    id="repository-select"
+                                    class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                >
+                                    <option>GitHub</option>
+                                    <option>DockerHub</option>
+                                </select>
+                            </div>
+                            <!--End Reposiotry Form-->
+                            <!--OpenAI Api Key Form-->
+                            <div>
+                                <label
+                                    for="openai-key"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                    >OpenAI API Key</label
+                                >
+                                <input
+                                    type="password"
+                                    id="openai-key"
+                                    class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    placeholder="sk-..."
+                                />
+                            </div>
+                            <!--End OpenAI Api Key Form-->
+                            <!--Modal Form-->
+                            <div>
+                                <label
+                                    for="modal-id"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                    >Modal Token ID (CPU Only)</label
+                                >
+                                <input
+                                    type="password"
+                                    id="modal-id"
+                                    class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    placeholder="tok_..."
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    for="modal-secret"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                    >Modal Token Secret (CPU Only)</label
+                                >
+                                <input
+                                    type="password"
+                                    id="modal-secret"
+                                    class="mt-1 block w-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    placeholder="ts-..."
+                                />
+                            </div>
+                            <!--End Modal Form-->
+                            <hr
+                                class="my-4 border-gray-300 dark:border-gray-700"
+                            />
+                            <!--Option Switches-->
+                            <div class="space-y-4">
+                                <label class="switch-label">
+                                    <span
+                                        class="ml-3 block text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                        >Use Local Docker Images</span
+                                    >
+                                    <div class="switch">
+                                        <input
+                                            id="local-build-checkbox"
+                                            type="checkbox"
+                                        />
+                                        <span class="slider"></span>
+                                    </div>
+                                </label>
+                                <label class="switch-label">
+                                    <span
+                                        class="ml-3 block text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                        >Clean Stop (Removes Volumes)</span
+                                    >
+                                    <div class="switch">
+                                        <input
+                                            id="clean-stop-checkbox"
+                                            type="checkbox"
+                                            checked
+                                        />
+                                        <span class="slider"></span>
+                                    </div>
+                                </label>
+                                <div id="gpu-option">
+                                    <label class="switch-label">
+                                        <span
+                                            class="ml-3 block text-sm font-semibold text-gray-900 dark:text-gray-100"
+                                            >Use NVIDIA GPU</span
+                                        >
+                                        <div class="switch">
+                                            <input
+                                                id="gpu-checkbox"
+                                                type="checkbox"
+                                            />
+                                            <span class="slider"></span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <!--End Option Switches-->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--End Configuration Tab-->
+                <!--App Logs Tab-->
+                <div id="appLogs-section" class="my-4 items-center hidden">
+                    <div
+                        class="flex flex-col space-x-4 gap-4 mb-4 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
+                    >
+                        <h2 class="text-2xl font-bold mb-4">Controls</h2>
+                        <button
+                            id="startAppLogStreamBtn"
+                            class="mx-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Start Streaming
+                        </button>
+                        <button
+                            id="stopAppLogStreamBtn"
+                            class="mx-4 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Stop Streaming
+                        </button>
+                    </div>
+                    <div
+                        class="my-10 bg-gray-900 dark:bg-black rounded-lg shadow-2xl overflow-hidden"
+                    >
+                        <div
+                            class="bg-gray-700 dark:bg-gray-800 p-2 border-b border-gray-600 dark:border-gray-700 flex justify-center items-center relative"
+                        >
+                            <span class="text-sm font-semibold text-gray-300"
+                                >LOGS</span
+                            >
+                            <button
+                                id="clear-app-logs-btn"
+                                class="absolute right-2 text-xs bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <!--App Log Container-->
+                        <div
+                            id="dockerAppLogContainer"
+                            class="logs-container h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
+                        ></div>
+                        <!--End App Log Container-->
+                    </div>
+                    <!--End App Logs Tab-->
+                </div>
+            </main>
+            <!--Log Area Footer-->
+            <footer id="footerLogs" class="mt-6">
+                <div
+                    class="bg-gray-900 dark:bg-black rounded-lg shadow-2xl overflow-hidden"
+                >
+                    <div
+                        class="bg-gray-700 dark:bg-gray-800 p-2 border-b border-gray-600 dark:border-gray-700 flex justify-center items-center relative"
+                    >
+                        <span class="text-sm font-semibold text-gray-300"
+                            >LOGS</span
+                        >
+                        <button
+                            id="clear-logs-btn"
+                            class="absolute right-2 text-xs bg-gray-600 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <!--Log Container-->
+                    <div
+                        id="logs"
+                        class="logs-container h-80 p-4 font-mono text-sm text-left text-gray-300 overflow-y-auto"
+                    ></div>
+                    <!--End Log Container-->
+                </div>
+            </footer>
+            <!--End Log Area Footer-->
+        </div>
+        <script src="/main.js"></script>
+    </body>
+</html>

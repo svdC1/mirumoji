@@ -14,8 +14,8 @@
 
 > You can find the GitHub Action Workflow file which builds the GPU Backend Docker Image [`Here`](https://github.com/svdC1/mirumoji/blob/main/.github/workflows/backend-build_push_gpu.yaml)
 
-## CLI
+## Launcher CLI & GUI
 
-> The launcher CLI code is located at the [`apps/cli`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) folder of the repository.
+> The launcher CLI and GUI code is located at the [`apps/cli`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) folder of the repository.
 
-> You can find the GitHub Action Workflow file which packages the executables for the CLI [`Here`](https://github.com/svdC1/mirumoji/blob/main/.github/workflows/build_release.yaml)
+> You can find the GitHub Action Workflow file which packages the executables for the GUI [`Here`](https://github.com/svdC1/mirumoji/blob/main/.github/workflows/build_release.yaml)
