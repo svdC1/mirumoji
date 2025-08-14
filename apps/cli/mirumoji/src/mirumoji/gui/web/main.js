@@ -132,11 +132,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw error;
             }
         },
-        async stream(url, options, logManager) {
+        async stream(url, options, logManager, manageAllButtons = true) {
             state.streamController = new AbortController();
             options.signal = state.streamController.signal;
 
-            setButtonsDisabled(true);
+            if (manageAllButtons) {
+                setButtonsDisabled(true);
+            }
             logManager.init();
             const connectingMsg = document.createElement("p");
             connectingMsg.className = "text-gray-400";
@@ -204,7 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     logManager.append(abortMsg);
                 }
             } finally {
-                setButtonsDisabled(false);
+                if (manageAllButtons) {
+                    setButtonsDisabled(false);
+                }
                 state.streamController = null;
             }
         },
@@ -428,7 +432,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 appLogManager.showError("Application is not running.");
                 return;
             }
-            api.stream("/api/logs", { method: "GET" }, appLogManager);
+            ui.buttons.startAppLogStream.disabled = true;
+            ui.buttons.stopAppLogStream.disabled = false;
+            api.stream(
+                "/api/logs",
+                { method: "GET" },
+                appLogManager,
+                false
+            ).finally(() => {
+                ui.buttons.startAppLogStream.disabled = false;
+                ui.buttons.stopAppLogStream.disabled = true;
+            });
         });
 
         ui.buttons.stopAppLogStream.addEventListener("click", () => {
@@ -443,6 +457,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setActiveTab("nav-launcher");
         setupEventListeners();
         loadSystemInfo();
+        ui.buttons.stopAppLogStream.disabled = true;
     }
 
     init();
