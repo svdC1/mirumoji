@@ -7,8 +7,15 @@ name = "mirumoji"
 version = "2.3.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
-description = "CLI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."
-keywords = ["japanese", "video-player", "language", "cli", "language-learning"]
+description = "CLI and GUI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."
+keywords = [
+    "japanese",
+    "video-player",
+    "language",
+    "cli",
+    "gui",
+    "language-learning",
+]
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -28,6 +35,10 @@ dependencies = [
 
 [project.scripts]
 mirumoji = "mirumoji.launcher:cli"
+mirumoji-gui = "mirumoji.gui_launcher:main"
+
+[tool.setuptools]
+include-package-data = true
 
 [project.urls]
 Homepage = "https://github.com/svdC1/mirumoji"
