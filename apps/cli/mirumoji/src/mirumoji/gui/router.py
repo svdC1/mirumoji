@@ -15,7 +15,7 @@ from core import (docker_running,
                   has_nvidia_gpu,
                   get_host_lan_ip,
                   docker_compose,
-                  build_img
+                  build_img,
                   )
 from models import (StartRequest,
                     StopRequest,
@@ -161,6 +161,32 @@ def start_app(request: StartRequest) -> StreamingResponse:
         return stream
     except Exception as e:
         LOGGER.error(f"Failed to start app: '{e}'")
+        raise HTTPException(400, detail=str(e))
+
+
+@router.get("/logs")
+def send_logs() -> StreamingResponse:
+    """
+    GET endpoint which streams the mirumoji application logs from
+    the docker compose application.
+
+    Returns:
+      StreamingResponse: Docker command's stdout
+    """
+    try:
+        def _docker_logs_gen() -> Generator[str, None, None]:
+            logs_gen = docker_compose("logs",
+                                      name_only=True,
+                                      command_flags=["-f"],
+                                      )
+            yield "Streaming Logs..."
+            yield from logs_gen
+        return StreamingResponse(content=_stream_gen(_docker_logs_gen()),
+                                 status_code=200,
+                                 media_type="text/event-stream"
+                                 )
+    except Exception as e:
+        LOGGER.error(f"Failed to send logs: '{e}'")
         raise HTTPException(400, detail=str(e))
 
 
