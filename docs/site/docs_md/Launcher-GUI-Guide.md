@@ -11,7 +11,7 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
 > ### [`Linux`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-linux)
 >
 > ### [`MacOS`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-macos.exe)
-
+>
 > The launcher is also distributed as a Python package and can be installed using `pip`.
 >
 > ```bash
