@@ -24,8 +24,6 @@ This guide will help you get the Mirumoji application running on your system.
 
 -   Download the GUI Launcher for your platform
 
--   Download Links
-
 -   ### [`Windows`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-windows.exe)
 
 -   ### [`Linux`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-linux)

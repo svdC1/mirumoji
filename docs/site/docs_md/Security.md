@@ -13,4 +13,5 @@
 > If you prefer to not use the executable, you can still run the `launcher.py` or `gui_launcher.py` script with your own Python environment by following the instructions detailed in [`Advanced CLI Reference`](Adavanced-CLI-Reference.md)
 
 -   **Manual Setup**
-    > If you prefer to download the specific `docker-compose` file for the version you want to run and use it to build the containers directly, you can follow the instructions provided at the [`Manual Setup`](Manual-Setup.md) page.
+
+> If you prefer to download the specific `docker-compose` file for the version you want to run and use it to build the containers directly, you can follow the instructions provided at the [`Manual Setup`](Manual-Setup.md) page.
