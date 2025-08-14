@@ -47,11 +47,11 @@ jobs:
             - name: Build executable for Windows
               if: matrix.os_name == 'Windows'
               run: |
-                  pyinstaller --name ${{ matrix.executable_name_base }} \
-                  --onefile \
-                  --windowed \
-                  --clean \
-                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" \
+                  pyinstaller --name ${{ matrix.executable_name_base }} `
+                  --onefile `
+                  --windowed `
+                  --clean `
+                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" `
                   apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: Build executable for Linux/macOS
