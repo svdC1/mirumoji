@@ -27,8 +27,6 @@ from mirumoji.gui.paths import (LOG_DIR,
                                 )
 from mirumoji.gui.router import router
 from flaskwebgui import FlaskUI
-import uvicorn
-from threading import Thread
 from multiprocessing import freeze_support
 
 # --- Environment Variables ---
@@ -157,31 +155,17 @@ async def http_exception_handler(request: Request,
     )
 
 
-def run_server():
-    """
-    Function to run the Uvicorn server in a thread,
-    binding to the correct host and port.
-    """
-    server_thread = Thread(
-        target=uvicorn.run,
-        kwargs={"app": "mirumoji.gui.main:app",
-                "host": "127.0.0.1",
-                "port": PORT},
-        daemon=True
-        )
-    server_thread.start()
-
-
 if __name__ == "__main__":
     freeze_support()
     # --- Setup Logging ---
     setup_logging()
     # --- Start Web GUI ---
+    setup_logging()
     FlaskUI(
         app=app,
         port=PORT,
-        server=run_server,
+        server="fastapi",
         fullscreen=False,
         width=1200,
         height=800
-        ).run()
+    ).run()

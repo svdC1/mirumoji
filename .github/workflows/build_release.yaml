@@ -16,17 +16,14 @@ jobs:
                       os_name: Linux
                       asset_name_suffix: linux
                       executable_name_base: mirumoji-gui
-                      final_executable_name: mirumoji-gui
                     - os_image: macos-latest
                       os_name: macOS
                       asset_name_suffix: macos
                       executable_name_base: mirumoji-gui
-                      final_executable_name: mirumoji-gui
                     - os_image: windows-latest
                       os_name: Windows
                       asset_name_suffix: windows
                       executable_name_base: mirumoji-gui
-                      final_executable_name: mirumoji-gui.exe
         env:
             PYTHON_VERSION: "3.11"
 
@@ -48,22 +45,32 @@ jobs:
             - name: Build executable for Windows
               if: matrix.os_name == 'Windows'
               run: |
-                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --windowed --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web;gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
+                  pyinstaller --name ${{ matrix.executable_name_base }} --windowed --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web;gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: Build executable for Linux/macOS
               if: matrix.os_name != 'Windows'
               run: |
-                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
+                  pyinstaller --name ${{ matrix.executable_name_base }} --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: List dist directory contents
               if: always()
               run: ls -R ./dist/
 
-            - name: Archive executable
+            - name: Archive executable for Windows
+              if: matrix.os_name == 'Windows'
+              run: |
+                  Compress-Archive -Path dist/${{ matrix.executable_name_base }}/* -DestinationPath ${{ matrix.executable_name_base }}-${{ matrix.asset_name_suffix }}.zip
+
+            - name: Archive executable for Linux/macOS
+              if: matrix.os_name != 'Windows'
+              run: |
+                  zip -r ${{ matrix.executable_name_base }}-${{ matrix.asset_name_suffix }}.zip dist/${{ matrix.executable_name_base }}
+
+            - name: Upload Artifact
               uses: actions/upload-artifact@v4
               with:
                   name: ${{ matrix.executable_name_base }}-${{ matrix.asset_name_suffix }}
-                  path: dist/${{ matrix.final_executable_name }}
+                  path: ${{ matrix.executable_name_base }}-${{ matrix.asset_name_suffix }}.zip
                   if-no-files-found: error
 
     upload_assets:
@@ -88,9 +95,9 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ github.event.release.upload_url }}
-                  asset_path: ./artifacts/mirumoji-gui-windows/mirumoji-gui.exe
-                  asset_name: mirumoji-gui-windows.exe
-                  asset_content_type: application/vnd.microsoft.portable-executable
+                  asset_path: ./artifacts/mirumoji-gui-windows/mirumoji-gui-windows.zip
+                  asset_name: mirumoji-gui-windows.zip
+                  asset_content_type: application/zip
 
             - name: Upload Linux Asset
               uses: actions/upload-release-asset@v1
@@ -98,9 +105,9 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ github.event.release.upload_url }}
-                  asset_path: ./artifacts/mirumoji-gui-linux/mirumoji-gui
-                  asset_name: mirumoji-gui-linux
-                  asset_content_type: application/octet-stream
+                  asset_path: ./artifacts/mirumoji-gui-linux/mirumoji-gui-linux.zip
+                  asset_name: mirumoji-gui-linux.zip
+                  asset_content_type: application/zip
 
             - name: Upload macOS Asset
               uses: actions/upload-release-asset@v1
@@ -108,6 +115,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ github.event.release.upload_url }}
-                  asset_path: ./artifacts/mirumoji-gui-macos/mirumoji-gui
-                  asset_name: mirumoji-gui-macos
-                  asset_content_type: application/octet-stream
+                  asset_path: ./artifacts/mirumoji-gui-macos/mirumoji-gui-macos.zip
+                  asset_name: mirumoji-gui-macos.zip
+                  asset_content_type: application/zip
