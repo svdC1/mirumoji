@@ -28,6 +28,8 @@ from mirumoji.gui.paths import (LOG_DIR,
 from mirumoji.gui.router import router
 from flaskwebgui import FlaskUI
 import uvicorn
+from threading import Thread
+from multiprocessing import freeze_support
 
 # --- Environment Variables ---
 LOGGER = logging.getLogger(__name__)
@@ -156,12 +158,19 @@ async def http_exception_handler(request: Request,
 
 def run_server():
     """
-    Function to run the Uvicorn server, binding to the correct host and port.
+    Function to run the Uvicorn server in a thread,
+    binding to the correct host and port.
     """
-    uvicorn.run(app, host="127.0.0.1", port=PORT)
+    server_thread = Thread(
+        target=uvicorn.run,
+        kwargs={"app": app, "host": "127.0.0.1", "port": PORT},
+        daemon=True
+        )
+    server_thread.start()
 
 
 if __name__ == "__main__":
+    freeze_support()
     # --- Setup Logging ---
     setup_logging()
     # --- Start Web GUI ---
