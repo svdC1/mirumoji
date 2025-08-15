@@ -15,17 +15,17 @@ from typing import (AsyncGenerator,
                     Any
                     )
 from contextlib import asynccontextmanager
-from .core import ensure_repo
+from mirumoji.gui.core import ensure_repo
 import sys
 import shutil
 import asyncio
-from .paths import (LOG_DIR,
-                    REPO_URL,
-                    REPO_DIR,
-                    APP_DIR,
-                    WEB_DIR
-                    )
-from .router import router
+from mirumoji.gui.paths import (LOG_DIR,
+                                REPO_URL,
+                                REPO_DIR,
+                                APP_DIR,
+                                WEB_DIR
+                                )
+from mirumoji.gui.router import router
 from flaskwebgui import FlaskUI
 
 # --- Environment Variables ---
