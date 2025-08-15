@@ -4,6 +4,7 @@ Launches the GUI application
 
 from mirumoji.gui.main import app, setup_logging, PORT
 from flaskwebgui import FlaskUI
+from multiprocessing import freeze_support
 
 
 def main():
@@ -22,4 +23,5 @@ def main():
 
 
 if __name__ == "__main__":
+    freeze_support()
     main()
