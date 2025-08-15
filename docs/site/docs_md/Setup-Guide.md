@@ -32,11 +32,15 @@ This guide will help you get the Mirumoji application running on your system.
 
 ## Step 2
 
+-   Unzip the application and double click the executable file
+
+## Step 3
+
 -   Navigate to the **Configuration** tab.
 -   Enter your **OpenAI API Key**.
 -   If you do not have a compatible NVIDIA GPU, you must also enter your **Modal Token ID** and **Modal Token Secret**.
 
-## Step 3
+## Step 4
 
 -   Navigate back to the **Launcher** tab
 -   Click the `Start` button.
