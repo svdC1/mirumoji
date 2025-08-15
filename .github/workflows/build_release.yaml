@@ -48,12 +48,12 @@ jobs:
             - name: Build executable for Windows
               if: matrix.os_name == 'Windows'
               run: |
-                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --windowed --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web;gui/web" apps/cli/mirumoji/src/mirumoji/gui/main.py
+                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --windowed --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web;gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: Build executable for Linux/macOS
               if: matrix.os_name != 'Windows'
               run: |
-                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" apps/cli/mirumoji/src/mirumoji/gui/main.py
+                  pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean --collect-all apps/cli/mirumoji/src/mirumoji/ --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" --hidden-import "uvicorn.lifespan.on" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.protocols.websockets.auto" --hidden-import "websockets" --hidden-import "h11" --hidden-import "watchfiles" --hidden-import "click" apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: List dist directory contents
               if: always()
