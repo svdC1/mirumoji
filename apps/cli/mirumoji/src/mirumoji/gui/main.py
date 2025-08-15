@@ -68,10 +68,11 @@ def setup_logging() -> None:
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    root_logger.addHandler(stream_handler)
+    # Only add the stream handler if the application is not frozen
+    if not getattr(sys, "frozen", False):
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        root_logger.addHandler(stream_handler)
 
 # --- API Setup ---
 
