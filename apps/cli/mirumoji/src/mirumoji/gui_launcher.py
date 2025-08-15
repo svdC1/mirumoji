@@ -2,7 +2,7 @@
 Launches the GUI application
 """
 
-from .gui.main import app, setup_logging
+from mirumoji.gui.main import app, setup_logging
 from flaskwebgui import FlaskUI
 
 
