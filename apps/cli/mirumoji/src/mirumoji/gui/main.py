@@ -27,6 +27,7 @@ from mirumoji.gui.paths import (LOG_DIR,
                                 )
 from mirumoji.gui.router import router
 from flaskwebgui import FlaskUI
+import uvicorn
 
 # --- Environment Variables ---
 LOGGER = logging.getLogger(__name__)
@@ -152,6 +153,14 @@ async def http_exception_handler(request: Request,
         media_type="application/json"
     )
 
+
+def run_server():
+    """
+    Function to run the Uvicorn server, binding to the correct host and port.
+    """
+    uvicorn.run(app, host="127.0.0.1", port=PORT)
+
+
 if __name__ == "__main__":
     # --- Setup Logging ---
     setup_logging()
@@ -159,7 +168,7 @@ if __name__ == "__main__":
     FlaskUI(
         app=app,
         port=PORT,
-        server="fastapi",
+        server=run_server,
         fullscreen=False,
         width=1200,
         height=800
