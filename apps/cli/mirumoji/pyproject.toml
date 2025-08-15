@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "2.3.7"
+version = "2.3.8"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "CLI and GUI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."

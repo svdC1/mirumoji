@@ -163,7 +163,9 @@ def run_server():
     """
     server_thread = Thread(
         target=uvicorn.run,
-        kwargs={"app": app, "host": "127.0.0.1", "port": PORT},
+        kwargs={"app": "mirumoji.gui.main:app",
+                "host": "127.0.0.1",
+                "port": PORT},
         daemon=True
         )
     server_thread.start()
