@@ -51,7 +51,7 @@ jobs:
                   --onefile `
                   --windowed `
                   --clean `
-                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web:gui/web" `
+                  --add-data "apps/cli/mirumoji/src/mirumoji/gui/web;gui/web" `
                   apps/cli/mirumoji/src/mirumoji/gui/main.py
 
             - name: Build executable for Linux/macOS
