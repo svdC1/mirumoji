@@ -20,6 +20,8 @@ from typing import (Optional,
 from functools import wraps
 from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
+from mirumoji.gui_launcher import main
+
 
 # -----------------------------
 # --- Pre-defined Constants ---
@@ -978,6 +980,25 @@ def build(gpu: Optional[bool],
         os.chdir(original_cwd)
         click.secho(f"Returned to original working directory: {original_cwd}",
                     fg="blue")
+
+
+@cli.command()
+def gui():
+    """
+    Start a GUI launcher.
+    """
+    click.secho("Starting GUI",
+                fg="blue"
+                )
+    try:
+        main()
+    except Exception as e:
+        click.secho(
+            f"\nUnexpected error while starting GUI '{e}'",
+            fg="red",
+            err=True
+        )
+        sys.exit(1)
 
 
 if __name__ == '__main__':
