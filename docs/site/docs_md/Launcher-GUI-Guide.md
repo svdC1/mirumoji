@@ -4,25 +4,7 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
 
 ## Installation
 
-> Download Links
->
-> ### [`Windows`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-windows.exe)
->
-> ### [`Linux`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-linux)
->
-> ### [`MacOS`](https://github.com/svdC1/mirumoji/releases/latest/download/mirumoji-gui-macos.exe)
->
-> The launcher is also distributed as a Python package and can be installed using `pip`.
->
-> ```bash
-> pip install mirumoji
-> ```
->
-> Once installed, you can run the GUI by simply executing the command:
->
-> ```bash
-> mirumoji-gui
-> ```
+-   View the [`Setup Guide`](Setup-Guide.md) for installation instructions.
 
 ## The Interface
 

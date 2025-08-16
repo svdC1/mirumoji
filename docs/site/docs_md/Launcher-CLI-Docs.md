@@ -105,3 +105,7 @@
 > `--no-clear` &rarr; To stop clearing the terminal screen after each stage during command execution. Default behavior is to clear the screen to avoid clutter.
 
 ---
+
+### `gui`
+
+> Starts the [`GUI Launcher`](Launcher-GUI-Guide.md)

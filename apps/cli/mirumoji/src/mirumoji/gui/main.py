@@ -26,8 +26,6 @@ from mirumoji.gui.paths import (LOG_DIR,
                                 WEB_DIR
                                 )
 from mirumoji.gui.router import router
-from flaskwebgui import FlaskUI
-from multiprocessing import freeze_support
 
 # --- Environment Variables ---
 LOGGER = logging.getLogger(__name__)
@@ -153,19 +151,3 @@ async def http_exception_handler(request: Request,
                  },
         media_type="application/json"
     )
-
-
-if __name__ == "__main__":
-    freeze_support()
-    # --- Setup Logging ---
-    setup_logging()
-    # --- Start Web GUI ---
-    setup_logging()
-    FlaskUI(
-        app=app,
-        port=PORT,
-        server="fastapi",
-        fullscreen=False,
-        width=1200,
-        height=800
-    ).run()
