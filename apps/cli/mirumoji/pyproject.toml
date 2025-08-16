@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=77.0.3"]
+requires = ["setuptools>=80.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "2.4.3"
+version = "2.4.4"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "CLI and GUI launcher for the Mirumoji project, an open-source, self-hostable Japanese language immersion tool."
@@ -37,12 +37,12 @@ dependencies = [
 mirumoji = "mirumoji.launcher:cli"
 mirumoji-gui = "mirumoji.gui_launcher:main"
 
-[tool.setuptools]
-include-package-data = true
-
 [project.urls]
 Homepage = "https://github.com/svdC1/mirumoji"
 Issues = "https://github.com/svdC1/mirumoji/issues"
+
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

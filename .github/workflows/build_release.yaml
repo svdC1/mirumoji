@@ -44,9 +44,10 @@ jobs:
                   python -m pip install --upgrade pip
                   pip install click python-dotenv
                   pip install pyinstaller
+                  pip install -e apps/cli/mirumoji
 
             - name: Build executable with PyInstaller
-              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --clean apps/cli/mirumoji/src/mirumoji/launcher.py
+              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --collect-all flaskwebgui --collect-all mirumoji --collect-all uvicorn --collect-all fastapi --clean apps/cli/mirumoji/src/mirumoji/launcher.py
 
             - name: List dist directory contents (Post-PyInstaller)
               if: always()
