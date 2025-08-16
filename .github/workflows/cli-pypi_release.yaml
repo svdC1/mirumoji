@@ -16,7 +16,7 @@ jobs:
               with:
                   python-version: "3.11"
             - name: Install Dependencies
-              run: pip install build
+              run: pip install build setuptools
             - name: Build Package
               run: cd ./apps/cli/mirumoji && python -m build
 

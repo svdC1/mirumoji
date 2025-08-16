@@ -1,1 +1,4 @@
-graft src/mirumoji/gui/web
+graft web
+include src/mirumoji/gui/web/index.html
+include src/mirumoji/gui/web/main.js
+include src/mirumoji/gui/web/favicon.ico
