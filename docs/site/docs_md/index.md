@@ -6,83 +6,84 @@
 
 # Overview
 
-> Mirumoji is an open-source, self-hosted Japanese immersion toolkit. Drop in any video, anime episode, drama or audio clip and it gives you: clickable tokenized subtitles with dictionary pop-ups, Whisper-powered transcription, instant SRT/clip extraction, and one-click Anki deck export — all in Docker, all running on your own machine.
+Mirumoji is an open-source, self-hosted Japanese immersion toolkit. Drop in any video, anime episode, drama or audio clip and it gives you: clickable tokenized subtitles with dictionary pop-ups, Whisper-powered transcription, instant SRT/clip extraction, and one-click Anki deck export — all in Docker, all running on your own machine.
 
-> Optional [`OpenAI`](https://platform.openai.com/docs/overview) Integration &rarr; Customizable GPT Breakdowns of Subtitles
+??? tip "Optional Integrations"
 
-> Optional [`Modal`](https://modal.com) Integration &rarr; Install a CPU only version and run all GPU tasks on the cloud
+    -   [`OpenAI`](https://platform.openai.com/docs/overview) Integration: Customizable GPT Breakdowns of Subtitles
+    -   [`Modal`](https://modal.com) Integration: Install a CPU only version and run all GPU tasks on the cloud
 
 ---
 
-# Preview
+??? info "Preview"
 
-> View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
+    > View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
 
-# Documentation
+??? Documentation
 
-> Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
+    > Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
 
 # Features
 
-## **Interactive Video Player**
+=== "**Interactive Video Player**"
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
+    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
 
-> Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.
+    > Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.
 
-## **Clickable Japanese Subtitles**
+=== "**Clickable Japanese Subtitles**"
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
+    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
 
-> Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
+    > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
 
-## **Dictionary**
+=== "**Dictionary**"
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
+    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
 
-> Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
+    > Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
 
-## **Text Analyzer**
+=== "**Text Analyzer**"
 
-![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
+    ![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
 
-> Copy and paste text for tokenized output with furigana and clickable words.
+    > Copy and paste text for tokenized output with furigana and clickable words.
 
-## **OpenAI Integration**
+=== "**OpenAI Integration**"
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/gpt_template.png?raw=true)
+    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/gpt_template.png?raw=true)
 
-> Modify System Message and User Prompt with `{sentence}` and `{word}` variables.
+    > Modify System Message and User Prompt with `{sentence}` and `{word}` variables.
 
-## **Local Media Processing**
+=== "**Local Media Processing**"
 
-### **Video Conversion**
+    === "**Video Conversion**"
 
-> Upload videos in various formats; they can be converted to MP4 for optimal playback.
+        > Upload videos in various formats; they can be converted to MP4 for optimal playback.
 
-### **SRT Generation**
+    === "**SRT Generation**"
 
-> Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
+        > Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
 
-## **Audio Transcription**
+=== "**Audio Transcription**"
 
-![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/transcription.png?raw=true)
+    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/transcription.png?raw=true)
 
-> Transcribe Japanese audio from recordings or uploaded files.
+    > Transcribe Japanese audio from recordings or uploaded files.
 
-## **Profile-Based Data Management**
+=== "**Profile-Based Data Management**"
 
-### **Persistent Storage**
+    === "**Persistent Storage**"
 
-![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/profile.png?raw=true)
+        ![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/profile.png?raw=true)
 
-> Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.
+        > Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.
 
-### **Clip Saving**
+    === "**Clip Saving**"
 
-![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
+        ![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
 
-> Save important video segments with their associated word breakdowns and export as an Anki Deck
+        > Save important video segments with their associated word breakdowns and export as an Anki Deck
 
 ---
 
