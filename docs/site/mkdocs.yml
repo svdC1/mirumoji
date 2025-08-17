@@ -11,9 +11,11 @@ theme:
   features:
     - header.autohide
     - navigation.footer
+    - content.code.copy
     - search.suggest
     - search.highlight
     - navigation.sections
+    - navigation.tracking
     - navigation.tabs
   icon:
     repo: fontawesome/brands/github
@@ -63,7 +65,16 @@ markdown_extensions:
   - def_list
   - footnotes
   - md_in_html
-  - pymdownx.highlight
+  - pymdownx.details
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.superfences
   - pymdownx.inlinehilite
   - pymdownx.snippets
