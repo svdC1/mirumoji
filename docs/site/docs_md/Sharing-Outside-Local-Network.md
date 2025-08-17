@@ -1,21 +1,22 @@
 # Sharing Outside of Local Network
 
-### When do I need to do this ?
+???+ question "When do I need to do this?"
 
-> You only need to do this if you want to let someone outside of your local network access the application, or access it outside your local network yourself.
+    You only need to do this if you want to let someone outside of your local network access the application, or access it outside your local network yourself.
 
-### Proposed Solution
+???+ tip "Proposed Solution"
 
-> There are many ways you can expose the application to the internet, This guide instructs on setting it up with **[`Zrok`](https://zrok.io/) since it's open-source and offers a fast and efficient SaaS implementation with 5Gb of traffic free per day which works on all platforms.**
+    There are many ways you can expose the application to the internet, This guide instructs on setting it up with **[`Zrok`](https://zrok.io/) since it's open-source and offers a fast and efficient SaaS implementation with 5Gb of traffic free per day which works on all platforms.**
 
-### Self Hosting (Optional)
-> Zrok also **offers you the ability to run a completely self-hosted version of the Zrok application if you don't want to use the SaaS**. Since the free quota of 5Gb per day should be enough for most users, and for the sake of simplicity, **this guide instructs you on running the SaaS pre-configured version. If you'd like to set up the self-hosted version on your own you can access their [`Self Hosting Guides`](https://docs.zrok.io/docs/category/self-hosting/)**
+???+ info "Self Hosting (Optional)"
+
+    Zrok also **offers you the ability to run a completely self-hosted version of the Zrok application if you don't want to use the SaaS**. Since the free quota of 5Gb per day should be enough for most users, and for the sake of simplicity, **this guide instructs you on running the SaaS pre-configured version. If you'd like to set up the self-hosted version on your own you can access their [`Self Hosting Guides`](https://docs.zrok.io/docs/category/self-hosting/)**
 
 ---
 
 ## Prerequisites
 
-> Your application is running in Docker and is reachable at your [`localhost`](https://localhost).
+Your application is running in Docker and is reachable at your [`localhost`](https://localhost).
 
 ---
 
@@ -23,26 +24,28 @@
 
 ### **Install Zrok**
 
-> open the [`Zrok Website`](https://docs.zrok.io/docs/getting-started). You can read information about the service there and find the download and instructions for your system. 
+1. Open the [`Zrok Website`](https://docs.zrok.io/docs/getting-started). You can read information about the service there and find the download and instructions for your system.
 
-### **Create a Free Account**
+2. **Create a Free Account**:
 
-> In the [`Getting Started`](https://docs.zrok.io/docs/getting-started) page, you’ll see options for Self-Hosting the service or using the SaaS implementation. This guide is for the SaaS implementation. Click on [`Create an Account`](https://myzrok.io/)
+    In the [`Getting Started`](https://docs.zrok.io/docs/getting-started) page, you’ll see options for Self-Hosting the service or using the SaaS implementation. This guide is for the SaaS implementation. Click on [`Create an Account`](https://myzrok.io/)
 
-### **Activate the CLI Once**
+3. **Activate the CLI Once**:
 
-> After you create an account and verify your email, you’ll receive a token. 
+    After you create an account and verify your email, you’ll receive a token.
 
-> After downloading the Zrok binary for your platform, you’ll need to run this command once to store the token which allows connection with your account
+    After downloading the Zrok binary for your platform, you’ll need to run this command once to store the token which allows connection with your account
 
-   ```bash
-   zrok enable <PASTE‑YOUR‑TOKEN>
-   ```
+    ```bash
+    zrok enable <PASTE‑YOUR‑TOKEN>
+    ```
 
 ---
+
 ## Starting the Service
 
 ### Start a Share with Basic‑Auth
+
 > By running the command below, Zrok will proxy all requests between the generated HTTPS website and your local application.
 
 ```bash
@@ -60,7 +63,6 @@ zrok share public 443 --basic-auth user:pass
 > After that, you’ll be prompted for your `user` and `password` you set up in the last step.
 
 > After inserting them you’ll be allowed to access the app.
-
 
 > Leave this terminal **open** while you want to share the application over the internet.
 
