@@ -32,6 +32,8 @@ theme:
   name: material
   font:
     code: Roboto Mono
+  logo: assets/icon-192.png
+  favicon: assets/favicon.ico
   features:
     - header.autohide
     - navigation.footer
