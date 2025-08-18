@@ -53,25 +53,26 @@ Your application is running in Docker and is reachable at your [`localhost`](htt
 zrok share public 443 --basic-auth user:pass
 ```
 
-> Setting up this `user` and `password` is optional. However, even though the URL is random and the chance of it accidentally getting found out by someone on the internet is minimal, this extra step to dismiss snoopers is recommended since the app will be globally available.
+???+ tip 
+    Setting up this `user` and `password` is optional. However, even though the URL is random and the chance of it accidentally getting found out by someone on the internet is minimal, this extra step to dismiss snoopers is recommended since the app will be globally available.
 
-> The command will give you a random URL like `https://curly‑iguana‑27.share.zrok.io
-` which you can access from anywhere.
+> The command will give you a random URL like `https://curly‑iguana‑27.share.zrok.io` which you can access from anywhere.
 
-> The first time you access you’ll see a Zrok page called an [`Interstitial`](https://docs.zrok.io/docs/guides/self-hosting/interstitial-page/) which is there for safety and to warn users that this is a Zrok Proxy. You can just click a button to dismiss it.
-
-> After that, you’ll be prompted for your `user` and `password` you set up in the last step.
-
-> After inserting them you’ll be allowed to access the app.
+??? warning
+    The first time you access you’ll see a Zrok page called an [`Interstitial`](https://docs.zrok.io/docs/guides/self-hosting/interstitial-page/) which is there for safety and to warn users that this is a Zrok Proxy. You can just click a button to dismiss it.
 
 > Leave this terminal **open** while you want to share the application over the internet.
 
 ### Access From Any Device
 
-> Open the URL
-> Enter the `username` and `password` you chose.
+???+ info
+    > If you've setup `username` and `password` you'll be prompted them before the website loads
+    > Enter the `username` and `password` you chose.
 
-> With this you have a password protected website running the application which is accessible from anywhere. The free tier allows **5 GB of traffic per 24 h** and auto‑resets each day. You can check your usage at the [`Zrok Dashboard`](https://myzrok.io/dashboard)
+> With this you have a password protected website running the application which is accessible from anywhere.
+
+??? warning 
+    The free tier allows **5 GB of traffic per 24 h** and auto‑resets each day. You can check your usage at the [`Zrok Dashboard`](https://myzrok.io/dashboard)
 
 ---
 

@@ -5,14 +5,14 @@ repo_url: https://github.com/svdC1/mirumoji
 repo_name: svdC1/mirumoji
 docs_dir: docs_md
 nav:
+  - Home:
+      - index.md
+      - Contributing: Contributing.md
   - Setup:
       - Setup Guide: Setup-Guide.md
       - Manual Setup: Manual-Setup.md
       - Launcher GUI Guide: Launcher-GUI-Guide.md
       - Launcher Documentation: Launcher-CLI-Docs.md
-  - Home:
-      - index.md
-      - Contributing: Contributing.md
   - Additional Information:
       - Sharing on the Internet: Sharing-Outside-Local-Network.md
       - Source Code: Source-Code.md
@@ -26,7 +26,8 @@ nav:
       - Profile Manager: Backend-API/profile_manager.md
       - Routers: Backend-API/router.md
       - Utils: Backend-API/utils.md
-  - Frontend UI: Frontend-UI/
+  - Frontend UI:
+      - Frontend-UI/index.md
 theme:
   name: material
   font:
@@ -34,6 +35,7 @@ theme:
   features:
     - header.autohide
     - navigation.footer
+    - content.tooltips
     - content.code.copy
     - search.suggest
     - search.highlight
@@ -47,14 +49,15 @@ theme:
       accent: deep purple
 
 plugins:
-  - search
-  - autorefs
   - mkdocstrings:
       handlers:
         python:
           inventories:
             - https://docs.python.org/3/objects.inv
-            - https://docs.sqlalchemy.org/en/20/objects.inv
+            - https://docs.sqlalchemy.org/objects.inv
+            - https://fastapi.tiangolo.com/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+
           options:
             show_root_heading: true
             show_root_toc_entry: true
@@ -78,7 +81,10 @@ plugins:
               "../../apps/backend/routers",
               "../../apps/backend/utils",
             ]
-
+  - search
+  - autorefs:
+      resolve_closest: true
+      link_titles: true
 markdown_extensions:
   - toc:
       permalink: true
