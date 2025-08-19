@@ -71,4 +71,15 @@ export default defineConfig({
             },
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (/\/react(?:-dom)?/.test(id)) {
+                        return "vendor";
+                    }
+                },
+            },
+        },
+    },
 });
