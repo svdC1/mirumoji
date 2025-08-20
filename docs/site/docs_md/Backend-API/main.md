@@ -1,3 +1,3 @@
 # API Main Entrypoint
 
-::: backend.main
+::: main

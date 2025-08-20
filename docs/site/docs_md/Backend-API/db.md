@@ -1,4 +1,3 @@
 # Database
 
 ::: db
-::: Tables

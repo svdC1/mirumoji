@@ -1,3 +1,3 @@
 # Profile Manager
 
-::: backend.profile_manager
+::: profile_manager
