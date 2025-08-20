@@ -111,16 +111,8 @@ plugins:
             show_object_full_path: false
             show_root_members_full_path: false
             show_source: false
-          paths:
-            [
-              "../../apps/",
-              "../../apps/backend/db",
-              "../../apps/backend/modal_processing",
-              "../../apps/backend/models",
-              "../../apps/backend/processing",
-              "../../apps/backend/routers",
-              "../../apps/backend/utils",
-            ]
+            show_submodules: true
+          paths: ["../../apps/", "../../apps/backend"]
   - search
   - autorefs:
       resolve_closest: true

@@ -1,3 +1,3 @@
 # Modal Configuration
 
-::: ModalApp
+::: modal_processing

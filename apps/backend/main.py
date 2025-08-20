@@ -59,7 +59,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 app = FastAPI(
     title="Mirumoji",
     description="Japanese sentence breakdown, audio processing and GPT.",
-    lifespan=lifespan
+    lifespan=lifespan,
+    root_path="/api"
 )
 
 app.mount("/media",
