@@ -5,7 +5,7 @@ services:
             - "80:80" # HTTP Nginx
             - "443:443" #HTTPS Nginx
         environment:
-            - HOST_LAN_IP=${HOST_LAN_IP}
+            - HOST_LAN_IP=${HOST_LAN_IP:?error}
         depends_on:
             - backend
         networks:
@@ -16,8 +16,12 @@ services:
         ports:
             - "8000:8000"
         environment:
-            - OPENAI_API_KEY=${OPENAI_API_KEY}
+            - OPENAI_API_KEY=${OPENAI_API_KEY:?error}
+            - MIRUMOJI_LOGGING_LEVEL=${MIRUMOJI_LOGGING_LEVEL:-INFO}
+            - MIRUMOJI_MODAL_GPU=${MIRUMOJI_MODAL_GPU:-A10G})
+            - MODAL_FORCE_BUILD=${MODAL_FORCE_BUILD:-0}}
         volumes:
+            - logs:/root/.mirumoji_logs
             - huggingface_cache:/root/.cache/huggingface
             - data:/app/data/
             - media_files:/app/media_files
@@ -32,6 +36,7 @@ services:
             - app-network
 
 volumes:
+    logs:
     huggingface_cache:
     data:
     media_files:
