@@ -69,6 +69,11 @@ export default defineConfig({
                 secure: false,
                 rewrite: (path) => path.replace(/^\/api/, ""),
             },
+            "/openapi.json": {
+                target: "http://localhost:8000/",
+                changeOrigin: true,
+                secure: false,
+            },
         },
     },
     build: {

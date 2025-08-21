@@ -60,7 +60,6 @@ app = FastAPI(
     title="Mirumoji",
     description="Japanese sentence breakdown, audio processing and GPT.",
     lifespan=lifespan,
-    root_path="/api"
 )
 
 app.mount("/media",
