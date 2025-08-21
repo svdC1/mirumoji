@@ -115,9 +115,14 @@ def start_app(request: StartRequest) -> StreamingResponse:
         lan_ip = get_host_lan_ip()
         # Configure Environment
         os.environ["OPENAI_API_KEY"] = request.OPENAI_API_KEY
+        os.environ["MIRUMOJI_LOGGING_LEVEL"] = request.MIRUMOJI_LOGGING_LEVEL
         if not request.gpu:
             os.environ["MODAL_TOKEN_ID"] = request.MODAL_TOKEN_ID
             os.environ["MODAL_TOKEN_SECRET"] = request.MODAL_TOKEN_SECRET
+            os.environ["MIRUMOJI_MODAL_GPU"] = request.MIRUMOJI_MODAL_GPU
+            os.environ["MODAL_FORCE_BUILD"] = (
+                1 if request.MODAL_FORCE_BUILD else 0
+                )
 
         # Configure Compose File
         compose_file = None

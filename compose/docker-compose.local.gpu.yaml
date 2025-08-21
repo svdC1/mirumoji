@@ -18,8 +18,6 @@ services:
         environment:
             - OPENAI_API_KEY=${OPENAI_API_KEY:?error}
             - MIRUMOJI_LOGGING_LEVEL=${MIRUMOJI_LOGGING_LEVEL:-INFO}
-            - MIRUMOJI_MODAL_GPU=${MIRUMOJI_MODAL_GPU:-A10G})
-            - MODAL_FORCE_BUILD=${MODAL_FORCE_BUILD:-0}}
         volumes:
             - logs:/root/.mirumoji_logs
             - huggingface_cache:/root/.cache/huggingface

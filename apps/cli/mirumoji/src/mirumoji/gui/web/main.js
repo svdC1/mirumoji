@@ -53,6 +53,11 @@ document.addEventListener("DOMContentLoaded", () => {
             modalSecret: document.getElementById("modal-secret"),
             gpu: document.getElementById("gpu-checkbox"),
             gpuOption: document.getElementById("gpu-option"),
+            modalForceBuild: document.getElementById(
+                "modal-force-build-checkbox"
+            ),
+            modalGpu: document.getElementById("modal-gpu-select"),
+            loggingLevel: document.getElementById("logging-level-select"),
         },
     };
 
@@ -364,6 +369,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 gpu: ui.inputs.gpu.checked,
                 local: ui.inputs.localBuild.checked,
                 repository: ui.inputs.repository.value,
+                MIRUMOJI_LOGGING_LEVEL: ui.inputs.loggingLevel.value,
+                MODAL_FORCE_BUILD: ui.inputs.modalForceBuild.checked,
+                MIRUMOJI_MODAL_GPU: ui.inputs.modalGpu.value,
                 OPENAI_API_KEY: openAIKey,
                 MODAL_TOKEN_ID: ui.inputs.modalId.value,
                 MODAL_TOKEN_SECRET: ui.inputs.modalSecret.value,
