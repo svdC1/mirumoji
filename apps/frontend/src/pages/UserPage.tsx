@@ -333,11 +333,11 @@ export default function UserPage() {
                     <div className="p-6">
                         {activeTab === "profile" &&
                             (profileId ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div className="text-gray-600 dark:text-gray-400 sm:col-span-1">
-                                        Active Profile:
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex-1 text-center text-gray-600 dark:text-gray-400">
+                                        Active Profile
                                     </div>
-                                    <div className="col-span-1 sm:col-span-2 break-all font-semibold">
+                                    <div className="flex-1 text-center font-semibold">
                                         {profileId}
                                     </div>
                                 </div>

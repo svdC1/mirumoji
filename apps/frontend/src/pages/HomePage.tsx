@@ -13,7 +13,7 @@ import {
     ChevronRightIcon,
     StatsIcon,
 } from "./Icons";
-
+import { ScrollTextIcon } from "lucide-react";
 /**
  * The HomePage component.
  *
@@ -66,7 +66,7 @@ export default function HomePage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 text-gray-100 font-sans antialiased">
-            <header className="absolute top-0 left-0 p-4">
+            <header className="absolute top-0 left-0 p-4 space-x-4">
                 <a
                     href="https://github.com/svdC1/mirumoji"
                     target="_blank"
@@ -75,6 +75,15 @@ export default function HomePage() {
                 >
                     <GitHubIcon />
                     GitHub Repo
+                </a>
+                <a
+                    href="https://svdc1.github.io/mirumoji/docs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                    <ScrollTextIcon size={20} />
+                    <p>Docs</p>
                 </a>
             </header>
             <main className="pt-8">

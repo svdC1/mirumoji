@@ -35,18 +35,13 @@ export default function PlayerPage() {
 
     return (
         <div className="h-screen w-screen flex flex-col bg-black text-white">
-            {/* Top Bar */}
-            <header className="flex items-center gap-2 p-2">
-                <button
-                    className="p-2 hover:bg-white/10 rounded"
-                    onClick={() => setDrawerOpen(!drawerOpen)}
-                >
-                    <Menu size={20} />
-                </button>
-                <h1 className="text-lg font-semibold text-center flex-1">
-                    Mirumoji Player
-                </h1>
-            </header>
+            {/* Open Button */}
+            <button
+                className="fixed top-4 left-4 z-50 p-2 shadow-md rounded-full focus:outline-none transition-opacity duration-200 opacity-50 hover:opacity-100 focus:opacity-100"
+                onClick={() => setDrawerOpen(!drawerOpen)}
+            >
+                <Menu size={20} />
+            </button>
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Drawer */}

@@ -168,11 +168,8 @@ export default function SavedPage() {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
             <div className="max-w-4xl mx-auto px-4 py-8">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col gap-4 items-center mb-6">
                     <h1 className="text-3xl font-bold">Saved Clips</h1>
-                    <h2 className="text-2xl font-semibold italic text-neutral-500">
-                        Profile : {profileId}
-                    </h2>
                     {clips && clips.length > 0 && (
                         <button
                             onClick={handleSaveToAnki}

@@ -282,17 +282,10 @@ export default function SettingsDrawer({
             className="flex-shrink-0 h-full bg-neutral-900 border-r border-neutral-700 overflow-y-auto"
         >
             <div className="flex flex-col h-full">
-                <div className="flex justify-center space-x-5 items-center px-6 py-4 border-b border-neutral-700">
-                    <h2 className="text-xl font-semibold text-neutral-100 text-center flex-1">
+                <div className="flex flex-col items-center px-6 py-4 border-b border-neutral-700">
+                    <h2 className="text-xl text-center font-semibold text-neutral-100 flex-1">
                         Settings
                     </h2>
-                    <button
-                        onClick={onClose}
-                        disabled={isBusy}
-                        className="text-neutral-400 hover:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        ✕
-                    </button>
                 </div>
                 <div className={"flex border-b border-neutral-700 mb-4"}>
                     <button
