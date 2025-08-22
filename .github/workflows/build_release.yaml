@@ -17,16 +17,19 @@ jobs:
                       asset_name_suffix: linux
                       executable_name_base: mirumoji-launcher
                       final_executable_name: mirumoji-launcher
+                      pyinstaller_flags: ""
                     - os_image: macos-latest
                       os_name: macOS
                       asset_name_suffix: macos
                       executable_name_base: mirumoji-launcher
                       final_executable_name: mirumoji-launcher
+                      pyinstaller_flags: '--icon "apps/cli/build_assets/icon.icns"'
                     - os_image: windows-latest
                       os_name: Windows
                       asset_name_suffix: windows
                       executable_name_base: mirumoji-launcher
                       final_executable_name: mirumoji-launcher.exe
+                      pyinstaller_flags: '--icon "apps/cli/build_assets/favicon.ico" --version-file "apps/cli/build_assets/version.txt"'
         env:
             PYTHON_VERSION: "3.11"
 
@@ -46,8 +49,20 @@ jobs:
                   pip install pyinstaller
                   pip install -e apps/cli/mirumoji
 
+            - name: Prepare Version File (Windows)
+              if: matrix.os_name  == 'Windows'
+              shell: pwsh
+              run: |
+                  $version = "${{ github.event.release.tag_name }}".TrimStart('v')
+                  (Get-Content -path "apps/cli/build_assets/version_template.txt" -Raw) -replace '__VERSION__', $version | Set-Content -Path "apps/cli/build_assets/version.txt"
+
+            - name: Create .icns file for macOS (macOS)
+              if: matrix.os_name == 'macOS'
+              run: |
+                  convert "apps/cli/build_assets/favicon.ico" "apps/cli/build_assets/icon.icns"
+
             - name: Build executable with PyInstaller
-              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --collect-all flaskwebgui --collect-all mirumoji --collect-all uvicorn --collect-all fastapi --clean apps/cli/mirumoji/src/mirumoji/launcher.py
+              run: pyinstaller --name ${{ matrix.executable_name_base }} --onefile --collect-all flaskwebgui --collect-all mirumoji --collect-all uvicorn --collect-all fastapi --clean ${{ matrix.pyinstaller_flags }} apps/cli/mirumoji/src/mirumoji/launcher.py
 
             - name: List dist directory contents (Post-PyInstaller)
               if: always()
