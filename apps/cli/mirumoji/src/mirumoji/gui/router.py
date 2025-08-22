@@ -121,7 +121,7 @@ def start_app(request: StartRequest) -> StreamingResponse:
             os.environ["MODAL_TOKEN_SECRET"] = request.MODAL_TOKEN_SECRET
             os.environ["MIRUMOJI_MODAL_GPU"] = request.MIRUMOJI_MODAL_GPU
             os.environ["MODAL_FORCE_BUILD"] = (
-                1 if request.MODAL_FORCE_BUILD else 0
+                "1" if request.MODAL_FORCE_BUILD else "0"
                 )
 
         # Configure Compose File
