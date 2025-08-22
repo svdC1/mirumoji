@@ -56,10 +56,6 @@ jobs:
                   $version = "${{ github.event.release.tag_name }}".TrimStart('v')
                   (Get-Content -path "apps/cli/build_assets/version_template.txt" -Raw) -replace '__VERSION__', $version | Set-Content -Path "apps/cli/build_assets/version.txt"
 
-            - name: Install ImageMagick (macOS only)
-              if: matrix.os_name == 'macOS'
-              run: brew install imagemagick
-
             - name: Create .icns file for macOS (macOS)
               if: matrix.os_name == 'macOS'
               run: |
