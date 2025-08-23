@@ -13,9 +13,9 @@ class JMEntry(BaseModel):
 
     Args:
       rank (int): Priority rank for entry
-      kana (list): List of kana readings
-      kanji (list): List of kanji readings
-      senses (list): List of WordSense models
+      kana (List[str]): List of kana readings
+      kanji (List[str]): List of kanji readings
+      senses (List[WordSense]): List of WordSense models
     """
     rank: int
     kana: List[str]

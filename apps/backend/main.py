@@ -7,7 +7,7 @@ Attributes:
   LOGGING_LEVEL (str): Level for the Logging object.
 """
 import logging
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator, Any, Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,7 +36,7 @@ MEDIA_FILE_HANDLER = MediaFileHandler()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[Optional[Any]]:
     """
     Context Manager for managing API's lifecyle.
 

@@ -14,7 +14,7 @@ class BreakdownResponse(BaseModel):
     Args:
       sentence (str): The analyzed sentence.
       focus (FocusInfo): The `FocusInfo` model.
-      tokens (list): List of `Token` models.
+      tokens (List[Token]): List of `Token` models.
       gpt_explanation (str): The GPT API call response.
     """
     sentence: str

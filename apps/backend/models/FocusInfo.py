@@ -14,9 +14,9 @@ class FocusInfo(BaseModel):
     Args:
       word (str): Word to breakdown.
       reading (str): Word Kana.
-      meanings (list): List of meanings for the word.
+      meanings (List[str]): List of meanings for the word.
       jlpt (str): JLPT vocabulary level for the word or 'Unkonwn'
-      examples (list): List of example sentences.
+      examples (List[str]): List of example sentences.
     """
     word: str
     reading: str

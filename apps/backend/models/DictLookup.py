@@ -16,12 +16,12 @@ class DictLookup(BaseModel):
 
     Args:
       word (str): Query word.
-      jmentries (list): List of JMEntry models.
-      jmnentries (list): List of JMNEntry models.
-      kanji (list): List of KanjiInfo models.
-      meanings (list): List of gloss strings from the first entry's sense
+      jmentries (List[JMEntry]): List of JMEntry models.
+      jmnentries (List[JMNEntry]): List of JMNEntry models.
+      kanji (List[KanjiInfo]): List of KanjiInfo models.
+      meanings (List[str]): List of gloss strings from the first entry's sense
       jlpt (str): JLPT vocabulary level for the word or 'Unkonwn'
-      examples (list): List of example sentences.
+      examples (List[str]): List of example sentences.
     """
     word: str
     jmentries: List[JMEntry]

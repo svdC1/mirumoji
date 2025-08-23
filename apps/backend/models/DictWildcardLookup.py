@@ -17,10 +17,10 @@ class DictWildcardLookup(BaseModel):
 
     Args:
       pattern (str): Query word.
-      jmentries (list): List of JMEntry models.
-      jmnentries (list): List of JMNEntry models.
-      kanji (list): List of KanjiInfo models.
-      examples (list): List of example sentences.
+      jmentries (List[JMEntry]): List of JMEntry models.
+      jmnentries (List[JMNEntry]): List of JMNEntry models.
+      kanji (List[KanjiInfo]): List of KanjiInfo models.
+      examples (List[str]): List of example sentences.
     """
     pattern: str
     jmentries: List[JMEntry]
