@@ -145,3 +145,4 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.magiclink
+  - pymdownx.blocks.caption

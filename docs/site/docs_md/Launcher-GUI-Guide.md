@@ -10,25 +10,29 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
 
 === "Launcher Tab"
 
-    This is the main control panel for your application.
-
+    <figure markdown="span">
     ![Launcher Tab Screenshot](assets/images/launch.png)
-
+    <figcaption>
+    This is the main control panel for your application.
     ???+ info "**Controls**"
-        -   **Start App**: Starts the Mirumoji application using the settings from the Configuration tab.
-        -   **Stop App**: Stops the Mirumoji application.
-        -   **Build Locally**: Builds the necessary Docker images on your machine instead of downloading them. This is for more advanced use cases.
+        |     Button    | Details                                                                                                              |
+        |:-------------:|----------------------------------------------------------------------------------------------------------------------|
+        | Start App     | Starts the Mirumoji application using the settings from the Configuration tab.                                       |
+        | Stop App      | Stops the Mirumoji application.                                                                                      |
+        | Build Locally | Builds the necessary Docker images on your machine instead of downloading them. This is for more advanced use cases. |
     ???+ info "**System Info**"
         -   Shows the status of Docker and whether an NVIDIA GPU is detected. You can click the refresh button to re-check the status.
     ???+ "**App Status**"
         -   Indicates whether the main Mirumoji application is `Running`, `Not Ready`, or `Unhealthy`.
+    </figcaption>
+    </figure>
 
 === "Configuration Tab"
 
-    This tab allows you to configure all aspects of your Mirumoji installation before you start it.
-
+    <figure markdown="span">
     ![Configuration Tab Screenshot](assets/images/config.png)
-
+    <figcaption>
+    This tab allows you to configure all aspects of your Mirumoji installation before you start it.
     ???+ info "**Image Repository**"
         Choose whether to download the pre-built Docker images from `GitHub` or `DockerHub`.
     ???+ info "**OpenAI API Key** **(Required)**"
@@ -43,16 +47,19 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
         If an NVIDIA GPU is detected on your system, this option will be available. Toggling it on will use the GPU-enabled backend for significantly faster AI performance.
         ??? warning
             The availability of the "Use NVIDIA GPU" option depends on whether an NVIDIA GPU is detected on your system and if the necessary drivers and NVIDIA Container Toolkit are installed. Refer to the [`Manual Setup Guide`](Manual-Setup.md) for more details.
+    </figcaption>
+    </figure>
 
 === "App Logs Tab"
 
-    This tab allows you to view the real-time logs from the running Mirumoji application, which is useful for monitoring its activity or debugging issues.
-
+    <figure markdown="span">
     ![Logs Tab Screenshot](./assets/images/appLogs.png)
-
+    <figcaption>
+    This tab allows you to view the real-time logs from the running Mirumoji application, which is useful for monitoring its activity or debugging issues.
     ???+ info "**Start/Stop Streaming**"
         Use these buttons to connect or disconnect from the log stream.
-
+    </figcaption>
+    </figure>
 ---
 
 ??? tip
