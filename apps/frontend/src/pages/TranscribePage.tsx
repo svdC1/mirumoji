@@ -290,7 +290,7 @@ export default function TranscribePage() {
                 />
             )}
 
-            <div className="p-4 border-t border-zinc-700 space-y-4">
+            <div className="p-4 border-t select-none border-zinc-700 space-y-4">
                 {previewUrl && (
                     <AudioPlayer
                         src={previewUrl}

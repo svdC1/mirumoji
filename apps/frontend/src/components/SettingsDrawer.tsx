@@ -281,7 +281,7 @@ export default function SettingsDrawer({
             transition={{ type: "tween", duration: 0.2 }}
             className="flex-shrink-0 h-full bg-neutral-900 border-r border-neutral-700 overflow-y-auto"
         >
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full select-none">
                 <div className="flex flex-col items-center px-6 py-4 border-b border-neutral-700">
                     <h2 className="text-xl text-center font-semibold text-neutral-100 flex-1">
                         Settings

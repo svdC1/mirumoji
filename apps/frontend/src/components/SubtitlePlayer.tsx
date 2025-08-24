@@ -166,7 +166,7 @@ export default function SubtitlePlayer({
 
             {activeCue && (
                 <div
-                    className="absolute w-full px-2 text-center pointer-events-none"
+                    className="absolute select-none w-full px-2 text-center pointer-events-none"
                     style={{ bottom: `${subtitleStyle.position}%` }}
                 >
                     <span
