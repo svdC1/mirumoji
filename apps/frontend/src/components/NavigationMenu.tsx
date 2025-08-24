@@ -65,7 +65,7 @@ export default function NavigationMenu() {
             {/* Side panel */}
             <aside
                 className={`
-          fixed top-0 right-0 z-50 h-full w-72  /* Increased width for profile input */
+          fixed top-0 right-0 z-50 h-full w-72 select-none
           bg-gray-800 dark:bg-gray-900 shadow-lg
           transform transition-transform flex flex-col
           ${open ? "translate-x-0" : "translate-x-full"}

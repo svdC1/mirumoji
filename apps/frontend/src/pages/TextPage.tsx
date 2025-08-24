@@ -70,7 +70,7 @@ const TextPage: React.FC = () => {
     };
 
     return (
-        <div className="p-4 bg-gray-900 text-white min-h-screen">
+        <div className="p-4 bg-gray-900 text-white select-none min-h-screen">
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold mb-4 text-center">
                     Text Analyzer
@@ -137,7 +137,7 @@ const TextPage: React.FC = () => {
                 ) : (
                     <div>
                         <textarea
-                            className="w-full h-96 p-4 border border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full h-96 p-4 border text-center border-gray-600 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             placeholder="Paste your Japanese text here..."
                             value={text}
                             onChange={handleTextChange}

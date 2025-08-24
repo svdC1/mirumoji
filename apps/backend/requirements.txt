@@ -10,7 +10,7 @@ python-multipart==0.0.20
 aiofiles==24.1.0
 uvicorn==0.34.2
 pydantic[email]
-modal==1.0.2
+modal==1.1.3
 genanki==0.13.1
 databases==0.9.0
 aiosqlite==0.20.0

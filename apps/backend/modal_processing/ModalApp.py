@@ -4,14 +4,9 @@ in Modal's container.
 
 Attributes:
   LOGGER (logging.Logger): Module's logging object.
-  MODAL_IMAGE (str): Docker Repository URL for pre-built Image acquired from
-                     environment variable. Defaults to
-                    `docker.io/svdc1/mirumoji-modal-gpu:latest`
-  GPU (str): Which Modal GPU to use from environment variable.
-             Defaults to `A10G`
 """
 
-from typing import Union, Generator
+from typing import Union, Generator, Optional
 import modal
 import os
 import logging
@@ -61,7 +56,7 @@ def transcribe_srt_job(media_fp: Union[str, Path],
                        fwhisper_kwargs: dict = {},
                        transcribe_kwargs: dict = {},
                        fix_with_chat_gpt: bool = True
-                       ) -> Union[str, None]:
+                       ) -> Optional[str]:
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
     and returns SRT string.
@@ -76,7 +71,7 @@ def transcribe_srt_job(media_fp: Union[str, Path],
                                           transcription. Defaults to True
 
     Returns:
-      str: Transcription in form of SRT string.
+      Optional[str]: Transcription in form of SRT string.
     """
     from processing.whisper_wrapper import FWhisperWrapper
 
@@ -191,7 +186,7 @@ def video_conversion_job(video_fp: Union[str, Path],
 def transcribe_to_string_job(audio_fp: Union[str, Path],
                              fwhisper_kwargs: dict = {},
                              transcribe_kwargs: dict = {}
-                             ) -> Union[str, None]:
+                             ) -> str:
     """
     Transcribe audio to string using Faster Whisper.
 

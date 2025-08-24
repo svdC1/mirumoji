@@ -27,80 +27,87 @@ Mirumoji is an open-source, self-hosted Japanese immersion toolkit. Drop in any 
 
 === "**Interactive Video Player**"
 
-    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
+    <figure markdown="span">
+    ![player](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
+    <figcaption>Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.</figcaption>
+    </figure>
 
-    > Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.
 
 === "**Clickable Japanese Subtitles**"
 
-    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
-
-    > Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information
+    <figure markdown="span">
+    ![word_dialog](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
+    <figcaption>Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information</figcaption>
+    </figure>
 
 === "**Dictionary**"
 
-    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
-
-    > Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.
+    <figure markdown="span">
+    ![dictionary](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
+    <figcaption>Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.</figcaption>
+    </figure>
 
 === "**Text Analyzer**"
 
-    ![alt-txt](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
-
-    > Copy and paste text for tokenized output with furigana and clickable words.
+    <figure markdown="span">
+    ![text_analyzer](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
+    <figcaption>Copy and paste text for tokenized output with furigana and clickable words.</figcaption>
+    </figure>
 
 === "**OpenAI Integration**"
 
-    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/gpt_template.png?raw=true)
-
-    > Modify System Message and User Prompt with `{sentence}` and `{word}` variables.
+    <figure markdown="span">
+    ![gpt_template](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/gpt_template.png?raw=true)
+    <figcaption>Modify System Message and User Prompt with `{sentence}` and `{word}` variables.</figcaption>
+    </figure>
 
 === "**Local Media Processing**"
 
-    === "**Video Conversion**"
+    ???+ info "**Video Conversion**"
+        Upload videos in various formats; they can be converted to MP4 for optimal playback.
 
-        > Upload videos in various formats; they can be converted to MP4 for optimal playback.
-
-    === "**SRT Generation**"
-
-        > Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
+    ???+ info "**SRT Generation**"
+        Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
 
 === "**Audio Transcription**"
 
-    ![alt-text](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/transcription.png?raw=true)
-
-    > Transcribe Japanese audio from recordings or uploaded files.
+    <figure markdown="span">
+    ![transcription](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/transcription.png?raw=true)
+    <figcaption>Transcribe Japanese audio from recordings or uploaded files.</figcaption>
+    </figure>
 
 === "**Profile-Based Data Management**"
 
-    === "**Persistent Storage**"
+    ??? info "**Persistent Storage**"
 
-        ![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/profile.png?raw=true)
+        <figure markdown="span">
+        ![profile](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/profile.png?raw=true)
+        <figcaption>Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.</figcaption>
+        </figure>
 
-        > Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.
+    ??? info "**Clip Saving**"
 
-    === "**Clip Saving**"
-
-        ![alt-img](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
-
-        > Save important video segments with their associated word breakdowns and export as an Anki Deck
-
+        <figure markdown="span">
+        ![clips](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
+        <figcaption>Save important video segments with their associated word breakdowns and export as an Anki Deck</figcaption>
+        </figure>
 ---
 
 # Setup
 
-> Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) images and are set up to work with Docker Compose.
+???+ info "Docker Images"
+    Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) images and are set up to work with Docker Compose.
 
-> The easiest setup is to run the [`launcher`](https://github.com/svdC1/mirumoji/tree/main/apps/cli) for your platform. **For detailed instructions please refer to the [`Setup Guide`](Setup-Guide.md)**
+???+ tip 
+    The easiest setup is to run the [`GUI Launcher`](Launcher-GUI-Guide.md) for your platform.
+    **For detailed instructions please refer to the [`Setup Guide`](Setup-Guide.md)**
 
-> You can also choose to [`build`](https://docs.docker.com/build/) the images locally with the Dockerfiles provided.
 
 ---
 
 # Image Sizes
 
-> Compressed sizes for the Docker Images
-
-> -   ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-gpu-latest?style=for-the-badge&&logoSize=auto&label=GPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-gpu-latest%2F)
-> -   ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-cpu-latest?style=for-the-badge&logoSize=auto&label=CPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-cpu-latest%2F)
-> -   ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/frontend-latest?style=for-the-badge&logoSize=auto&label=Frontend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Ffrontend-latest%2F)
+???+ info "Compressed Image Sizes"
+    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-gpu-latest?style=for-the-badge&&logoSize=auto&label=GPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-gpu-latest%2F)
+    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-cpu-latest?style=for-the-badge&logoSize=auto&label=CPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-cpu-latest%2F)
+    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/frontend-latest?style=for-the-badge&logoSize=auto&label=Frontend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Ffrontend-latest%2F)

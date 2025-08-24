@@ -65,7 +65,7 @@ export default function HomePage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 text-gray-100 font-sans antialiased">
+        <div className="min-h-screen select-none bg-gradient-to-br from-slate-900 to-gray-900 text-gray-100 font-sans antialiased">
             <header className="absolute top-0 left-0 p-4 space-x-4">
                 <a
                     href="https://github.com/svdC1/mirumoji"

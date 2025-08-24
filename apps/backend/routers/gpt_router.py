@@ -41,7 +41,7 @@ async def breakdown(
 
     Args:
       req (BreakdownRequest): JSON request matching `BreakdownRequest` model.
-      profile_id (str, optinoal): Profile ID Header.
+      profile_id (str, optional): Profile ID Header.
 
     Returns:
       dict: Dictionary containing fields of `BreakdownResonse` model.
@@ -81,7 +81,7 @@ async def custom_breakdown(
     Args:
       req (CustomBreakdownRequest): JSON request matching
                                     `CustomBreakdownRequest` model.
-      profile_id (str, optinoal): Profile ID Header.
+      profile_id (str, optional): Profile ID Header.
 
     Returns:
       dict: Dictionary containing fields of `BreakdownResonse` model.

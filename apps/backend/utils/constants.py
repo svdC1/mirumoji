@@ -1,6 +1,21 @@
 """
 This module defines constant and environemnt variables that are used
 throughout the application for consistency.
+
+Attributes:
+  LOG_DIR (Path): Environment variable of directory to use for logging.
+                  Defaults to `Path.home() / '.mirumoji_logs'`
+  BASE_MEDIA_DIR (Path): Environment variable of the main directory to store
+                         user media. Defaults to `Path('media_files')`.
+  TEMP_DIR (Path): Directory to use for temporary operations inside
+                   `BASE_MEDIA_DIR` resolved as `BASE_MEDIA_DIR / 'temp'`.
+  FWHISPER_GPT_DEFAULT_SYS_MSG (str): Default system message for subtitle
+                                      fixing with GPT fron environment variable
+  MODAL_GPU (str): Which Modal GPU to use from environment variable.
+                   Defaults to `A10G`
+  MODAL_IMAGE (str): Docker Repository URL for pre-built Image acquired from
+                     environment variable. Defaults to
+                    `docker.io/svdc1/mirumoji-modal-gpu:latest`
 """
 
 import os

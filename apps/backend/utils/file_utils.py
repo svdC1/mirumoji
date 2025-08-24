@@ -30,7 +30,7 @@ async def save_upload_file(request: Request,
     chunks to `dest` and displaying a `TQDM` progress bar in logging.
 
     Args:
-      request (UploadFile): FastAPI `Request` object.
+      request (Request): FastAPI `Request` object.
       dest (Path): The path where the file will be saved.
       tqdm_description (str, optional): Description of the progress bar in
                                         logging. Defaults to None

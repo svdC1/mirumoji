@@ -119,9 +119,8 @@ code mirumoji
 
     > When submiting contributions, please adhere to the [`Code of Conduct`](https://github.com/svdC1/mirumoji/blob/main/.github/CODE_OF_CONDUCT.md)
 
-    > Responsibilities
-    >
-    > -   Create issues for any major changes and enhancements that you wish to make. Discuss things transparently and get community feedback.
-    > -   Follow provided issue templates when submitting.
-    > -   Keep feature versions as small as possible, preferably one new feature per version.
-    > -   Be welcoming to newcomers and encourage diverse new contributors from all backgrounds. See the [Python Community Code of Conduct](https://www.python.org/psf/codeofconduct/).
+    ???+ info "Responsibilities"
+        -   Create issues for any major changes and enhancements that you wish to make. Discuss things transparently and get community feedback.
+        -   Follow provided issue templates when submitting.
+        -   Keep feature versions as small as possible, preferably one new feature per version.
+        -   Be welcoming to newcomers and encourage diverse new contributors from all backgrounds. See the [`Python Community Code of Conduct`](https://www.python.org/psf/codeofconduct/).

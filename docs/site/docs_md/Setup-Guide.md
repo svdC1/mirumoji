@@ -23,7 +23,8 @@ This guide will help you get the Mirumoji application running on your system.
     Since this is a bundled application program, it's common to have securities concerns regarding what exactly it is executing. This has been bundled as an executable mainly for the sake of convenience, so that you don't have to manually find which `docker-compose` file is suitable for the version you want to run, look up docker build and compose commands, etc.
 
     ??? note "MacOS"
-        On newer macOS versions, you might see a security warning the first time you run the launcher because it's a downloaded application. You may need to go to "System Settings" > "Privacy & Security", scroll down, and click "Open Anyway" or allow the app.
+        On newer macOS versions, you might see a security warning the first time you run the launcher because it's a downloaded application. You may need to go to
+        `System Settings > Privacy & Security`, scroll down, and click `Open Anyway` or allow the app.
 
     === "**GUI Launcher**"
 
@@ -100,15 +101,16 @@ This guide will help you get the Mirumoji application running on your system.
 
 ## Accessing the Application
 
-> Once the containers are running the application will be live in your [localhost](https://localhost) over HTTPS.
-
-> You can access it from any device inside your local network by accessing your computer's local [`IPv4 address`](https://geekflare.com/consumer-tech/find-ip-address-of-windows-linux-mac-and-website/) over HTTPS.
+???+ info 
+    Once the containers are running the application will be live in your [`localhost`](https://localhost) over HTTPS.
+    You can access it from any device inside your local network by accessing your computer's local [`IPv4 address`](https://geekflare.com/consumer-tech/find-ip-address-of-windows-linux-mac-and-website/) over HTTPS.
 
 ---
 
 # Manual Setup
 
-> Please refer to the [`Manual Setup`](https://svdc1.github.io/mirumoji/docs/Manual-Setup) Page
+???+ tip
+    Please refer to the [`Manual Setup`](https://svdc1.github.io/mirumoji/docs/Manual-Setup) Page
 
 ---
 

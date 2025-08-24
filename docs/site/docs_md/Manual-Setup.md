@@ -88,18 +88,22 @@ This guide explains how to run Mirumoji on your local machine using Docker Compo
 
 ## Accessing the Application
 
-Once the containers are running:
+Once the containers are running
 
 === "**Frontend Application**"
-    -   Open your web browser and go to you [`localhost`](https://localhost) over HTTPS where `Nginx` will serve the application.
+    ???+ info
+        Open your web browser and go to you [`localhost`](https://localhost) over HTTPS where `Nginx` will serve the application.
 === "**Backend API (Direct Access)**"
-    -   The backend API will be accessible at your [`localhost`](http://localhost:8000) at port `8000` where uvicorn will deploy the API. It will also be available at your [`localhost/api`](https://localhost/api/health/status) through a reverse-proxy.
-    -   The frontend application is configured to communicate with the backend automatically.
-    -   If you want to check if the backend is running correctly you can access the [`/health/status`](http://localhost:8000/health/status) endpoint, where you should see the following `JSON` response: `{'status':'ok'}`. You can also check information about the Docker Container running the backend at the [`/health/system`](http://localhost:8000/health/system) endpoint.
+    ???+ info
+        The backend API will be accessible at your [`localhost`](http://localhost:8000) at port `8000` where uvicorn will deploy the API. It will also be available at your [`localhost/api`](https://localhost/api/health/status) through a reverse-proxy. The frontend application is configured to communicate with the backend automatically.
+    ???+ tip
+        If you want to check if the backend is running correctly you can access the [`/health/status`](http://localhost:8000/health/status) endpoint, where you should see the following `JSON` response: `{'status':'ok'}`. You can also check information about the Docker Container running the backend at the [`/health/system`](http://localhost:8000/health/system) endpoint.
 
-> You can access it from any device inside your local network using your computer's [`Internal IPv4 address`](https://geekflare.com/consumer-tech/find-ip-address-of-windows-linux-mac-and-website/) over HTTPS.
+???+ tip
+    You can access it from any device inside your local network using your computer's [`Internal IPv4 address`](https://geekflare.com/consumer-tech/find-ip-address-of-windows-linux-mac-and-website/) over HTTPS.
 
-> On the first time access on any device, the browser will display a security warning because the HTTPS certificate is [`self-signed`](https://www.keyfactor.com/blog/self-signed-certificate-risks/). This presents very little risk since the application runs entirely inside your system and is only available inside your local network. To learn more about this you can follow the link provided on self-signed.
+??? warning 
+    On the first time access on any device, the browser will display a security warning because the HTTPS certificate is [`self-signed`](https://www.keyfactor.com/blog/self-signed-certificate-risks/). This presents very little risk since the application runs entirely inside your system and is only available inside your local network. To learn more about this you can follow the link provided on self-signed.
 
 ## Stopping the Application
 
@@ -120,8 +124,8 @@ To stop the application and remove the containers:
     ```bash
     docker compose -f compose/docker-compose.gpu.yaml down
     ```
-
--   This command will stop and remove the containers. If you also want to remove the volumes (Application cache to speed up subsequent runs and your database/files), you can attach the `-v` flag at the end of the command.
+???+ info
+    This command will stop and remove the containers. If you also want to remove the volumes (Application cache to speed up subsequent runs and your database/files), you can attach the `-v` flag at the end of the command.
 
 ## Troubleshooting
 

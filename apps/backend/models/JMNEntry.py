@@ -11,10 +11,10 @@ class JMNEntry(BaseModel):
     a queried word.
 
     Args:
-      kana (list): List of kana readings
-      kanji (list): List of kanji readings
+      kana (List[str]): List of kana readings
+      kanji (List[str]): List of kanji readings
       translation_type (str): Type of name
-      gloss (list): List of translation strings
+      gloss (List[str]): List of translation strings
     """
     kana: List[str]
     kanji: List[str]

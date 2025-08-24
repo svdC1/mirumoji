@@ -11,6 +11,7 @@ import {
     filterDictWildcardLookup,
     filterDictLookup,
 } from "../services/dictApi";
+import { SearchIcon } from "lucide-react";
 import { DictLookup, DictWildcardLookup } from "../types/types";
 import {
     ComprehensiveEntryCard,
@@ -75,25 +76,25 @@ export const DictionaryPage = () => {
     };
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 text-white min-h-screen">
+        <div className="container select-none mx-auto p-4 sm:p-6 text-white min-h-screen">
             <h1 className="text-4xl font-bold mb-6 text-center text-indigo-400">
                 Dictionary
             </h1>
-            <div className="flex flex-col sm:flex-row gap-2 mb-6 max-w-xl mx-auto">
+            <div className="flex flex-col justify-center sm:flex-row gap-2 mb-6 max-w-xl mx-auto">
                 <input
                     type="text"
                     value={pattern}
                     onChange={(e) => setPattern(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     placeholder="Word or wildcard pattern (e.g. *字*)"
-                    className="flex-grow bg-neutral-800 border border-neutral-700 rounded-md py-2 px-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+                    className="flex-grow text-center bg-neutral-800 border border-neutral-700 rounded-md py-2 px-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
                 />
                 <button
                     onClick={handleSearch}
                     disabled={isLoading}
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white font-bold py-2 px-6 rounded-md transition-colors duration-200"
                 >
-                    {isLoading ? "Searching..." : "Search"}
+                    {isLoading ? "..." : <SearchIcon size={20}/>}
                 </button>
             </div>
 
