@@ -19,16 +19,19 @@ jobs:
             
             - name: Install Dependencies
               run: |
-                  cd apps/frontend && npm install license-checker-rseidelsohn
-                  cd apps/frontend && npm install --omit=dev
-                  cd apps/frontend && npm install yui-lint
+                  
+                  cd apps/frontend
+                  npm install --omit=dev
+                  npm install license-checker-rseidelsohn
+                  npm install yui-lint
             - name: Generate NOTICE + legal texts
               run: |
-                  cd apps/frontend && \
-                  license-checker-rseidelsohn --production \
-                    --markdown \
-                    --out frontend-licenses/NOTICE-frontend.md \
-                    --files frontend-licenses
+                  cd apps/frontend
+                  license-checker-rseidelsohn \
+                  --production \
+                  --markdown \
+                  --out frontend-licenses/NOTICE-frontend.md \
+                  --files frontend-licenses
             - name: Download External Licenses
               run: |
                   curl -L \
