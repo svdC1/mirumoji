@@ -27,7 +27,7 @@ jobs:
             - name: Generate NOTICE + legal texts
               run: |
                   cd apps/frontend
-                  license-checker-rseidelsohn \
+                  npx license-checker-rseidelsohn \
                   --production \
                   --markdown \
                   --out frontend-licenses/NOTICE-frontend.md \
