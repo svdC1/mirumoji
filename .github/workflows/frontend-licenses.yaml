@@ -13,21 +13,24 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: "22"
-
+            
+            - name: Create Folder
+              run: mkdir apps/frontend/frontend-licenses
+            
+            - name: Install Dependencies
+              run: |
+                  npm install -g license-checker-rseidelsohn
+                  cd apps/frontend && npm install --omit=dev
+                  cd apps/frontend && npm install yui-lint
             - name: Generate NOTICE + legal texts
               run: |
-                  mkdir apps/frontend/frontend-licenses
-                  npm install -g license-checker-rseidelsohn
-                  cd apps/frontend && \
-                  npm install --omit=dev
-                  cd apps/frontend && \ 
-                  npm install yui-lint
                   cd apps/frontend && \
                   license-checker-rseidelsohn --production \
                     --markdown \
-                    --out apps/frontend/frontend-licenses/NOTICE-frontend.md \
-                    --files apps/frontend/frontend-licenses
-                    --excludePrivatePackages
+                    --out frontend-licenses/NOTICE-frontend.md \
+                    --files frontend-licenses
+            - name: Download External Licenses
+              run: |
                   curl -L \
                     "https://raw.githubusercontent.com/nodejs/node/v22.x/LICENSE" \
                     -o apps/frontend/frontend-licenses/NodeJS_LICENSE.txt
