@@ -30,8 +30,7 @@ jobs:
                   npx license-checker-rseidelsohn \
                   --production \
                   --markdown \
-                  --out frontend-licenses/NOTICE-frontend.md \
-                  --files frontend-licenses
+                  --out frontend-licenses/license.md \
             - name: Download External Licenses
               run: |
                   curl -L \
