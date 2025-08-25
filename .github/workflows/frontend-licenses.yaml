@@ -29,13 +29,13 @@ jobs:
                     --files frontend-licenses
                   curl -L \
                     "https://raw.githubusercontent.com/nodejs/node/v22.x/LICENSE" \
-                    -o frontend-licenses/NodeJS_LICENSE.txt
+                    -o apps/frontend/frontend-licenses/NodeJS_LICENSE.txt
                   curl -L \
                     "https://raw.githubusercontent.com/nginx/nginx/master/LICENSE" \
-                    -o frontend-licenses/NGINX_LICENSE.txt
+                    -o apps/frontend/frontend-licenses/NGINX_LICENSE.txt
 
             - name: Upload licenses folder
               uses: actions/upload-artifact@v4
               with:
                   name: frontend-licenses
-                  path: frontend-licenses
+                  path: apps/frontend/frontend-licenses
