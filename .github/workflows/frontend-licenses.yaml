@@ -23,10 +23,11 @@ jobs:
                   cd apps/frontend && \ 
                   npm install yui-lint
                   cd apps/frontend && \
-                  npx license-checker-rseidelsohn --production \
+                  license-checker-rseidelsohn --production \
                     --markdown \
                     --out apps/frontend/frontend-licenses/NOTICE-frontend.md \
                     --files apps/frontend/frontend-licenses
+                    --excludePrivatePackages
                   curl -L \
                     "https://raw.githubusercontent.com/nodejs/node/v22.x/LICENSE" \
                     -o apps/frontend/frontend-licenses/NodeJS_LICENSE.txt
