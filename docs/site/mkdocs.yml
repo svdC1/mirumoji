@@ -8,6 +8,7 @@ nav:
   - Home:
       - index.md
       - Contributing: Contributing.md
+      - Licenses: Licenses.md
   - Setup:
       - Setup Guide: Setup-Guide.md
       - Manual Setup: Manual-Setup.md
