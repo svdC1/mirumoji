@@ -19,7 +19,7 @@ jobs:
             
             - name: Install Dependencies
               run: |
-                  npm install -g license-checker-rseidelsohn
+                  cd apps/frontend && npm install license-checker-rseidelsohn
                   cd apps/frontend && npm install --omit=dev
                   cd apps/frontend && npm install yui-lint
             - name: Generate NOTICE + legal texts
