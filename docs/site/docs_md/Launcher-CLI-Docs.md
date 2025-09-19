@@ -104,9 +104,9 @@ mirumoji shutdown [OPTIONS]
 
 ??? tip "Steps Performed"
 
-   > -   Verifies options which were not passed as options flags.
-   >
-   > -   Runs appropriate Docker Compose command to stop application.
+    > -   Verifies options which were not passed as options flags.
+    >
+    > -   Runs appropriate Docker Compose command to stop application.
 
 ??? info "Options"
     | Option                 | Description                                                                                        |

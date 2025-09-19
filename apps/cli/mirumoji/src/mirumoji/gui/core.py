@@ -29,7 +29,7 @@ def git_installed() -> subprocess.CompletedProcess[str]:
       subprocess.CalledProcessError: If command fails
 
     Returns:
-      CompletedProcess[str]: The `subprocess.CompletedProcess` object
+      The `subprocess.CompletedProcess` object
     """
     try:
         git_check = subprocess.run(
@@ -58,7 +58,7 @@ def docker_running() -> subprocess.CompletedProcess[str]:
       subprocess.CalledProcessError: If command fails
 
     Returns:
-      CompletedProcess[str]: The `subprocess.CompletedProcess` object
+      The `subprocess.CompletedProcess` object
     """
     try:
         p = subprocess.run(
@@ -238,8 +238,7 @@ def run_command(command_list: List[str],
                                Defaults to True
 
     Returns:
-      Union[Popen[str],Generator[str,str,Popen[str]]:
-        Subprocess object with `pid`, `stdin`, `stdout`, `stderr`
+      Subprocess object with `pid`, `stdin`, `stdout`, `stderr`
         and `returncode` or a generator that yields stdout lines
         (str) and has a return value of the completed `subprocess.Popen`
         object.
@@ -371,9 +370,9 @@ def build_img(image_name: str,
       FileNotFoundError: If `dockerfile` or `build_context` couldn't be found
 
     Returns:
-      Generator[str, str, Popen[str]]: Generator that yields stdout lines
-                                       (str) and has a return value of the
-                                       completed `subprocess.Popen` object.
+      Generator that yields stdout lines
+        (str) and has a return value of the
+        completed `subprocess.Popen` object.
     """
     if not dockerfile.is_file():
         LOGGER.error(f"Dockerfile couldn't be found at '{dockerfile}'")
@@ -428,9 +427,9 @@ def docker_compose(compose_command: str,
       ValueError: If `name_only=False`and `docker_compose_file=None`
 
     Returns:
-      Generator[str, str, Popen[str]]: Generator that yields stdout lines
-                                       (str) and has a return value of the
-                                       completed `subprocess.Popen` object.
+      Generator that yields stdout lines
+        (str) and has a return value of the
+        completed `subprocess.Popen` object.
     """
     if not name_only and docker_compose_file is None:
         LOGGER.error("`name_only=False` and compose file not provided")

@@ -27,6 +27,8 @@ export interface PlayerContextState {
     showFurigana: boolean;
     setShowFurigana: (show: boolean) => void;
     clearPlayerState: () => void;
+    timestamp: number | null;
+    setTimestamp: (time: number | null) => void;
 }
 
 const PlayerContext = createContext<PlayerContextState | undefined>(undefined);
@@ -53,6 +55,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [showFurigana, setShowFurigana] = useState<boolean>(true);
+    const [timestamp, setTimestamp] = useState<number | null>(null);
 
     /**
      * Resets all player-related state to their initial default values.
@@ -65,6 +68,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setVideoUrl(null);
         setDrawerOpen(true);
         setShowFurigana(true);
+        setTimestamp(null);
     };
 
     const value = {
@@ -83,6 +87,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         showFurigana,
         setShowFurigana,
         clearPlayerState,
+        timestamp,
+        setTimestamp,
     };
 
     return (

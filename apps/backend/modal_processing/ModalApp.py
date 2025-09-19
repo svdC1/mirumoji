@@ -71,7 +71,7 @@ def transcribe_srt_job(media_fp: Union[str, Path],
                                           transcription. Defaults to True
 
     Returns:
-      Optional[str]: Transcription in form of SRT string.
+      Transcription in form of SRT string.
     """
     from processing.whisper_wrapper import FWhisperWrapper
 

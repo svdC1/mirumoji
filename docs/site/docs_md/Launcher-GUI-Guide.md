@@ -35,6 +35,10 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
     This tab allows you to configure all aspects of your Mirumoji installation before you start it.
     ???+ info "**Image Repository**"
         Choose whether to download the pre-built Docker images from `GitHub` or `DockerHub`.
+    ???+ info "**Application Logging Level**"
+        Choose at what level logging gets printed during application runtime.
+    ???+ info "**Modal GPU**"
+        Choose what GPU will be used to process requests in the Modal container.
     ???+ info "**OpenAI API Key** **(Required)**"
         You must provide a valid OpenAI API key for the application's AI features to work.
     ???+ info "**Modal Tokens (CPU Only)**"
@@ -47,6 +51,10 @@ The Mirumoji Launcher (`mirumoji-gui`) is the recommended way to install, config
         If an NVIDIA GPU is detected on your system, this option will be available. Toggling it on will use the GPU-enabled backend for significantly faster AI performance.
         ??? warning
             The availability of the "Use NVIDIA GPU" option depends on whether an NVIDIA GPU is detected on your system and if the necessary drivers and NVIDIA Container Toolkit are installed. Refer to the [`Manual Setup Guide`](Manual-Setup.md) for more details.
+    ???+ info "**Modal Force Build**"
+        When using Modal, this will make the container re-pull the latest version of the Modal container image
+        if it's not on, Modal will use the latest version it has on cache. This should only be on when you want
+        to update the version you're using on your account to the latest one.
     </figcaption>
     </figure>
 

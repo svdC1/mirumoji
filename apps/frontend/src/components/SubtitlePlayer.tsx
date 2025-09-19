@@ -13,6 +13,7 @@ import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 import { IpadicFeatures } from "kuromoji";
 import { Cue, SubtitlePlayerProps } from "../types/types";
 import { toSec, hexToRgba } from "../utils/formatters";
+import { usePlayer } from "../contexts/PlayerContext";
 
 /**
  * The SubtitlePlayer component.
@@ -31,6 +32,7 @@ export default function SubtitlePlayer({
     videoUrl,
     showFurigana,
 }: SubtitlePlayerProps) {
+    const { timestamp, setTimestamp } = usePlayer();
     // Video reference
     const videoRef = useRef<HTMLVideoElement | null>(null);
     // Video Blob URL for Download
@@ -132,6 +134,26 @@ export default function SubtitlePlayer({
         v.addEventListener("timeupdate", onTime);
         return () => v.removeEventListener("timeupdate", onTime);
     }, [cues]);
+
+    useEffect(() => {
+        const videoElement = videoRef.current;
+        if (videoElement && timestamp) {
+            videoElement.currentTime = timestamp;
+        }
+
+        const interval = setInterval(() => {
+            if (videoElement) {
+                setTimestamp(videoElement.currentTime);
+            }
+        }, 5000); // Save timestamp every 5 seconds
+
+        return () => {
+            clearInterval(interval);
+            if (videoElement) {
+                setTimestamp(videoElement.currentTime);
+            }
+        };
+    }, [setTimestamp]);
 
     const activeCue = activeIdx !== null ? cues[activeIdx] : null;
 

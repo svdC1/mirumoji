@@ -26,7 +26,7 @@ async def get_profile_id_from_header(
       x_profile_id (str): The X-Profile-ID Header
 
     Returns:
-      Optional[str]: The X-Profile-ID Header content.
+      The X-Profile-ID Header content.
     """
     return x_profile_id
 
@@ -91,9 +91,9 @@ async def get_profile_id_optional(
       profile_id (str): Profile ID from header.
 
     Returns:
-      Optional[strt]: If profile ID if X-Profile-ID is provided and the
-                        profile exists or could be implicitly created
-                        returns str, otherwise returns None.
+      If X-Profile-ID is provided and the profile
+        exists or could be implicitly created returns str,
+        otherwise returns None.
     """
     if not profile_id:
         return None

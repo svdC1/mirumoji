@@ -163,8 +163,8 @@ def run_command(command_list: List[str],
                                Defaults to True.
 
     Returns:
-      Popen[str]: Subprocess object with `pid`, `stdin`, `stdout`, `stderr`
-                  and `returncode`
+      Subprocess object with `pid`, `stdin`, `stdout`, `stderr`
+        and `returncode`
 
     Raises:
       subprocess.CalledProcessError: If command raises an error and
