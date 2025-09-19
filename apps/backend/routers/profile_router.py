@@ -290,7 +290,7 @@ async def get_saved_clips(
       profile_id (str): Profile ID from Header.
 
     Returns:
-      List[ClipResponse]: List of `ClipResponse` models
+      List of `ClipResponse` models
 
     Raises:
       HTTPException: If no profile ID was provided or there was an error
@@ -378,7 +378,7 @@ async def get_profile_files(
       profile_id (str): Profile ID from Header.
 
     Returns:
-      List[ProfileFileResponse]: List of `ProfileFileResponse` models
+      List of `ProfileFileResponse` models
 
     Raises:
       HTTPException: If no profile ID was provided or there was an error
@@ -478,8 +478,7 @@ async def get_profile_transcripts(
       profile_id (str): Profile ID from Header.
 
     Returns:
-      List[ProfileTranscriptResponse]: List of `ProfileTranscriptResponse`
-                                       models.
+      List of `ProfileTranscriptResponse` models.
 
     Raises:
       HTTPException: If no profile ID was provided or there was an error

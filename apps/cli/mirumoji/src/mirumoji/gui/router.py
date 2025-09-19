@@ -75,7 +75,7 @@ def check_docker() -> Dict[str, bool]:
     GET endpoint which checks if Docker deamon is running
 
     Returns:
-      Dict[str,bool]: Dictionary with `status` key
+      Dictionary with `status` key
     """
     try:
         p = docker_running()
@@ -93,7 +93,7 @@ def has_gpu() -> Dict[str, bool]:
     GET endpoint which checks if the system has an NVIDIA GPU installed
 
     Returns:
-      Dict[str,bool]: Dictionary with `status` key
+      Dictionary with `status` key
     """
     return {"status": has_nvidia_gpu()}
 

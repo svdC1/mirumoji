@@ -16,7 +16,7 @@ def gpu_available() -> Dict[str, Union[bool, str]]:
     Check if there's a GPU available in the machine running the program.
 
     Returns:
-      Dict[str, Union[bool, str]: Dict with keys "available" and "name".
+      Dict with keys "available" and "name".
     """
     try:
         import torch
@@ -38,7 +38,7 @@ def get_system_info() -> Dict[str, Any]:
     Collects basic information about the system running the program.
 
     Returns:
-      Dict[str, Any]: Dict with information about the system.
+      Dict with information about the system.
     """
     info: Dict[str, Any] = {
         "time": datetime.datetime.now().isoformat(timespec="seconds") + "Z",

@@ -197,6 +197,7 @@ class MediaFileHandler:
                                                  media directory.
           check (bool, optional): If True, raise error on failure, otherwise
                                   skip. Defaults to False
+
         Raises:
           OSError: If the file cannot be deleted and `check=True`
         """

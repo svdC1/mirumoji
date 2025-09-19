@@ -27,6 +27,10 @@ nav:
       - Profile Manager: Backend-API/profile_manager.md
       - Routers: Backend-API/router.md
       - Utils: Backend-API/utils.md
+  - Python Package:
+      - GUI: Python-Package/GUI.md
+      - GUI Launcher: Python-Package/GUI-Launcher.md
+      - CLI: Python-Package/CLI.md
   - Frontend UI:
       - Index: Frontend-UI/README.md
       - App: Frontend-UI/App.md
@@ -113,7 +117,8 @@ plugins:
             show_root_members_full_path: false
             show_source: false
             show_submodules: true
-          paths: ["../../apps/", "../../apps/backend"]
+          paths:
+            ["../../apps/", "../../apps/backend", "../../apps/cli/mirumoji/src"]
   - search
   - autorefs:
       resolve_closest: true
