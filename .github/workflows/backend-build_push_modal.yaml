@@ -39,8 +39,8 @@ jobs:
             - name: Build and Push
               uses: docker/build-push-action@v5
               with:
-                  context: ./apps/backend # Backend root
-                  file: ./apps/backend/modal_processing/Dockerfile.modal
+                  context: ./apps/mirumoji # Backend root
+                  file: ./apps/mirumoji/src/mirumoji/server/modal_processing/Dockerfile.modal
                   platforms: linux/amd64
                   tags: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
                   outputs: type=registry

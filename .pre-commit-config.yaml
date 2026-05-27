@@ -1,0 +1,38 @@
+repos:
+    # --- General File Hygiene ---
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: end-of-file-fixer
+          - id: trailing-whitespace
+          - id: check-merge-conflict
+          - id: check-yaml
+          - id: check-added-large-files
+            args: [--maxkb=1000]
+
+    # --- Python: ruff (lint + format) ---
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.11.0
+      hooks:
+          - id: ruff
+            args: [--fix]
+            files: ^apps/mirumoji/src/
+          - id: ruff-format
+            files: ^apps/mirumoji/src/
+
+    # --- Frontend: eslint + prettier ---
+    - repo: local
+      hooks:
+          - id: frontend-eslint
+            name: Frontend ESLint
+            language: node
+            entry: bash -c 'cd apps/frontend && npm run lint'
+            files: ^apps/frontend/src/.*\.(ts|tsx)$
+            pass_filenames: false
+
+          - id: frontend-prettier
+            name: Frontend Prettier
+            language: node
+            entry: bash -c 'cd apps/frontend && npx prettier --write'
+            files: ^apps/frontend/src/.*\.(ts|tsx|css|json)$
+            pass_filenames: true

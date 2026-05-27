@@ -1,0 +1,47 @@
+name: Release CLI + Server Package to PyPi
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+jobs:
+    build-package:
+        name: Build CLI Package
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+            - name: Install Dependencies
+              run: pip install build setuptools
+            - name: Build Package
+              run: cd ./apps/mirumoji && python -m build
+
+            - name: Upload Dist Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dist-artifact
+                  path: ./apps/mirumoji/mirumoji/dist/
+
+    pypi-publish:
+        name: Upload Release to PyPI
+        runs-on: ubuntu-latest
+        environment: pypi
+        needs: build-package
+        permissions:
+            # Trusted Publishing Permission
+            id-token: write
+        steps:
+            - name: Download Dist Artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: dist-artifact
+                  path: dist
+
+            - name: Publish package distributions to PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist

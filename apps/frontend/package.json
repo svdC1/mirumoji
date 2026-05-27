@@ -1,6 +1,6 @@
 {
     "name": "mirumoji-ui",
-    "version": "2.6.0",
+    "version": "3.0.0",
     "private": true,
     "type": "module",
     "scripts": {
@@ -8,7 +8,11 @@
         "build": "vite build",
         "preview": "vite preview",
         "test": "vitest",
-        "docs:generate": "typedoc --options typedoc.json"
+        "docs:generate": "typedoc --options typedoc.json",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
+        "format": "prettier --write src",
+        "format:check": "prettier --check src"
     },
     "dependencies": {
         "@heroicons/react": "^2.2.0",
@@ -51,6 +55,12 @@
         "typedoc-plugin-rename-defaults": "^0.7.3",
         "typedoc-plugin-extras": "^4.0.1",
         "typedoc-plugin-no-inherit": "^1.6.1",
-        "prettier": "^3.6.2"
+        "prettier": "^3.6.2",
+        "eslint": "^9.0.0",
+        "@eslint/js": "^9.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "eslint-plugin-react": "^7.37.0",
+        "eslint-plugin-react-hooks": "^5.0.0"
     }
 }

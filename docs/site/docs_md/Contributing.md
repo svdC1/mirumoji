@@ -58,12 +58,13 @@ code mirumoji
 
 === "Running the Backend"
 
-    > Once inside the development container environment, you can start up the Python backend by running the following command in a terminal. The `8000` port is already forwarded in the container and should be visible in your `localhost:8000`.
+    > Once inside the development container environment, you can start up the Python server by running the following command in a terminal. The `8000` port is already forwarded in the container and should be visible in your `localhost:8000`.
 
     ``` bash
-    cd apps/backend
-    # Run Uvicorn
-    uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    cd apps/mirumoji
+    pip install -e ".[server,dev]"
+    # Start the server (reloads on code changes)
+    mirumoji-server
     ```
 
 === "Running the Frontend"
@@ -80,11 +81,13 @@ code mirumoji
 
 === "Installing the Launcher"
 
-    > Once inside the development container environment, you can install the Python CLI launcher package in editable mode by running the following command.
+    > The launcher and server are now a unified package. The install command above (`pip install -e ".[server,dev]"`) already registers all three entry points: `mirumoji`, `mirumoji-gui`, and `mirumoji-server`.
+
+    Install pre-commit hooks once after cloning:
 
     ```bash
-    cd apps/cli/mirumoji
-    pip install --editable .
+    pip install pre-commit
+    pre-commit install
     ```
 
 ### Repository

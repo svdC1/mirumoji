@@ -12,7 +12,7 @@ services:
             - app-network
 
     backend:
-        image: mirumoji_backend_gpu_local:latest # Changed
+        image: mirumoji_gpu_local:latest # Changed
         ports:
             - "8000:8000"
         environment:

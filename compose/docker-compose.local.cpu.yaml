@@ -12,7 +12,7 @@ services:
             - app-network
 
     backend:
-        image: mirumoji_backend_cpu_local:latest
+        image: mirumoji_cpu_local:latest
         ports:
             - "8000:8000"
         environment:
