@@ -17,12 +17,14 @@ from fastapi import (APIRouter,
                      Header,
                      Path as FastAPIPath
                      )
-from mirumoji.server.models.GptTemplateResponse import GptTemplateResponse
-from mirumoji.server.models.GptTemplateBase import GptTemplateBase
-from mirumoji.server.models.ClipResponse import ClipResponse
-from mirumoji.server.models.ProfileFileResponse import ProfileFileResponse
-from mirumoji.server.models.ProfileTranscriptResponse import ProfileTranscriptResponse
-from mirumoji.server.models.AnkiExportResponse import AnkiExportResponse
+from mirumoji.server.models.llm import GptTemplateBase
+from mirumoji.server.models.responses import (
+    AnkiExportResponse,
+    ClipResponse,
+    GptTemplateResponse,
+    ProfileFileResponse,
+    ProfileTranscriptResponse,
+)
 from mirumoji.server.processing.audio_processing import AudioTools
 from typing import Optional, List
 from pathlib import Path

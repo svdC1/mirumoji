@@ -16,10 +16,12 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, Dict
 
 from mirumoji.server.processing.Processor import Processor
-from mirumoji.server.models.ChatRequest import ChatRequest
-from mirumoji.server.models.BreakdownRequest import BreakdownRequest
-from mirumoji.server.models.BreakdownResponse import BreakdownResponse
-from mirumoji.server.models.CustomBreakdownRequest import CustomBreakdownRequest
+from mirumoji.server.models.requests import (
+    BreakdownRequest,
+    ChatRequest,
+    CustomBreakdownRequest,
+)
+from mirumoji.server.models.responses import BreakdownResponse
 from mirumoji.server.utils.stream_utils import sse_gen
 from mirumoji.server.profile_manager import get_profile_id_optional
 

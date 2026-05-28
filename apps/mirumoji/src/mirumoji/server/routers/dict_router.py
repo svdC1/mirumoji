@@ -10,8 +10,10 @@ Attributes:
 from fastapi import APIRouter, Query, HTTPException
 import logging
 from mirumoji.server.processing.Processor import Processor
-from mirumoji.server.models.DictLookup import DictLookup
-from mirumoji.server.models.DictWildcardLookup import DictWildcardLookup
+from mirumoji.server.models.dict_data import (
+    DictLookup,
+    DictWildcardLookup,
+)
 
 LOGGER = logging.getLogger(__name__)
 dict_router = APIRouter(prefix="/dict")
