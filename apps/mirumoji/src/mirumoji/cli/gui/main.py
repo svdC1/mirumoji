@@ -2,29 +2,28 @@
 Defines and starts the Mirumoji Launcher GUI
 """
 
-from fastapi import (FastAPI,
-                     HTTPException,
-                     Request
-                     )
+import asyncio
+import logging
+import os
+import shutil
+import sys
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-import logging
-import os
-from typing import (AsyncGenerator,
-                    Any
-                    )
-from contextlib import asynccontextmanager
+
 from mirumoji.cli.gui.core import ensure_repo
-import sys
-import shutil
-import asyncio
-from mirumoji.cli.gui.paths import (LOG_DIR,
-                                REPO_URL,
-                                REPO_DIR,
-                                APP_DIR,
-                                WEB_DIR
-                                )
+from mirumoji.cli.gui.paths import (
+    APP_DIR,
+    LOG_DIR,
+    REPO_DIR,
+    REPO_URL,
+    WEB_DIR,
+)
 from mirumoji.cli.gui.router import router
 
 # --- Environment Variables ---
@@ -55,7 +54,7 @@ def setup_logging() -> None:
     formatter = logging.Formatter(
         "{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
         style="{",
-        datefmt="%H:%M:%S[%z]"
+        datefmt="%H:%M:%S[%z]",
     )
 
     # Create and add handlers
@@ -69,6 +68,7 @@ def setup_logging() -> None:
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         root_logger.addHandler(stream_handler)
+
 
 # --- API Setup ---
 
@@ -87,32 +87,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     # --- Setup Repository ---
     try:
         APP_DIR.mkdir(exist_ok=True)
-        ensure_repo(REPO_URL,
-                    REPO_DIR
-                    )
+        ensure_repo(REPO_URL, REPO_DIR)
         LOGGER.info(f"Repo ensured at: '{REPO_DIR}'")
         yield
     except Exception as e:
         LOGGER.error(f"Application failed to start: '{e}'")
         sys.exit(1)
-    await asyncio.to_thread(shutil.rmtree,
-                            REPO_DIR,
-                            ignore_errors=True
-                            )
+    await asyncio.to_thread(shutil.rmtree, REPO_DIR, ignore_errors=True)
 
 
 app = FastAPI(
     title="Mirumoji Launcher",
     description="GUI Launcher for the `mirumoji` application",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.include_router(router)
 
-app.mount("/",
-          StaticFiles(directory=WEB_DIR, html=True),
-          name="stactic"
-          )
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="stactic")
 
 
 app.add_middleware(
@@ -125,9 +117,10 @@ app.add_middleware(
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request,
-                                 exc: HTTPException
-                                 ) -> JSONResponse:
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
     """
     Custom Exception Handler for all HTTP Errors.
 
@@ -144,10 +137,11 @@ async def http_exception_handler(request: Request,
         url = request.url.path
     return JSONResponse(
         status_code=exc.status_code,
-        content={"success": False,
-                 "message": exc.detail,
-                 "url": url,
-                 "body": rbody,
-                 },
-        media_type="application/json"
+        content={
+            "success": False,
+            "message": exc.detail,
+            "url": url,
+            "body": rbody,
+        },
+        media_type="application/json",
     )

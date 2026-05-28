@@ -6,13 +6,20 @@ Attributes:
   LOGGER (logging.Logger): Module's logging object.
 """
 
-from typing import Union, Generator, Optional
-import modal
-import os
 import logging
-from mirumoji.server.utils.constants import MODAL_GPU, MODAL_IMAGE, BASE_MEDIA_DIR
+import os
+from collections.abc import Generator
 from pathlib import Path
+from typing import Optional, Union
+
+import modal
 from dotenv import load_dotenv
+
+from mirumoji.server.utils.constants import (
+    BASE_MEDIA_DIR,
+    MODAL_GPU,
+    MODAL_IMAGE,
+)
 
 load_dotenv()
 LOGGER = logging.getLogger(__name__)
@@ -20,25 +27,20 @@ LOGGER = logging.getLogger(__name__)
 script_dir = Path(__file__).resolve().parent
 project_root_dir = script_dir.parent
 media_files_path = project_root_dir / str(BASE_MEDIA_DIR)
-media_files_path.mkdir(parents=True,
-                       exist_ok=True
-                       )
+media_files_path.mkdir(parents=True, exist_ok=True)
 
 LOGGER.info(
-    f"Config Image + Mount '{media_files_path}' at /root/{str(BASE_MEDIA_DIR)}"
-    )
+    f"Config Image + Mount '{media_files_path}' at /root/{BASE_MEDIA_DIR!s}",
+)
 # Build media_files on modal container startup
-mirumoji_image = (modal.Image.from_registry(MODAL_IMAGE)
-                  .add_local_dir(media_files_path,
-                                 remote_path=f"/root/{str(BASE_MEDIA_DIR)}")
-                  )
+mirumoji_image = modal.Image.from_registry(MODAL_IMAGE).add_local_dir(
+    media_files_path,
+    remote_path=f"/root/{BASE_MEDIA_DIR!s}",
+)
 
 LOGGER.info("Configured.")
 
-app = modal.App(
-    "mirumoji-gpu",
-    image=mirumoji_image
-)
+app = modal.App("mirumoji-gpu", image=mirumoji_image)
 
 # Create Secret from local environment variables
 env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
@@ -50,13 +52,14 @@ env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
     gpu=MODAL_GPU,
     timeout=600,
     include_source=True,
-    secrets=[env_secrets]
+    secrets=[env_secrets],
 )
-def transcribe_srt_job(media_fp: Union[str, Path],
-                       fwhisper_kwargs: dict = {},
-                       transcribe_kwargs: dict = {},
-                       fix_with_chat_gpt: bool = True
-                       ) -> Optional[str]:
+def transcribe_srt_job(
+    media_fp: Union[str, Path],
+    fwhisper_kwargs: Optional[dict] = None,
+    transcribe_kwargs: Optional[dict] = None,
+    fix_with_chat_gpt: bool = True,
+) -> Optional[str]:
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
     and returns SRT string.
@@ -73,12 +76,17 @@ def transcribe_srt_job(media_fp: Union[str, Path],
     Returns:
       Transcription in form of SRT string.
     """
+    if not transcribe_kwargs:
+        transcribe_kwargs = {}
+    if not fwhisper_kwargs:
+        fwhisper_kwargs = {}
     from mirumoji.server.processing.whisper_wrapper import FWhisperWrapper
 
-    logging.basicConfig(level=logging.INFO,
-                        style="{",
-                        format="{levelname}-{name}-{message}"
-                        )
+    logging.basicConfig(
+        level=logging.INFO,
+        style="{",
+        format="{levelname}-{name}-{message}",
+    )
 
     LOGGER.info(f"transcribe_srt_job started for media: '{media_fp}'")
     try:
@@ -86,7 +94,7 @@ def transcribe_srt_job(media_fp: Union[str, Path],
 
         gpt_model_kwargs = {
             "ApiKey": os.environ["OPENAI_API_KEY"],
-            "from_dotenv": False
+            "from_dotenv": False,
         }
         srt_result_string = fwhisper.transcribe_to_srt(
             audio_path=str(media_fp),
@@ -94,8 +102,8 @@ def transcribe_srt_job(media_fp: Union[str, Path],
             string_result=True,
             fix_with_chat_gpt=fix_with_chat_gpt,
             gpt_model_kwargs=gpt_model_kwargs,
-            transcribe_kwargs=transcribe_kwargs
-            )
+            transcribe_kwargs=transcribe_kwargs,
+        )
 
         if srt_result_string:
             LOGGER.info(f"Generated SRT For: '{media_fp}'")
@@ -104,8 +112,10 @@ def transcribe_srt_job(media_fp: Union[str, Path],
             LOGGER.warning(f"SRT Transcription Failed For: '{media_fp}'")
             return None
     except Exception as e:
-        LOGGER.error(f"Error in transcribe_srt_job for '{media_fp}': '{e}'",
-                     exc_info=True)
+        LOGGER.error(
+            f"Error in transcribe_srt_job for '{media_fp}': '{e}'",
+            exc_info=True,
+        )
         return None
 
 
@@ -113,11 +123,12 @@ def transcribe_srt_job(media_fp: Union[str, Path],
     gpu=MODAL_GPU,
     timeout=600,
     include_source=True,
-    is_generator=True
+    is_generator=True,
 )
-def video_conversion_job(video_fp: Union[str, Path],
-                         to_mp4_kwargs: dict = {}
-                         ) -> Generator[bytes, None, None]:
+def video_conversion_job(
+    video_fp: Union[str, Path],
+    to_mp4_kwargs: Optional[dict] = None,
+) -> Generator[bytes, None, None]:
     """
     Converts video_fp to MP4 using NVENC and returns the
     video content as bytes.
@@ -130,12 +141,16 @@ def video_conversion_job(video_fp: Union[str, Path],
     Yields:
       bytes: The converted video chunks.
     """
-    logging.basicConfig(level=logging.INFO,
-                        style="{",
-                        format="{levelname}-{name}-{message}"
-                        )
+    if not to_mp4_kwargs:
+        to_mp4_kwargs = {}
+    logging.basicConfig(
+        level=logging.INFO,
+        style="{",
+        format="{levelname}-{name}-{message}",
+    )
 
     from mirumoji.server.processing.audio_processing import AudioTools
+
     LOGGER.info(f"video_conversion_job started for video: '{video_fp}'")
     tmp_p = Path.cwd() / "tmp"
     tmp_p.mkdir(parents=True, exist_ok=True)
@@ -148,17 +163,19 @@ def video_conversion_job(video_fp: Union[str, Path],
 
     try:
         LOGGER.info(f"Converting '{video_fp}' to '{outp_local}' using NVENC.")
-        to_mp4_kwargs.update(input_path=str(video_fp),
-                             output_path=str(outp_local),
-                             use_nvenc=True
-                             )
+        to_mp4_kwargs.update(
+            input_path=str(video_fp),
+            output_path=str(outp_local),
+            use_nvenc=True,
+        )
         result_p = audio_tools.to_mp4(**to_mp4_kwargs)
 
         if result_p and result_p.exists() and result_p.stat().st_size > 0:
             LOGGER.info(f"Converted video to: '{result_p}'")
             video_bytes = result_p.read_bytes()
             LOGGER.info(
-                f"Returning {len(video_bytes)} bytes for converted video.")
+                f"Returning {len(video_bytes)} bytes for converted video.",
+            )
             # Stream the converted file in chunks
             with open(result_p, "rb") as f:
                 while True:
@@ -168,25 +185,26 @@ def video_conversion_job(video_fp: Union[str, Path],
                     yield chunk
             LOGGER.info(f"Finished streaming video bytes for: '{result_p}'")
         else:
-            e = (f"Video conversion failed or produced an "
-                 f"empty file for: '{video_fp}'")
+            e = (
+                f"Video conversion failed or produced an "
+                f"empty file for: '{video_fp}'"
+            )
             LOGGER.error(e)
             raise Exception(e)
     except Exception as e:
-        LOGGER.error(f"Error in video_conversion_job for '{video_fp}': '{e}'",
-                     exc_info=True)
+        LOGGER.error(
+            f"Error in video_conversion_job for '{video_fp}': '{e}'",
+            exc_info=True,
+        )
         raise e
 
 
-@app.function(
-    gpu=MODAL_GPU,
-    timeout=600,
-    include_source=True
-)
-def transcribe_to_string_job(audio_fp: Union[str, Path],
-                             fwhisper_kwargs: dict = {},
-                             transcribe_kwargs: dict = {}
-                             ) -> str:
+@app.function(gpu=MODAL_GPU, timeout=600, include_source=True)
+def transcribe_to_string_job(
+    audio_fp: Union[str, Path],
+    fwhisper_kwargs: Optional[dict] = None,
+    transcribe_kwargs: Optional[dict] = None,
+) -> str:
     """
     Transcribe audio to string using Faster Whisper.
 
@@ -200,11 +218,21 @@ def transcribe_to_string_job(audio_fp: Union[str, Path],
     Returns:
       str: Transcription in form of string.
     """
+
+    if not fwhisper_kwargs:
+        fwhisper_kwargs = {}
+    if not transcribe_kwargs:
+        transcribe_kwargs = {}
+
     from mirumoji.server.processing.whisper_wrapper import FWhisperWrapper
-    logging.basicConfig(level=logging.INFO,
-                        style="{",
-                        format="{levelname}-{name}-{message}"
-                        )
+
+    logging.basicConfig(
+        level=logging.INFO,
+        style="{",
+        format="{levelname}-{name}-{message}",
+    )
     fwhisper = FWhisperWrapper(**fwhisper_kwargs)
-    return fwhisper.transcribe_to_str(audio_fp,
-                                      transcribe_kwargs=transcribe_kwargs)
+    return fwhisper.transcribe_to_str(
+        audio_fp,
+        transcribe_kwargs=transcribe_kwargs,
+    )

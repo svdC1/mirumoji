@@ -9,19 +9,22 @@ Attributes:
   profile_files (Table): sqalchemy table object for files.
   clips (Table): sqalchemy table object for saved clips.
 """
+
 import uuid
-from sqlalchemy import (MetaData,
-                        Table,
-                        Column,
-                        String,
-                        Text,
-                        ForeignKey,
-                        UniqueConstraint,
-                        JSON,
-                        Float,
-                        DateTime,
-                        func
-                        )
+
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    MetaData,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    func,
+)
 
 METADATA = MetaData()
 # ---------------------
@@ -29,170 +32,111 @@ METADATA = MetaData()
 profiles = Table(
     "profiles",
     METADATA,
-    Column("id",
-           String,
-           primary_key=True,
-           index=True
-           ),
-    Column("name",
-           String,
-           unique=True,
-           index=True
-           ),
+    Column("id", String, primary_key=True, index=True),
+    Column("name", String, unique=True, index=True),
 )
 # ----------------------------
 # --- GPT Templates Table ---
 gpt_templates = Table(
     "gpt_templates",
     METADATA,
-    Column("id",
-           String,
-           primary_key=True,
-           index=True,
-           default=lambda: str(uuid.uuid4())
-           ),
-    Column("profile_id",
-           String,
-           ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False,
-           unique=True
-           ),
-    Column("sys_msg",
-           Text,
-           nullable=False),
-    Column("prompt",
-           Text,
-           nullable=False
-           ),
-    Column("version",
-           String,
-           nullable=False
-           ),
-    UniqueConstraint("profile_id",
-                     name="uq_profile_template"
-                     )
+    Column(
+        "id",
+        String,
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    ),
+    Column(
+        "profile_id",
+        String,
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("sys_msg", Text, nullable=False),
+    Column("prompt", Text, nullable=False),
+    Column("version", String, nullable=False),
+    UniqueConstraint("profile_id", name="uq_profile_template"),
 )
 # ---------------------------------
 # --- Profile Transcripts Table ---
 profile_transcripts = Table(
     "profile_transcripts",
     METADATA,
-    Column("id",
-           String,
-           primary_key=True,
-           index=True,
-           default=lambda: str(uuid.uuid4())
-           ),
-    Column("profile_id",
-           String,
-           ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False
-           ),
-    Column("original_file_name",
-           String,
-           nullable=True
-           ),
-    Column("transcript",
-           Text,
-           nullable=False
-           ),
-    Column("gpt_explanation",
-           Text,
-           nullable=True
-           ),
-    Column("audio_file_path",
-           String,
-           nullable=True
-           ),
-    Column("created_at",
-           DateTime,
-           server_default=func.now()
-           )
+    Column(
+        "id",
+        String,
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    ),
+    Column(
+        "profile_id",
+        String,
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("original_file_name", String, nullable=True),
+    Column("transcript", Text, nullable=False),
+    Column("gpt_explanation", Text, nullable=True),
+    Column("audio_file_path", String, nullable=True),
+    Column("created_at", DateTime, server_default=func.now()),
 )
 # ---------------------------
 # --- Profile Files Table ---
 profile_files = Table(
     "profile_files",
     METADATA,
-    Column("id",
-           String,
-           primary_key=True,
-           index=True,
-           default=lambda: str(uuid.uuid4())
-           ),
-    Column("profile_id",
-           String,
-           ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False
-           ),
-    Column("file_name",
-           String,
-           nullable=False
-           ),
-    Column("file_path",
-           String,
-           nullable=False,
-           unique=True
-           ),
-    Column("file_type",
-           String,
-           nullable=True
-           ),
-    Column("created_at",
-           DateTime,
-           server_default=func.now()
-           ),
-    Column("related_transcript_id",
-           String,
-           ForeignKey("profile_transcripts.id"),
-           nullable=True
-           ),
+    Column(
+        "id",
+        String,
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    ),
+    Column(
+        "profile_id",
+        String,
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("file_name", String, nullable=False),
+    Column("file_path", String, nullable=False, unique=True),
+    Column("file_type", String, nullable=True),
+    Column("created_at", DateTime, server_default=func.now()),
+    Column(
+        "related_transcript_id",
+        String,
+        ForeignKey("profile_transcripts.id"),
+        nullable=True,
+    ),
 )
 # -------------------
 # --- Clips Table ---
 clips = Table(
     "clips",
     METADATA,
-    Column("id",
-           String,
-           primary_key=True,
-           index=True,
-           default=lambda: str(uuid.uuid4())
-           ),
-    Column("profile_id",
-           String,
-           ForeignKey("profiles.id", ondelete="CASCADE"),
-           nullable=False
-           ),
-    Column("clip_start_time",
-           Float,
-           nullable=False
-           ),
-    Column("clip_end_time",
-           Float,
-           nullable=False
-           ),
+    Column(
+        "id",
+        String,
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    ),
+    Column(
+        "profile_id",
+        String,
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("clip_start_time", Float, nullable=False),
+    Column("clip_end_time", Float, nullable=False),
     # Store the full JSON string or dict
-    Column("gpt_breakdown_response",
-           JSON,
-           nullable=False
-           ),
-    Column("video_clip_path",
-           String,
-           nullable=False,
-           unique=True
-           ),
-    Column("original_video_file_name",
-           String,
-           nullable=True
-           ),
-    Column("original_video_url",
-           String,
-           nullable=True
-           ),
-    Column("created_at",
-           DateTime,
-           server_default=func.now()
-           ),
+    Column("gpt_breakdown_response", JSON, nullable=False),
+    Column("video_clip_path", String, nullable=False, unique=True),
+    Column("original_video_file_name", String, nullable=True),
+    Column("original_video_url", String, nullable=True),
+    Column("created_at", DateTime, server_default=func.now()),
 )
 # ------------------------------

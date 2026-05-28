@@ -6,16 +6,18 @@ Attributes:
   LOGGER (logging.Logger): Module's Logger object.
 """
 
-from typing import Optional, Union, Dict
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Optional, Union
+
 import aiofiles
-from mirumoji.server.processing.text_processing import SentenceBreakdownService
-from mirumoji.server.processing.audio_processing import AudioTools
-from tqdm.auto import tqdm
 from dotenv import load_dotenv
-from mirumoji.server.utils.env_utils import check_env, using_modal
+from tqdm.auto import tqdm
+
+from mirumoji.server.processing.audio_processing import AudioTools
+from mirumoji.server.processing.text_processing import SentenceBreakdownService
 from mirumoji.server.utils.constants import TEMP_DIR
+from mirumoji.server.utils.env_utils import check_env, using_modal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,17 +45,20 @@ class Processor:
       audio_tools (AudioTools): Instance of `AudioTools`
 
     """
+
     def __init__(
         self,
         gpt_version: str = "gpt-4.1-mini",
         dotenv_path: Union[str, Path, None] = None,
-        whisper_kwargs: Dict = {},
+        whisper_kwargs: Optional[dict] = None,
         OPENAI_API_KEY: Optional[str] = None,
         MODAL_TOKEN_ID: Optional[str] = None,
-        MODAL_TOKEN_SECRET: Optional[str] = None
+        MODAL_TOKEN_SECRET: Optional[str] = None,
     ) -> None:
 
         # Check MODAL
+        if whisper_kwargs is None:
+            whisper_kwargs = {}
         use_modal = using_modal()
         # Configure Temp Path
         self.temp = TEMP_DIR
@@ -62,26 +67,32 @@ class Processor:
         # Configure API Keys
         load_dotenv(dotenv_path=dotenv_path)
         if use_modal:
-            expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY,
-                             "MODAL_TOKEN_ID": MODAL_TOKEN_ID,
-                             "MODAL_TOKEN_SECRET": MODAL_TOKEN_SECRET}
+            expected_keys = {
+                "OPENAI_API_KEY": OPENAI_API_KEY,
+                "MODAL_TOKEN_ID": MODAL_TOKEN_ID,
+                "MODAL_TOKEN_SECRET": MODAL_TOKEN_SECRET,
+            }
         else:
             LOGGER.info("Not using Modal")
             expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY}
 
-        self.API_KEYS = check_env(expected_keys.keys(),
-                                  expected_keys,
-                                  dotenv_path
-                                  )
+        self.API_KEYS = check_env(
+            expected_keys.keys(),
+            expected_keys,
+            dotenv_path,
+        )
 
         # Initializing Instances
 
         # Text Processing
-        gpt_kwargs = {"from_dotenv": False,
-                      "ApiKey": self.API_KEYS["OPENAI_API_KEY"]
-                      }
-        self.sentence_breakdown_service = SentenceBreakdownService(gpt_version,
-                                                                   gpt_kwargs)
+        gpt_kwargs = {
+            "from_dotenv": False,
+            "ApiKey": self.API_KEYS["OPENAI_API_KEY"],
+        }
+        self.sentence_breakdown_service = SentenceBreakdownService(
+            gpt_version,
+            gpt_kwargs,
+        )
         # Audio Tools
         self.audio_tools = AudioTools()
 
@@ -89,18 +100,23 @@ class Processor:
         if use_modal:
             # CPU Version - Don't Import Whisper - No GPU
             # Import Modal Functions
-            from mirumoji.server.modal_processing.ModalApp import (app,
-                                                   transcribe_srt_job,
-                                                   transcribe_to_string_job,
-                                                   video_conversion_job
-                                                   )
+            from mirumoji.server.modal_processing.ModalApp import (
+                app,
+                transcribe_srt_job,
+                transcribe_to_string_job,
+                video_conversion_job,
+            )
+
             self.modal_app = app
             self.transcribe_srt_job = transcribe_srt_job
             self.transcribe_to_string_job = transcribe_to_string_job
             self.video_conversion_job = video_conversion_job
         else:
             # GPU Version - Import Whisper
-            from mirumoji.server.processing.whisper_wrapper import FWhisperWrapper
+            from mirumoji.server.processing.whisper_wrapper import (
+                FWhisperWrapper,
+            )
+
             self.fwhisper = FWhisperWrapper(**whisper_kwargs)
 
         # Save attrs
@@ -125,16 +141,17 @@ class Processor:
             "whisper_kwargs": self.whisper_kwargs,
             "OPENAI_API_KEY": self.openai_key_input,
             "MODAL_TOKEN_ID": self.modal_token_id_input,
-            "MODAL_TOKEN_SECRET": self.modal_token_secret_input
-                }
-        arg_s = ','.join([f"{k}={v}" for k, v in args.items()])
+            "MODAL_TOKEN_SECRET": self.modal_token_secret_input,
+        }
+        arg_s = ",".join([f"{k}={v}" for k, v in args.items()])
         return f"Processor({arg_s})"
 
-    async def modal_transcribe_to_srt(self,
-                                      media_fp: Union[str, Path],
-                                      transcribe_kwargs: dict = {},
-                                      fix_with_chat_gpt: bool = True
-                                      ) -> Union[str, None]:
+    async def modal_transcribe_to_srt(
+        self,
+        media_fp: Union[str, Path],
+        transcribe_kwargs: Optional[dict] = None,
+        fix_with_chat_gpt: bool = True,
+    ) -> Union[str, None]:
         """
         Call Modal function to transcribe video to SRT
 
@@ -148,20 +165,22 @@ class Processor:
         Returns:
           str: Formatted SRT transcription string.
         """
+        if not transcribe_kwargs:
+            transcribe_kwargs = {}
         async with self.modal_app.run():
             media_fp = Path(media_fp).as_posix()
             return await self.transcribe_srt_job.remote.aio(
                 media_fp=media_fp,
                 fwhisper_kwargs=self.whisper_kwargs,
                 transcribe_kwargs=transcribe_kwargs,
-                fix_with_chat_gpt=fix_with_chat_gpt
+                fix_with_chat_gpt=fix_with_chat_gpt,
+            )
 
-                )
-
-    async def modal_transcribe_to_str(self,
-                                      audio_fp: Union[str, Path],
-                                      transcribe_kwargs: dict = {}
-                                      ) -> Union[str, None]:
+    async def modal_transcribe_to_str(
+        self,
+        audio_fp: Union[str, Path],
+        transcribe_kwargs: Optional[dict] = None,
+    ) -> Union[str, None]:
         """
         Call Modal function to transcribe audio to string.
 
@@ -173,19 +192,22 @@ class Processor:
         Returns:
             str: String transcription.
         """
+        if not transcribe_kwargs:
+            transcribe_kwargs = {}
         async with self.modal_app.run():
             audio_fp = Path(audio_fp).as_posix()
             return await self.transcribe_to_string_job.remote.aio(
                 audio_fp=audio_fp,
                 fwhisper_kwargs=self.whisper_kwargs,
-                transcribe_kwargs=transcribe_kwargs
-                )
+                transcribe_kwargs=transcribe_kwargs,
+            )
 
-    async def modal_convert_to_mp4(self,
-                                   video_fp: Union[str, Path],
-                                   outpath: Union[str, Path],
-                                   to_mp4_kwargs: dict = {}
-                                   ) -> Path:
+    async def modal_convert_to_mp4(
+        self,
+        video_fp: Union[str, Path],
+        outpath: Union[str, Path],
+        to_mp4_kwargs: Optional[dict] = None,
+    ) -> Path:
         """
         Call Modal function to convert a video to MP4 format.
 
@@ -198,21 +220,24 @@ class Processor:
         Returns:
           Path: The path to converted video from `outpath`.
         """
+        if not to_mp4_kwargs:
+            to_mp4_kwargs = {}
         async with self.modal_app.run():
             video_fp = Path(video_fp).as_posix()
             outpath = Path(outpath).as_posix()
             try:
-                with tqdm(unit='B',
-                          unit_scale=True,
-                          unit_divisor=1024,
-                          desc="Receiving Converted Video"
-                          ) as pbar:
+                with tqdm(
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc="Receiving Converted Video",
+                ) as pbar:
                     async with aiofiles.open(outpath, "ab") as f_out:
-                        async for chunk in (
-                            self.video_conversion_job.remote_gen.aio(
-                                video_fp=video_fp,
-                                to_mp4_kwargs=to_mp4_kwargs
-                                )
+                        async for (
+                            chunk
+                        ) in self.video_conversion_job.remote_gen.aio(
+                            video_fp=video_fp,
+                            to_mp4_kwargs=to_mp4_kwargs,
                         ):
                             await f_out.write(chunk)
                             pbar.update(len(chunk))

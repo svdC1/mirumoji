@@ -3,28 +3,26 @@ This module provides helper functions for file operations and a class for
 handling file operations within the media_files directory
 """
 
+import asyncio
 import logging
-import aiofiles
+import shutil
 from pathlib import Path
 from typing import Optional, Union
-from fastapi import (Request,
-                     Header,
-                     HTTPException
-                     )
+
+import aiofiles
+from fastapi import Header, HTTPException, Request
 from tqdm.auto import tqdm
-import asyncio
-import shutil
-from mirumoji.server.utils.constants import (BASE_MEDIA_DIR,
-                             TEMP_DIR
-                             )
+
+from mirumoji.server.utils.constants import BASE_MEDIA_DIR, TEMP_DIR
 
 LOGGER = logging.getLogger(__name__)
 
 
-async def save_upload_file(request: Request,
-                           dest: Path,
-                           tqdm_description: Optional[str] = None
-                           ) -> None:
+async def save_upload_file(
+    request: Request,
+    dest: Path,
+    tqdm_description: Optional[str] = None,
+) -> None:
     """
     Saves a `FastAPI.Request.stream` by reading and writing streamed
     chunks to `dest` and displaying a `TQDM` progress bar in logging.
@@ -51,18 +49,18 @@ async def save_upload_file(request: Request,
         LOGGER.info(f"Saved {total_content} bytes to {dest}")
     except Exception as e:
         LOGGER.error(
-            f"Failed to save uploaded stream"
-            f"to '{dest}'. Error: '{e}'"
+            f"Failed to save uploaded streamto '{dest}'. Error: '{e}'",
         )
         # Clean up partially created file on error
         dest.unlink(missing_ok=True)
         raise
 
 
-async def get_stream_file(request: Request,
-                          upload_id: str = Header(..., alias="X-Upload-ID"),
-                          file_name: str = Header(..., alias="X-File-Name")
-                          ) -> Path:
+async def get_stream_file(
+    request: Request,
+    upload_id: str = Header(..., alias="X-Upload-ID"),
+    file_name: str = Header(..., alias="X-File-Name"),
+) -> Path:
     """
     Endpoint dependency to save a streamed file to local storage
 
@@ -78,14 +76,10 @@ async def get_stream_file(request: Request,
       HTTPException: If upload fails or headers are not present
     """
     temp_dir = TEMP_DIR / f"{upload_id}"
-    temp_dir.mkdir(parents=True,
-                   exist_ok=True
-                   )
+    temp_dir.mkdir(parents=True, exist_ok=True)
     temp_file_path = temp_dir / f"{file_name}"
     try:
-        await save_upload_file(request,
-                               temp_file_path
-                               )
+        await save_upload_file(request, temp_file_path)
         return temp_file_path
     except Exception as e:
         HTTPException(status_code=400, detail=f"{e}")
@@ -120,9 +114,7 @@ class MediaFileHandler:
         self.temp_path.mkdir(exist_ok=True)
         self.profiles_path.mkdir(exist_ok=True)
 
-    def get_temp_dir(self,
-                     name: str
-                     ) -> Path:
+    def get_temp_dir(self, name: str) -> Path:
         """
         Creates and returns a path to a named directory inside temp.
 
@@ -137,10 +129,11 @@ class MediaFileHandler:
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
 
-    async def move_file(self,
-                        src: Union[str, Path],
-                        dest_relative: Union[str, Path]
-                        ) -> Path:
+    async def move_file(
+        self,
+        src: Union[str, Path],
+        dest_relative: Union[str, Path],
+    ) -> Path:
         """
         Moves a file from a source path to a destination relative to the media
         base.
@@ -161,10 +154,11 @@ class MediaFileHandler:
         LOGGER.info(f"Moved '{src}' -> '{dest_path}'")
         return dest_path
 
-    async def copy_file(self,
-                        src: Union[str, Path],
-                        dest_relative: Union[str, Path]
-                        ) -> Path:
+    async def copy_file(
+        self,
+        src: Union[str, Path],
+        dest_relative: Union[str, Path],
+    ) -> Path:
         """
         Copies a file to a destination relative to the media base.
 
@@ -184,10 +178,11 @@ class MediaFileHandler:
         LOGGER.info(f"Copied '{src}' -> '{dest_path}'")
         return dest_path
 
-    async def delete_file(self,
-                          file_path_relative: Union[str, Path],
-                          check=False
-                          ) -> None:
+    async def delete_file(
+        self,
+        file_path_relative: Union[str, Path],
+        check=False,
+    ) -> None:
         """
         Deletes a single file located relative to the media base.
 
@@ -205,12 +200,8 @@ class MediaFileHandler:
         path = self.base_path / file_path_relative
         if path.exists() and path.is_file():
             try:
-                if check:
-                    missing_ok = False
-                else:
-                    missing_ok = True
-                await asyncio.to_thread(path.unlink,
-                                        missing_ok=missing_ok)
+                missing_ok = not check
+                await asyncio.to_thread(path.unlink, missing_ok=missing_ok)
                 LOGGER.info(f"Deleted file: '{path}'")
             except OSError as e:
                 if check:
@@ -218,9 +209,7 @@ class MediaFileHandler:
                 else:
                     LOGGER.error(f"Error deleting file '{path}': '{e}'")
 
-    async def delete_dir(self,
-                         dir_path_relative: Union[str, Path]
-                         ) -> None:
+    async def delete_dir(self, dir_path_relative: Union[str, Path]) -> None:
         """
         Deletes a directory located relative to the media base.
 
@@ -242,9 +231,7 @@ class MediaFileHandler:
                 LOGGER.error(f"Error deleting directory '{path}': '{e}'")
                 raise
 
-    def get_profile_dir(self,
-                        profile_id: str,
-                        subfolder: str) -> Path:
+    def get_profile_dir(self, profile_id: str, subfolder: str) -> Path:
         """
         Gets or creates a profile-specific subdirectory.
 
@@ -261,9 +248,7 @@ class MediaFileHandler:
         profile_dir.mkdir(parents=True, exist_ok=True)
         return profile_dir
 
-    def get_relative_path(self,
-                          full_path: Union[str, Path]
-                          ) -> Path:
+    def get_relative_path(self, full_path: Union[str, Path]) -> Path:
         """
         Resolves a path relative to the media directory.
 
@@ -278,9 +263,7 @@ class MediaFileHandler:
         # return = some_folder/some_file
         return Path(full_path).relative_to(self.base_path)
 
-    def get_modal_path(self,
-                       local_path: Union[str, Path]
-                       ) -> Path:
+    def get_modal_path(self, local_path: Union[str, Path]) -> Path:
         """
         Converts an absolute local path to a Modal-compatible relative path.
 
@@ -295,10 +278,11 @@ class MediaFileHandler:
         relative_path = self.get_relative_path(local_path)
         return self.modal_media_path / relative_path
 
-    async def write_file(self,
-                         file_path_relative: Union[str, Path],
-                         content: str
-                         ) -> Path:
+    async def write_file(
+        self,
+        file_path_relative: Union[str, Path],
+        content: str,
+    ) -> Path:
         """
         Writes text content to a file, creating directories if necessary.
 
@@ -320,13 +304,11 @@ class MediaFileHandler:
             async with aiofiles.open(path, "a+", encoding="utf-8") as f:
                 await f.write(content)
             return path
-        except IOError as e:
+        except OSError as e:
             LOGGER.error(f"Error writing to file '{path}': '{e}'")
             raise
 
-    async def clean_temp(self,
-                         check=False
-                         ) -> None:
+    async def clean_temp(self, check=False) -> None:
         """
         Tries to delete all files in temp folder and recreate it
 

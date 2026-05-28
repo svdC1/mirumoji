@@ -6,25 +6,29 @@ Attributes:
   LOGGER (logging.Logger): Root Logging object.
   LOGGING_LEVEL (str): Level for the Logging object.
 """
-import logging
-from typing import AsyncGenerator, Any
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
-from mirumoji.server.routers.gpt_router import gpt_router
-from mirumoji.server.routers.audio_router import audio_router
-from mirumoji.server.routers.health_router import health_router
-from mirumoji.server.routers.dict_router import dict_router
-from mirumoji.server.routers.video_router import video_router
-from mirumoji.server.routers.profile_router import profile_router
+
 import asyncio
+import logging
 import shutil
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from mirumoji.server.db.db import connect_db, disconnect_db, DATABASE_URL
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from mirumoji.server.db.db import DATABASE_URL, connect_db, disconnect_db
+from mirumoji.server.routers.audio_router import audio_router
+from mirumoji.server.routers.dict_router import dict_router
+from mirumoji.server.routers.gpt_router import gpt_router
+from mirumoji.server.routers.health_router import health_router
+from mirumoji.server.routers.profile_router import profile_router
+from mirumoji.server.routers.video_router import video_router
 from mirumoji.server.utils.env_utils import using_modal
-from mirumoji.server.utils.logging_utils import setup_logging
 from mirumoji.server.utils.file_utils import MediaFileHandler
+from mirumoji.server.utils.logging_utils import setup_logging
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)
@@ -50,10 +54,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     LOGGER.info(f"Storage ensured at: '{MEDIA_FILE_HANDLER.base_path}'")
     yield
     await disconnect_db()
-    await asyncio.to_thread(shutil.rmtree,
-                            MEDIA_FILE_HANDLER.temp_path,
-                            ignore_errors=True
-                            )
+    await asyncio.to_thread(
+        shutil.rmtree,
+        MEDIA_FILE_HANDLER.temp_path,
+        ignore_errors=True,
+    )
 
 
 app = FastAPI(
@@ -62,9 +67,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.mount("/media",
-          StaticFiles(directory=MEDIA_FILE_HANDLER.base_path),
-          name="media")
+app.mount(
+    "/media",
+    StaticFiles(directory=MEDIA_FILE_HANDLER.base_path),
+    name="media",
+)
 
 origins = ["*"]
 
@@ -78,9 +85,10 @@ app.add_middleware(
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request,
-                                 exc: HTTPException
-                                 ) -> JSONResponse:
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
     """
     Custom Exception Handler for all HTTP Errors.
 
@@ -93,9 +101,9 @@ async def http_exception_handler(request: Request,
     """
     return JSONResponse(
         status_code=exc.status_code,
-        content={"success": False,
-                 "message": exc.detail},
+        content={"success": False, "message": exc.detail},
     )
+
 
 app.include_router(gpt_router)
 app.include_router(audio_router)
@@ -118,6 +126,7 @@ def run() -> None:
     mode). For production deployments use the Docker image directly.
     """
     import uvicorn
+
     uvicorn.run(
         "mirumoji.server.app:app",
         host="0.0.0.0",

@@ -7,13 +7,16 @@ Attributes:
   DEFAULT_SYS_MSG (str): Default system message to use for OpenAI
                          post-processing.
 """
-from typing import Dict, Union, Optional
+
+import datetime
 import logging
 import time
-from faster_whisper import WhisperModel
-import srt
-import datetime
 from pathlib import Path
+from typing import Optional, Union
+
+import srt
+from faster_whisper import WhisperModel
+
 from mirumoji.server.processing.gpt_wrapper import GptModel
 from mirumoji.server.utils.constants import FWHISPER_GPT_DEFAULT_SYS_MSG
 
@@ -34,27 +37,29 @@ class FWhisperWrapper:
                                    post-processing.
       gpt_version (str): Which GPT version to use for OpenAI post-processing.
     """
-    def __init__(self,
-                 model_name: str = 'large-v3',
-                 lang: str = 'ja',
-                 compute_type: str = "float16",
-                 device: str = 'cuda',
-                 gpt_sys_msg: Optional[str] = None,
-                 gpt_version: str = 'gpt-4.1'
-                 ) -> None:
+
+    def __init__(
+        self,
+        model_name: str = "large-v3",
+        lang: str = "ja",
+        compute_type: str = "float16",
+        device: str = "cuda",
+        gpt_sys_msg: Optional[str] = None,
+        gpt_version: str = "gpt-4.1",
+    ) -> None:
 
         self.lang = lang
-        self.instance = WhisperModel(model_name,
-                                     device=device,
-                                     compute_type=compute_type)
+        self.instance = WhisperModel(
+            model_name,
+            device=device,
+            compute_type=compute_type,
+        )
         self.device = device
         self.model_name = model_name
         self.gpt_version = gpt_version
         self.gpt_sys_msg = gpt_sys_msg if gpt_sys_msg else DEFAULT_SYS_MSG
 
-    def _check_input(self,
-                     audio_path: str
-                     ) -> Union[str, None]:
+    def _check_input(self, audio_path: str) -> Union[str, None]:
         """
         Check if input audio is a valid file.
 
@@ -69,13 +74,15 @@ class FWhisperWrapper:
             return str(audio_path)
         else:
             LOGGER.error(
-                f"Transcribe Failed : Path '{audio_path}' is invalid.")
+                f"Transcribe Failed : Path '{audio_path}' is invalid.",
+            )
             return None
 
-    def gpt_fix_srt(self,
-                    source: str,
-                    gpt_model_kwargs: Dict = {}
-                    ) -> str:
+    def gpt_fix_srt(
+        self,
+        source: str,
+        gpt_model_kwargs: Optional[dict] = None,
+    ) -> str:
         """
         Post-process transcription with OpenAI API.
 
@@ -87,12 +94,15 @@ class FWhisperWrapper:
         Returns:
           str: The formatted response from the OpenAI model.
         """
+        if not gpt_model_kwargs:
+            gpt_model_kwargs = {}
         kwargs = {
-            'version': self.gpt_version,
-            'from_dotenv': True,
-            'system_msg': self.gpt_sys_msg,
-            'ApiKey': None,
-            'max_context': 100000}
+            "version": self.gpt_version,
+            "from_dotenv": True,
+            "system_msg": self.gpt_sys_msg,
+            "ApiKey": None,
+            "max_context": 100000,
+        }
         if gpt_model_kwargs:
             kwargs.update(gpt_model_kwargs)
 
@@ -100,18 +110,19 @@ class FWhisperWrapper:
             model = GptModel(**kwargs)
             LOGGER.info("Requesting GPT to fix SRT")
             request = model.request(source)
-            rsrt = request['response']
+            rsrt = request["response"]
             return rsrt
         except Exception as e:
             LOGGER.exception(f"Error Requesting GPT: {e}")
             return None
 
-    def transcribe(self,
-                   audio_path: str,
-                   language: str = "ja",
-                   generator_only: bool = False,
-                   add_kargs: dict = {}) -> Union[Dict,
-                                                  None]:
+    def transcribe(
+        self,
+        audio_path: str,
+        language: str = "ja",
+        generator_only: bool = False,
+        add_kargs: Optional[dict] = None,
+    ) -> Union[dict, None]:
         """
         Transcribe audio with FasterWhisper.
 
@@ -127,18 +138,19 @@ class FWhisperWrapper:
           dict: The segment objects returned by FasterWhisper
                 (contains .start, .end, .text and optionally .words)
         """
-
+        if not add_kargs:
+            add_kargs = {}
         audio_path = self._check_input(audio_path)
 
         if not audio_path:
             return None
 
         add_kwds = {
-            'audio': audio_path,
-            'beam_size': 5,
-            'word_timestamps': False,
-            'language': language,
-            'vad_filter': False,
+            "audio": audio_path,
+            "beam_size": 5,
+            "word_timestamps": False,
+            "language": language,
+            "vad_filter": False,
             "no_speech_threshold": 0.3,
             "log_prob_threshold": -1.0,
             "condition_on_previous_text": False,
@@ -150,24 +162,21 @@ class FWhisperWrapper:
         try:
             segments, info = self.instance.transcribe(**add_kwds)
             if generator_only:
-                return {'obj': segments,
-                        'info': info}
+                return {"obj": segments, "info": info}
             else:
                 elapsed = time.perf_counter()
                 segments = list(segments)
                 tt = time.perf_counter() - elapsed
-                return {'obj': segments,
-                        'info': info,
-                        'elapsed': tt
-                        }
+                return {"obj": segments, "info": info, "elapsed": tt}
         except Exception as e:
             LOGGER.exception(f"Transcription Failed : '{e}' ")
             return None
 
-    def transcribe_to_str(self,
-                          audio_path: str,
-                          transcribe_kwargs: dict = {}
-                          ) -> str:
+    def transcribe_to_str(
+        self,
+        audio_path: str,
+        transcribe_kwargs: Optional[dict] = None,
+    ) -> str:
         """
         Transcribe to single raw string from joining segments.
 
@@ -179,25 +188,26 @@ class FWhisperWrapper:
         Returns:
           str: string of joined segments.
         """
+        if not transcribe_kwargs:
+            transcribe_kwargs = {}
         try:
             rdict = self.transcribe(audio_path, **transcribe_kwargs)
-            segments = rdict['obj']
+            segments = rdict["obj"]
             text = "。".join(seg.text for seg in segments)
-            return {"obj": segments,
-                    "text": text,
-                    "elapsed": rdict['elapsed']}
+            return {"obj": segments, "text": text, "elapsed": rdict["elapsed"]}
         except Exception as e:
             LOGGER.error(f"Error when generating str transcript: {e}")
             return None
 
-    def transcribe_to_srt(self,
-                          audio_path: str,
-                          output_path: str,
-                          fix_with_chat_gpt: bool = True,
-                          string_result: bool = False,
-                          gpt_model_kwargs: dict = {},
-                          transcribe_kwargs: dict = {}
-                          ) -> Union[str, None]:
+    def transcribe_to_srt(
+        self,
+        audio_path: str,
+        output_path: str,
+        fix_with_chat_gpt: bool = True,
+        string_result: bool = False,
+        gpt_model_kwargs: Optional[dict] = None,
+        transcribe_kwargs: Optional[dict] = None,
+    ) -> Union[str, None]:
         """
         Transcribe audio and save as an SRT file with sentence-level cues.
 
@@ -215,9 +225,14 @@ class FWhisperWrapper:
           str: Either the file output path or the SRT string if string_result
                is True
         """
+        if not gpt_model_kwargs:
+            gpt_model_kwargs = {}
+        if not transcribe_kwargs:
+            transcribe_kwargs = {}
+
         try:
             opath = Path(output_path).resolve()
-            if opath.suffix != '.srt':
+            if opath.suffix != ".srt":
                 output_path = str(opath.with_suffix(".srt"))
         except Exception as e:
             LOGGER.error(f"Error resolving output path : '{e}'")
@@ -225,23 +240,29 @@ class FWhisperWrapper:
                 return None
         try:
             segments = self.transcribe(audio_path, **transcribe_kwargs)
-            segments = segments['obj']
+            segments = segments["obj"]
             subtitles = []
             for i, seg in enumerate(segments, start=1):
                 start = datetime.timedelta(seconds=seg.start)
                 end = datetime.timedelta(seconds=seg.end)
-                subtitles.append(srt.Subtitle(index=i,
-                                              start=start,
-                                              end=end,
-                                              content=seg.text))
+                subtitles.append(
+                    srt.Subtitle(
+                        index=i,
+                        start=start,
+                        end=end,
+                        content=seg.text,
+                    ),
+                )
         except Exception as e:
             LOGGER.error(f"Error when generating SRT: '{e}'")
             return None
 
         if fix_with_chat_gpt:
             try:
-                rsrt = self.gpt_fix_srt(srt.compose(subtitles),
-                                        gpt_model_kwargs)
+                rsrt = self.gpt_fix_srt(
+                    srt.compose(subtitles),
+                    gpt_model_kwargs,
+                )
                 if not rsrt:
                     LOGGER.error("Error fixing subtitles with ChatGPT")
                     return None
@@ -250,8 +271,11 @@ class FWhisperWrapper:
                     LOGGER.info("Generated SRT")
                     return rsrt
 
-                with open(opath.parent / "nogpt.srt", "w", encoding="utf-8"
-                          ) as f:
+                with open(
+                    opath.parent / "nogpt.srt",
+                    "w",
+                    encoding="utf-8",
+                ) as f:
                     f.write(srt.compose(subtitles))
 
                 with open(output_path, "w", encoding="utf-8") as f:

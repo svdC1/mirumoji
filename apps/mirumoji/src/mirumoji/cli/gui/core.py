@@ -2,21 +2,18 @@
 This module contains the main helper functions to check the environment and
 launch the mirumoji application.
 """
+
 import logging
-import subprocess
-from subprocess import Popen
-from typing import (List,
-                    Optional,
-                    Union,
-                    Generator,
-                    overload,
-                    Literal
-                    )
-from pathlib import Path
-from dotenv import dotenv_values, load_dotenv
-import socket
 import os
 import platform
+import socket
+import subprocess
+from collections.abc import Generator
+from pathlib import Path
+from subprocess import Popen
+from typing import Literal, Optional, Union, overload
+
+from dotenv import dotenv_values, load_dotenv
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,13 +33,14 @@ def git_installed() -> subprocess.CompletedProcess[str]:
             ["git", "--version"],
             check=True,
             capture_output=True,
-            text=True
+            text=True,
         )
         LOGGER.info("Git Installed")
         return git_check
     except subprocess.CalledProcessError as e:
         LOGGER.error(
-            (f"Git Check Failed: '{e.stderr}'; Return Code: '{e.returncode}'"))
+            f"Git Check Failed: '{e.stderr}'; Return Code: '{e.returncode}'",
+        )
         raise
     except FileNotFoundError as e:
         LOGGER.error(f"Git not found: '{e}'")
@@ -62,17 +60,17 @@ def docker_running() -> subprocess.CompletedProcess[str]:
     """
     try:
         p = subprocess.run(
-             ["docker", "info"],
-             check=True,
-             capture_output=True,
-             text=True
-             )
+            ["docker", "info"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         LOGGER.info("Docker is Running")
         return p
     except subprocess.CalledProcessError as e:
-        LOGGER.error((
-            f"Docker Check Failed: '{e.stderr}'; Return Code: '{e.returncode}'"
-            ))
+        LOGGER.error(
+            f"Docker Check Failed: '{e.stderr}';Return Code: '{e.returncode}'",
+        )
         raise
     except FileNotFoundError as e:
         LOGGER.error(f"Docker not found: '{e}'")
@@ -107,34 +105,40 @@ def has_nvidia_container_toolkit() -> bool:
     try:
         docker_running()
     except Exception:
-        LOGGER.error(("Docker is not running, cannot perform NVIDIA Container "
-                      "Toolkit check"))
+        LOGGER.error(
+            "Docker is not running, cannot perform NVIDIA Container "
+            "Toolkit check",
+        )
         raise
     try:
         if not has_nvidia_gpu():
             return False
 
         # Run a test container
-        gpu_test = ["docker",
-                    "run",
-                    "--rm",
-                    "--gpus",
-                    "all",
-                    "nvidia/cuda:12.3.0-base-ubuntu22.04",
-                    "nvidia-smi"
-                    ]
+        gpu_test = [
+            "docker",
+            "run",
+            "--rm",
+            "--gpus",
+            "all",
+            "nvidia/cuda:12.3.0-base-ubuntu22.04",
+            "nvidia-smi",
+        ]
         LOGGER.info("Starting Nvidia Container Toolkit Test")
         run_command(gpu_test, stream=False)
         return True
     except subprocess.CalledProcessError as e:
-        LOGGER.info((f"NVIDIA Container Toolkit Test Failed: '{e.stderr}';"
-                     f"Return Code:'{e.returncode}'"))
+        LOGGER.info(
+            f"NVIDIA Container Toolkit Test Failed: '{e.stderr}';"
+            f"Return Code:'{e.returncode}'",
+        )
         return False
 
 
-def get_host_lan_ip(load_to_env: bool = True,
-                    var_name: str = "HOST_LAN_IP"
-                    ) -> str:
+def get_host_lan_ip(
+    load_to_env: bool = True,
+    var_name: str = "HOST_LAN_IP",
+) -> str:
     """
     Get the primary LAN IPv4 address of the host machine and loads
     it as an environment variable.
@@ -150,7 +154,7 @@ def get_host_lan_ip(load_to_env: bool = True,
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(('8.8.8.8', 80))
+        s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         if load_to_env:
             os.environ[var_name] = ip
@@ -162,9 +166,7 @@ def get_host_lan_ip(load_to_env: bool = True,
         s.close()
 
 
-def check_env_file(expected_vars: List[str],
-                   env_file_path: Path
-                   ) -> None:
+def check_env_file(expected_vars: list[str], env_file_path: Path) -> None:
     """
     Checks for existence of required `.env` file and its contents.
 
@@ -192,36 +194,35 @@ def check_env_file(expected_vars: List[str],
 
 
 @overload
-def run_command(command_list: List[str],
-                *,
-                cwd: Optional[Path] = None,
-                check: bool = True,
-                shell: bool = False,
-                stream: Literal[True]
-                ) -> Generator[str, str, Popen[str]]:
-    ...
+def run_command(
+    command_list: list[str],
+    *,
+    cwd: Optional[Path] = None,
+    check: bool = True,
+    shell: bool = False,
+    stream: Literal[True],
+) -> Generator[str, str, Popen[str]]: ...
 
 
 @overload
-def run_command(command_list: List[str],
-                *,
-                cwd: Optional[Path] = None,
-                check: bool = True,
-                shell: bool = False,
-                stream: Literal[False]
-                ) -> Popen[str]:
-    ...
+def run_command(
+    command_list: list[str],
+    *,
+    cwd: Optional[Path] = None,
+    check: bool = True,
+    shell: bool = False,
+    stream: Literal[False],
+) -> Popen[str]: ...
 
 
-def run_command(command_list: List[str],
-                *,
-                cwd: Optional[Path] = None,
-                check: bool = True,
-                shell: bool = False,
-                stream: bool = True
-                ) -> Union[subprocess.Popen[str],
-                           Generator[str, str, Popen[str]]
-                           ]:
+def run_command(
+    command_list: list[str],
+    *,
+    cwd: Optional[Path] = None,
+    check: bool = True,
+    shell: bool = False,
+    stream: bool = True,
+) -> Union[subprocess.Popen[str], Generator[str, str, Popen[str]]]:
     """
     `subprocess.Popen` wrapper with error handling and logging
 
@@ -274,9 +275,9 @@ def run_command(command_list: List[str],
                 shell=shell,
                 bufsize=1,
                 universal_newlines=True,
-                encoding='utf-8',
-                errors='replace',
-                env=env
+                encoding="utf-8",
+                errors="replace",
+                env=env,
             )
             return_code = process.wait()
             if check and return_code != 0:
@@ -284,13 +285,13 @@ def run_command(command_list: List[str],
                     return_code,
                     cmd_str,
                     process.stdout,
-                    process.stderr
-                    )
+                    process.stderr,
+                )
             return process
         except subprocess.CalledProcessError as e:
             LOGGER.error(
-                (f"Error: Command '{e.cmd}' returned non-zero exit status "
-                 f"Return Code: '{e.returncode}'")
+                f"Error: Command '{e.cmd}' returned non-zero exit status "
+                f"Return Code: '{e.returncode}'",
             )
             if check:
                 raise
@@ -313,14 +314,14 @@ def run_command(command_list: List[str],
                 shell=shell,
                 bufsize=1,
                 universal_newlines=True,
-                encoding='utf-8',
-                errors='replace',
-                env=env
+                encoding="utf-8",
+                errors="replace",
+                env=env,
             )
 
             if process.stdout:
                 yield f"Running Command: `{cmd_str}`"
-                for line in iter(process.stdout.readline, ''):
+                for line in iter(process.stdout.readline, ""):
                     line_content = line.strip()
                     if line_content:
                         yield line_content
@@ -333,15 +334,15 @@ def run_command(command_list: List[str],
                     return_code,
                     cmd_str,
                     process.stdout,
-                    process.stderr
-                    )
+                    process.stderr,
+                )
             return process
         except subprocess.CalledProcessError as e:
             LOGGER.error(
-                (f"Error: Command '{e.cmd}' returned non-zero exit status; "
-                 f"stderr: {e.stderr}; "
-                 f"stdout: {e.stdout}; "
-                 f"Return Code: '{e.returncode}'")
+                f"Error: Command '{e.cmd}' returned non-zero exit status; "
+                f"stderr: {e.stderr}; "
+                f"stdout: {e.stdout}; "
+                f"Return Code: '{e.returncode}'",
             )
             if check:
                 raise
@@ -349,13 +350,15 @@ def run_command(command_list: List[str],
             LOGGER.error(f"Error: Command not found: '{e.filename}'.")
             if check:
                 raise
+
     return _stream_generator()
 
 
-def build_img(image_name: str,
-              dockerfile: Path,
-              build_context: Path
-              ) -> Generator[str, str, Popen[str]]:
+def build_img(
+    image_name: str,
+    dockerfile: Path,
+    build_context: Path,
+) -> Generator[str, str, Popen[str]]:
     """
     Runs the docker build command for a specified image name and streams the
     command's stdout and stderr, finally returning the `Popen` process object.
@@ -390,7 +393,7 @@ def build_img(image_name: str,
             image_name,
             "-f",
             str(dockerfile),
-            str(build_context)
+            str(build_context),
         ]
         return run_command(build_cmd, stream=True)
 
@@ -399,13 +402,14 @@ def build_img(image_name: str,
         raise
 
 
-def docker_compose(compose_command: str,
-                   *,
-                   name_only: bool,
-                   command_flags: List[str] = [],
-                   docker_compose_file: Optional[Path] = None,
-                   compose_app_name: str = "mirumoji"
-                   ) -> Generator[str, str, Popen[str]]:
+def docker_compose(
+    compose_command: str,
+    *,
+    name_only: bool,
+    command_flags: Optional[list[str]] = None,
+    docker_compose_file: Optional[Path] = None,
+    compose_app_name: str = "mirumoji",
+) -> Generator[str, str, Popen[str]]:
     """
     Run a docker compose command on `docker_compose_file` with
     `compose_app_name` as the compose application name and stream
@@ -431,33 +435,28 @@ def docker_compose(compose_command: str,
         (str) and has a return value of the
         completed `subprocess.Popen` object.
     """
+    if not command_flags:
+        command_flags = []
     if not name_only and docker_compose_file is None:
         LOGGER.error("`name_only=False` and compose file not provided")
         raise ValueError(
-            "`docker_compose_file` must be provided is `name_only=False`"
-            )
+            "`docker_compose_file` must be provided is `name_only=False`",
+        )
     if not name_only and not docker_compose_file.is_file():
         LOGGER.error(
-            f"Docker Compose file coulnd't be found at '{docker_compose_file}'"
-            )
+            "Docker Compose file coulnd't be found at "
+            f"'{docker_compose_file}'",
+        )
         raise FileNotFoundError(filename=str(docker_compose_file))
     docker_running()
-    base_command = [
-        "docker",
-        "compose"
-        ]
+    base_command = ["docker", "compose"]
     identifier = [
         "-p",
         compose_app_name,
-        ]
+    ]
     if not name_only:
-        identifier = ["-f", str(docker_compose_file)] + identifier
-    cmd = [
-        *base_command,
-        *identifier,
-        compose_command,
-        *command_flags
-        ]
+        identifier = ["-f", str(docker_compose_file), *identifier]
+    cmd = [*base_command, *identifier, compose_command, *command_flags]
     try:
         return run_command(cmd, stream=True)
     except Exception as e:
@@ -465,9 +464,7 @@ def docker_compose(compose_command: str,
         raise
 
 
-def ensure_repo(repo_url: str,
-                repo_path: Path
-                ) -> None:
+def ensure_repo(repo_url: str, repo_path: Path) -> None:
     """
     Clones or updates a git repository `repo_url ` at `repo_path`
 
@@ -478,53 +475,40 @@ def ensure_repo(repo_url: str,
     git_installed()
     if not repo_path.is_dir():
         LOGGER.debug(f"Cloning repository: '{repo_url}' into '{repo_path}'")
-        run_command(["git", "clone", repo_url, str(repo_path)],
-                    stream=False
-                    )
+        run_command(["git", "clone", repo_url, str(repo_path)], stream=False)
     else:
         LOGGER.debug(f"Repo '{repo_path}' already exists. Fetching updates")
-        run_command(["git", "fetch", "--all"],
-                    cwd=repo_path,
-                    stream=False
-                    )
+        run_command(["git", "fetch", "--all"], cwd=repo_path, stream=False)
 
     try:
         # Get Current Branch
         git_rev_parse_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
 
-        result = run_command(
-            git_rev_parse_cmd,
-            cwd=repo_path,
-            stream=False
-            )
+        result = run_command(git_rev_parse_cmd, cwd=repo_path, stream=False)
         current_branch = result.stdout.read().strip()
     except subprocess.CalledProcessError:
         current_branch = "HEAD"
 
     # Handle detached states
     if current_branch == "HEAD":
-        LOGGER.debug(("Currently in a detached HEAD state."
-                      "Attempting to checkout default branch (main)"
-                      ))
+        LOGGER.debug(
+            "Currently in a detached HEAD state."
+            "Attempting to checkout default branch (main)",
+        )
 
         # Try checking out 'main' and fail on error
         checkout_main_cmd = ["git", "checkout", "main"]
-        run_command(checkout_main_cmd,
-                    cwd=repo_path,
-                    stream=False
-                    )
+        run_command(checkout_main_cmd, cwd=repo_path, stream=False)
 
         # Try getting current branch again and fail on error
         git_rev_parse_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
 
-        result = run_command(
-            git_rev_parse_cmd,
-            cwd=repo_path,
-            stream=False
-            )
+        result = run_command(git_rev_parse_cmd, cwd=repo_path, stream=False)
         current_branch = result.stdout.read().strip()
     LOGGER.debug(f"Pulling latest changes for branch '{current_branch}'")
-    run_command(["git", "pull", "origin", current_branch],
-                cwd=repo_path,
-                stream=False)
+    run_command(
+        ["git", "pull", "origin", current_branch],
+        cwd=repo_path,
+        stream=False,
+    )
     LOGGER.debug("Repository Setup Complete")

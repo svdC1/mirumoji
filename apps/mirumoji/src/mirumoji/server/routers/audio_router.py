@@ -6,22 +6,19 @@ Attributes:
   audio_router (APIRouter): The FastAPI Router Object.
 """
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
-from fastapi import (APIRouter,
-                     Header,
-                     Depends,
-                     HTTPException,
-                     status
-                     )
-from mirumoji.server.processing.audio_processing import AudioTools
-from mirumoji.server.profile_manager import ensure_profile_exists
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+
 from mirumoji.server.db.db import DbManager
+from mirumoji.server.processing.audio_processing import AudioTools
 from mirumoji.server.processing.Processor import Processor
+from mirumoji.server.profile_manager import ensure_profile_exists
 from mirumoji.server.utils.env_utils import using_modal
-from mirumoji.server.utils.file_utils import get_stream_file, MediaFileHandler
-import asyncio
+from mirumoji.server.utils.file_utils import MediaFileHandler, get_stream_file
 
 USING_MODAL = using_modal()
 
@@ -75,14 +72,16 @@ async def transcribe_from_audio(
     persistent_audio_fname = f"{op_id}_{original_filename}"
     final_audio_storage_loc = prof_audio_dir / persistent_audio_fname
     rel_audio_path_db = MEDIA_FILE_HANDLER.get_relative_path(
-        final_audio_storage_loc)
+        final_audio_storage_loc,
+    )
 
     tmp_uploaded_audio_loc = file
     audio_to_process_loc = tmp_uploaded_audio_loc
 
     try:
         LOGGER.info(
-            f"Temp audio for transcription: '{tmp_uploaded_audio_loc}'")
+            f"Temp audio for transcription: '{tmp_uploaded_audio_loc}'",
+        )
 
         # 2. Optional Pre-processing
         if do_clean_audio:
@@ -97,8 +96,9 @@ async def transcribe_from_audio(
                 output_wav=str(cleaned_audio_tmp_loc),
             )
             if not cleaned_path_str or not Path(cleaned_path_str).exists():
-                LOGGER.error((f"Audio cleaning failed for"
-                              f"'{tmp_uploaded_audio_loc}'"))
+                LOGGER.error(
+                    f"Audio cleaning failed for'{tmp_uploaded_audio_loc}'",
+                )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Audio cleaning process failed.",
@@ -106,21 +106,24 @@ async def transcribe_from_audio(
             audio_to_process_loc = Path(cleaned_path_str)
             LOGGER.info(f"Audio cleaned: '{audio_to_process_loc}'")
 
-        await MEDIA_FILE_HANDLER.copy_file(audio_to_process_loc,
-                                           rel_audio_path_db)
+        await MEDIA_FILE_HANDLER.copy_file(
+            audio_to_process_loc,
+            rel_audio_path_db,
+        )
         LOGGER.info(
             f"Audio ({'cleaned' if do_clean_audio else 'original'}) "
-            f"copied to persistent: '{final_audio_storage_loc}'"
+            f"copied to persistent: '{final_audio_storage_loc}'",
         )
         # 3. Transcribe audio
         # When MODAL env variables are available use MODAL
         if USING_MODAL:
             LOGGER.info("Conversion sent to Modal")
             final_audio_storage_loc = MEDIA_FILE_HANDLER.get_modal_path(
-                final_audio_storage_loc)
+                final_audio_storage_loc,
+            )
             LOGGER.info(f"Audio Filepath: '{final_audio_storage_loc}'")
             transcription_data = await processor.modal_transcribe_to_str(
-                audio_fp=str(final_audio_storage_loc)
+                audio_fp=str(final_audio_storage_loc),
             )
         # Run locally
         # processor will have fwhisper attribute.
@@ -129,13 +132,13 @@ async def transcribe_from_audio(
             LOGGER.info(f"Audio Filepath: '{final_audio_storage_loc}'")
             transcription_data = await asyncio.to_thread(
                 processor.fwhisper.transcribe_to_str,
-                audio_path=str(final_audio_storage_loc)
+                audio_path=str(final_audio_storage_loc),
             )
         if not transcription_data or "text" not in transcription_data:
-            LOGGER.error((
+            LOGGER.error(
                 f"Transcription (to_str) failed or gave invalid"
-                f"result for '{final_audio_storage_loc}'"
-            ))
+                f"result for '{final_audio_storage_loc}'",
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Audio transcription failed to produce text.",
@@ -147,26 +150,33 @@ async def transcribe_from_audio(
         gpt_explanation_text = None
         if do_gpt_explain:
             if not plain_text_transcript.strip():
-                LOGGER.warning((f"Skipping GPT for empty transcript"
-                               f"(Profile: '{profile_id}')"))
+                LOGGER.warning(
+                    f"Skipping GPT for empty transcript"
+                    f"(Profile: '{profile_id}')",
+                )
                 gpt_explanation_text = (
-                    "Transcript content empty, no explanation.")
+                    "Transcript content empty, no explanation."
+                )
             else:
                 gpt_explainer = (
                     processor.sentence_breakdown_service.gpt_explainer
-                    )
+                )
                 try:
-                    LOGGER.info((f"Generating GPT explanation"
-                                 f"(Profile: '{profile_id}')"))
-                    gpt_explanation_text = gpt_explainer.explain_sentence(
-                        sentence=plain_text_transcript
+                    LOGGER.info(
+                        f"Generating GPT explanation(Profile: '{profile_id}')",
                     )
-                    LOGGER.info(f"GPT explanation\
-                        generated (Profile: '{profile_id}')")
+                    gpt_explanation_text = gpt_explainer.explain_sentence(
+                        sentence=plain_text_transcript,
+                    )
+                    LOGGER.info(
+                        f"GPT explanation\
+                        generated (Profile: '{profile_id}')",
+                    )
                 except Exception as e_gpt:
                     LOGGER.error(f"GPT explanation failed: '{e_gpt}'")
                     gpt_explanation_text = (
-                        "Failed to generate GPT explanation.")
+                        "Failed to generate GPT explanation."
+                    )
 
         # 5. Save Data to Database
         transcript_id = str(uuid.uuid4())
@@ -176,11 +186,12 @@ async def transcribe_from_audio(
             "original_file_name": original_filename,
             "transcript": plain_text_transcript,
             "gpt_explanation": gpt_explanation_text,
-            "audio_file_path": str(rel_audio_path_db)
+            "audio_file_path": str(rel_audio_path_db),
         }
         await db_manager.create("profile_transcripts", values)
-        LOGGER.info((f"Transcript '{transcript_id}' saved"
-                     f"(Profile: '{profile_id}')"))
+        LOGGER.info(
+            f"Transcript '{transcript_id}' saved(Profile: '{profile_id}')",
+        )
         # Also insert into Files table.
         audio_file_rec_id = str(uuid.uuid4())
         file_values = {
@@ -189,11 +200,13 @@ async def transcribe_from_audio(
             "file_name": original_filename,
             "file_path": str(rel_audio_path_db),
             "file_type": "audio_source",
-            "related_transcript_id": transcript_id
+            "related_transcript_id": transcript_id,
         }
         await db_manager.create("profile_files", file_values)
-        LOGGER.info((f"Audio source record '{audio_file_rec_id}'"
-                    f"saved (Profile: '{profile_id}')"))
+        LOGGER.info(
+            f"Audio source record '{audio_file_rec_id}'"
+            f"saved (Profile: '{profile_id}')",
+        )
 
         return {
             "transcript": plain_text_transcript,
@@ -204,29 +217,33 @@ async def transcribe_from_audio(
         # Propagate Exceptions
         raise
     except Exception as e:
-        LOGGER.exception((
+        LOGGER.exception(
             f"Error in transcribe_from_audio"
-            f"(Profile: '{profile_id}', File: '{original_filename}')"
-        ))
+            f"(Profile: '{profile_id}', File: '{original_filename}')",
+        )
         if final_audio_storage_loc.exists():
             try:
                 await MEDIA_FILE_HANDLER.delete_file(
                     MEDIA_FILE_HANDLER.get_relative_path(
-                        final_audio_storage_loc))
+                        final_audio_storage_loc,
+                    ),
+                )
             except OSError as ose:
-                LOGGER.error((f"Could not remove"
-                              f"'{final_audio_storage_loc}': '{ose}'"
-                              ))
+                LOGGER.error(
+                    f"Could not remove'{final_audio_storage_loc}': '{ose}'",
+                )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to transcribe audio: '{str(e)}'",
-        )
+            detail=f"Failed to transcribe audio: {e}'",
+        ) from e
     finally:
         # 6. Delete temp data
         if op_tmp_dir.exists():
             try:
                 await MEDIA_FILE_HANDLER.delete_dir(
-                    MEDIA_FILE_HANDLER.get_relative_path(op_tmp_dir))
+                    MEDIA_FILE_HANDLER.get_relative_path(op_tmp_dir),
+                )
             except OSError as e_os:
                 LOGGER.error(
-                    f"Error cleaning temp dir '{op_tmp_dir}': '{e_os}'")
+                    f"Error cleaning temp dir '{op_tmp_dir}': '{e_os}'",
+                )

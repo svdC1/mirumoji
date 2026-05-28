@@ -6,17 +6,19 @@ Attributes:
   LOGGER (logging.Logger): Module's Logging object.
 """
 
-from fastapi import Header, HTTPException, Depends, status
-from mirumoji.server.db.db import DbManager
 import logging
 from typing import Optional
+
+from fastapi import Depends, Header, HTTPException, status
+
+from mirumoji.server.db.db import DbManager
 
 LOGGER = logging.getLogger(__name__)
 db_manager = DbManager()
 
 
 async def get_profile_id_from_header(
-    x_profile_id: str = Header(None)
+    x_profile_id: str = Header(None),
 ) -> Optional[str]:
     """
     Function meant to be run inside FastAPI endpoint which
@@ -32,7 +34,7 @@ async def get_profile_id_from_header(
 
 
 async def ensure_profile_exists(
-    profile_id: str = Depends(get_profile_id_from_header)
+    profile_id: str = Depends(get_profile_id_from_header),
 ) -> str:
     """
     Function meant to be run inside FastAPI endpoint which
@@ -52,13 +54,14 @@ async def ensure_profile_exists(
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="X-Profile-ID header is required for this operation."
+            detail="X-Profile-ID header is required for this operation.",
         )
 
-    profile = await db_manager.read("profiles",
-                                    {"id": profile_id},
-                                    fetch_one=True
-                                    )
+    profile = await db_manager.read(
+        "profiles",
+        {"id": profile_id},
+        fetch_one=True,
+    )
     if not profile:
         try:
             values = {"id": profile_id, "name": profile_id}
@@ -71,17 +74,18 @@ async def ensure_profile_exists(
             profile_check_after_error = await db_manager.read(
                 "profiles",
                 {"id": profile_id},
-                fetch_one=True
-                )
+                fetch_one=True,
+            )
             if not profile_check_after_error:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Could not create or find profile '{profile_id}'.")
+                    detail=f"Could not create or find profile '{profile_id}'.",
+                ) from e
     return profile_id
 
 
 async def get_profile_id_optional(
-    profile_id: str = Depends(get_profile_id_from_header)
+    profile_id: str = Depends(get_profile_id_from_header),
 ) -> Optional[str]:
     """
     Function meant to be run inside FastAPI endpoint which returns the content
@@ -99,16 +103,19 @@ async def get_profile_id_optional(
         return None
 
     # If header is provided, ensure profile exists (or create it)
-    profile = await db_manager.read("profiles",
-                                    {"id": profile_id},
-                                    fetch_one=True
-                                    )
+    profile = await db_manager.read(
+        "profiles",
+        {"id": profile_id},
+        fetch_one=True,
+    )
     if not profile:
         try:
             values = {"id": profile_id, "name": profile_id}
             await db_manager.create("profiles", values)
-            LOGGER.info((f"Implicitly created profile with ID "
-                         f"(optional context): '{profile_id}'"))
+            LOGGER.info(
+                f"Implicitly created profile with ID "
+                f"(optional context): '{profile_id}'",
+            )
         except Exception:
             LOGGER.exception(f"Error creating profile '{profile_id}'")
 
@@ -116,11 +123,13 @@ async def get_profile_id_optional(
             profile_check_after_error = await db_manager.read(
                 "profiles",
                 {"id": profile_id},
-                fetch_one=True
-                )
+                fetch_one=True,
+            )
             if not profile_check_after_error:
-                LOGGER.exception((f"Could not find or create profile"
-                                  f" '{profile_id}' after error."))
+                LOGGER.exception(
+                    f"Could not find or create profile"
+                    f" '{profile_id}' after error.",
+                )
                 return None
 
     return profile_id

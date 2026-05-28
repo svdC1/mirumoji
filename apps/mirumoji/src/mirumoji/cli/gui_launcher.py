@@ -2,11 +2,9 @@
 Launches the GUI application
 """
 
-from mirumoji.cli.gui.main import (app,
-                               setup_logging,
-                               PORT
-                               )
-from flaskwebgui import FlaskUI
+from flaskwebgui import FlaskUI  # type: ignore
+
+from mirumoji.cli.gui.main import PORT, app, setup_logging
 
 
 def main():
@@ -20,7 +18,7 @@ def main():
         server="fastapi",
         fullscreen=False,
         width=1200,
-        height=800
+        height=800,
     ).run()
 
 

@@ -12,17 +12,20 @@ Attributes:
 """
 
 import os
-from databases import Database
-from sqlalchemy import create_engine
-from mirumoji.server.db.Tables import METADATA
-from mirumoji.server.db.Tables import (profiles,
-                       gpt_templates,
-                       profile_files,
-                       profile_transcripts,
-                       clips
-                       )
-from typing import Any, Dict
 from pathlib import Path
+from typing import Any, ClassVar
+
+from databases import Database
+from sqlalchemy import Table, create_engine
+
+from mirumoji.server.db.Tables import (
+    METADATA,
+    clips,
+    gpt_templates,
+    profile_files,
+    profile_transcripts,
+    profiles,
+)
 
 # Check if Data Folder exists
 project_root = Path(__file__).resolve().parent.parent
@@ -69,12 +72,12 @@ class DbManager:
                      `SQAlchemy Table` object
     """
 
-    TABLES = {
+    TABLES: ClassVar[dict[str, Table]] = {
         "profiles": profiles,
         "gpt_templates": gpt_templates,
         "profile_transcripts": profile_transcripts,
         "profile_files": profile_files,
-        "clips": clips
+        "clips": clips,
     }
 
     def __init__(self):
@@ -96,15 +99,16 @@ class DbManager:
         """
         try:
             return self.TABLES[table_name]
-        except KeyError:
-            raise ValueError("Table doesn't exist in database")
+        except KeyError as e:
+            raise ValueError("Table doesn't exist in database") from e
 
-    async def _column_value_filter(self,
-                                   table_name: str,
-                                   filter_dict: Dict[str, Any],
-                                   extend_query: bool = False,
-                                   raw_q: Any = None
-                                   ) -> Any:
+    async def _column_value_filter(
+        self,
+        table_name: str,
+        filter_dict: dict[str, Any],
+        extend_query: bool = False,
+        raw_q: Any = None,
+    ) -> Any:
         """
         Return table records in which columns `filter_dict.keys` have value of
         `filter_dict.value`
@@ -123,29 +127,24 @@ class DbManager:
           Any: Result of `databases.fetch_all` on filter query
         """
         tbl = self._map_table(table_name)
-        q = (tbl
-             .select()
-             )
+        q = tbl.select()
         for col, val in filter_dict.items():
-            q = (q
-                 .where(tbl.c[col] == val)
-                 )
+            q = q.where(tbl.c[col] == val)
         if extend_query:
             ext_q = raw_q
             for col, val in filter_dict.items():
-                ext_q = (ext_q
-                         .where(tbl.c[col] == val)
-                         )
+                ext_q = ext_q.where(tbl.c[col] == val)
             return ext_q
 
         db = await get_db()
         return await db.fetch_all(q)
 
-    async def update(self,
-                     table_name: str,
-                     filter_dict: Dict[str, Any],
-                     values: dict
-                     ) -> Any:
+    async def update(
+        self,
+        table_name: str,
+        filter_dict: dict[str, Any],
+        values: dict,
+    ) -> Any:
         """
         Update row where columns `filter_dict.key` have value
         `filter_dict.value`, in table `table_name` with values `values`
@@ -160,22 +159,18 @@ class DbManager:
           Any: Return result of `databases.execute`
         """
         tbl = self._map_table(table_name)
-        q = (tbl
-             .update()
-             )
-        q = await self._column_value_filter(table_name,
-                                            filter_dict,
-                                            extend_query=True,
-                                            raw_q=q
-                                            )
+        q = tbl.update()
+        q = await self._column_value_filter(
+            table_name,
+            filter_dict,
+            extend_query=True,
+            raw_q=q,
+        )
         q = q.values(**values)
         db = await get_db()
         return await db.execute(q)
 
-    async def create(self,
-                     table_name: str,
-                     values: dict
-                     ) -> Any:
+    async def create(self, table_name: str, values: dict) -> Any:
         """
         Create row with values `values` in table `table_name`
 
@@ -187,17 +182,15 @@ class DbManager:
           Any: Return result of `databases.execute`
         """
         tbl = self._map_table(table_name)
-        q = (tbl
-             .insert()
-             .values(**values)
-             )
+        q = tbl.insert().values(**values)
         db = await get_db()
         return await db.execute(q)
 
-    async def delete(self,
-                     table_name: str,
-                     filter_dict: Dict[str, Any]
-                     ) -> Any:
+    async def delete(
+        self,
+        table_name: str,
+        filter_dict: dict[str, Any],
+    ) -> Any:
         """
         Delete row where column `filter_dict.key` has value
         `filter_dict.value`, in table `table_name`
@@ -211,22 +204,22 @@ class DbManager:
           Any: Return result of `databases.execute`
         """
         tbl = self._map_table(table_name)
-        q = (tbl
-             .delete()
-             )
-        q = await self._column_value_filter(table_name,
-                                            filter_dict,
-                                            extend_query=True,
-                                            raw_q=q
-                                            )
+        q = tbl.delete()
+        q = await self._column_value_filter(
+            table_name,
+            filter_dict,
+            extend_query=True,
+            raw_q=q,
+        )
         db = await get_db()
         return await db.execute(q)
 
-    async def read(self,
-                   table_name: str,
-                   filter_dict: Dict[str, Any],
-                   fetch_one: bool = False
-                   ) -> Any:
+    async def read(
+        self,
+        table_name: str,
+        filter_dict: dict[str, Any],
+        fetch_one: bool = False,
+    ) -> Any:
         """
         Select all rows where column `filter_dict.key` has value
         `filter_dict.value`, in table `table_name`
@@ -243,22 +236,19 @@ class DbManager:
         """
         if fetch_one:
             tbl = self._map_table(table_name)
-            q = (tbl
-                 .select()
-                 )
-            q = await self._column_value_filter(table_name,
-                                                filter_dict,
-                                                extend_query=True,
-                                                raw_q=q
-                                                )
+            q = tbl.select()
+            q = await self._column_value_filter(
+                table_name,
+                filter_dict,
+                extend_query=True,
+                raw_q=q,
+            )
             db = await get_db()
             return await db.fetch_one(q)
 
         return await self._column_value_filter(table_name, filter_dict)
 
-    async def execute(self,
-                      q: Any
-                      ) -> Any:
+    async def execute(self, q: Any) -> Any:
         """
         Wrapper for executing an arbitrary query
 

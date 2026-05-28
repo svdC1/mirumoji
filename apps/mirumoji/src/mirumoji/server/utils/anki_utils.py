@@ -9,11 +9,13 @@ Attributes:
   MODEL_FIELDS (list): Pre-defined card model fields.
   MODEL_NAME (str): Pre-defined standard deck name.
 """
-import genanki
+
 import hashlib
-from typing import List, Optional
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Optional
+
+import genanki
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,9 +64,9 @@ margin: 1.5em 0;
 
 CARD_TEMPLATE = [
     {
-        'name': 'Recognition → Recall',
-        'qfmt': '<div class="card"><h1>{{Word}}</h1></div>',
-        'afmt': '''
+        "name": "Recognition → Recall",
+        "qfmt": '<div class="card"><h1>{{Word}}</h1></div>',
+        "afmt": """
           {{FrontSide}}
           <hr>
           <div class="card">
@@ -75,17 +77,17 @@ CARD_TEMPLATE = [
             <div class="sentence"><strong>Sentence:</strong> {{Sentence}}</div>
             <div class="explanation">{{Explanation}}</div>
           </div>
-        ''',
+        """,
     },
 ]
 
 MODEL_FIELDS = [
-                {'name': 'Clip'},
-                {'name': 'Word'},
-                {'name': 'Meanings'},
-                {'name': 'Sentence'},
-                {'name': 'Explanation'}
-                ]
+    {"name": "Clip"},
+    {"name": "Word"},
+    {"name": "Meanings"},
+    {"name": "Sentence"},
+    {"name": "Explanation"},
+]
 
 MODEL_NAME = "Mirumoji-Anki-V1"
 
@@ -102,13 +104,15 @@ class AnkiExporter:
       card_template (list, optional): Card template for genanki.
 
     """
-    def __init__(self,
-                 model_name: Optional[str] = MODEL_NAME,
-                 deck_name:  Optional[str] = MODEL_NAME + " Deck",
-                 model_fields: Optional[List] = MODEL_FIELDS,
-                 css: Optional[str] = VIDEO_CSS,
-                 card_template: Optional[List] = CARD_TEMPLATE
-                 ) -> None:
+
+    def __init__(
+        self,
+        model_name: Optional[str] = MODEL_NAME,
+        deck_name: Optional[str] = MODEL_NAME + " Deck",
+        model_fields: Optional[list] = MODEL_FIELDS,
+        css: Optional[str] = VIDEO_CSS,
+        card_template: Optional[list] = CARD_TEMPLATE,
+    ) -> None:
 
         self.model_name = model_name
         self.model_id = __class__.id_from_string(model_name)
@@ -119,12 +123,13 @@ class AnkiExporter:
             name=model_name,
             fields=model_fields,
             templates=card_template,
-            css=css)
+            css=css,
+        )
 
         self.deck_name = deck_name
         self.deck_id = __class__.id_from_string(deck_name)
         self.deck = genanki.Deck(self.deck_id, self.deck_name)
-        self.media_files: List[str] = []
+        self.media_files: list[str] = []
         self.video_tag = '<video controls><source src="{0}"\
             type="video/webm"/></video>'
 
@@ -139,16 +144,17 @@ class AnkiExporter:
         Returns:
           int: ID generated using hashlib.
         """
-        return int.from_bytes(hashlib.sha1(s.encode()).digest()[:4], 'big')
+        return int.from_bytes(hashlib.sha1(s.encode()).digest()[:4], "big")
 
-    def add_card(self,
-                 clip_path: str,
-                 word: str,
-                 meanings: str,
-                 sentence: str,
-                 explanation: str,
-                 tags: Optional[List[str]] = None
-                 ) -> None:
+    def add_card(
+        self,
+        clip_path: str,
+        word: str,
+        meanings: str,
+        sentence: str,
+        explanation: str,
+        tags: Optional[list[str]] = None,
+    ) -> None:
         """
         Add one card to the deck, `clip_path` will be bundled as media.
 
@@ -166,26 +172,19 @@ class AnkiExporter:
 
         note = genanki.Note(
             model=self.model,
-            fields=[
-                video,
-                word,
-                meanings,
-                sentence,
-                explanation],
+            fields=[video, word, meanings, sentence, explanation],
             tags=tags or [],
         )
         self.deck.add_note(note)
 
-    def export(self,
-               output_path: str) -> None:
+    def export(self, output_path: str) -> None:
         """
         Write .apkg (deck + all media) to output_path.
 
         Args:
           output_path (str): Path to save the Anki Deck.
         """
-        pkg = genanki.Package(self.deck,
-                              self.media_files)
+        pkg = genanki.Package(self.deck, self.media_files)
         pkg.write_to_file(output_path)
         _notes = f"#Notes -> '{len(self.deck.notes)}';"
         _media = f"#Media -> '{len(self.media_files)}';"

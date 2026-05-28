@@ -5,8 +5,8 @@ Attributes:
   health_router (APIRouter): The FastAPI Router Object.
 """
 
-
 from fastapi import APIRouter
+
 from mirumoji.server.utils.system_info_utils import get_system_info
 
 health_router = APIRouter(prefix="/health")

@@ -5,9 +5,8 @@ Attributes:
   LOGGER (logging.Logger): Logger's Module
 """
 
-from typing import (Dict,
-                    Any)
 import logging
+from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,8 +27,7 @@ def format_time(seconds: float) -> str:
     return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02},{ms:03}"
 
 
-def generate_srt(result: Dict[str, Any],
-                 srt_path: str) -> str:
+def generate_srt(result: dict[str, Any], srt_path: str) -> str:
     """
     Generate an SRT file from Whisper transcription result.
 

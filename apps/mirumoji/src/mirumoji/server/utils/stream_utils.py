@@ -6,26 +6,25 @@ Attributes:
   LOGGER (logging.Logger): Module's logger object.
 """
 
-from typing import (Union,
-                    Iterator,
-                    Generator,
-                    Any)
-from mirumoji.server.processing.gpt_wrapper import GptModel
-import logging
-from pathlib import Path
 import asyncio
+import logging
+from collections.abc import Generator, Iterator
+from pathlib import Path
+from typing import Any, Callable, Union
+
 from fastapi import HTTPException
-from typing import Callable
 from fastapi.responses import StreamingResponse
+
+from mirumoji.server.processing.gpt_wrapper import GptModel
 
 LOGGER = logging.getLogger(__name__)
 
 
-def _generate_reply(version: str,
-                    sys_msg: str,
-                    prompt: str
-                    ) -> Union[Iterator[str],
-                               None]:
+def _generate_reply(
+    version: str,
+    sys_msg: str,
+    prompt: str,
+) -> Union[Iterator[str], None]:
     """
     Stream reply from a `GptModel` object OpenAI API call.
 
@@ -38,20 +37,18 @@ def _generate_reply(version: str,
       Iterator[str]: The text chunks from the reply.
     """
     try:
-        model = GptModel(
-                version=version,
-                system_msg=sys_msg)
-        for chunk in model.stream_request(prompt):
-            yield chunk
+        model = GptModel(version=version, system_msg=sys_msg)
+        yield from model.stream_request(prompt)
     except Exception as e:
         LOGGER.error(str(e))
         return None
 
 
-def sse_gen(version: str,
-            system_message: str,
-            prompt: str
-            ) -> Generator[str, Any, None]:
+def sse_gen(
+    version: str,
+    system_message: str,
+    prompt: str,
+) -> Generator[str, Any, None]:
     """
     Stream reply from a `GptModel` object OpenAI API call.
 
@@ -63,9 +60,7 @@ def sse_gen(version: str,
     Yields:
       str: The text chunks from the reply.
     """
-    reply = _generate_reply(version,
-                            system_message,
-                            prompt)
+    reply = _generate_reply(version, system_message, prompt)
 
     if not reply:
         LOGGER.error("Failed to generate stream")
@@ -80,10 +75,10 @@ def stream_response_with_task(
     task_func: Callable[[], None],
     filename: str,
     media_type: str | None = None,
-    keepalive_interval: float = 20.0
+    keepalive_interval: float = 20.0,
 ) -> StreamingResponse:
     """
-    Streams a long‐running task’s output file over HTTP without timing out
+    Streams a long-running task's output file over HTTP without timing out
     by running `task_func` in a background thread while yielding a space
     every `keepalive_interval` seconds to keep proxies alive.
 
@@ -99,6 +94,7 @@ def stream_response_with_task(
       StreamingReponse: Once the task is done, streams the file at `path` in 8k
                         chunks.
     """
+
     async def _generator():
         task = asyncio.create_task(asyncio.to_thread(task_func))
         while not task.done():
@@ -111,12 +107,10 @@ def stream_response_with_task(
                 yield chunk
         return
 
-    headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"'
-    }
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
 
     return StreamingResponse(
         _generator(),
         media_type=media_type,
-        headers=headers
+        headers=headers,
     )

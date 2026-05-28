@@ -6,17 +6,26 @@ Attributes:
   profile_router (APIRouter): The FastAPI Router Object.
 """
 
-import logging
-import uuid
 import asyncio
 import json
-from fastapi import (APIRouter,
-                     Depends,
-                     HTTPException,
-                     status,
-                     Header,
-                     Path as FastAPIPath
-                     )
+import logging
+import urllib.parse
+import uuid
+from pathlib import Path
+from typing import Optional
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    status,
+)
+from fastapi import (
+    Path as FastAPIPath,
+)
+
+from mirumoji.server.db.db import DbManager
 from mirumoji.server.models.llm import GptTemplateBase
 from mirumoji.server.models.responses import (
     AnkiExportResponse,
@@ -26,30 +35,28 @@ from mirumoji.server.models.responses import (
     ProfileTranscriptResponse,
 )
 from mirumoji.server.processing.audio_processing import AudioTools
-from typing import Optional, List
-from pathlib import Path
-import urllib.parse
-from mirumoji.server.db.db import DbManager
 from mirumoji.server.profile_manager import ensure_profile_exists
 from mirumoji.server.utils.anki_utils import AnkiExporter
-from mirumoji.server.utils.file_utils import get_stream_file, MediaFileHandler
+from mirumoji.server.utils.file_utils import MediaFileHandler, get_stream_file
 
 LOGGER = logging.getLogger(__name__)
 
-profile_router = APIRouter(prefix='/profiles',
-                           dependencies=[Depends(ensure_profile_exists)]
-                           )
+profile_router = APIRouter(
+    prefix="/profiles",
+    dependencies=[Depends(ensure_profile_exists)],
+)
 
 MEDIA_FILE_HANDLER = MediaFileHandler()
 db_manager = DbManager()
 
 
 # --- GPT Template Management ---
-@profile_router.get("/gpt_template",
-                    response_model=GptTemplateResponse
-                    )
+@profile_router.get(
+    "/gpt_template",
+    response_model=GptTemplateResponse,
+)
 async def get_gpt_template(
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> GptTemplateResponse:
     """
     GET endpoint for retrieving the active profile's GPT Template.
@@ -64,29 +71,35 @@ async def get_gpt_template(
       HTTPException: If no profile ID was provided or no record was found.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
-    rec = await db_manager.read("gpt_templates",
-                                {"profile_id": profile_id},
-                                fetch_one=True
-                                )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
+    rec = await db_manager.read(
+        "gpt_templates",
+        {"profile_id": profile_id},
+        fetch_one=True,
+    )
     if not rec:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="GPT template not found.")
-    return GptTemplateResponse(id=rec.id,
-                               sysMsg=rec.sys_msg,
-                               prompt=rec.prompt,
-                               version=rec.version
-                               )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GPT template not found.",
+        )
+    return GptTemplateResponse(
+        id=rec.id,
+        sysMsg=rec.sys_msg,
+        prompt=rec.prompt,
+        version=rec.version,
+    )
 
 
-@profile_router.post("/gpt_template",
-                     response_model=GptTemplateResponse
-                     )
+@profile_router.post(
+    "/gpt_template",
+    response_model=GptTemplateResponse,
+)
 async def upsert_gpt_template(
     template_data: GptTemplateBase,
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> GptTemplateResponse:
     """
     POST endpoint for creating or updating the active profile's GPT Template.
@@ -102,18 +115,21 @@ async def upsert_gpt_template(
       HTTPException: If no profile ID was provided.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     values = {
         "profile_id": profile_id,
         "sys_msg": template_data.sys_msg,
         "prompt": template_data.prompt,
-        "version": template_data.version
-        }
-    ex = await db_manager.read("gpt_templates",
-                               {"profile_id": profile_id},
-                               fetch_one=True
-                               )
+        "version": template_data.version,
+    }
+    ex = await db_manager.read(
+        "gpt_templates",
+        {"profile_id": profile_id},
+        fetch_one=True,
+    )
     if ex:
         # Update current template
         await db_manager.update("gpt_templates", {"id": ex.id}, values)
@@ -123,18 +139,20 @@ async def upsert_gpt_template(
         tid = str(uuid.uuid4())
         values["id"] = tid
         await db_manager.create("gpt_templates", values)
-    return GptTemplateResponse(id=tid,
-                               sysMsg=values["sys_msg"],
-                               prompt=values["prompt"],
-                               version=values["version"]
-                               )
+    return GptTemplateResponse(
+        id=tid,
+        sysMsg=values["sys_msg"],
+        prompt=values["prompt"],
+        version=values["version"],
+    )
 
 
-@profile_router.delete("/gpt_template",
-                       status_code=status.HTTP_200_OK
-                       )
+@profile_router.delete(
+    "/gpt_template",
+    status_code=status.HTTP_200_OK,
+)
 async def delete_gpt_template(
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     DELETE endpoint for deleting the active profile's GPT Template.
@@ -149,21 +167,27 @@ async def delete_gpt_template(
       HTTPException: If no profile ID was provided or no template was found.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     res = await db_manager.delete("gpt_templates", {"profile_id": profile_id})
     if res == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="GPT template not found.")
-    return {"success": True,
-            "message": "Template deleted successfully."
-            }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="GPT template not found.",
+        )
+    return {
+        "success": True,
+        "message": "Template deleted successfully.",
+    }
 
 
 # --- Clip Management ---
-@profile_router.post("/clips/save",
-                     status_code=status.HTTP_201_CREATED
-                     )
+@profile_router.post(
+    "/clips/save",
+    status_code=status.HTTP_201_CREATED,
+)
 async def save_video_clip(
     video_clip: Path = Depends(get_stream_file),
     profile_id: str = Header(..., alias="X-Profile-ID"),
@@ -171,7 +195,7 @@ async def save_video_clip(
     clip_end_time: str = Header(...),
     gpt_breakdown_response: str = Header(...),
     original_video_file_name: Optional[str] = Header(None),
-    original_video_url: Optional[str] = Header(None)
+    original_video_url: Optional[str] = Header(None),
 ) -> dict:
     """
     POST endpoint for saving a new clip for the active profile
@@ -195,9 +219,10 @@ async def save_video_clip(
     """
 
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     await ensure_profile_exists(profile_id)
     # Create or Get Profile Clips Dir
     p_path = MEDIA_FILE_HANDLER.get_profile_dir(profile_id, "clips")
@@ -219,12 +244,13 @@ async def save_video_clip(
                 audio_tools.to_webm,
                 input_path=str(loc),
                 output_path=str(webm_loc),
-                use_nvenc=True
-                )
+                use_nvenc=True,
+            )
         except Exception as e:
-            LOGGER.exception((
+            LOGGER.exception(
                 f"Failed to convert '{loc}' to WEBM : '{e}';"
-                f"Falling back to original format"))
+                f"Falling back to original format",
+            )
         if webm_loc.exists():
             rel_path = MEDIA_FILE_HANDLER.get_relative_path(webm_loc)
             fname = webm_fname
@@ -243,7 +269,7 @@ async def save_video_clip(
             "gpt_breakdown_response": gpt_j,
             "video_clip_path": str(rel_path),
             "original_video_file_name": original_video_file_name,
-            "original_video_url": original_video_url
+            "original_video_url": original_video_url,
         }
         await db_manager.create("clips", values)
 
@@ -253,38 +279,45 @@ async def save_video_clip(
             "profile_id": profile_id,
             "file_name": video_clip.name,
             "file_path": str(rel_path),
-            "file_type": "video_clip"
+            "file_type": "video_clip",
         }
         await db_manager.create("profile_files", files_values)
 
-        return {"success": True,
-                "message": "Clip saved successfully.",
-                "clip_id": c_id
-                }
+        return {
+            "success": True,
+            "message": "Clip saved successfully.",
+            "clip_id": c_id,
+        }
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Invalid JSON.")
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Invalid time format.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON.",
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid time format.",
+        ) from e
     except HTTPException:
         # Propagate Exceptions
         raise
     except Exception as e:
         LOGGER.exception("Error saving clip")
         await MEDIA_FILE_HANDLER.delete_file(rel_path)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Failed to save clip: '{e}'"
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save clip: '{e}'",
+        ) from e
 
 
-@profile_router.get("/clips",
-                    response_model=List[ClipResponse]
-                    )
+@profile_router.get(
+    "/clips",
+    response_model=list[ClipResponse],
+)
 async def get_saved_clips(
-    profile_id: str = Depends(ensure_profile_exists)
-) -> List[ClipResponse]:
+    profile_id: str = Depends(ensure_profile_exists),
+) -> list[ClipResponse]:
     """
     GET endpoint for getting a profile's saved clips.
 
@@ -299,24 +332,28 @@ async def get_saved_clips(
                      getting saved clips.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     c_lst = await db_manager.read("clips", {"profile_id": profile_id})
     return [
-        ClipResponse(id=c.id,
-                     get_url=f"/media/{c.video_clip_path}",
-                     breakdown_response=json.dumps(c.gpt_breakdown_response)
-                     ) for c in c_lst
-        ]
+        ClipResponse(
+            id=c.id,
+            get_url=f"/media/{c.video_clip_path}",
+            breakdown_response=json.dumps(c.gpt_breakdown_response),
+        )
+        for c in c_lst
+    ]
 
 
-@profile_router.delete("/clips/{clipId}",
-                       status_code=status.HTTP_200_OK
-                       )
+@profile_router.delete(
+    "/clips/{clipId}",
+    status_code=status.HTTP_200_OK,
+)
 async def delete_saved_clip(
     clipId: str = FastAPIPath(...),
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     DELETE endpoint for deleting a profile's specific saved clip.
@@ -333,23 +370,28 @@ async def delete_saved_clip(
                      deleting the clip.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     filter = {"id": clipId, "profile_id": profile_id}
-    clip_r = await db_manager.read("clips",
-                                   filter,
-                                   fetch_one=True
-                                   )
+    clip_r = await db_manager.read(
+        "clips",
+        filter,
+        fetch_one=True,
+    )
 
     if not clip_r:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Clip not found."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clip not found.",
+        )
     await db_manager.delete("clips", filter)
 
-    files_filter = {"file_path": clip_r.video_clip_path,
-                    "profile_id": profile_id}
+    files_filter = {
+        "file_path": clip_r.video_clip_path,
+        "profile_id": profile_id,
+    }
 
     await db_manager.delete("profile_files", files_filter)
     fp = clip_r.video_clip_path
@@ -358,21 +400,24 @@ async def delete_saved_clip(
         LOGGER.info(f"Deleted: '{fp}'")
     except OSError as e:
         LOGGER.error(f"Error deleting '{fp}': '{e}'")
-        return {"success": False,
-                "message": f"Error deleting '{fp}': '{e}'"
-                }
-    return {"success": True,
-            "message": "Clip deleted successfully."
-            }
+        return {
+            "success": False,
+            "message": f"Error deleting '{fp}': '{e}'",
+        }
+    return {
+        "success": True,
+        "message": "Clip deleted successfully.",
+    }
 
 
 # --- Profile File Management ---
-@profile_router.get("/files",
-                    response_model=List[ProfileFileResponse]
-                    )
+@profile_router.get(
+    "/files",
+    response_model=list[ProfileFileResponse],
+)
 async def get_profile_files(
-    profile_id: str = Depends(ensure_profile_exists)
-) -> List[ProfileFileResponse]:
+    profile_id: str = Depends(ensure_profile_exists),
+) -> list[ProfileFileResponse]:
     """
     GET endpoint for getting a profile's saved files.
 
@@ -387,27 +432,30 @@ async def get_profile_files(
                      getting files.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     f_lst = await db_manager.read("profile_files", {"profile_id": profile_id})
     return [
-        ProfileFileResponse(id=f.id,
-                            file_name=f.file_name,
-                            get_url=f"/media/{f.file_path}",
-                            file_type=f.file_type,
-                            created_at=f.created_at.isoformat() if
-                            f.created_at else None
-                            ) for f in f_lst
-            ]
+        ProfileFileResponse(
+            id=f.id,
+            file_name=f.file_name,
+            get_url=f"/media/{f.file_path}",
+            file_type=f.file_type,
+            created_at=f.created_at.isoformat() if f.created_at else None,
+        )
+        for f in f_lst
+    ]
 
 
-@profile_router.delete("/files/{fileId}",
-                       status_code=status.HTTP_200_OK
-                       )
+@profile_router.delete(
+    "/files/{fileId}",
+    status_code=status.HTTP_200_OK,
+)
 async def delete_profile_file(
     fileId: str = FastAPIPath(...),
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     DELETE endpoint for deleting a specific saved file for a profile.
@@ -424,15 +472,17 @@ async def delete_profile_file(
                      deleting the file
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     filter = {"id": fileId, "profile_id": profile_id}
     file_r = await db_manager.read("profile_files", filter, fetch_one=True)
     if not file_r:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="File record not found."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File record not found.",
+        )
     await db_manager.delete("profile_files", filter)
     fp = file_r.file_path
     try:
@@ -440,9 +490,10 @@ async def delete_profile_file(
         LOGGER.info(f"Deleted file: '{fp}'")
     except OSError as e:
         LOGGER.error(f"Error deleting '{fp}': '{e}'")
-        return {"success": False,
-                "message": f"Error deleting '{fp}': '{e}'"
-                }
+        return {
+            "success": False,
+            "message": f"Error deleting '{fp}': '{e}'",
+        }
 
     if file_r.file_type == "video_clip":
         # Delete related saved clip
@@ -454,25 +505,29 @@ async def delete_profile_file(
     elif file_r.file_type == "audio_source":
         # Delete related transcript
         transcript_filter = {"audio_file_path": file_r.file_path}
-        res = await db_manager.update("profile_transcripts",
-                                      transcript_filter,
-                                      values={"audio_file_path": None}
-                                      )
+        res = await db_manager.update(
+            "profile_transcripts",
+            transcript_filter,
+            values={"audio_file_path": None},
+        )
         if res > 0:
             LOGGER.info(
-                f"Cleared path in transcripts for '{file_r.file_path}'")
-    return {"success": True,
-            "message": "File deleted successfully."
-            }
+                f"Cleared path in transcripts for '{file_r.file_path}'",
+            )
+    return {
+        "success": True,
+        "message": "File deleted successfully.",
+    }
 
 
 # --- Profile Transcript Management ---
-@profile_router.get("/transcripts",
-                    response_model=List[ProfileTranscriptResponse]
-                    )
+@profile_router.get(
+    "/transcripts",
+    response_model=list[ProfileTranscriptResponse],
+)
 async def get_profile_transcripts(
-    profile_id: str = Depends(ensure_profile_exists)
-) -> List[ProfileTranscriptResponse]:
+    profile_id: str = Depends(ensure_profile_exists),
+) -> list[ProfileTranscriptResponse]:
     """
     GET endpoint for retrieving profile transcripts.
 
@@ -487,13 +542,15 @@ async def get_profile_transcripts(
                      retrieving transcripts
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     res_trans = []
-    for t in await db_manager.read("profile_transcripts",
-                                   {"profile_id": profile_id}
-                                   ):
+    for t in await db_manager.read(
+        "profile_transcripts",
+        {"profile_id": profile_id},
+    ):
         url = f"/media/{t.audio_file_path}" if t.audio_file_path else None
         res_trans.append(
             ProfileTranscriptResponse(
@@ -502,18 +559,19 @@ async def get_profile_transcripts(
                 transcript=t.transcript,
                 gpt_explanation=t.gpt_explanation,
                 get_url=url,
-                created_at=t.created_at.isoformat() if t.created_at else None
-                )
-            )
+                created_at=t.created_at.isoformat() if t.created_at else None,
+            ),
+        )
     return res_trans
 
 
-@profile_router.delete("/transcripts/{transcriptId}",
-                       status_code=status.HTTP_200_OK
-                       )
+@profile_router.delete(
+    "/transcripts/{transcriptId}",
+    status_code=status.HTTP_200_OK,
+)
 async def delete_profile_transcript(
     transcriptId: str = FastAPIPath(...),
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> dict:
     """
     DELETE endpoint for deleting a specific transcript for a profile.
@@ -530,18 +588,21 @@ async def delete_profile_transcript(
                      deleting the transcript.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     filter = {"id": transcriptId, "profile_id": profile_id}
-    trans_r = await db_manager.read("profile_transcripts",
-                                    filter,
-                                    fetch_one=True
-                                    )
+    trans_r = await db_manager.read(
+        "profile_transcripts",
+        filter,
+        fetch_one=True,
+    )
     if not trans_r:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Transcript not found."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transcript not found.",
+        )
 
     await db_manager.delete("profile_transcripts", filter)
 
@@ -559,27 +620,32 @@ async def delete_profile_transcript(
                 LOGGER.info(f"Del audio file: '{fp_aud}'")
             except OSError as e:
                 LOGGER.error(f"Err del audio '{fp_aud}': '{e}'")
-                return {"success": False,
-                        "message": f"Err del audio '{fp_aud}': '{e}'"
-                        }
+                return {
+                    "success": False,
+                    "message": f"Err del audio '{fp_aud}': '{e}'",
+                }
         else:
-            LOGGER.warning((
+            LOGGER.warning(
                 f"No profile_files entry for '{aud_path}' "
-                f"with transcript '{transcriptId}'"))
-            return {"success": False,
-                    "message": f"Audio file not found for del: '{fp_aud}'"
-                    }
-    return {"success": True,
-            "message": "Transcript deleted successfully."
+                f"with transcript '{transcriptId}'",
+            )
+            return {
+                "success": False,
+                "message": f"Audio file not found for del: '{fp_aud}'",
             }
+    return {
+        "success": True,
+        "message": "Transcript deleted successfully.",
+    }
 
 
 # --- Anki Export ---
-@profile_router.get("/anki_export",
-                    response_model=AnkiExportResponse
-                    )
+@profile_router.get(
+    "/anki_export",
+    response_model=AnkiExportResponse,
+)
 async def export_anki_deck(
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ) -> AnkiExportResponse:
     """
     GET endpoint for exporting profile's saved clips as an Anki Deck.
@@ -595,32 +661,33 @@ async def export_anki_deck(
                      generating the Anki deck.
     """
     if not profile_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="X-Profile-ID header is required."
-                            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
     # Get Clips
-    clip_lst = [
-        c for c in await db_manager.read("clips", {"profile_id": profile_id})
-        ]
+    clip_lst = list(await db_manager.read("clips", {"profile_id": profile_id}))
     anki = AnkiExporter()
     for c in clip_lst:
         breakdown = c.gpt_breakdown_response
         explanation = breakdown["gpt_explanation"]
-        sentence = breakdown['sentence']
+        sentence = breakdown["sentence"]
         path = str(MEDIA_FILE_HANDLER.base_path / c.video_clip_path)
         LOGGER.info(f"Clip Path: {path}")
-        focus = breakdown["focus"]['word']
-        meanings = ','.join(breakdown['focus']['meanings'])
-        anki.add_card(clip_path=path,
-                      word=focus,
-                      meanings=meanings,
-                      sentence=sentence,
-                      explanation=explanation
-                      )
+        focus = breakdown["focus"]["word"]
+        meanings = ",".join(breakdown["focus"]["meanings"])
+        anki.add_card(
+            clip_path=path,
+            word=focus,
+            meanings=meanings,
+            sentence=sentence,
+            explanation=explanation,
+        )
     anki_dir = MEDIA_FILE_HANDLER.get_profile_dir(profile_id, "anki")
     pkg_fn = f"{uuid.uuid4()}_saved_deck.apkg"
     outpath = anki_dir / pkg_fn
     anki.export(str(outpath))
     media_path = str(
-        Path("media") / MEDIA_FILE_HANDLER.get_relative_path(outpath))
+        Path("media") / MEDIA_FILE_HANDLER.get_relative_path(outpath),
+    )
     return AnkiExportResponse(anki_deck_url=media_path)

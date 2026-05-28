@@ -2,8 +2,9 @@
 Pydantic models for the GUI FastAPI application.
 """
 
+from typing import Literal, Optional, Union
+
 from pydantic import BaseModel, Field
-from typing import Literal, Union, Optional
 
 
 class StartRequest(BaseModel):
@@ -29,6 +30,7 @@ class StartRequest(BaseModel):
       repository (str, optional): Wether to pull images from `GitHub` or
                                  `DockerHub` if `local=False`
     """
+
     gpu: bool
     local: bool
     OPENAI_API_KEY: str
@@ -48,6 +50,7 @@ class StopRequest(BaseModel):
     Args:
       clean (bool): Wether to delete created Docker volumes and networks
     """
+
     clean: bool
 
 
@@ -59,4 +62,5 @@ class BuildRequest(BaseModel):
       gpu (bool): If `True`, build GPU version of backend, otherwise build CPU
                   version
     """
+
     gpu: bool

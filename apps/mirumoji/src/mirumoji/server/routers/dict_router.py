@@ -7,13 +7,12 @@ Attributes:
 
 """
 
-from fastapi import APIRouter, Query, HTTPException
 import logging
-from mirumoji.server.processing.Processor import Processor
-from mirumoji.server.models.dict_data import (
-    DictLookup,
-    DictWildcardLookup,
-)
+
+from fastapi import APIRouter, HTTPException, Query
+
+from ..models.dict_data import DictLookup, DictWildcardLookup
+from ..processing.Processor import Processor
 
 LOGGER = logging.getLogger(__name__)
 dict_router = APIRouter(prefix="/dict")
@@ -41,7 +40,7 @@ async def explain_sentence(sentence: str = Query(...)) -> dict:
 
     except Exception as e:
         LOGGER.exception(f"Failed to breakdown sentence '{sentence}'")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None
 
 
 @dict_router.get("/word", response_model=DictLookup)
@@ -63,9 +62,7 @@ async def query_word(word: str = Query(...)) -> DictLookup:
         return r
     except Exception as e:
         LOGGER.exception(f"Failed to query kotobase for word: '{word}'")
-        raise HTTPException(status_code=500,
-                            detail=str(e)
-                            )
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @dict_router.get("/wildcard", response_model=DictWildcardLookup)
@@ -91,8 +88,6 @@ async def wildcard_query(pattern: str = Query(...)) -> DictWildcardLookup:
         return r
     except Exception as e:
         LOGGER.exception(
-            f"Failed to query kotobase for wildcard pattern: '{pattern}'"
-            )
-        raise HTTPException(status_code=500,
-                            detail=str(e)
-                            )
+            f"Failed to query kotobase for wildcard pattern: '{pattern}'",
+        )
+        raise HTTPException(status_code=500, detail=str(e)) from e

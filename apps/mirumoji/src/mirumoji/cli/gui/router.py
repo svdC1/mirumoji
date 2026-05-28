@@ -2,42 +2,39 @@
 Defines the `/api` router of the GUI launcher application
 """
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
-from subprocess import Popen, CalledProcessError
 import logging
 import os
-from typing import (Generator,
-                    Dict
-                    )
+from collections.abc import Generator
+from subprocess import CalledProcessError, Popen
 
-from mirumoji.cli.gui.core import (docker_running,
-                               has_nvidia_gpu,
-                               get_host_lan_ip,
-                               docker_compose,
-                               build_img
-                               )
-from mirumoji.cli.gui.models import (StartRequest,
-                                 StopRequest,
-                                 BuildRequest
-                                 )
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+
+from mirumoji.cli.gui.core import (
+    build_img,
+    docker_compose,
+    docker_running,
+    get_host_lan_ip,
+    has_nvidia_gpu,
+)
+from mirumoji.cli.gui.models import BuildRequest, StartRequest, StopRequest
 from mirumoji.cli.gui.paths import (
+    BACKEND_BUILD_CONTEXT_RELPATH,
+    BACKEND_CPU_DOCKERFILE_RELPATH,
+    BACKEND_CPU_LOCAL_IMAGE_NAME,
+    BACKEND_GPU_DOCKERFILE_RELPATH,
+    BACKEND_GPU_LOCAL_IMAGE_NAME,
     COMPOSE_LOCAL_CPU_RELPATH,
     COMPOSE_LOCAL_GPU_RELPATH,
     COMPOSE_PREBUILT_CPU_RELPATH,
     COMPOSE_PREBUILT_DOCKER_CPU_RELPATH,
     COMPOSE_PREBUILT_DOCKER_GPU_RELPATH,
     COMPOSE_PREBUILT_GPU_RELPATH,
-    REPO_DIR,
     FRONTEND_BUILD_CONTEXT_RELPATH,
     FRONTEND_DOCKERFILE_RELPATH,
     FRONTEND_LOCAL_IMAGE_NAME,
-    BACKEND_BUILD_CONTEXT_RELPATH,
-    BACKEND_CPU_DOCKERFILE_RELPATH,
-    BACKEND_CPU_LOCAL_IMAGE_NAME,
-    BACKEND_GPU_DOCKERFILE_RELPATH,
-    BACKEND_GPU_LOCAL_IMAGE_NAME
-    )
+    REPO_DIR,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,8 +43,9 @@ router = APIRouter(prefix="/api")
 # --- Stream Helper ---
 
 
-def _stream_gen(gen: Generator[str, str, Popen[str]]
-                ) -> Generator[str, None, None]:
+def _stream_gen(
+    gen: Generator[str, str, Popen[str]],
+) -> Generator[str, None, None]:
     """
     Formats a generator's output for an event-stream.
 
@@ -70,7 +68,7 @@ def _stream_gen(gen: Generator[str, str, Popen[str]]
 
 
 @router.get("/dockerRunning")
-def check_docker() -> Dict[str, bool]:
+def check_docker() -> dict[str, bool]:
     """
     GET endpoint which checks if Docker deamon is running
 
@@ -88,7 +86,7 @@ def check_docker() -> Dict[str, bool]:
 
 
 @router.get("/hasGPU")
-def has_gpu() -> Dict[str, bool]:
+def has_gpu() -> dict[str, bool]:
     """
     GET endpoint which checks if the system has an NVIDIA GPU installed
 
@@ -122,7 +120,7 @@ def start_app(request: StartRequest) -> StreamingResponse:
             os.environ["MIRUMOJI_MODAL_GPU"] = request.MIRUMOJI_MODAL_GPU
             os.environ["MODAL_FORCE_BUILD"] = (
                 "1" if request.MODAL_FORCE_BUILD else "0"
-                )
+            )
 
         # Configure Compose File
         compose_file = None
@@ -141,19 +139,20 @@ def start_app(request: StartRequest) -> StreamingResponse:
                 if request.gpu:
                     compose_file = (
                         REPO_DIR / COMPOSE_PREBUILT_DOCKER_GPU_RELPATH
-                        )
+                    )
                 else:
                     compose_file = (
                         REPO_DIR / COMPOSE_PREBUILT_DOCKER_CPU_RELPATH
-                        )
+                    )
 
         # Combine Generators to Return LAN IP
         def _combined_generator():
-            docker_gen = docker_compose("up",
-                                        name_only=False,
-                                        command_flags=["-d"],
-                                        docker_compose_file=compose_file
-                                        )
+            docker_gen = docker_compose(
+                "up",
+                name_only=False,
+                command_flags=["-d"],
+                docker_compose_file=compose_file,
+            )
             yield from docker_gen
             yield f"LAN Access URL: https://{lan_ip}"
             yield "Local Access URL: https://localhost"
@@ -162,12 +161,12 @@ def start_app(request: StartRequest) -> StreamingResponse:
         stream = StreamingResponse(
             content=_stream_gen(_combined_generator()),
             status_code=200,
-            media_type="text/event-stream"
+            media_type="text/event-stream",
         )
         return stream
     except Exception as e:
         LOGGER.error(f"Failed to start app: '{e}'")
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(400, detail=str(e)) from e
 
 
 @router.get("/logs")
@@ -180,20 +179,24 @@ def send_logs() -> StreamingResponse:
       StreamingResponse: Docker command's stdout
     """
     try:
+
         def _docker_logs_gen() -> Generator[str, None, None]:
-            logs_gen = docker_compose("logs",
-                                      name_only=True,
-                                      command_flags=["-f"],
-                                      )
+            logs_gen = docker_compose(
+                "logs",
+                name_only=True,
+                command_flags=["-f"],
+            )
             yield "Streaming Logs..."
             yield from logs_gen
-        return StreamingResponse(content=_stream_gen(_docker_logs_gen()),
-                                 status_code=200,
-                                 media_type="text/event-stream"
-                                 )
+
+        return StreamingResponse(
+            content=_stream_gen(_docker_logs_gen()),
+            status_code=200,
+            media_type="text/event-stream",
+        )
     except Exception as e:
         LOGGER.error(f"Failed to send logs: '{e}'")
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(400, detail=str(e)) from e
 
 
 @router.post("/stop")
@@ -213,18 +216,16 @@ def stop_app(request: StopRequest) -> StreamingResponse:
         if request.clean:
             flags.append("-v")
         stream = StreamingResponse(
-            content=_stream_gen(docker_compose("down",
-                                               name_only=True,
-                                               command_flags=flags
-                                               )
-                                ),
+            content=_stream_gen(
+                docker_compose("down", name_only=True, command_flags=flags),
+            ),
             status_code=200,
-            media_type="text/event-stream"
+            media_type="text/event-stream",
         )
         return stream
     except Exception as e:
         LOGGER.error(f"Failed to stop application: '{e}'")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/build")
@@ -245,10 +246,11 @@ def build_imgs(request: BuildRequest) -> StreamingResponse:
         frontend_dockerfile = REPO_DIR / FRONTEND_DOCKERFILE_RELPATH
         frontend_context = REPO_DIR / FRONTEND_BUILD_CONTEXT_RELPATH
 
-        frontend_gen = build_img(image_name=FRONTEND_LOCAL_IMAGE_NAME,
-                                 dockerfile=frontend_dockerfile,
-                                 build_context=frontend_context
-                                 )
+        frontend_gen = build_img(
+            image_name=FRONTEND_LOCAL_IMAGE_NAME,
+            dockerfile=frontend_dockerfile,
+            build_context=frontend_context,
+        )
         for line in frontend_gen:
             yield f"data: {line}\\n\\n"
         yield "data: Frontend Image Built!\\n\\n"
@@ -262,10 +264,11 @@ def build_imgs(request: BuildRequest) -> StreamingResponse:
             backend_dockerfile = REPO_DIR / BACKEND_CPU_DOCKERFILE_RELPATH
             backend_image_name = BACKEND_CPU_LOCAL_IMAGE_NAME
 
-        backend_gen = build_img(image_name=backend_image_name,
-                                dockerfile=backend_dockerfile,
-                                build_context=backend_context
-                                )
+        backend_gen = build_img(
+            image_name=backend_image_name,
+            dockerfile=backend_dockerfile,
+            build_context=backend_context,
+        )
         for line in backend_gen:
             yield f"data: {line}\\n\\n"
 
@@ -276,9 +279,9 @@ def build_imgs(request: BuildRequest) -> StreamingResponse:
         stream = StreamingResponse(
             content=_build_stream(),
             status_code=200,
-            media_type="text/event-stream"
+            media_type="text/event-stream",
         )
         return stream
     except Exception as e:
         LOGGER.error(f"Error building images locally: '{e}'")
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(400, detail=str(e)) from e

@@ -5,19 +5,19 @@ Attributes:
     LOGGER (logging.Logger): Logger object of module.
 """
 
-import subprocess
-import shutil
-from pathlib import Path
-from typing import Union, Optional
 import logging
+import shutil
+import subprocess
 from datetime import datetime
-from mirumoji.server.utils.constants import TEMP_DIR, LOG_DIR
+from pathlib import Path
+from typing import Optional, Union
+
+from mirumoji.server.utils.constants import LOG_DIR, TEMP_DIR
 
 LOGGER = logging.getLogger(__name__)
 
 
 class AudioTools:
-
     """
     Perform operations on media using system installed FFMPEG.
 
@@ -42,20 +42,21 @@ class AudioTools:
         self.ffprobe = shutil.which("ffprobe")
         if not self.ffmpeg:
             LOGGER.error("FFmpeg not found")
-            raise EnvironmentError("FFmpeg not found.")
+            raise OSError("FFmpeg not found.")
         if not self.ffprobe:
             LOGGER.error("FFprobe not found")
-            raise EnvironmentError("FFprobe not found.")
+            raise OSError("FFprobe not found.")
 
         LOGGER.debug(f"FFMPEG at : {self.ffmpeg}")
 
-    def run_command(self,
-                    command: list[str],
-                    capture_output: bool = True,
-                    check: bool = False,
-                    cwd: Optional[str] = None,
-                    hide_and_log: bool = False
-                    ) -> Optional[subprocess.CompletedProcess]:
+    def run_command(
+        self,
+        command: list[str],
+        capture_output: bool = True,
+        check: bool = False,
+        cwd: Optional[str] = None,
+        hide_and_log: bool = False,
+    ) -> Optional[subprocess.CompletedProcess]:
         """
         Wrapper for subprocess.run to handle errors and results.
 
@@ -80,18 +81,22 @@ class AudioTools:
 
         try:
             if hide_and_log:
-                result = subprocess.run(command,
-                                        check=check,
-                                        stdout=subprocess.DEVNULL,
-                                        stderr=subprocess.PIPE,
-                                        text=True,
-                                        cwd=cwd)
+                result = subprocess.run(
+                    command,
+                    check=check,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    cwd=cwd,
+                )
             else:
-                result = subprocess.run(command,
-                                        check=check,
-                                        capture_output=capture_output,
-                                        text=True,
-                                        cwd=cwd)
+                result = subprocess.run(
+                    command,
+                    check=check,
+                    capture_output=capture_output,
+                    text=True,
+                    cwd=cwd,
+                )
 
             if capture_output:
                 stdout_log = f"STDOUT: '{result.stdout}'"
@@ -100,13 +105,15 @@ class AudioTools:
                 LOGGER.debug(stderr_log)
                 try:
                     timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                    with open(self.log_dir / "ffmpeg.log",
-                              "a+",
-                              encoding="utf-8") as log_file:
-                        log_file.write((
+                    with open(
+                        self.log_dir / "ffmpeg.log",
+                        "a+",
+                        encoding="utf-8",
+                    ) as log_file:
+                        log_file.write(
                             f"{timestamp} FFmpeg error:"
-                            f"\n{stdout_log}\n{stderr_log}\n"
-                            ))
+                            f"\n{stdout_log}\n{stderr_log}\n",
+                        )
                 except Exception as e:
                     LOGGER.error(f"Error writing FFMPEG Log: '{e}'")
                     return None
@@ -124,22 +131,21 @@ class AudioTools:
                 stdout_log = f"STDOUT: '{e.stdout}'"
                 stderr_log = f"STDERR: '{e.stderr}'"
                 timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                with open(self.log_dir / "ffmpeg.log",
-                          "a+",
-                          encoding="utf-8") as log_file:
-                    log_file.write((
+                with open(
+                    self.log_dir / "ffmpeg.log",
+                    "a+",
+                    encoding="utf-8",
+                ) as log_file:
+                    log_file.write(
                         f"{timestamp} FFmpeg error:"
-                        f"\n{stdout_log}\n{stderr_log}\n"))
+                        f"\n{stdout_log}\n{stderr_log}\n",
+                    )
             except Exception:
                 LOGGER.error(f"Error writing FFMPEG Log: '{e}'")
                 return None
             return None
 
-    def to_wav(self,
-               input_path: str,
-               output_path: str
-               ) -> Path:
-
+    def to_wav(self, input_path: str, output_path: str) -> Path:
         """
         Convert file to `.wav` format.
 
@@ -157,23 +163,30 @@ class AudioTools:
         s = ip.as_posix()
         so = op.as_posix()
 
-        command = [self.ffmpeg,
-                   "-y",  # overwrite output file without asking
-                   "-i", s,
-                   "-ar", "44100",
-                   "-ac", "2",
-                   "-f", "wav",
-                   so]
+        command = [
+            self.ffmpeg,
+            "-y",  # overwrite output file without asking
+            "-i",
+            s,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-f",
+            "wav",
+            so,
+        ]
 
-        self.run_command(command,
-                         capture_output=True,
-                         check=True,
-                         hide_and_log=True)
+        self.run_command(
+            command,
+            capture_output=True,
+            check=True,
+            hide_and_log=True,
+        )
         LOGGER.info(f"Converted to WAV '{s}' → '{so}'")
         return op
 
-    def extract_audio(self, input_path: str,
-                      output_path: str) -> str:
+    def extract_audio(self, input_path: str, output_path: str) -> str:
         """
         Extract a WAV file from video container. If input file is already an
         audio file, return the unchanged input file path.
@@ -187,12 +200,7 @@ class AudioTools:
         """
 
         ext = Path(input_path).resolve().suffix
-        audio_exts = {".wav",
-                      ".mp3",
-                      ".m4a",
-                      ".flac",
-                      ".aac"
-                      }
+        audio_exts = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
         if ext in audio_exts:
             LOGGER.info(f"Input is audio '{ext}', no extraction needed")
             return input_path
@@ -202,20 +210,30 @@ class AudioTools:
         si = Path(input_path).resolve().as_posix()
         so = out.as_posix()
         cmd = [
-            self.ffmpeg, "-y", "-i", si,
-            "-vn", "-acodec", "pcm_s16le",
-            "-ar", "16000", "-ac", "1", so
+            self.ffmpeg,
+            "-y",
+            "-i",
+            si,
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            so,
         ]
-        self.run_command(cmd,
-                         hide_and_log=True)
+        self.run_command(cmd, hide_and_log=True)
         LOGGER.info(f"Extracted audio from '{si}' → '{so}'")
         return out
 
-    def filter_audio(self,
-                     input_path: str,
-                     output_wav: str,
-                     highpass: int = 300,
-                     lowpass: int = 3400) -> str:
+    def filter_audio(
+        self,
+        input_path: str,
+        output_wav: str,
+        highpass: int = 300,
+        lowpass: int = 3400,
+    ) -> str:
         """
         Extracts audio from video or uses an existing audio file,
         applies a band-pass (highpass→lowpass) and loudness normalization,
@@ -235,13 +253,16 @@ class AudioTools:
         cmd = [
             self.ffmpeg,
             "-y",
-            "-i", i,
+            "-i",
+            i,
             "-vn",
             "-af",
             f"highpass=f={highpass}, lowpass=f={lowpass}, loudnorm",
-            "-ac", "1",
-            "-ar", "16000",
-            o
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            o,
         ]
         LOGGER.info("Filtering audio")
         self.run_command(cmd, hide_and_log=True)
@@ -289,52 +310,77 @@ class AudioTools:
             f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
         )
         cpu_enc = [
-                "-c:v", "libx264",
-                "-profile:v", "high",
-                "-b:v", target_bitrate,
-                "-preset", "veryfast",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",
-            ]
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "high",
+            "-b:v",
+            target_bitrate,
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+        ]
         # Set longer analyzeduration and probesize for complex video files
         input_args = [
-            "-analyzeduration", "20M",  # 20 million microseconds = 20 seconds
-            "-probesize", "50M",       # 50 megabytes
+            "-analyzeduration",
+            "20M",  # 20 million microseconds = 20 seconds
+            "-probesize",
+            "50M",  # 50 megabytes
         ]
 
         cpu_cmd = [
-            self.ffmpeg, "-y",
+            self.ffmpeg,
+            "-y",
             *input_args,
-            "-i", src.as_posix(),
-            "-vf", vf,
+            "-i",
+            src.as_posix(),
+            "-vf",
+            vf,
             *cpu_enc,
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-movflags", "+faststart",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
             dst.as_posix(),
         ]
 
         # ---------- choose encoder ----------
         if use_nvenc:
             enc_args = [
-                "-c:v", "h264_nvenc",
-                "-preset", "p6",
-                "-rc:v", "vbr",
-                "-b:v", target_bitrate,
-                "-pix_fmt", "yuv420p",
+                "-c:v",
+                "h264_nvenc",
+                "-preset",
+                "p6",
+                "-rc:v",
+                "vbr",
+                "-b:v",
+                target_bitrate,
+                "-pix_fmt",
+                "yuv420p",
             ]
         else:
             enc_args = cpu_enc
 
         cmd = [
-            self.ffmpeg, "-y",
+            self.ffmpeg,
+            "-y",
             *input_args,
-            "-i", src.as_posix(),
-            "-vf", vf,
+            "-i",
+            src.as_posix(),
+            "-vf",
+            vf,
             *enc_args,
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-movflags", "+faststart",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
             dst.as_posix(),
         ]
         LOGGER.info(f"Converting with use_nvenc='{use_nvenc}'")
@@ -342,9 +388,11 @@ class AudioTools:
         # Retry with normal args in case of NVENC error
         if result.returncode != 0 and use_nvenc:
             LOGGER.info("Retrying without NVENC")
-            result = self.run_command(cpu_cmd,
-                                      capture_output=True,
-                                      hide_and_log=True)
+            result = self.run_command(
+                cpu_cmd,
+                capture_output=True,
+                hide_and_log=True,
+            )
         if result is None or result.returncode != 0:
             LOGGER.error(f"FFmpeg to_mp4 failed:\n'{result.stderr}'")
             return None
@@ -393,45 +441,63 @@ class AudioTools:
             f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
         )
         cpu_enc = [
-                "-c:v", "libvpx-vp9",
-                "-b:v", target_bitrate,
-                "-deadline", "good",
-            ]
+            "-c:v",
+            "libvpx-vp9",
+            "-b:v",
+            target_bitrate,
+            "-deadline",
+            "good",
+        ]
         # Set longer analyzeduration and probesize for complex video files
         input_args = [
-            "-analyzeduration", "20M",  # 20 million microseconds = 20 seconds
-            "-probesize", "50M",       # 50 megabytes
+            "-analyzeduration",
+            "20M",  # 20 million microseconds = 20 seconds
+            "-probesize",
+            "50M",  # 50 megabytes
         ]
 
         cpu_cmd = [
-            self.ffmpeg, "-y",
+            self.ffmpeg,
+            "-y",
             *input_args,
-            "-i", src.as_posix(),
-            "-vf", vf,
+            "-i",
+            src.as_posix(),
+            "-vf",
+            vf,
             *cpu_enc,
-            "-c:a", "libopus",
-            "-b:a", "128k",
+            "-c:a",
+            "libopus",
+            "-b:a",
+            "128k",
             dst.as_posix(),
         ]
 
         # ---------- choose encoder ----------
         if use_nvenc:
             enc_args = [
-                "-c:v", "vp9_nvenc",
-                "-rc:v", "vbr",
-                "-b:v", target_bitrate,
+                "-c:v",
+                "vp9_nvenc",
+                "-rc:v",
+                "vbr",
+                "-b:v",
+                target_bitrate,
             ]
         else:
             enc_args = cpu_enc
 
         cmd = [
-            self.ffmpeg, "-y",
+            self.ffmpeg,
+            "-y",
             *input_args,
-            "-i", src.as_posix(),
-            "-vf", vf,
+            "-i",
+            src.as_posix(),
+            "-vf",
+            vf,
             *enc_args,
-            "-c:a", "libopus",
-            "-b:a", "128k",
+            "-c:a",
+            "libopus",
+            "-b:a",
+            "128k",
             dst.as_posix(),
         ]
         LOGGER.info(f"Converting with use_nvenc='{use_nvenc}'")
@@ -439,9 +505,11 @@ class AudioTools:
         # Retry with normal args in case of NVENC error
         if result.returncode != 0 and use_nvenc:
             LOGGER.info("Retrying without NVENC")
-            result = self.run_command(cpu_cmd,
-                                      capture_output=True,
-                                      hide_and_log=True)
+            result = self.run_command(
+                cpu_cmd,
+                capture_output=True,
+                hide_and_log=True,
+            )
         if result is None or result.returncode != 0:
             LOGGER.error(f"FFmpeg to_webm failed:\n'{result.stderr}'")
             return None

@@ -92,7 +92,8 @@ where = ["src"]
 # --- Ruff ---
 [tool.ruff]
 target-version = "py39"
-line-length = 88
+line-length = 79
+indent-width = 4
 
 [tool.ruff.lint]
 select = [
@@ -105,9 +106,11 @@ select = [
     "C4",  # flake8-comprehensions
     "RUF", # ruff-specific rules
 ]
+
 ignore = [
-    "E501",  # line-too-long — handled by formatter
-]
+    "UP007", # non-pep604-annotation-union (requires py>=3.10)
+    "UP045" # non-pep604-annotation-optional (requires py>3.10)
+    ] 
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI routers instantiate services at module level (cleanup planned for 3.x)
@@ -119,7 +122,7 @@ indent-style = "space"
 
 # --- MyPy ---
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = false
 ignore_missing_imports = true
 check_untyped_defs = true

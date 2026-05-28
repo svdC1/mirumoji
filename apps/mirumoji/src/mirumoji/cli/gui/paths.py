@@ -2,6 +2,7 @@
 This module defines configuration Constants and utility functions for the
 paths used in the Mirumoji Launcher GUI
 """
+
 from pathlib import Path
 
 # App and Repository Directories
@@ -32,8 +33,10 @@ FRONTEND_BUILD_CONTEXT_RELPATH = Path("apps/frontend")
 COMPOSE_PREBUILT_CPU_RELPATH = Path("compose/docker-compose.cpu.yaml")
 COMPOSE_PREBUILT_GPU_RELPATH = Path("compose/docker-compose.gpu.yaml")
 COMPOSE_PREBUILT_DOCKER_GPU_RELPATH = Path(
-    "compose/docker-compose.gpu.dockerpull.yaml")
+    "compose/docker-compose.gpu.dockerpull.yaml",
+)
 COMPOSE_PREBUILT_DOCKER_CPU_RELPATH = Path(
-    "compose/docker-compose.cpu.dockerpull.yaml")
+    "compose/docker-compose.cpu.dockerpull.yaml",
+)
 COMPOSE_LOCAL_CPU_RELPATH = Path("compose/docker-compose.local.cpu.yaml")
 COMPOSE_LOCAL_GPU_RELPATH = Path("compose/docker-compose.local.gpu.yaml")

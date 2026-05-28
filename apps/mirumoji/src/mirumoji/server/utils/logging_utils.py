@@ -4,7 +4,9 @@ This module defines a helper function for configuring the backend's logging.
 
 import logging
 import sys
+
 from tqdm.auto import tqdm
+
 from mirumoji.server.utils.constants import LOG_DIR, LOGGING_LEVEL
 
 
@@ -12,6 +14,7 @@ class TqdmStreamHandler(logging.StreamHandler):
     """
     Handler for displaying `tqdm` progress bars with python logging
     """
+
     def __init__(self) -> None:
         super().__init__(sys.stdout)
 
@@ -41,7 +44,7 @@ def setup_logging() -> None:
     formatter = logging.Formatter(
         "{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
         style="{",
-        datefmt="%H:%M:%S[%z]"
+        datefmt="%H:%M:%S[%z]",
     )
 
     # Create and add handlers

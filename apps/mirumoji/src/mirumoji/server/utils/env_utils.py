@@ -5,24 +5,26 @@ Attributes:
   LOGGER (logging.Logger): Module's logger.
 """
 
-from typing import List, Dict, Optional
-from dotenv import load_dotenv
 import logging
 import os
+from typing import Optional
+
+from dotenv import load_dotenv
 
 LOGGER = logging.getLogger(__name__)
 
 
-def check_env(expected: List,
-              input: Dict,
-              dotenv_path: Optional[str] = None
-              ) -> Dict:
+def check_env(
+    expected: list,
+    input: dict,
+    dotenv_path: Optional[str] = None,
+) -> dict:
     """
     Check if environment variables are available.
 
     Args:
-      expected (list): List of expected environment variables.
-      input (dict): Dictionary with custom valued variables which
+      expected (list): list of expected environment variables.
+      input (dict): dictionary with custom valued variables which
                     don't need to be present in environment
       dotenv_path (str, optional): Optional custom path to look for .env file.
 
@@ -30,19 +32,19 @@ def check_env(expected: List,
       ValueError: If a variable cannot be found.
 
     Returns:
-      dict: Dictionary with all checked variables.
+      dict: dictionary with all checked variables.
     """
     # Load from dotenv
     load_dotenv(dotenv_path=dotenv_path)
     # Get available vars from env
     API_KEYS = {k: v for k, v in os.environ.items() if k in expected}
     LOGGER.info(f"Retrieved {','.join(API_KEYS.keys())} from ENV")
-    missing = [k for k in expected if k not in API_KEYS.keys()]
+    missing = [k for k in expected if k not in API_KEYS]
     # Get missing from input
     if missing:
         LOGGER.info(f"{','.join(missing)} not found in ENV")
         for m in missing:
-            if m not in input.keys() or not input[m]:
+            if m not in input or not input[m]:
                 raise ValueError(f"Could not find variable: {m}")
             API_KEYS[m] = input[m]
     return API_KEYS
@@ -58,6 +60,4 @@ def using_modal() -> bool:
     """
     load_dotenv()
     keys = ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]
-    if keys[0] in os.environ and keys[1] in os.environ:
-        return True
-    return False
+    return keys[0] in os.environ and keys[1] in os.environ
