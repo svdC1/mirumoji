@@ -7,7 +7,6 @@ import asyncio
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional, Union
 
 import aiofiles
 from fastapi import Header, HTTPException, Request
@@ -21,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 async def save_upload_file(
     request: Request,
     dest: Path,
-    tqdm_description: Optional[str] = None,
+    tqdm_description: str | None = None,
 ) -> None:
     """
     Saves a `FastAPI.Request.stream` by reading and writing streamed
@@ -131,8 +130,8 @@ class MediaFileHandler:
 
     async def move_file(
         self,
-        src: Union[str, Path],
-        dest_relative: Union[str, Path],
+        src: str | Path,
+        dest_relative: str | Path,
     ) -> Path:
         """
         Moves a file from a source path to a destination relative to the media
@@ -156,8 +155,8 @@ class MediaFileHandler:
 
     async def copy_file(
         self,
-        src: Union[str, Path],
-        dest_relative: Union[str, Path],
+        src: str | Path,
+        dest_relative: str | Path,
     ) -> Path:
         """
         Copies a file to a destination relative to the media base.
@@ -180,7 +179,7 @@ class MediaFileHandler:
 
     async def delete_file(
         self,
-        file_path_relative: Union[str, Path],
+        file_path_relative: str | Path,
         check=False,
     ) -> None:
         """
@@ -209,7 +208,7 @@ class MediaFileHandler:
                 else:
                     LOGGER.error(f"Error deleting file '{path}': '{e}'")
 
-    async def delete_dir(self, dir_path_relative: Union[str, Path]) -> None:
+    async def delete_dir(self, dir_path_relative: str | Path) -> None:
         """
         Deletes a directory located relative to the media base.
 
@@ -248,7 +247,7 @@ class MediaFileHandler:
         profile_dir.mkdir(parents=True, exist_ok=True)
         return profile_dir
 
-    def get_relative_path(self, full_path: Union[str, Path]) -> Path:
+    def get_relative_path(self, full_path: str | Path) -> Path:
         """
         Resolves a path relative to the media directory.
 
@@ -263,7 +262,7 @@ class MediaFileHandler:
         # return = some_folder/some_file
         return Path(full_path).relative_to(self.base_path)
 
-    def get_modal_path(self, local_path: Union[str, Path]) -> Path:
+    def get_modal_path(self, local_path: str | Path) -> Path:
         """
         Converts an absolute local path to a Modal-compatible relative path.
 
@@ -280,7 +279,7 @@ class MediaFileHandler:
 
     async def write_file(
         self,
-        file_path_relative: Union[str, Path],
+        file_path_relative: str | Path,
         content: str,
     ) -> Path:
         """

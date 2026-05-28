@@ -12,7 +12,6 @@ import logging
 import urllib.parse
 import uuid
 from pathlib import Path
-from typing import Optional
 
 from fastapi import (
     APIRouter,
@@ -194,8 +193,8 @@ async def save_video_clip(
     clip_start_time: str = Header(...),
     clip_end_time: str = Header(...),
     gpt_breakdown_response: str = Header(...),
-    original_video_file_name: Optional[str] = Header(None),
-    original_video_url: Optional[str] = Header(None),
+    original_video_file_name: str | None = Header(None),
+    original_video_url: str | None = Header(None),
 ) -> dict:
     """
     POST endpoint for saving a new clip for the active profile

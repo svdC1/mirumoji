@@ -8,7 +8,6 @@ Attributes:
 
 import logging
 import re
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -34,7 +33,7 @@ gpt_router = APIRouter(prefix="/gpt")
 @gpt_router.post("/breakdown", response_model=BreakdownResponse)
 async def breakdown(
     req: BreakdownRequest,
-    profile_id: Optional[str] = Depends(get_profile_id_optional),
+    profile_id: str | None = Depends(get_profile_id_optional),
 ) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence.
@@ -76,7 +75,7 @@ async def breakdown(
 @gpt_router.post("/custom_breakdown", response_model=BreakdownResponse)
 async def custom_breakdown(
     req: CustomBreakdownRequest,
-    profile_id: Optional[str] = Depends(get_profile_id_optional),
+    profile_id: str | None = Depends(get_profile_id_optional),
 ) -> BreakdownResponse:
     """
     POST endpoint for analysing a Japanese sentence with custom system message

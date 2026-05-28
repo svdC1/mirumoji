@@ -12,7 +12,7 @@ import logging
 import os
 import time
 from collections.abc import Generator
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
@@ -64,7 +64,7 @@ class GptModel:
         version: str,
         system_msg: str = "default",
         from_dotenv: bool = True,
-        ApiKey: Optional[str] = None,
+        ApiKey: str | None = None,
         max_context: int = 100000,
     ) -> None:
         try:

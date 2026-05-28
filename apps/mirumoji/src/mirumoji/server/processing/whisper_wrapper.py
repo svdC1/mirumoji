@@ -12,7 +12,6 @@ import datetime
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Union
 
 import srt
 from faster_whisper import WhisperModel
@@ -44,7 +43,7 @@ class FWhisperWrapper:
         lang: str = "ja",
         compute_type: str = "float16",
         device: str = "cuda",
-        gpt_sys_msg: Optional[str] = None,
+        gpt_sys_msg: str | None = None,
         gpt_version: str = "gpt-4.1",
     ) -> None:
 
@@ -59,7 +58,7 @@ class FWhisperWrapper:
         self.gpt_version = gpt_version
         self.gpt_sys_msg = gpt_sys_msg if gpt_sys_msg else DEFAULT_SYS_MSG
 
-    def _check_input(self, audio_path: str) -> Union[str, None]:
+    def _check_input(self, audio_path: str) -> str | None:
         """
         Check if input audio is a valid file.
 
@@ -81,7 +80,7 @@ class FWhisperWrapper:
     def gpt_fix_srt(
         self,
         source: str,
-        gpt_model_kwargs: Optional[dict] = None,
+        gpt_model_kwargs: dict | None = None,
     ) -> str:
         """
         Post-process transcription with OpenAI API.
@@ -121,8 +120,8 @@ class FWhisperWrapper:
         audio_path: str,
         language: str = "ja",
         generator_only: bool = False,
-        add_kargs: Optional[dict] = None,
-    ) -> Union[dict, None]:
+        add_kargs: dict | None = None,
+    ) -> dict | None:
         """
         Transcribe audio with FasterWhisper.
 
@@ -175,7 +174,7 @@ class FWhisperWrapper:
     def transcribe_to_str(
         self,
         audio_path: str,
-        transcribe_kwargs: Optional[dict] = None,
+        transcribe_kwargs: dict | None = None,
     ) -> str:
         """
         Transcribe to single raw string from joining segments.
@@ -205,9 +204,9 @@ class FWhisperWrapper:
         output_path: str,
         fix_with_chat_gpt: bool = True,
         string_result: bool = False,
-        gpt_model_kwargs: Optional[dict] = None,
-        transcribe_kwargs: Optional[dict] = None,
-    ) -> Union[str, None]:
+        gpt_model_kwargs: dict | None = None,
+        transcribe_kwargs: dict | None = None,
+    ) -> str | None:
         """
         Transcribe audio and save as an SRT file with sentence-level cues.
 

@@ -7,7 +7,6 @@ Attributes:
 
 import logging
 import os
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -17,7 +16,7 @@ LOGGER = logging.getLogger(__name__)
 def check_env(
     expected: list,
     input: dict,
-    dotenv_path: Optional[str] = None,
+    dotenv_path: str | None = None,
 ) -> dict:
     """
     Check if environment variables are available.

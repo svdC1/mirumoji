@@ -11,7 +11,7 @@ import subprocess
 from collections.abc import Generator
 from pathlib import Path
 from subprocess import Popen
-from typing import Literal, Optional, Union, overload
+from typing import Literal, overload
 
 from dotenv import dotenv_values, load_dotenv
 
@@ -197,7 +197,7 @@ def check_env_file(expected_vars: list[str], env_file_path: Path) -> None:
 def run_command(
     command_list: list[str],
     *,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     check: bool = True,
     shell: bool = False,
     stream: Literal[True],
@@ -208,7 +208,7 @@ def run_command(
 def run_command(
     command_list: list[str],
     *,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     check: bool = True,
     shell: bool = False,
     stream: Literal[False],
@@ -218,11 +218,11 @@ def run_command(
 def run_command(
     command_list: list[str],
     *,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     check: bool = True,
     shell: bool = False,
     stream: bool = True,
-) -> Union[subprocess.Popen[str], Generator[str, str, Popen[str]]]:
+) -> subprocess.Popen[str] | Generator[str, str, Popen[str]]:
     """
     `subprocess.Popen` wrapper with error handling and logging
 
@@ -406,8 +406,8 @@ def docker_compose(
     compose_command: str,
     *,
     name_only: bool,
-    command_flags: Optional[list[str]] = None,
-    docker_compose_file: Optional[Path] = None,
+    command_flags: list[str] | None = None,
+    docker_compose_file: Path | None = None,
     compose_app_name: str = "mirumoji",
 ) -> Generator[str, str, Popen[str]]:
     """

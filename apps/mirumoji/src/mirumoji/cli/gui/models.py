@@ -2,7 +2,7 @@
 Pydantic models for the GUI FastAPI application.
 """
 
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -35,11 +35,11 @@ class StartRequest(BaseModel):
     local: bool
     OPENAI_API_KEY: str
     MIRUMOJI_LOGGING_LEVEL: str = Field(default="INFO")
-    MODAL_TOKEN_ID: Optional[str]
-    MODAL_TOKEN_SECRET: Optional[str]
-    MIRUMOJI_MODAL_GPU: Optional[str] = Field(default="A10G")
-    MODAL_FORCE_BUILD: Optional[bool] = Field(default=False)
-    repository: Optional[Union[Literal["GitHub"], Literal["DockerHub"]]]
+    MODAL_TOKEN_ID: str | None
+    MODAL_TOKEN_SECRET: str | None
+    MIRUMOJI_MODAL_GPU: str | None = Field(default="A10G")
+    MODAL_FORCE_BUILD: bool | None = Field(default=False)
+    repository: Literal["GitHub"] | Literal["DockerHub"] | None
 
 
 class StopRequest(BaseModel):

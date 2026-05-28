@@ -13,7 +13,6 @@ Attributes:
 import hashlib
 import logging
 from pathlib import Path
-from typing import Optional
 
 import genanki
 
@@ -107,11 +106,11 @@ class AnkiExporter:
 
     def __init__(
         self,
-        model_name: Optional[str] = MODEL_NAME,
-        deck_name: Optional[str] = MODEL_NAME + " Deck",
-        model_fields: Optional[list] = MODEL_FIELDS,
-        css: Optional[str] = VIDEO_CSS,
-        card_template: Optional[list] = CARD_TEMPLATE,
+        model_name: str | None = MODEL_NAME,
+        deck_name: str | None = MODEL_NAME + " Deck",
+        model_fields: list | None = MODEL_FIELDS,
+        css: str | None = VIDEO_CSS,
+        card_template: list | None = CARD_TEMPLATE,
     ) -> None:
 
         self.model_name = model_name
@@ -153,7 +152,7 @@ class AnkiExporter:
         meanings: str,
         sentence: str,
         explanation: str,
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
     ) -> None:
         """
         Add one card to the deck, `clip_path` will be bundled as media.

@@ -10,7 +10,6 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Union
 
 from mirumoji.server.utils.constants import LOG_DIR, TEMP_DIR
 
@@ -54,9 +53,9 @@ class AudioTools:
         command: list[str],
         capture_output: bool = True,
         check: bool = False,
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
         hide_and_log: bool = False,
-    ) -> Optional[subprocess.CompletedProcess]:
+    ) -> subprocess.CompletedProcess | None:
         """
         Wrapper for subprocess.run to handle errors and results.
 
@@ -276,7 +275,7 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> Union[Path, None]:
+    ) -> Path | None:
         """
         Convert any video to MP4 (H.264 + AAC).
 
@@ -407,7 +406,7 @@ class AudioTools:
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
         use_nvenc: bool = False,
-    ) -> Union[Path, None]:
+    ) -> Path | None:
         """
         Convert any video to WebM (VP9 + Opus).
 

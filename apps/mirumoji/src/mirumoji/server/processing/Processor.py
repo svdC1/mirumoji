@@ -8,7 +8,6 @@ Attributes:
 
 import logging
 from pathlib import Path
-from typing import Optional, Union
 
 import aiofiles
 from dotenv import load_dotenv
@@ -49,11 +48,11 @@ class Processor:
     def __init__(
         self,
         gpt_version: str = "gpt-4.1-mini",
-        dotenv_path: Union[str, Path, None] = None,
-        whisper_kwargs: Optional[dict] = None,
-        OPENAI_API_KEY: Optional[str] = None,
-        MODAL_TOKEN_ID: Optional[str] = None,
-        MODAL_TOKEN_SECRET: Optional[str] = None,
+        dotenv_path: str | Path | None = None,
+        whisper_kwargs: dict | None = None,
+        OPENAI_API_KEY: str | None = None,
+        MODAL_TOKEN_ID: str | None = None,
+        MODAL_TOKEN_SECRET: str | None = None,
     ) -> None:
 
         # Check MODAL
@@ -148,10 +147,10 @@ class Processor:
 
     async def modal_transcribe_to_srt(
         self,
-        media_fp: Union[str, Path],
-        transcribe_kwargs: Optional[dict] = None,
+        media_fp: str | Path,
+        transcribe_kwargs: dict | None = None,
         fix_with_chat_gpt: bool = True,
-    ) -> Union[str, None]:
+    ) -> str | None:
         """
         Call Modal function to transcribe video to SRT
 
@@ -178,9 +177,9 @@ class Processor:
 
     async def modal_transcribe_to_str(
         self,
-        audio_fp: Union[str, Path],
-        transcribe_kwargs: Optional[dict] = None,
-    ) -> Union[str, None]:
+        audio_fp: str | Path,
+        transcribe_kwargs: dict | None = None,
+    ) -> str | None:
         """
         Call Modal function to transcribe audio to string.
 
@@ -204,9 +203,9 @@ class Processor:
 
     async def modal_convert_to_mp4(
         self,
-        video_fp: Union[str, Path],
-        outpath: Union[str, Path],
-        to_mp4_kwargs: Optional[dict] = None,
+        video_fp: str | Path,
+        outpath: str | Path,
+        to_mp4_kwargs: dict | None = None,
     ) -> Path:
         """
         Call Modal function to convert a video to MP4 format.

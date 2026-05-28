@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +11,7 @@ class BreakdownRequest(BaseModel):
     """
 
     sentence: str
-    focus: Optional[str] = None
+    focus: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -44,7 +42,7 @@ class CustomBreakdownRequest(BaseModel):
     """
 
     sentence: str
-    focus: Optional[str] = None
+    focus: str | None = None
     sysMsg: str
     prompt: str
     version: str

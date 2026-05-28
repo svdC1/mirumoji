@@ -8,9 +8,9 @@ Attributes:
 
 import asyncio
 import logging
-from collections.abc import Generator, Iterator
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -24,7 +24,7 @@ def _generate_reply(
     version: str,
     sys_msg: str,
     prompt: str,
-) -> Union[Iterator[str], None]:
+) -> Iterator[str] | None:
     """
     Stream reply from a `GptModel` object OpenAI API call.
 

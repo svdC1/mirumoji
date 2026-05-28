@@ -20,7 +20,7 @@ keywords = [
     "whisper",
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -91,7 +91,7 @@ where = ["src"]
 
 # --- Ruff ---
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 79
 indent-width = 4
 
@@ -107,10 +107,7 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
-ignore = [
-    "UP007", # non-pep604-annotation-union (requires py>=3.10)
-    "UP045" # non-pep604-annotation-optional (requires py>3.10)
-    ] 
+ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI routers instantiate services at module level (cleanup planned for 3.x)

@@ -7,7 +7,6 @@ Attributes:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import Depends, Header, HTTPException, status
 
@@ -19,7 +18,7 @@ db_manager = DbManager()
 
 async def get_profile_id_from_header(
     x_profile_id: str = Header(None),
-) -> Optional[str]:
+) -> str | None:
     """
     Function meant to be run inside FastAPI endpoint which
     extracts X-Profile-ID header if present.
@@ -86,7 +85,7 @@ async def ensure_profile_exists(
 
 async def get_profile_id_optional(
     profile_id: str = Depends(get_profile_id_from_header),
-) -> Optional[str]:
+) -> str | None:
     """
     Function meant to be run inside FastAPI endpoint which returns the content
     of Profile ID Header.

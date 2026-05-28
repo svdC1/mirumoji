@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -74,13 +72,13 @@ class KanjiInfo(BaseModel):
     """
 
     literal: str
-    grade: Optional[int]
+    grade: int | None
     stroke_count: int
     meanings: list[str]
     onyomi: list[str]
     kunyomi: list[str]
-    jlpt_kanjidic: Optional[int]
-    jlpt_tanos: Optional[int]
+    jlpt_kanjidic: int | None
+    jlpt_tanos: int | None
 
 
 class Token(BaseModel):

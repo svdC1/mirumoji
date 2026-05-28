@@ -10,7 +10,6 @@ import logging
 import os
 from collections.abc import Generator
 from pathlib import Path
-from typing import Optional, Union
 
 import modal
 from dotenv import load_dotenv
@@ -55,11 +54,11 @@ env_secrets = modal.Secret.from_local_environ(["OPENAI_API_KEY"])
     secrets=[env_secrets],
 )
 def transcribe_srt_job(
-    media_fp: Union[str, Path],
-    fwhisper_kwargs: Optional[dict] = None,
-    transcribe_kwargs: Optional[dict] = None,
+    media_fp: str | Path,
+    fwhisper_kwargs: dict | None = None,
+    transcribe_kwargs: dict | None = None,
     fix_with_chat_gpt: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """
     Runs Whisper transcription on media_fp, fixes with GPT,
     and returns SRT string.
@@ -126,8 +125,8 @@ def transcribe_srt_job(
     is_generator=True,
 )
 def video_conversion_job(
-    video_fp: Union[str, Path],
-    to_mp4_kwargs: Optional[dict] = None,
+    video_fp: str | Path,
+    to_mp4_kwargs: dict | None = None,
 ) -> Generator[bytes, None, None]:
     """
     Converts video_fp to MP4 using NVENC and returns the
@@ -201,9 +200,9 @@ def video_conversion_job(
 
 @app.function(gpu=MODAL_GPU, timeout=600, include_source=True)
 def transcribe_to_string_job(
-    audio_fp: Union[str, Path],
-    fwhisper_kwargs: Optional[dict] = None,
-    transcribe_kwargs: Optional[dict] = None,
+    audio_fp: str | Path,
+    fwhisper_kwargs: dict | None = None,
+    transcribe_kwargs: dict | None = None,
 ) -> str:
     """
     Transcribe audio to string using Faster Whisper.

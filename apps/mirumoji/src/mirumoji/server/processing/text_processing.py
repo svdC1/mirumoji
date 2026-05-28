@@ -8,7 +8,6 @@ Attributes:
 
 import logging
 from functools import lru_cache
-from typing import Optional
 
 import fugashi
 from kotobase import Kotobase
@@ -60,7 +59,7 @@ In your response:
 
     def __init__(
         self,
-        gpt_model_kwargs: Optional[dict] = None,
+        gpt_model_kwargs: dict | None = None,
         version: str = "gpt-4.1-mini",
     ) -> None:
         if not gpt_model_kwargs:
@@ -103,7 +102,7 @@ In your response:
         sysMsg: str,
         prompt: str,
         version: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Request an explanation from GPT using custom system message and prompt.
 
@@ -157,7 +156,7 @@ In your response:
         sysMsg: str,
         prompt: str,
         version: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Request an explanation from GPT using custom system message and prompt
         without any focus words.
@@ -284,7 +283,7 @@ class SentenceBreakdownService:
     def __init__(
         self,
         gpt_version: str = "gpt-4.1-mini",
-        gpt_kwargs: Optional[dict] = None,
+        gpt_kwargs: dict | None = None,
     ) -> None:
 
         if not gpt_kwargs:
@@ -359,7 +358,7 @@ class SentenceBreakdownService:
                 "jlpt": lu["jlpt"],
                 "examples": lu["examples"],
             }
-            for tok, lu in zip(tokens, lookups)
+            for tok, lu in zip(tokens, lookups, strict=True)
         ]
         return e_tokens
 
@@ -603,7 +602,7 @@ class SentenceBreakdownService:
     def explain(
         self,
         sentence: str,
-        focus: Optional[str] = None,
+        focus: str | None = None,
     ) -> BreakdownResponse:
         """
         Perform a complete Japanese sentence breakdown.
@@ -672,7 +671,7 @@ class SentenceBreakdownService:
         sysMsg: str,
         prompt: str,
         version: str,
-        focus: Optional[str] = None,
+        focus: str | None = None,
     ) -> BreakdownResponse:
         """
         Perform a complete sentence breakdown using custom sys_msg and prompt

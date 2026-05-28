@@ -7,11 +7,12 @@ import os
 import socket
 import subprocess
 import sys
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
 from subprocess import Popen
 from textwrap import dedent
-from typing import Callable, Optional, ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar
 
 import click
 from dotenv import dotenv_values, load_dotenv
@@ -138,7 +139,7 @@ def get_host_lan_ip() -> str:
 
 def run_command(
     command_list: list[str],
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     check: bool = True,
     shell: bool = False,
     stream: bool = True,
@@ -595,9 +596,9 @@ def cli():
     help="Do not clear the terminal after each step",
 )
 def launch(
-    build: Optional[bool],
-    gpu: Optional[bool],
-    github_pull: Optional[bool],
+    build: bool | None,
+    gpu: bool | None,
+    github_pull: bool | None,
     no_clear: bool,
 ):
     """
@@ -737,7 +738,7 @@ def launch(
     default=False,
     help="Do not clear the terminal after each step",
 )
-def shutdown(clean: Optional[bool], no_clear: bool):
+def shutdown(clean: bool | None, no_clear: bool):
     """
     Stops application by running Docker Compose Down.
     """
@@ -782,7 +783,7 @@ def shutdown(clean: Optional[bool], no_clear: bool):
     default=False,
     help="Do not clear the terminal after each step",
 )
-def launch_local(gpu: Optional[bool], no_clear: bool):
+def launch_local(gpu: bool | None, no_clear: bool):
     """
     Launch Mirumoji with previously built local images
     """
@@ -887,7 +888,7 @@ def launch_local(gpu: Optional[bool], no_clear: bool):
     default=False,
     help="Do not clear the terminal after each step",
 )
-def build(gpu: Optional[bool], no_clear: bool):
+def build(gpu: bool | None, no_clear: bool):
     """
     Build local images only, but don't run application
     """

@@ -9,10 +9,10 @@ import datetime
 import os
 import platform
 import socket
-from typing import Any, Union
+from typing import Any
 
 
-def gpu_available() -> dict[str, Union[bool, str]]:
+def gpu_available() -> dict[str, bool | str]:
     """
     Check if there's a GPU available in the machine running the program.
 

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 from .dict_data import FocusInfo, Token
@@ -78,8 +76,8 @@ class ProfileFileResponse(BaseModel):
     id: str
     file_name: str
     get_url: str
-    file_type: Optional[str] = None
-    created_at: Optional[str] = None
+    file_type: str | None = None
+    created_at: str | None = None
 
 
 class ProfileTranscriptResponse(BaseModel):
@@ -102,7 +100,7 @@ class ProfileTranscriptResponse(BaseModel):
 
     id: str
     transcript: str
-    original_file_name: Optional[str] = None
-    gpt_explanation: Optional[str] = None
-    get_url: Optional[str] = None
-    created_at: Optional[str] = None
+    original_file_name: str | None = None
+    gpt_explanation: str | None = None
+    get_url: str | None = None
+    created_at: str | None = None
