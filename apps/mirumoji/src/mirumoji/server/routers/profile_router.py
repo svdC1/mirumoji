@@ -33,7 +33,7 @@ from mirumoji.server.models.responses import (
     ProfileFileResponse,
     ProfileTranscriptResponse,
 )
-from mirumoji.server.processing.audio_processing import AudioTools
+from mirumoji.server.processing.audio import AudioTools
 from mirumoji.server.profile_manager import ensure_profile_exists
 from mirumoji.server.utils.anki_utils import AnkiExporter
 from mirumoji.server.utils.file_utils import MediaFileHandler, get_stream_file

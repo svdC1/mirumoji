@@ -1,5 +1,5 @@
 """
-This module defines a helper function for configuring the backend's logging.
+This module defines helpers for configuring the backend's logging
 """
 
 import logging
@@ -7,7 +7,7 @@ import sys
 
 from tqdm.auto import tqdm
 
-from mirumoji.server.utils.constants import LOG_DIR, LOGGING_LEVEL
+from ..utils.constants import LOG_DIR, LOGGING_LEVEL
 
 
 class TqdmStreamHandler(logging.StreamHandler):
@@ -18,7 +18,7 @@ class TqdmStreamHandler(logging.StreamHandler):
     def __init__(self) -> None:
         super().__init__(sys.stdout)
 
-    def emit(self, record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
             tqdm.write(msg, file=self.stream)
@@ -29,17 +29,18 @@ class TqdmStreamHandler(logging.StreamHandler):
 
 def setup_logging() -> None:
     """
-    Configure the root logger to include custom formatting and handlers
+    Configures the `mirumoji` logger to include custom formatters and handlers.
+    In addition, creates the logging directory if it doesn't exist
     """
     level = getattr(logging, LOGGING_LEVEL, logging.INFO)
 
-    # Get the root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    # Get the logger and set its level
+    logger = logging.getLogger("mirumoji")
+    logger.setLevel(level)
 
     # Remove any existing handlers
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
 
     formatter = logging.Formatter(
         "{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
@@ -47,13 +48,13 @@ def setup_logging() -> None:
         datefmt="%H:%M:%S[%z]",
     )
 
-    # Create and add handlers
+    # Create DIR and add handlers
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_file = str((LOG_DIR / "backend.log").resolve())
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
-    root_logger.addHandler(file_handler)
+    logger.addHandler(file_handler)
 
     stream_handler = TqdmStreamHandler()
     stream_handler.setFormatter(formatter)
-    root_logger.addHandler(stream_handler)
+    logger.addHandler(stream_handler)

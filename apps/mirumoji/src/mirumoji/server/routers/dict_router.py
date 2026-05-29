@@ -11,7 +11,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..models.dict_data import DictLookup, DictWildcardLookup
+from ..models.jpdict import DictLookup, DictWildcardLookup
 from ..processing.Processor import Processor
 
 LOGGER = logging.getLogger(__name__)

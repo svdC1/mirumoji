@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from .dict_data import FocusInfo, Token
+from .jpdict import FocusInfo, Token
 from .llm import GptTemplateBase
 
 

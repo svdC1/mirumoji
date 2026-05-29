@@ -1,6 +1,6 @@
 """
 This module defines helper functions for colleting information
-about the system running the program.
+about the system running the program
 """
 
 from __future__ import annotations
@@ -14,13 +14,24 @@ from typing import Any
 
 def gpu_available() -> dict[str, bool | str]:
     """
-    Check if there's a GPU available in the machine running the program.
+    Uses PyTorch to checks if there's a GPU available in the machine running
+    the program
+
+    info: Return Values
+        This function returns a dictionary with the following keys
+
+        - `available (bool)` &rarr; `True` if `torch` can be imported and
+          `torch.cuda.is_available` evaluates to `True`, `False` otherwise
+
+        - `name (str)` &rarr;
+          `torch.cuda.get_device_name(torch.cuda.current_device())` when
+          `available=True`, `''` otherwise.
 
     Returns:
-      dict with keys "available" and "name".
+        dict with keys "available" and "name".
     """
     try:
-        import torch  # type: ignore
+        import torch
 
         if torch.cuda.is_available():
             idx = torch.cuda.current_device()
@@ -36,12 +47,13 @@ def gpu_available() -> dict[str, bool | str]:
 
 def get_system_info() -> dict[str, Any]:
     """
-    Collects basic information about the system running the program.
+    Uses `os`, `socket`, and `platform` to collect basic information about the
+    system running the program
 
     Returns:
-      dict with information about the system.
+        dict with information about the system
     """
-    info: dict[str, Any] = {
+    info = {
         "time": datetime.datetime.now().isoformat(timespec="seconds") + "Z",
         "hostname": socket.gethostname(),
         "platform": platform.platform(aliased=True, terse=True),

@@ -148,7 +148,7 @@ def video_conversion_job(
         format="{levelname}-{name}-{message}",
     )
 
-    from mirumoji.server.processing.audio_processing import AudioTools
+    from mirumoji.server.processing.audio import AudioTools
 
     LOGGER.info(f"video_conversion_job started for video: '{video_fp}'")
     tmp_p = Path.cwd() / "tmp"

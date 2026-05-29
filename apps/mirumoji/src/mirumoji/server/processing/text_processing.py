@@ -17,7 +17,7 @@ from kotobase.core.datatypes import (
     LookupResult,
 )
 
-from ..models.dict_data import (
+from ..models.jpdict import (
     DictLookup,
     DictWildcardLookup,
     FocusInfo,

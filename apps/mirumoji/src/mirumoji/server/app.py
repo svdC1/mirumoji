@@ -12,6 +12,7 @@ import logging
 import shutil
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -19,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from mirumoji.exceptions import MirumojiServerError
 from mirumoji.server.db.db import DATABASE_URL, connect_db, disconnect_db
 from mirumoji.server.routers.audio_router import audio_router
 from mirumoji.server.routers.dict_router import dict_router
@@ -84,6 +86,39 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(MirumojiServerError)
+async def mirumoji_exception_handler(
+    request: Request,
+    exc: MirumojiServerError,
+) -> JSONResponse:
+    """
+    Translate domain exceptions into the structured error envelope.
+
+    Reads the HTTP contract (`http_status`, `code`) and optional `details`
+    that each `MirumojiServerError` subclass carries, so domain code never
+    constructs HTTP responses itself.
+
+    Args:
+      request (Request): Incoming request object.
+      exc (MirumojiServerError): Raised domain exception.
+
+    Returns:
+      JSONResponse: The structured error response to return.
+    """
+    LOGGER.warning(f"[{exc.code}] {exc}")
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={
+            "success": False,
+            "error": {
+                "code": exc.code,
+                "message": str(exc),
+                "details": exc.details,
+            },
+        },
+    )
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(
     request: Request,
@@ -92,6 +127,10 @@ async def http_exception_handler(
     """
     Custom Exception Handler for all HTTP Errors.
 
+    Emits the same nested envelope as the domain handler so the frontend has a
+    single error shape to parse. The machine-readable `code` is derived from
+    the HTTP status phrase (e.g. 404 -> "NotFound").
+
     Args:
       request (Request): Incoming request object.
       exc (HTTPException): Raised Exception Object.
@@ -99,9 +138,17 @@ async def http_exception_handler(
     Returns:
       JSONResponse: The exception response to return.
     """
+    phrase = HTTPStatus(exc.status_code).phrase.replace(" ", "")
     return JSONResponse(
         status_code=exc.status_code,
-        content={"success": False, "message": exc.detail},
+        content={
+            "success": False,
+            "error": {
+                "code": phrase,
+                "message": exc.detail,
+                "details": None,
+            },
+        },
     )
 
 

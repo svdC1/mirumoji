@@ -14,7 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from mirumoji.server.db.db import DbManager
-from mirumoji.server.processing.audio_processing import AudioTools
+from mirumoji.server.processing.audio import AudioTools
 from mirumoji.server.processing.Processor import Processor
 from mirumoji.server.profile_manager import ensure_profile_exists
 from mirumoji.server.utils.env_utils import using_modal
