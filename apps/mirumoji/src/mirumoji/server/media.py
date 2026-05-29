@@ -12,7 +12,7 @@ import aiofiles
 from fastapi import Header, HTTPException, Request
 from tqdm.auto import tqdm
 
-from mirumoji.server.utils.constants import BASE_MEDIA_DIR, TEMP_DIR
+from .constants import BASE_MEDIA_DIR, TEMP_DIR
 
 LOGGER = logging.getLogger(__name__)
 

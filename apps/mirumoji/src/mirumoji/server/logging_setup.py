@@ -7,7 +7,7 @@ import sys
 
 from tqdm.auto import tqdm
 
-from ..utils.constants import LOG_DIR, LOGGING_LEVEL
+from .constants import LOG_DIR, LOGGING_LEVEL
 
 
 class TqdmStreamHandler(logging.StreamHandler):

@@ -36,13 +36,13 @@ def get_ffmpeg_path() -> dict[str, str]:
             "The `FFMPEG` executable couldn't be located. "
             "Mirumoji requires `FFMPEG` to be installed in order "
             "to perform media operations."
-            )
+        )
     if not ffprobe:
         raise MissingFFprobeError(
             "The `FFPROBE` executable couldn't be located. "
             "Mirumoji requires `FFMPROBE` to be installed in order "
             "to perform media operations."
-            )
+        )
 
     return {"ffmpeg": ffmpeg, "ffprobe": ffprobe}
 
@@ -76,20 +76,20 @@ def run_command(
     try:
         # Redirect `stdout` and `stderr` to `subprocess.PIPE`
         result = subprocess.run(
-                command,
-                check=check,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                cwd=cwd,
-                )
+            command,
+            check=check,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=cwd,
+        )
 
         # Warn error if check=False
         if result.returncode != 0:
             LOGGER.warning(
                 f"Audio Processing - Command Failure Suppressed - "
                 f"Exit Code: {result.returncode}"
-                )
+            )
 
         LOGGER.debug(f"Audio Processing - STDOUT: '{result.stdout}'")
         LOGGER.debug(f"Audio Processing - STDERR: '{result.stderr}'")
@@ -100,7 +100,7 @@ def run_command(
         LOGGER.error(
             f"Audio Processing - Command Failed - "
             f"Audio Processing - Exit Code: {e.returncode}"
-            )
+        )
         LOGGER.error(f"Audio Processing - STDOUT: '{e.stdout}'")
         LOGGER.error(f"Audio Processing - STDERR: '{e.stderr}'")
         raise
@@ -132,7 +132,7 @@ def to_wav(
         raise ValueError(
             f"Audio Processing - WAV conversion failed - {input.as_posix()} is"
             f" not a valid file"
-            )
+        )
 
     output = Path(output_path).resolve()
 
@@ -156,12 +156,12 @@ def to_wav(
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
             f"Audio Processing - Failed to convert '{input.as_posix()}' to WAV"
-            ) from e
+        ) from e
 
     LOGGER.info(
         f"Audio Processing - Converted '{input.as_posix()}' "
         f"to WAV File At '{output.as_posix()}'"
-        )
+    )
     return output
 
 
@@ -210,12 +210,10 @@ def extract_audio(
         LOGGER.info(
             f"Audio Processing - Input {input_path} is already an "
             f"audio file ({ext}), no extraction needed"
-            )
+        )
         return input_path
 
-    LOGGER.info(
-        f"Audio Processing - Extracting audio from '{input_path}'"
-        )
+    LOGGER.info(f"Audio Processing - Extracting audio from '{input_path}'")
 
     output = Path(output_path).resolve()
     input = Path(input_path).resolve()
@@ -224,7 +222,7 @@ def extract_audio(
         raise ValueError(
             f"Audio Processing - Audio Extraction Failed -"
             f"{input.as_posix()} is not a valid file"
-            )
+        )
 
     cmd = [
         ffmpeg_path,
@@ -246,11 +244,11 @@ def extract_audio(
         raise FFmpegError(
             f"Audio Processing - Failed to extract WAV audio from "
             f"'{input.as_posix()}'"
-            ) from e
+        ) from e
     LOGGER.info(
         f"Audio Processing - Extracted audio from '{input.as_posix()}' to WAV "
         f"file at '{output.as_posix()}'"
-        )
+    )
     return output
 
 
@@ -286,7 +284,7 @@ def filter_audio(
         raise ValueError(
             f"Audio Processing - Audio Filtering Failed -"
             f"{input.as_posix()} is not a valid file"
-            )
+        )
 
     output = Path(output_path).resolve()
 
@@ -308,18 +306,18 @@ def filter_audio(
     LOGGER.info(
         f"Audio Processing - Applying Band-Pass ({highpass} - {lowpass}) and "
         f"loudness normalization to {input.as_posix()}"
-        )
+    )
     try:
         run_command(cmd)
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
             f"Audio Processing - Failed to filter '{input.as_posix()}'"
-            ) from e
+        ) from e
 
     LOGGER.info(
         f"Audio Processing - Filtered '{input.as_posix()}' t"
         f"WAV file at '{output.as_posix()}'"
-        )
+    )
     return output
 
 
@@ -364,7 +362,7 @@ def to_mp4(
         raise ValueError(
             f"Audio Processing - MP4 Conversion Failed -"
             f"{input.as_posix()} is not a valid file"
-            )
+        )
 
     output = Path(output_path or input.with_suffix(".mp4")).resolve()
 
@@ -374,7 +372,7 @@ def to_mp4(
     except ValueError as e:
         raise ValueError(
             f"Resolution must be 'WxH', got '{resolution}'"
-            ) from e
+        ) from e
 
     # --- FFMPEG Parameters ---
 
@@ -440,7 +438,7 @@ def to_mp4(
         target_bitrate,
         "-pix_fmt",
         "yuv420p",
-        ]
+    ]
 
     nvidia_cmd = [
         ffmpeg_path,
@@ -467,7 +465,7 @@ def to_mp4(
     LOGGER.info(
         f"Audio Processing - Converting {input.as_posix()} to MP4 with"
         f"use_nvenc='{use_nvenc}'"
-        )
+    )
 
     result = run_command(cmd, check=False)
 
@@ -475,7 +473,7 @@ def to_mp4(
         LOGGER.warning(
             f"Audio Processing - NVENC MP4 Conversion Failed For "
             f"{input.as_posix()} - Retrying with libx264"
-            )
+        )
 
         # Retry with `libx264` in case of NVENC error
         result = run_command(cpu_cmd)
@@ -485,12 +483,12 @@ def to_mp4(
         LOGGER.info(
             f"Audio Processing - Converted {input.as_posix()} to MP4 file at "
             f"{output.as_posix()}"
-            )
+        )
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
             f"Audio Processing - CPU MP4 conversion for"
             f"{input.as_posix()} failed"
-            ) from e
+        ) from e
 
 
 def to_webm(
@@ -534,7 +532,7 @@ def to_webm(
         raise ValueError(
             f"Audio Processing - WebM Conversion Failed -"
             f"{input.as_posix()} is not a valid file"
-            )
+        )
 
     output = Path(output_path or input.with_suffix(".webm")).resolve()
 
@@ -544,7 +542,7 @@ def to_webm(
     except ValueError as e:
         raise ValueError(
             f"Resolution must be 'WxH', got '{resolution}'"
-            ) from e
+        ) from e
 
     # --- FFMPEG Parameters ---
 
@@ -570,7 +568,7 @@ def to_webm(
         target_bitrate,
         "-deadline",
         "good",
-        ]
+    ]
 
     cpu_cmd = [
         ffmpeg_path,
@@ -597,7 +595,7 @@ def to_webm(
         "vbr",
         "-b:v",
         target_bitrate,
-        ]
+    ]
 
     nvidia_cmd = [
         ffmpeg_path,
@@ -622,7 +620,7 @@ def to_webm(
     LOGGER.info(
         f"Audio Processing - Converting {input.as_posix()} to WebM with"
         f"use_nvenc='{use_nvenc}'"
-        )
+    )
 
     result = run_command(cmd, check=False)
 
@@ -630,7 +628,7 @@ def to_webm(
         LOGGER.warning(
             f"Audio Processing - NVENC WebM Conversion Failed For "
             f"{input.as_posix()} - Retrying with libvpx-vp9"
-            )
+        )
 
         # Retry with `libvpx-vp9` in case of NVENC error
         result = run_command(cpu_cmd)
@@ -640,9 +638,9 @@ def to_webm(
         LOGGER.info(
             f"Audio Processing - Converted {input.as_posix()} to WebM file at "
             f"{output.as_posix()}"
-            )
+        )
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
             f"Audio Processing - CPU WebM conversion for"
             f"{input.as_posix()} failed"
-            ) from e
+        ) from e

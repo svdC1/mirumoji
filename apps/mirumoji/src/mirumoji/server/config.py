@@ -1,5 +1,10 @@
 """
-This module defines helper functions for environment management.
+This module defines helpers for environment and capability detection.
+
+The capability helpers let the `Processor` route per capability by checking
+which optional dependencies are installed (via ``importlib.util.find_spec``)
+and which environment variables are configured, without importing the heavy
+packages themselves.
 
 Attributes:
   LOGGER (logging.Logger): Module's logger.
@@ -7,6 +12,7 @@ Attributes:
 
 import logging
 import os
+from importlib.util import find_spec
 
 from dotenv import load_dotenv
 
@@ -60,3 +66,48 @@ def using_modal() -> bool:
     load_dotenv()
     keys = ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]
     return keys[0] in os.environ and keys[1] in os.environ
+
+
+# --- Capability detection ---
+
+
+def has_module(name: str) -> bool:
+    """
+    Check whether an importable module is installed without importing it.
+
+    Args:
+      name (str): Top-level module/package name (e.g. ``"faster_whisper"``).
+
+    Returns:
+      bool: True if the module can be located on the import path.
+    """
+    try:
+        return find_spec(name) is not None
+    except ModuleNotFoundError:
+        # A parent package in the path is missing.
+        return False
+
+
+def env_present(*keys: str) -> bool:
+    """
+    Check whether every given environment variable is set (and non-empty).
+
+    Args:
+      *keys (str): Environment variable names to require.
+
+    Returns:
+      bool: True only if all named variables are present and non-empty.
+    """
+    load_dotenv()
+    return all(os.environ.get(k) for k in keys)
+
+
+def whisper_local_available() -> bool:
+    """
+    Whether local Whisper transcription is possible in this deployment.
+
+    Returns:
+      bool: True if the ``whisper-local`` extra (``faster-whisper``) is
+            installed.
+    """
+    return has_module("faster_whisper")

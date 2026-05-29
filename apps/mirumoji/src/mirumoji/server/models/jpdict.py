@@ -91,6 +91,7 @@ class KanjiInfo(BaseModel):
         jlpt_kanjidic (int | None): Optional JLPT level present in `KANJIDIC2`
         jlpt_tanos (int | None): Optional JLPT level in `Tanos` list
     """
+
     literal: str
     grade: int | None = Field(default=None)
     stroke_count: int | None = Field(default=None)
@@ -130,6 +131,7 @@ class Token(BaseModel):
         f_type (str): Word-final transformation type.
         f_form (str): Word-final transformation form.
     """
+
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     # Core Token Properties

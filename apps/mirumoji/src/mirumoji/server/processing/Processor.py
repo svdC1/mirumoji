@@ -15,8 +15,9 @@ from tqdm.auto import tqdm
 
 from mirumoji.server.processing.audio import AudioTools
 from mirumoji.server.processing.text_processing import SentenceBreakdownService
-from mirumoji.server.utils.constants import TEMP_DIR
-from mirumoji.server.utils.env_utils import check_env, using_modal
+
+from ..config import check_env, using_modal
+from ..constants import TEMP_DIR
 
 LOGGER = logging.getLogger(__name__)
 

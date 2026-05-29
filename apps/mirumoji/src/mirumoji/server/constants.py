@@ -26,30 +26,36 @@ import os
 from pathlib import Path
 
 LOG_DIR: Path = Path(
-  os.getenv("MIRUMOJI_LOG_DIR", Path.home() / ".mirumoji_logs")
-  )
+    os.getenv("MIRUMOJI_LOG_DIR", Path.home() / ".mirumoji_logs")
+)
 
 BASE_MEDIA_DIR: Path = Path(
-  os.getenv("MIRUMOJI_BASE_MEDIA_DIR", "media_files")
-  )
+    os.getenv("MIRUMOJI_BASE_MEDIA_DIR", "media_files")
+)
 
 TEMP_DIR: Path = BASE_MEDIA_DIR / "temp"
 
 _WHISPER_GPT_DEFAULT = (
-  "You are an expert subtitle editor for Japanese anime.\n"
-  "You understand:\n  - Conversational Japanese, character names, honorifics "
-  "onomatopoeia and scene-specific slang.\n  - How to pick the correct Kanji/"
-  "Kana from phonetic transcriptions based on context.\n  - Natural sentence "
-  "flow and typical timing for subtitles.\nYour job is to **clean only the "
-  "text** of each SRT cue:\n  - Fix mis-recognized Kanji or Kana.\n  - Merge "
-  "cues that split a single sentence (new cue's start = earlier, end = later)."
-  "\n  - Remove any pure gibberish or repeated song-lyric artifacts.\n  - "
-  "Insert correct punctuation (。？！、) and adjust spacing.\n\n"  # noqa: RUF001
-  "**You must not**:\n  - Change any start/end timestamps.\n  - Renumber "
-  "beyond simple sequential order.\n  - Add or remove cues "
-  "(only merge as above).\n  - Add any commentary or explanations.\n\n"
-  "Output **only** the cleaned `.srt` file content."
-  )
+    "You are an expert subtitle editor for Japanese anime.\n"
+    "You understand:\n"
+    "  - Conversational Japanese, character names, "
+    "honorifics onomatopoeia and scene-specific slang.\n"
+    "  - How to pick the correct Kanji/Kana from phonetic "
+    "transcriptions based on context.\n"
+    "  - Natural sentence flow and typical timing for "
+    "subtitles.\n"
+    "Your job is to **clean only the text** of each SRT cue:\n"
+    "  - Fix mis-recognized Kanji or Kana.\n"
+    "  - Merge cues that split a single sentence "
+    "(new cue's start = earlier, end = later).\n"
+    "  - Remove any pure gibberish or repeated song-lyric "
+    "artifacts.\n  - "
+    "Insert correct punctuation (。？！、) and adjust spacing.\n\n"  # noqa: RUF001
+    "**You must not**:\n  - Change any start/end timestamps.\n  - Renumber "
+    "beyond simple sequential order.\n  - Add or remove cues "
+    "(only merge as above).\n  - Add any commentary or explanations.\n\n"
+    "Output **only** the cleaned `.srt` file content."
+)
 
 FWHISPER_GPT_DEFAULT_SYS_MSG: str = os.getenv(
     "MIRUMOJI_FWHISPER_GPT_DEFAULT_SYS_MSG",

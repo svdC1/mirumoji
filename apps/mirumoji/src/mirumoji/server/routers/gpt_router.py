@@ -20,7 +20,8 @@ from mirumoji.server.models.requests import (
 from mirumoji.server.models.responses import BreakdownResponse
 from mirumoji.server.processing.Processor import Processor
 from mirumoji.server.profile_manager import get_profile_id_optional
-from mirumoji.server.utils.stream_utils import sse_gen
+
+from ..utils.stream_utils import sse_gen
 
 LOGGER = logging.getLogger(__name__)
 

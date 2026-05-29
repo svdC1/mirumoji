@@ -28,9 +28,10 @@ from mirumoji.server.routers.gpt_router import gpt_router
 from mirumoji.server.routers.health_router import health_router
 from mirumoji.server.routers.profile_router import profile_router
 from mirumoji.server.routers.video_router import video_router
-from mirumoji.server.utils.env_utils import using_modal
-from mirumoji.server.utils.file_utils import MediaFileHandler
-from mirumoji.server.utils.logging_utils import setup_logging
+
+from .config import using_modal
+from .logging_setup import setup_logging
+from .media import MediaFileHandler
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)

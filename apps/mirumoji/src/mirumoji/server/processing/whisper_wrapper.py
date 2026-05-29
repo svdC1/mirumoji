@@ -17,7 +17,8 @@ import srt
 from faster_whisper import WhisperModel
 
 from mirumoji.server.processing.gpt_wrapper import GptModel
-from mirumoji.server.utils.constants import FWHISPER_GPT_DEFAULT_SYS_MSG
+
+from ..constants import FWHISPER_GPT_DEFAULT_SYS_MSG
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_SYS_MSG = FWHISPER_GPT_DEFAULT_SYS_MSG

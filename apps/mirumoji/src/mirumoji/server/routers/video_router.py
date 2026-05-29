@@ -18,8 +18,9 @@ from mirumoji.server.db.db import DbManager
 from mirumoji.server.processing.audio import AudioTools
 from mirumoji.server.processing.Processor import Processor
 from mirumoji.server.profile_manager import ensure_profile_exists
-from mirumoji.server.utils.env_utils import using_modal
-from mirumoji.server.utils.file_utils import MediaFileHandler, get_stream_file
+
+from ..config import using_modal
+from ..media import MediaFileHandler, get_stream_file
 
 USING_MODAL = using_modal()
 LOGGER = logging.getLogger(__name__)

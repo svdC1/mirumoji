@@ -35,8 +35,9 @@ from mirumoji.server.models.responses import (
 )
 from mirumoji.server.processing.audio import AudioTools
 from mirumoji.server.profile_manager import ensure_profile_exists
-from mirumoji.server.utils.anki_utils import AnkiExporter
-from mirumoji.server.utils.file_utils import MediaFileHandler, get_stream_file
+
+from ..media import MediaFileHandler, get_stream_file
+from ..processing.anki import AnkiExporter
 
 LOGGER = logging.getLogger(__name__)
 

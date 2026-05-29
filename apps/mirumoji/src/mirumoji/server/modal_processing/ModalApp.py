@@ -14,7 +14,7 @@ from pathlib import Path
 import modal
 from dotenv import load_dotenv
 
-from mirumoji.server.utils.constants import (
+from ..constants import (
     BASE_MEDIA_DIR,
     MODAL_GPU,
     MODAL_IMAGE,

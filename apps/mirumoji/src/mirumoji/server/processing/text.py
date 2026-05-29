@@ -35,7 +35,7 @@ def ensure_fugashi() -> None:
     except Exception as e:
         raise FugashiError(
             f"Failed to Properly Initialise Fugashi : {e}"
-            ) from e
+        ) from e
 
 
 def ensure_kotobase() -> None:
@@ -52,7 +52,7 @@ def ensure_kotobase() -> None:
     except Exception as e:
         raise KotobaseError(
             f"Failed to Properly Initialise Kotobase: {e}"
-            ) from e
+        ) from e
 
 
 def tokenize(sentence: str) -> list[Token]:
@@ -89,7 +89,7 @@ def query_kotobase(
     wildcard: bool = False,
     include_names: bool = True,
     sentence_limit: int = 5,
-    entry_limit: int | None = None
+    entry_limit: int | None = None,
 ) -> KotobaseData:
     """
     Wraps `kotobase.Kotobase.lookup` to provide a lru-cache for queries and
@@ -116,13 +116,11 @@ def query_kotobase(
         wildcard=wildcard,
         include_names=include_names,
         sentence_limit=sentence_limit,
-        entry_limit=entry_limit
+        entry_limit=entry_limit,
     )
 
     # Extract JLPT
-    jlpt = (
-        f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else None
-    )
+    jlpt = f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else None
 
     # Extract Examples
     examples = [i.text for i in result.examples] if result.examples else None
@@ -134,7 +132,6 @@ def query_kotobase(
     jm_senses = None
 
     if result.entries:
-
         filtered = result.filter_entries()
         jm: list[JMDictEntryDTO] = filtered["jmdict"]
         jmne: list[JMNeDictEntryDTO] = filtered["jmnedict"]
@@ -155,8 +152,9 @@ def query_kotobase(
                         order=sense["order"],
                         pos=sense["pos"],
                         gloss=sense["gloss"],
-                        ) for sense in entry.senses
-                    ]
+                    )
+                    for sense in entry.senses
+                ]
 
             jmentries.append(
                 JMEntry(
@@ -164,8 +162,8 @@ def query_kotobase(
                     kana=entry.kana or None,
                     kanji=entry.kanji or None,
                     senses=jm_senses,
-                    ),
-                )
+                ),
+            )
 
         # Build JMNe Entries
         for entry in jmne:
@@ -202,7 +200,7 @@ def query_kotobase(
         meanings=meanings,
         jlpt=jlpt,
         examples=examples,
-        )
+    )
 
 
 def process_sentence(sentence: str) -> list[JapaneseWord]:
@@ -221,8 +219,6 @@ def process_sentence(sentence: str) -> list[JapaneseWord]:
     data_lst = [query_kotobase(query=tok.surface) for tok in tokens]
 
     return [
-        JapaneseWord(
-            token=tok,
-            kotobase_data=data
-            ) for tok, data in zip(tokens, data_lst, strict=True)
-        ]
+        JapaneseWord(token=tok, kotobase_data=data)
+        for tok, data in zip(tokens, data_lst, strict=True)
+    ]
