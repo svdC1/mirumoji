@@ -35,14 +35,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Full Server Stack - Installed Inside Docker Image
+# Core Server Stack - API, tokenizer, dictionary, media, persistence, Modal
+# offload. No local Whisper (torch/ctranslate2) and no LLM provider SDKs;
+# those live in their own extras so minimal/CPU+Modal images stay lean.
 server = [
     "fastapi==0.115.12",
     "uvicorn==0.34.2",
-    "faster-whisper==1.1.1",
     "fugashi[unidic]==1.4.0",
     "kotobase==0.2.7",
-    "openai==1.76.2",
     "pydantic==2.11.4",
     "pydantic[email]",
     "srt==3.5.3",
@@ -52,6 +52,24 @@ server = [
     "genanki==0.13.1",
     "databases==0.9.0",
     "aiosqlite==0.20.0"
+]
+
+# Local Whisper Transcription (Offload to Modal instead to skip this)
+whisper-local = [
+    "faster-whisper==1.1.1"
+]
+
+# LLM Provider - OpenAI SDK
+# Also drives Gemini (OpenAI-compat endpoint)
+# Any local OpenAI-compatible server
+# And Modal-hosted OpenAI-compatible models via base_url
+llm-openai = [
+    "openai==1.76.2"
+]
+
+# LLM provider: native Anthropic SDK for first-class Claude support
+llm-anthropic = [
+    "anthropic"
 ]
 
 # Desktop GUI Launcher

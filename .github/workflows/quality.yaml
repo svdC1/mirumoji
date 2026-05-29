@@ -50,7 +50,7 @@ jobs:
             - name: Install server + dev dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install -e "apps/mirumoji[server,dev]"
+                  pip install -e "apps/mirumoji[server,llm-openai,llm-anthropic,dev]"
 
             - name: Run pytest
               run: |

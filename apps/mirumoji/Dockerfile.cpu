@@ -31,7 +31,7 @@ RUN python3.11 -m pip install --no-cache-dir \
 # --- Copy package files and install server dependencies ---
 COPY pyproject.toml README.md ./
 COPY src/ src/
-RUN python3.11 -m pip install --no-cache-dir ".[server]"
+RUN python3.11 -m pip install --no-cache-dir ".[server,whisper-local,llm-openai,llm-anthropic]"
 
 # --- Download UniDic Dictionary and Kotobase DB---
 RUN python3.11 -m unidic download
