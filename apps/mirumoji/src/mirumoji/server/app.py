@@ -27,13 +27,12 @@ from mirumoji.server.routers.llm_router import llm_router
 from mirumoji.server.routers.profile_router import profile_router
 from mirumoji.server.routers.video_router import video_router
 
+from . import media
 from .config import using_modal
 from .logging_setup import setup_logging
-from .media import MediaFileHandler
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)
-MEDIA_FILE_HANDLER = MediaFileHandler()
 
 # ───────────────────────────────────────────────────────────
 # App setup
@@ -52,12 +51,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
       Any: Application
     """
     await connect_db()
-    LOGGER.info(f"Storage ensured at: '{MEDIA_FILE_HANDLER.base_path}'")
+    media.init_storage()
     yield
     await disconnect_db()
     await asyncio.to_thread(
         shutil.rmtree,
-        MEDIA_FILE_HANDLER.temp_path,
+        media.TEMP_PATH,
         ignore_errors=True,
     )
 
@@ -70,7 +69,9 @@ app = FastAPI(
 
 app.mount(
     "/media",
-    StaticFiles(directory=MEDIA_FILE_HANDLER.base_path),
+    # check_dir=False: the directory is created at startup by
+    # media.init_storage(), after this module is imported
+    StaticFiles(directory=media.BASE_PATH, check_dir=False),
     name="media",
 )
 
@@ -163,7 +164,7 @@ app.include_router(llm_router)
 LOGGER.info(f"Database URL: {DATABASE_URL}")
 LOGGER.info(f"USING_MODAL={using_modal()}")
 LOGGER.info("Setup Complete")
-LOGGER.info(f"Serving '{MEDIA_FILE_HANDLER.base_path}' at '/media'.")
+LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'.")
 
 
 def run() -> None:

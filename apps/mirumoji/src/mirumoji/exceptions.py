@@ -201,8 +201,65 @@ class ModalError(MirumojiServerError):
     Raised when a Modal remote job fails
 
     Indicates an error running or communicating with a Modal function (e.g.
-    transcription or video conversion offloaded to Modal's GPU containers).
+    transcription or video conversion offloaded to Modal's GPU containers)
     """
 
     http_status: ClassVar[int] = 502
     code: ClassVar[str] = "Modal"
+
+
+# --- Media Exceptions ---
+
+
+class MediaError(MirumojiServerError):
+    """
+    Base exception for failures handling media files
+    """
+
+    http_status: ClassVar[int] = 500
+    code: ClassVar[str] = "Media"
+
+
+class MediaNotFoundError(MediaError):
+    """
+    Raised when a requested media file does not exist
+    """
+
+    http_status: ClassVar[int] = 404
+    code: ClassVar[str] = "MediaNotFound"
+
+
+class UploadError(MediaError):
+    """
+    Raised when saving a streamed upload fails
+
+    Indicates the client upload could not be written to storage (e.g. a
+    broken stream or a missing required header)
+    """
+
+    http_status: ClassVar[int] = 400
+    code: ClassVar[str] = "Upload"
+
+
+class InvalidMediaPathError(MediaError):
+    """
+    Raised when a requested path is invalid for, or escapes, the media
+    directory
+
+    Guards against path traversal and malformed relative paths
+    """
+
+    http_status: ClassVar[int] = 400
+    code: ClassVar[str] = "InvalidMediaPath"
+
+
+class StorageError(MediaError):
+    """
+    Raised when a media filesystem operation fails
+
+    Covers move, copy, delete, and directory-creation failures within the
+    media directory
+    """
+
+    http_status: ClassVar[int] = 500
+    code: ClassVar[str] = "Storage"

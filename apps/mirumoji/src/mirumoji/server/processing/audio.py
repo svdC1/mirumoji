@@ -349,8 +349,8 @@ def to_mp4(
     Raises:
         FFmpegError: If any of the FFMPEG commands have returned a non-zero
             exit code
-         ValueError: If `input_path` doesn't exist or is not a file, or if an
-             invalid resolution is provided
+        ValueError: If `input_path` doesn't exist or is not a file, or if an
+            invalid resolution is provided
 
     Returns:
         Path to the resulting MP4

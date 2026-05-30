@@ -7,7 +7,7 @@ import sys
 
 from tqdm.auto import tqdm
 
-from .constants import LOG_DIR, LOGGING_LEVEL
+from .constants import HOST_LOG_PATH, LOGGING_LEVEL
 
 
 class TqdmStreamHandler(logging.StreamHandler):
@@ -49,8 +49,8 @@ def setup_logging() -> None:
     )
 
     # Create DIR and add handlers
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_file = str((LOG_DIR / "backend.log").resolve())
+    HOST_LOG_PATH.mkdir(parents=True, exist_ok=True)
+    log_file = str((HOST_LOG_PATH / "backend.log").resolve())
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

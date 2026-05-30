@@ -245,7 +245,7 @@ def process_sentence(sentence: str) -> list[JapaneseWord]:
         sentence (str): The Japanese sentence to process
 
     Returns:
-        A list of pydantic model containing token information extracted from
+        A list of pydantic models containing token information extracted from
         `fugashi` and `kotobase`
     """
     tokens = tokenize(sentence)

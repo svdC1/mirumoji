@@ -64,6 +64,7 @@ server = [
     "genanki==0.13.1",
     "databases==0.9.0",
     "aiosqlite==0.20.0",
+    "platformdirs",
     "openai==1.76.2",
     "anthropic"
 
