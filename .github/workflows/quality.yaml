@@ -20,10 +20,13 @@ jobs:
               with:
                   python-version: "3.11"
 
-            - name: Install dev dependencies
+            - name: Install all extras + dev dependencies
+              # Install every runtime extra so mypy type-checks against the real
+              # (typed) optional deps - e.g. the openai / anthropic SDKs ship
+              # py.typed - instead of treating them as Any.
               run: |
                   python -m pip install --upgrade pip
-                  pip install -e "apps/mirumoji[dev]"
+                  pip install -e "apps/mirumoji[server,whisper-local,llm-openai,llm-anthropic,dev]"
 
             - name: ruff check
               run: ruff check apps/mirumoji/src

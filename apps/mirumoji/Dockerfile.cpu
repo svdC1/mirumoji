@@ -23,15 +23,13 @@ RUN apt-get update && \
 RUN python3.11 -m ensurepip --upgrade && \
     python3.11 -m pip install --no-cache-dir --upgrade pip
 
-# --- Install PyTorch CPU ---
-RUN python3.11 -m pip install --no-cache-dir \
-    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cpu
-
 # --- Copy package files and install server dependencies ---
+# CPU image is the Modal-offload deployment: no local Whisper, so no torch.
+# Transcription is handled by Modal GPU containers; the LLM provider SDKs are
+# included so breakdowns/explanations work without GPU.
 COPY pyproject.toml README.md ./
 COPY src/ src/
-RUN python3.11 -m pip install --no-cache-dir ".[server,whisper-local,llm-openai,llm-anthropic]"
+RUN python3.11 -m pip install --no-cache-dir ".[server,llm-openai,llm-anthropic]"
 
 # --- Download UniDic Dictionary and Kotobase DB---
 RUN python3.11 -m unidic download
