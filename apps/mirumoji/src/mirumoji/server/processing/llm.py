@@ -307,7 +307,7 @@ def provider_status() -> list[dict]:
 
     Returns:
         List of `{"provider": str, "available": bool}` for each provider, so
-        the frontend can offer configured ones and grey out the rest
+            the frontend can offer configured ones and grey out the rest
     """
     return [
         {"provider": p.value, "available": provider_available(p)}
@@ -446,7 +446,7 @@ def sse_format(chunks: Iterable[str]) -> Iterator[str]:
 
     Yields:
         SSE-formatted strings (`data: <chunk>\\n\\n`), then a terminal
-        `event: done` frame
+            `event: done` frame
     """
     for chunk in chunks:
         yield f"data: {chunk}\n\n"

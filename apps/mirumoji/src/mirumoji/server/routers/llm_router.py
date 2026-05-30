@@ -23,6 +23,6 @@ async def list_providers() -> dict:
 
     Returns:
         Mapping with a `providers` list of `{"provider", "available"}` entries,
-        used by the frontend to populate the model picker
+            used by the frontend to populate the model picker
     """
     return {"providers": provider_status()}
