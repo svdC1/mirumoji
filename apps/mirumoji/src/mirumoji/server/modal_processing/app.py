@@ -14,6 +14,7 @@ warning: Media Paths
 """
 
 import logging
+from dataclasses import dataclass
 
 import modal
 
@@ -24,7 +25,24 @@ from .transcription import transcribe_job
 LOGGER = logging.getLogger("mirumoji")
 
 
-def setup_modal() -> modal.App:
+@dataclass(frozen=True)
+class ModalRuntime:
+    """
+    Bundle of the ephemeral Modal app and its registered job handles
+
+    Attributes:
+        app (modal.App): The fully-configured ephemeral `mirumoji-gpu` app to
+            run jobs under
+        transcribe (modal.Function): Handle for the transcription job
+        convert (modal.Function): Handle for the video-conversion job
+    """
+
+    app: modal.App
+    transcribe: modal.Function
+    convert: modal.Function
+
+
+def setup_modal() -> ModalRuntime:
     """
     Configures the Mirumoji `Modal` integration
 
@@ -43,7 +61,9 @@ def setup_modal() -> modal.App:
           jobs
 
     Returns:
-        The fully-configured, ephemeral `mirumoji-gpu` `Modal` app
+        A `ModalRuntime` bundling the ephemeral app and its job handles, so
+            callers invoke `runtime.transcribe.remote.aio(...)` /
+            `runtime.convert.remote_gen.aio(...)` inside `runtime.app.run()`
     """
     # Create Shared Media Directory
     HOST_MEDIA_PATH.mkdir(parents=True, exist_ok=True)
@@ -61,14 +81,14 @@ def setup_modal() -> modal.App:
     app = modal.App("mirumoji-gpu", image=mirumoji_image)
 
     # Register Jobs
-    app.function(
+    convert = app.function(
         gpu=MODAL_GPU,
         timeout=600,
         include_source=True,
         is_generator=True,
     )(video_conversion_job)
 
-    app.function(
+    transcribe = app.function(
         gpu=MODAL_GPU,
         timeout=600,
         include_source=True,
@@ -76,4 +96,4 @@ def setup_modal() -> modal.App:
 
     LOGGER.info("Modal Setup - Ready")
 
-    return app
+    return ModalRuntime(app=app, transcribe=transcribe, convert=convert)

@@ -9,6 +9,9 @@ packages themselves
 
 import os
 from importlib.util import find_spec
+from typing import Literal
+
+from ..exceptions import ModalError, WhisperUnavailableError
 
 # --- Capability Detection ---
 
@@ -64,3 +67,63 @@ def using_modal() -> bool:
         `True` if variables are present, `False` otherwise
     """
     return env_present("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+
+
+def transcribe_backend() -> Literal["local", "modal", "none"]:
+    """
+    Resolves which transcription backend the server should use
+
+    tip: Transcribe Backend
+        - Reads `MIRUMOJI_TRANSCRIBE_BACKEND` (`auto` | `local` | `modal`)
+
+        - `auto` or unset picks `modal` when Modal tokens are configured, or
+          `local` when faster-whisper is installed, otherwise `none`
+
+        - Explicit `local` or `modal` overrides are validated and raise when
+          that backend isn't available
+
+    Returns:
+        The resolved backend identifier
+
+    Raises:
+        WhisperUnavailableError: If `local` is forced but faster-whisper isn't
+            installed
+        ModalError: If `modal` is forced but Modal tokens aren't configured
+        ValueError: If the variable holds an unrecognised value
+    """
+    choice = (
+        os.environ.get(
+            "MIRUMOJI_TRANSCRIBE_BACKEND",
+            "auto",
+        )
+        .strip()
+        .lower()
+    )
+
+    if choice == "modal":
+        if not using_modal():
+            raise ModalError(
+                "MIRUMOJI_TRANSCRIBE_BACKEND=modal but MODAL_TOKEN_ID / "
+                "MODAL_TOKEN_SECRET are not configured",
+            )
+        return "modal"
+
+    if choice == "local":
+        if not whisper_local_available():
+            raise WhisperUnavailableError(
+                "MIRUMOJI_TRANSCRIBE_BACKEND=local but faster-whisper "
+                "(the whisper-local extra) is not installed",
+            )
+        return "local"
+
+    if choice == "auto":
+        if using_modal():
+            return "modal"
+        if whisper_local_available():
+            return "local"
+        return "none"
+
+    raise ValueError(
+        f"Invalid MIRUMOJI_TRANSCRIBE_BACKEND '{choice}'; "
+        f"expected one of: auto, local, modal",
+    )

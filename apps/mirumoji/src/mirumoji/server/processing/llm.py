@@ -21,6 +21,7 @@ import os
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
+from functools import lru_cache
 from typing import Protocol
 
 from anthropic import Anthropic
@@ -315,10 +316,14 @@ def provider_status() -> list[dict]:
     ]
 
 
+@lru_cache
 def build_client(provider: LLMProvider) -> LLMClient:
     """
     Builds a client for an LLM provider, resolving its config from the
     environment
+
+    Cached per provider so clients aren't rebuilt on every request. The
+    environment is fixed for the server's lifetime
 
     Args:
         provider (LLMProvider): LLM provider to build a client for
