@@ -21,6 +21,25 @@ from ..models.jpdict import (
 )
 
 
+@lru_cache(maxsize=1)
+def _get_tagger() -> fugashi.Tagger:
+    """
+    Builds and caches a single `fugashi.Tagger`
+
+    The tagger loads the UniDic dictionary on construction, which is
+    expensive, so it is built once and reused across calls
+
+    Raises:
+        FugashiError: If the tagger cannot be initialised
+    """
+    try:
+        return fugashi.Tagger()
+    except Exception as e:
+        raise FugashiError(
+            f"Failed to Initialise Fugashi : {e}",
+        ) from e
+
+
 def ensure_fugashi() -> None:
     """
     Performs a simple tokenisation operation using `fugashi` to ensure that
@@ -30,12 +49,14 @@ def ensure_fugashi() -> None:
         FugashiError: If any error occurs during tokenisation
     """
     try:
-        tagger = fugashi.Tagger()
+        tagger = _get_tagger()
         tagger("試しに")
     except Exception as e:
-        raise FugashiError(
-            f"Failed to Properly Initialise Fugashi : {e}"
-        ) from e
+        # Raise Initialisation Exception From _get_tagger Unchanged
+        if isinstance(e, FugashiError):
+            raise e
+
+        raise FugashiError(f"Failed to Tokenise With Fugashi : {e}") from e
 
 
 def ensure_kotobase() -> None:
@@ -66,10 +87,17 @@ def tokenize(sentence: str) -> list[Token]:
     Returns:
         list of `Token` models containing extracted token information
     """
-    tagger = fugashi.Tagger()
+    tagger = _get_tagger()
     tokens: list[Token] = []
 
-    for tok in tagger(sentence):
+    try:
+        raw_tokens = list(tagger(sentence))
+    except Exception as e:
+        raise FugashiError(
+            f"Failed to Tokenise Sentence : {e}",
+        ) from e
+
+    for tok in raw_tokens:
         # Convert the named tuple of features to a flat dictionary
         token_dict = tok.feature._asdict()
 
@@ -111,13 +139,18 @@ def query_kotobase(
         Pydantic model containing all information extracted from `kotobase`
             for the query word
     """
-    result = Kotobase().lookup(
-        word=query,
-        wildcard=wildcard,
-        include_names=include_names,
-        sentence_limit=sentence_limit,
-        entry_limit=entry_limit,
-    )
+    try:
+        result = Kotobase().lookup(
+            word=query,
+            wildcard=wildcard,
+            include_names=include_names,
+            sentence_limit=sentence_limit,
+            entry_limit=entry_limit,
+        )
+    except Exception as e:
+        raise KotobaseError(
+            f"Kotobase Lookup Failed For '{query}' : {e}",
+        ) from e
 
     # Extract JLPT
     jlpt = f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else None
@@ -205,8 +238,8 @@ def query_kotobase(
 
 def process_sentence(sentence: str) -> list[JapaneseWord]:
     """
-    Tokenizes every word in a Japanese sentence and extracts information
-    from `fugashi` and `kotobase` for every token
+    Tokenizes a Japanese sentence and extracts information
+    from `fugashi` and `kotobase` for every word
 
     Args:
         sentence (str): The Japanese sentence to process
