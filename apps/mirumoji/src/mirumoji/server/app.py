@@ -1,10 +1,7 @@
 """
-Module defining the FastAPI API. Sets up Database connection
-and manages application lifecycle.
+Defines the `FastAPI` Mirummoji Server API
 
-Attributes:
-  LOGGER (logging.Logger): Root Logging object.
-  LOGGING_LEVEL (str): Level for the Logging object.
+Sets up database connection and manages application lifecycle
 """
 
 import asyncio
@@ -26,6 +23,7 @@ from mirumoji.server.routers.audio_router import audio_router
 from mirumoji.server.routers.dict_router import dict_router
 from mirumoji.server.routers.gpt_router import gpt_router
 from mirumoji.server.routers.health_router import health_router
+from mirumoji.server.routers.llm_router import llm_router
 from mirumoji.server.routers.profile_router import profile_router
 from mirumoji.server.routers.video_router import video_router
 
@@ -126,7 +124,7 @@ async def http_exception_handler(
     exc: HTTPException,
 ) -> JSONResponse:
     """
-    Custom Exception Handler for all HTTP Errors.
+    Custom Exception Handler for all HTTP Errors
 
     Emits the same nested envelope as the domain handler so the frontend has a
     single error shape to parse. The machine-readable `code` is derived from
@@ -159,6 +157,7 @@ app.include_router(health_router)
 app.include_router(dict_router)
 app.include_router(video_router)
 app.include_router(profile_router)
+app.include_router(llm_router)
 
 
 LOGGER.info(f"Database URL: {DATABASE_URL}")

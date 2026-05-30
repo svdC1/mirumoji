@@ -4,7 +4,7 @@ Defines the package's exception hierarchy
 Server-side domain exceptions carry their own HTTP contract (`http_status` and
 a stable machine-readable `code`) plus an optional structured `details`
 payload. A single FastAPI exception handler reads those attributes and renders
-the nested error envelope, so transport concerns never leak into domain code.
+the nested error envelope, so transport concerns never leak into domain code
 """
 
 from typing import ClassVar

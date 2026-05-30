@@ -44,7 +44,7 @@ RUN python3.11 -m pip install huggingface_hub \
 # --- Copy package files and install server dependencies ---
 COPY pyproject.toml README.md ./
 COPY src/ src/
-RUN python3.11 -m pip install ".[server,whisper-local,llm-openai,llm-anthropic]"
+RUN python3.11 -m pip install ".[server,whisper-local]"
 
 # --- Download UniDic Dictionary and Kotobase DB ---
 RUN python3.11 -m unidic download

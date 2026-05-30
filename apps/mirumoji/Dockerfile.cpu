@@ -29,7 +29,7 @@ RUN python3.11 -m ensurepip --upgrade && \
 # included so breakdowns/explanations work without GPU.
 COPY pyproject.toml README.md ./
 COPY src/ src/
-RUN python3.11 -m pip install --no-cache-dir ".[server,llm-openai,llm-anthropic]"
+RUN python3.11 -m pip install --no-cache-dir ".[server]"
 
 # --- Download UniDic Dictionary and Kotobase DB---
 RUN python3.11 -m unidic download

@@ -35,9 +35,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Core Server Stack - API, tokenizer, dictionary, media, persistence, Modal
-# offload. No local Whisper (torch/ctranslate2) and no LLM provider SDKs;
-# those live in their own extras so minimal/CPU+Modal images stay lean.
+# Core Server Stack - CPU
+# API Deps
+# Tokenizer
+# Dictionary
+# Media
+# DB 
+# Modal Offload
+
+# LLM Provider - OpenAI SDK - `base_url` Supports
+# Gemini (OpenAI-Compatible Endpoint)
+# Any Local OpenAI-Compatible LLM Server
+# Modal-Hosted OpenAI-Compatible LLM Server
+
+# LLM Provider - Native Anthropic SDK For Better Claude Support
+
 server = [
     "fastapi==0.115.12",
     "uvicorn==0.34.2",
@@ -51,26 +63,17 @@ server = [
     "modal==1.1.3",
     "genanki==0.13.1",
     "databases==0.9.0",
-    "aiosqlite==0.20.0"
+    "aiosqlite==0.20.0",
+    "openai==1.76.2",
+    "anthropic"
+
 ]
 
-# Local Whisper Transcription (Offload to Modal instead to skip this)
+# Local Whisper Transcription (Modal Offload Deployments Don't Need This)
 whisper-local = [
     "faster-whisper==1.1.1"
 ]
 
-# LLM Provider - OpenAI SDK
-# Also drives Gemini (OpenAI-compat endpoint)
-# Any local OpenAI-compatible server
-# And Modal-hosted OpenAI-compatible models via base_url
-llm-openai = [
-    "openai==1.76.2"
-]
-
-# LLM provider: native Anthropic SDK for first-class Claude support
-llm-anthropic = [
-    "anthropic"
-]
 
 # Desktop GUI Launcher
 gui = [
