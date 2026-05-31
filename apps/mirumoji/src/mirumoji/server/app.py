@@ -18,7 +18,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from mirumoji.exceptions import MirumojiServerError
-from mirumoji.server.db.db import DATABASE_URL, connect_db, disconnect_db
+from mirumoji.server.constants import DB_URL
+from mirumoji.server.db import get_engine, init_db
 from mirumoji.server.routers.audio_router import audio_router
 from mirumoji.server.routers.dict_router import dict_router
 from mirumoji.server.routers.gpt_router import gpt_router
@@ -51,11 +52,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     Yields:
       Any: Application
     """
-    await connect_db()
+    await init_db()
     media.init_storage()
     app.state.processor = Processor()
     yield
-    await disconnect_db()
+    await get_engine().dispose()
     await asyncio.to_thread(
         shutil.rmtree,
         media.TEMP_PATH,
@@ -163,7 +164,7 @@ app.include_router(profile_router)
 app.include_router(llm_router)
 
 
-LOGGER.info(f"Database URL: {DATABASE_URL}")
+LOGGER.info(f"Database URL: {DB_URL}")
 LOGGER.info(f"USING_MODAL={using_modal()}")
 LOGGER.info("Setup Complete")
 LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'.")

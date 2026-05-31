@@ -32,8 +32,7 @@ from ...exceptions import (
     LLMProviderUnavailableError,
     LLMRequestError,
 )
-from ..config import env_present
-from ..constants import BREAKDOWN_DEFAULT_SYS_MSG
+from ..config import env_present, get_settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -391,7 +390,7 @@ def default_breakdown_prompt(sentence: str, focus: str) -> tuple[str, str]:
         Tuple of the system message and the user prompt
     """
     return (
-        BREAKDOWN_DEFAULT_SYS_MSG,
+        get_settings().breakdown_sys_msg,
         f"{sentence}. Explain usage of word : {focus}",
     )
 
@@ -407,7 +406,7 @@ def sentence_breakdown_prompt(sentence: str) -> tuple[str, str]:
         Tuple of the system message and the user prompt
     """
     return (
-        BREAKDOWN_DEFAULT_SYS_MSG,
+        get_settings().breakdown_sys_msg,
         f"Sentence : {sentence}. Word: None, explain the sentence.",
     )
 

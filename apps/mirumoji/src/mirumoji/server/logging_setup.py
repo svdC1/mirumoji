@@ -7,12 +7,13 @@ import sys
 
 from tqdm.auto import tqdm
 
-from .constants import HOST_LOG_PATH, LOGGING_LEVEL
+from .config import get_settings
+from .constants import HOST_LOG_PATH
 
 
 class TqdmStreamHandler(logging.StreamHandler):
     """
-    Handler for displaying `tqdm` progress bars with python logging
+    Handler for displaying `tqdm` progress bars properly with python logging
     """
 
     def __init__(self) -> None:
@@ -32,7 +33,7 @@ def setup_logging() -> None:
     Configures the `mirumoji` logger to include custom formatters and handlers.
     In addition, creates the logging directory if it doesn't exist
     """
-    level = getattr(logging, LOGGING_LEVEL, logging.INFO)
+    level = getattr(logging, get_settings().logging_level, logging.INFO)
 
     # Get the logger and set its level
     logger = logging.getLogger("mirumoji")

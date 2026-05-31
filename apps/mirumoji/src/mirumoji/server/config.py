@@ -8,10 +8,89 @@ packages themselves
 """
 
 import os
+from dataclasses import dataclass
+from functools import lru_cache
 from importlib.util import find_spec
 from typing import Literal
 
+from dotenv import load_dotenv
+
 from ..exceptions import ModalError, WhisperUnavailableError
+from .constants import DEFAULT_BREAKDOWN_SYS_MSG, DEFAULT_SRT_SYS_MSG
+
+# --- Environment Loading + Settings ---
+
+
+@lru_cache(maxsize=1)
+def _load_env_once() -> None:
+    """
+    Loads variables from a `.env` file into the environment
+
+    warning: Single Execution
+        - This function is meant to be executed only once during the
+          application lifetime
+
+        - It's cached so that environment reads throughout the server can
+          consume `.env` values without re-reading the file
+
+        - Variables already set in the real environment are no overriden
+    """
+    load_dotenv()
+
+
+@dataclass(frozen=True)
+class Settings:
+    """
+    Resolved, environment-dependent server configuration
+
+    Attributes:
+        logging_level (str): Python logging level name
+        modal_gpu (str): GPU type requested for Modal jobs
+        modal_image (str): Docker image used for Modal containers
+        srt_sys_msg (str): System message for SRT-fixing
+        breakdown_sys_msg (str): System message for word-nuance breakdowns
+    """
+
+    logging_level: str
+    modal_gpu: str
+    modal_image: str
+    srt_sys_msg: str
+    breakdown_sys_msg: str
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """
+    Resolves environment-dependent settings once, after loading `.env`
+
+    Reads the environment lazily (not at import) so that values reflect a
+    `.env` loaded at startup + variables that the launcher sets before the
+    process starts. Cached for the process lifetime
+
+    Returns:
+        The resolved `Settings`
+    """
+    _load_env_once()
+    return Settings(
+        logging_level=os.environ.get(
+            "MIRUMOJI_LOGGING_LEVEL",
+            "INFO",
+        ).upper(),
+        modal_gpu=os.environ.get("MIRUMOJI_MODAL_GPU", "A10G"),
+        modal_image=os.environ.get(
+            "MIRUMOJI_MODAL_IMAGE",
+            "docker.io/svdc1/mirumoji-modal-gpu:latest",
+        ),
+        srt_sys_msg=os.environ.get(
+            "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
+            DEFAULT_SRT_SYS_MSG,
+        ),
+        breakdown_sys_msg=os.environ.get(
+            "MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG",
+            DEFAULT_BREAKDOWN_SYS_MSG,
+        ),
+    )
+
 
 # --- Capability Detection ---
 
@@ -44,6 +123,7 @@ def env_present(*keys: str) -> bool:
     Returns:
         `True` only if all named variables are present and non-empty
     """
+    _load_env_once()
     return all(os.environ.get(k) for k in keys)
 
 
@@ -91,6 +171,7 @@ def transcribe_backend() -> Literal["local", "modal", "none"]:
         ModalError: If `modal` is forced but Modal tokens aren't configured
         ValueError: If the variable holds an unrecognised value
     """
+    _load_env_once()
     choice = (
         os.environ.get(
             "MIRUMOJI_TRANSCRIBE_BACKEND",

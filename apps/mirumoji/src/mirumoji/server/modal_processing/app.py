@@ -18,7 +18,8 @@ from dataclasses import dataclass
 
 import modal
 
-from ..constants import HOST_MEDIA_PATH, MODAL_GPU, MODAL_IMAGE
+from ..config import get_settings
+from ..constants import HOST_MEDIA_PATH
 from .conversion import video_conversion_job
 from .transcription import transcribe_job
 
@@ -65,6 +66,8 @@ def setup_modal() -> ModalRuntime:
             callers invoke `runtime.transcribe.remote.aio(...)` /
             `runtime.convert.remote_gen.aio(...)` inside `runtime.app.run()`
     """
+    settings = get_settings()
+
     # Create Shared Media Directory
     HOST_MEDIA_PATH.mkdir(parents=True, exist_ok=True)
     LOGGER.info(
@@ -73,7 +76,9 @@ def setup_modal() -> ModalRuntime:
     )
 
     # Build media_files on modal container startup
-    mirumoji_image = modal.Image.from_registry(MODAL_IMAGE).add_local_dir(
+    mirumoji_image = modal.Image.from_registry(
+        settings.modal_image,
+    ).add_local_dir(
         HOST_MEDIA_PATH,
         remote_path="/root/media_files",
     )
@@ -82,14 +87,14 @@ def setup_modal() -> ModalRuntime:
 
     # Register Jobs
     convert = app.function(
-        gpu=MODAL_GPU,
+        gpu=settings.modal_gpu,
         timeout=600,
         include_source=True,
         is_generator=True,
     )(video_conversion_job)
 
     transcribe = app.function(
-        gpu=MODAL_GPU,
+        gpu=settings.modal_gpu,
         timeout=600,
         include_source=True,
     )(transcribe_job)

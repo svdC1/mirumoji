@@ -263,3 +263,24 @@ class StorageError(MediaError):
 
     http_status: ClassVar[int] = 500
     code: ClassVar[str] = "Storage"
+
+
+# --- Database Exceptions ---
+
+
+class DatabaseError(MirumojiServerError):
+    """
+    Raised when a database operation fails unexpectedly
+    """
+
+    http_status: ClassVar[int] = 500
+    code: ClassVar[str] = "Database"
+
+
+class RecordNotFoundError(DatabaseError):
+    """
+    Raised when a requested database record does not exist
+    """
+
+    http_status: ClassVar[int] = 404
+    code: ClassVar[str] = "RecordNotFound"
