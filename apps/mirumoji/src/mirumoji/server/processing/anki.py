@@ -1,17 +1,22 @@
 """
-This module defines the `AnkiExporter` class for creating an
-Anki deck from the user's saved clips using `genanki`
+Defines stateless helpers for exporting a profile's saved clips as an Anki
+deck using `genanki`
 
 Attributes:
-  LOGGER (logging.Logger): Module's logger.
+  LOGGER (logging.Logger): Module's logger
   VIDEO_CSS (str): Pre-defined CSS of the cards
   CARD_TEMPLATE (list): Pre-defined template of the cards for `genanki`
-  MODEL_FIELDS (list): Pre-defined card model fields.
-  MODEL_NAME (str): Pre-defined standard deck name.
+  MODEL_FIELDS (list): Pre-defined card model fields
+  MODEL_NAME (str): Pre-defined standard model name
+  DECK_NAME (str): Pre-defined standard deck name
+  VIDEO_TAG (str): HTML `<video>` tag template embedding a bundled clip
 """
+
+from __future__ import annotations
 
 import hashlib
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import genanki
@@ -90,101 +95,98 @@ MODEL_FIELDS = [
 
 MODEL_NAME = "Mirumoji-Anki-V1"
 
+DECK_NAME = MODEL_NAME + " Deck"
 
-class AnkiExporter:
+VIDEO_TAG = '<video controls><source src="{0}" type="video/webm"/></video>'
+
+
+@dataclass
+class AnkiCard:
     """
-    Exports saved clips as an Anki Deck.
+    Data for a single Anki card built from a saved clip
+
+    Attributes:
+        clip_path (str): Absolute path to the clip file, bundled as card media
+        word (str): The focus word shown on the card front
+        meanings (str): The word's meanings as a single string
+        sentence (str): The sentence the word came from
+        explanation (str): The LLM explanation of the sentence
+        tags (list[str]): Optional card tags
+    """
+
+    clip_path: str
+    word: str
+    meanings: str
+    sentence: str
+    explanation: str
+    tags: list[str] = field(default_factory=list)
+
+
+def id_from_string(s: str) -> int:
+    """
+    Creates a stable, unique genanki model/deck id from a string
 
     Args:
-      model_name (str, optional): Model name for genanki
-      deck_name (str, optional): Deck name for genanki
-      model_fields (list, optional): Model fields for genanki
-      css (str, optional): Card CSS for genanki
-      card_template (list, optional): Card template for genanki.
+        s (str): String to derive the id from
 
+    Returns:
+        An integer id derived from the string's SHA-1 digest
     """
+    return int.from_bytes(hashlib.sha1(s.encode()).digest()[:4], "big")
 
-    def __init__(
-        self,
-        model_name: str | None = MODEL_NAME,
-        deck_name: str | None = MODEL_NAME + " Deck",
-        model_fields: list | None = MODEL_FIELDS,
-        css: str | None = VIDEO_CSS,
-        card_template: list | None = CARD_TEMPLATE,
-    ) -> None:
 
-        self.model_name = model_name
-        self.model_id = __class__.id_from_string(model_name)
-        self.css = css
-        self.card_template = card_template
-        self.model = genanki.Model(
-            model_id=self.model_id,
-            name=model_name,
-            fields=model_fields,
-            templates=card_template,
-            css=css,
+def build_model() -> genanki.Model:
+    """
+    Builds the shared `genanki.Model` used for every Mirumoji card
+
+    Returns:
+        The configured `genanki.Model`
+    """
+    return genanki.Model(
+        model_id=id_from_string(MODEL_NAME),
+        name=MODEL_NAME,
+        fields=MODEL_FIELDS,
+        templates=CARD_TEMPLATE,
+        css=VIDEO_CSS,
+    )
+
+
+def export_deck(cards: list[AnkiCard], output_path: str) -> None:
+    """
+    Builds a deck from `cards` and writes it (with bundled clip media) to disk
+
+    Each card's `clip_path` is bundled into the package as media and embedded
+    in the card via an HTML `<video>` tag referencing the file's base name
+
+    Args:
+        cards (list[AnkiCard]): The cards to add to the deck
+        output_path (str): Path to write the resulting `.apkg` file to
+    """
+    model = build_model()
+    deck = genanki.Deck(id_from_string(DECK_NAME), DECK_NAME)
+    media_files: list[str] = []
+
+    for card in cards:
+        filename = Path(card.clip_path).name
+        video = VIDEO_TAG.format(filename)
+        media_files.append(card.clip_path)
+        deck.add_note(
+            genanki.Note(
+                model=model,
+                fields=[
+                    video,
+                    card.word,
+                    card.meanings,
+                    card.sentence,
+                    card.explanation,
+                ],
+                tags=card.tags,
+            ),
         )
 
-        self.deck_name = deck_name
-        self.deck_id = __class__.id_from_string(deck_name)
-        self.deck = genanki.Deck(self.deck_id, self.deck_name)
-        self.media_files: list[str] = []
-        self.video_tag = '<video controls><source src="{0}"\
-            type="video/webm"/></video>'
-
-    @staticmethod
-    def id_from_string(s: str) -> int:
-        """
-        Create a unique anki deck ID from string
-
-        Args:
-          s (str): String to create ID from
-
-        Returns:
-          int: ID generated using hashlib.
-        """
-        return int.from_bytes(hashlib.sha1(s.encode()).digest()[:4], "big")
-
-    def add_card(
-        self,
-        clip_path: str,
-        word: str,
-        meanings: str,
-        sentence: str,
-        explanation: str,
-        tags: list[str] | None = None,
-    ) -> None:
-        """
-        Add one card to the deck, `clip_path` will be bundled as media.
-
-        Args:
-          clip_path (str): Path to the clip
-          word (str): Card word
-          meanings (str): Word meanings in string form.
-          sentence (str): Sentence the word came from.
-          explanation (str): GPT explanation of the sentence.
-          tags (list, optional): Optional card tags.
-        """
-        filename = Path(clip_path).name
-        video = self.video_tag.format(filename)
-        self.media_files.append(clip_path)
-
-        note = genanki.Note(
-            model=self.model,
-            fields=[video, word, meanings, sentence, explanation],
-            tags=tags or [],
-        )
-        self.deck.add_note(note)
-
-    def export(self, output_path: str) -> None:
-        """
-        Write .apkg (deck + all media) to output_path.
-
-        Args:
-          output_path (str): Path to save the Anki Deck.
-        """
-        pkg = genanki.Package(self.deck, self.media_files)
-        pkg.write_to_file(output_path)
-        _notes = f"#Notes -> '{len(self.deck.notes)}';"
-        _media = f"#Media -> '{len(self.media_files)}';"
-        LOGGER.info(f"Anki Package -> '{output_path}';{_notes}{_media}")
+    genanki.Package(deck, media_files).write_to_file(output_path)
+    LOGGER.info(
+        f"Anki Package -> '{output_path}';"
+        f"#Notes -> '{len(deck.notes)}';"
+        f"#Media -> '{len(media_files)}';",
+    )

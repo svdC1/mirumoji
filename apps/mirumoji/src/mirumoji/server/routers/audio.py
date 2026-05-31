@@ -16,12 +16,15 @@ from fastapi import APIRouter, Depends, Query
 
 from .. import media
 from ..db import UnitOfWork
-from ..dependencies import get_processor, get_stream_file
+from ..dependencies import (
+    ensure_profile_exists,
+    get_processor,
+    get_stream_file,
+)
 from ..models.requests import TranscribeAudioRequest
 from ..models.responses import AudioTranscriptResponse
 from ..processing import audio
 from ..processing.processor import Processor
-from ..profile_manager import ensure_profile_exists
 
 LOGGER = logging.getLogger(__name__)
 audio_router = APIRouter(prefix="/audio")
