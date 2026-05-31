@@ -6,14 +6,33 @@ Kept separate from `media` so that module stays pure storage logic with no
 FastAPI coupling
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import Header, Request
 
 from . import media
 
+if TYPE_CHECKING:
+    from .processing.processor import Processor
+
 LOGGER = logging.getLogger(__name__)
+
+
+def get_processor(request: Request) -> Processor:
+    """
+    Endpoint dependency returning the lifespan-scoped `Processor`
+
+    Args:
+        request (Request): The `FastAPI.Request` object
+
+    Returns:
+        The single `Processor` instance built during application startup
+    """
+    return request.app.state.processor
 
 
 async def get_stream_file(

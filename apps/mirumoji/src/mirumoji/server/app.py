@@ -30,6 +30,7 @@ from mirumoji.server.routers.video_router import video_router
 from . import media
 from .config import using_modal
 from .logging_setup import setup_logging
+from .processing.processor import Processor
 
 setup_logging()
 LOGGER = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """
     await connect_db()
     media.init_storage()
+    app.state.processor = Processor()
     yield
     await disconnect_db()
     await asyncio.to_thread(
