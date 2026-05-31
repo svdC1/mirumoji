@@ -1,7 +1,14 @@
 """
-Defines the `FastAPI` Mirummoji Server API
+Defines the `FastAPI` Mirumoji Server API
 
-Sets up database connection and manages application lifecycle
+Exposes a `create_app` factory that builds and wires the application, plus a
+module-level `app = create_app()` singleton for the `mirumoji.server.app:app`
+import string (uvicorn, the Docker `CMD`, and the `mirumoji-server` script)
+
+Importing this module has no side effects beyond constructing the app object
+logging configuration, storage/database initialisation, and startup logging all
+happen inside the lifespan handler, so the module is safe to import as a
+library
 """
 
 import asyncio
@@ -17,41 +24,54 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from mirumoji.exceptions import MirumojiServerError
-from mirumoji.server.constants import DB_URL
-from mirumoji.server.db import get_engine, init_db
-from mirumoji.server.routers.audio import audio_router
-from mirumoji.server.routers.dict import dict_router
-from mirumoji.server.routers.health_router import health_router
-from mirumoji.server.routers.llm import llm_router
-from mirumoji.server.routers.video import video_router
-
+from ..exceptions import MirumojiServerError
 from . import media
 from .config import setup_logging, using_modal
+from .constants import DB_URL
+from .db import get_engine, init_db
 from .processing.processor import Processor
+from .routers.audio import audio_router
+from .routers.dict import dict_router
+from .routers.health_router import health_router
+from .routers.llm import llm_router
+from .routers.video import video_router
 
-setup_logging()
 LOGGER = logging.getLogger(__name__)
 
-# ───────────────────────────────────────────────────────────
-# App setup
-# ───────────────────────────────────────────────────────────
+# --- Lifespan + Handlers ---
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """
-    Context Manager for managing API's lifecyle.
+    Manages the API's lifecycle
+
+    info: Startup Operations
+        - Logging Configuration
+
+        - Database + Media Storage Initialisation
+
+        - Lifespan-Scoped `Processor` Initialisation
+
+    info: Shutdown Operations
+        - Disposes the Database Engine
+
+        - Clears Temporary Media
 
     Args:
-      app (FastAPI): The API object.
+      app (FastAPI): The API object
 
     Yields:
-      Any: Application
+        Control back to the running application
     """
+    setup_logging()
     await init_db()
     media.init_storage()
     app.state.processor = Processor()
+    LOGGER.info(f"Database URL: {DB_URL}")
+    LOGGER.info(f"USING_MODAL={using_modal()}")
+    LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'.")
+    LOGGER.info("Setup Complete")
     yield
     await get_engine().dispose()
     await asyncio.to_thread(
@@ -61,49 +81,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     )
 
 
-app = FastAPI(
-    title="Mirumoji",
-    description="Japanese sentence breakdown, audio processing and GPT.",
-    lifespan=lifespan,
-)
-
-app.mount(
-    "/media",
-    # check_dir=False: the directory is created at startup by
-    # media.init_storage(), after this module is imported
-    StaticFiles(directory=media.BASE_PATH, check_dir=False),
-    name="media",
-)
-
-origins = ["*"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.exception_handler(MirumojiServerError)
 async def mirumoji_exception_handler(
     request: Request,
     exc: MirumojiServerError,
 ) -> JSONResponse:
     """
-    Translate domain exceptions into the structured error envelope.
+    Translate domain exceptions into the structured error envelope
 
     Reads the HTTP contract (`http_status`, `code`) and optional `details`
     that each `MirumojiServerError` subclass carries, so domain code never
-    constructs HTTP responses itself.
+    constructs HTTP responses itself
 
     Args:
-      request (Request): Incoming request object.
-      exc (MirumojiServerError): Raised domain exception.
+      request (Request): Incoming request object
+      exc (MirumojiServerError): Raised domain exception
 
     Returns:
-      JSONResponse: The structured error response to return.
+      JSONResponse: The structured error response to return
     """
     LOGGER.warning(f"[{exc.code}] {exc}")
     return JSONResponse(
@@ -119,24 +113,23 @@ async def mirumoji_exception_handler(
     )
 
 
-@app.exception_handler(HTTPException)
 async def http_exception_handler(
     request: Request,
     exc: HTTPException,
 ) -> JSONResponse:
     """
-    Custom Exception Handler for all HTTP Errors
+    Custom exception handler for all HTTP errors
 
     Emits the same nested envelope as the domain handler so the frontend has a
     single error shape to parse. The machine-readable `code` is derived from
-    the HTTP status phrase (e.g. 404 -> "NotFound").
+    the HTTP status phrase (e.g. 404 -> "NotFound")
 
     Args:
-      request (Request): Incoming request object.
-      exc (HTTPException): Raised Exception Object.
+      request (Request): Incoming request object
+      exc (HTTPException): Raised exception object
 
     Returns:
-      JSONResponse: The exception response to return.
+      JSONResponse: The exception response to return
     """
     phrase = HTTPStatus(exc.status_code).phrase.replace(" ", "")
     return JSONResponse(
@@ -152,24 +145,76 @@ async def http_exception_handler(
     )
 
 
-app.include_router(health_router)
-app.include_router(audio_router)
-app.include_router(video_router)
-app.include_router(dict_router)
-app.include_router(llm_router)
+# --- App Factory ---
 
 
-LOGGER.info(f"Database URL: {DB_URL}")
-LOGGER.info(f"USING_MODAL={using_modal()}")
-LOGGER.info("Setup Complete")
-LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'.")
+def create_app() -> FastAPI:
+    """
+    Builds and wires the Mirumoji FastAPI application without performing I/O
+    operations
+
+    info: Operations Performed
+        - App Construction
+
+        - Static File Mounting
+
+        - CORS Configuration
+
+        - Domain / HTTP Exception Handler Registration
+
+        - Router Registration
+
+    Returns:
+      FastAPI: The fully-configured application
+    """
+    app = FastAPI(
+        title="Mirumoji",
+        description="Japanese sentence breakdown, audio processing and LLM.",
+        lifespan=lifespan,
+    )
+
+    app.mount(
+        "/media",
+        # check_dir=False
+        # Directory is created at startup by media.init_storage()
+        StaticFiles(directory=media.BASE_PATH, check_dir=False),
+        name="media",
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.add_exception_handler(
+        MirumojiServerError,
+        mirumoji_exception_handler,  # type: ignore[arg-type]
+    )
+    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+
+    app.include_router(health_router)
+    app.include_router(audio_router)
+    app.include_router(video_router)
+    app.include_router(dict_router)
+    app.include_router(llm_router)
+
+    return app
+
+
+app = create_app()
 
 
 def run() -> None:
-    """Entry point for the ``mirumoji-server`` console script.
+    """
+    Entry point for the `mirumoji-server` console script
 
-    Launches Uvicorn on ``0.0.0.0:8000`` with auto-reload enabled (development
-    mode). For production deployments use the Docker image directly.
+    Launches `Uvicorn` on `0.0.0.0:8000` with auto-reload enabled
+    (development mode)
+
+    For production deployments use the Docker image directly
     """
     import uvicorn
 
