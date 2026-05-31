@@ -7,7 +7,7 @@ Attributes:
 
 from fastapi import APIRouter
 
-from ..system_info import get_system_info
+from ..config import get_system_info
 
 health_router = APIRouter(prefix="/health")
 

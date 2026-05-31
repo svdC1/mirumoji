@@ -27,8 +27,7 @@ from mirumoji.server.routers.llm import llm_router
 from mirumoji.server.routers.video import video_router
 
 from . import media
-from .config import using_modal
-from .logging_setup import setup_logging
+from .config import setup_logging, using_modal
 from .processing.processor import Processor
 
 setup_logging()
