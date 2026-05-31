@@ -1,46 +1,126 @@
+"""
+Defines Pydantic response models for the API's endpoints
+"""
+
 from pydantic import BaseModel
 
-from .jpdict import FocusInfo, Token
+from .jpdict import JapaneseWord
 from .llm import GptTemplateBase
+
+# --- LLM responses ---
+
+
+class BreakdownResponse(BaseModel):
+    """
+    Response for the `/llm/breakdown` endpoint
+
+    warning: `focus`
+        - For all tokens in a sentence use the `/dict/tokenize` endpoint
+          instead
+
+        - This only carries the focused word's `Token` + `KotobaseData` models
+          and its LLM explanation within the sentence
+
+    Args:
+        focus (JapaneseWord | None): The focused word's token + dictionary
+            info, or `None` when no focus was provided
+        explanation (str): The LLM explanation
+    """
+
+    focus: JapaneseWord | None = None
+    explanation: str
+
+
+class ExplanationResponse(BaseModel):
+    """
+    Response carrying a single LLM explanation
+
+    Args:
+        explanation (str): The LLM explanation
+    """
+
+    explanation: str
+
+
+class FixSrtResponse(BaseModel):
+    """
+    Response for the `/llm/fix_srt` endpoint
+
+    Args:
+        srt (str): The cleaned-up SRT content
+    """
+
+    srt: str
+
+
+# --- Media Responses ---
+
+
+class AudioTranscriptResponse(BaseModel):
+    """
+    Response for the `/audio/transcribe` endpoint
+
+    Args:
+        transcript_id (str): Database ID of the saved transcript
+        transcript (str): The transcription text
+        original_file_name (str): Original uploaded file name
+        audio_url (str): Media URL serving the stored audio
+    """
+
+    transcript_id: str
+    transcript: str
+    original_file_name: str
+    audio_url: str
+
+
+class GenerateSrtResponse(BaseModel):
+    """
+    Response for the `/video/generate_srt` endpoint
+
+    Args:
+        file_id (str): Database ID of the saved SRT file
+        srt_content (str): The raw SRT content
+        srt_url (str): Media URL serving the stored SRT file
+    """
+
+    file_id: str
+    srt_content: str
+    srt_url: str
+
+
+class ConvertVideoResponse(BaseModel):
+    """
+    Response for the `/video/convert_to_mp4` endpoint
+
+    Args:
+        converted_video_url (str): Media URL serving the converted MP4
+    """
+
+    converted_video_url: str
+
+
+# --- Profile Responses (Deferred) ---
 
 
 class AnkiExportResponse(BaseModel):
     """
-    Pydantic Model for Anki Export Endpoint Response
+    Response for the Anki export endpoint
 
     Args:
-      anki_deck_url (str): The media URL from FastAPI stactic media serving to
-                           the deck file.
+        anki_deck_url (str): Media URL serving the exported deck file
     """
 
     anki_deck_url: str
 
 
-class BreakdownResponse(BaseModel):
-    """
-    Pydantic Model for the `/gpt/breakdown` response.
-
-    Args:
-      sentence (str): The analyzed sentence.
-      focus (FocusInfo): The `FocusInfo` model.
-      tokens (list[Token]): list of `Token` models.
-      gpt_explanation (str): The GPT API call response.
-    """
-
-    sentence: str
-    focus: FocusInfo
-    tokens: list[Token]
-    gpt_explanation: str
-
-
 class ClipResponse(BaseModel):
     """
-    Pydantic Model for the `/profile/clips` request.
+    Response representing a saved clip
 
     Args:
-      id (str): Clip's ID in database.
-      get_url (str): URL where FastAPI is serving the stactic file.
-      breakdown_response (str): JSON string of `BreakdownResponse` model.
+        id (str): Clip's database ID
+        get_url (str): Media URL serving the clip file
+        breakdown_response (str): JSON string of the saved breakdown
     """
 
     id: str
@@ -50,11 +130,10 @@ class ClipResponse(BaseModel):
 
 class GptTemplateResponse(GptTemplateBase):
     """
-    Pydantic Model representing the response of `profile/gpt_template`
-    endpoint.
+    Response representing a profile's prompt template
 
     Args:
-      id (str): The database ID of the template.
+        id (str): The database ID of the template
     """
 
     id: str
@@ -62,15 +141,14 @@ class GptTemplateResponse(GptTemplateBase):
 
 class ProfileFileResponse(BaseModel):
     """
-    Pydantic Model representing the response of `profile/files`
-    endpoint.
+    Response representing a profile file
 
     Args:
-      id (str): The database ID of the file
-      file_name (str): Base file name.
-      get_url (str): URL where FastAPI is serving the stactic file.
-      file_type (str, optional): Optional information about file.
-      created_at (str, optional): Optional creation date information.
+        id (str): The database ID of the file
+        file_name (str): Base file name
+        get_url (str): Media URL serving the file
+        file_type (str | None): Optional file-type tag
+        created_at (str | None): Optional creation date
     """
 
     id: str
@@ -82,20 +160,15 @@ class ProfileFileResponse(BaseModel):
 
 class ProfileTranscriptResponse(BaseModel):
     """
-    Pydantic Model representing the response of `profile/transcripts`
-    endpoint.
+    Response representing a profile transcript
 
     Args:
-      id (str): The database ID of the transcript
-      transcript (str): Transcript text.
-      original_file_name (str, optional): Optional name of the audio file
-                                          transcribed.
-      gpt_explanation (str, optional): Optional GPT explanation for the
-                                       transcription if it was created.
-
-      get_url (str, optional): Optional URL where FastAPI is serving the
-                               transcribed audio file
-      created_at (str, optional): Optional information about creation date.
+        id (str): The database ID of the transcript
+        transcript (str): Transcript text
+        original_file_name (str | None): Optional source audio file name
+        gpt_explanation (str | None): Optional saved explanation
+        get_url (str | None): Optional media URL serving the audio
+        created_at (str | None): Optional creation date
     """
 
     id: str
