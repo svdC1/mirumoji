@@ -46,7 +46,7 @@ HOST_MEDIA_PATH: Path = HOST_DATA_DIRS.user_data_path / "media_files"
 
 HOST_DB_PATH: Path = HOST_DATA_DIRS.user_data_path / "mirumoji.db"
 
-HOST_LOG_PATH: Path = HOST_DATA_DIRS.user_log_dir
+HOST_LOG_PATH: Path = HOST_DATA_DIRS.user_log_path
 
 # --- Database ---
 

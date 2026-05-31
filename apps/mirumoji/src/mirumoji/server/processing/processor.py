@@ -63,25 +63,30 @@ class Processor:
 
     def _get_model(
         self,
-        load_model_kwargs: dict | None = None,
+        w_model_args: dict | None = None,
     ) -> WhisperModel:
         """
         Loads the local `WhisperModel` object on first use, returning the
         cached model on subsequent calls
 
         info: Caching
-            The model is built once and cached, so `load_model_kwargs` only
+            The model is built once and cached, so `w_model_args` only
             applies to the first load
 
         Args:
-            load_model_kwargs (dict | None): Argument overrides for
-                `whisper.load_model`, used only on the first load
+            w_model_args (dict | None): Additional arguments for
+                `WhisperModel`. Overrides the ones set in
+                `mirumoji.server.processing.whisper.DEFAULT_MODEL_OPTS`
+
+        Raises:
+            WhisperUnavailableError: If `faster-whisper` is not installed or
+                the model fails to load
 
         Returns:
             The local `WhisperModel` object that should be used
         """
         if self._model is None:
-            self._model = whisper.load_model(**(load_model_kwargs or {}))
+            self._model = whisper.load_model(w_model_args)
         return self._model
 
     def _get_runtime(self) -> ModalRuntime:
@@ -119,8 +124,8 @@ class Processor:
         media_path: str | os.PathLike[str],
         output_format: Literal["srt", "joined"] = "srt",
         *,
-        load_model_kwargs: dict | None = None,
-        transcribe_kwargs: dict | None = None,
+        w_model_args: dict | None = None,
+        w_transcribe_args: dict | None = None,
     ) -> str:
         """
         Transcribes media using either a local `WhisperModel` or the `Modal`
@@ -135,7 +140,7 @@ class Processor:
               joined with the Japanese full stop into a single string without
               any timing information
 
-        info: `load_model_kwargs`
+        info: `w_model_args`
             - When running the `local` backend, the model-loading overrides
               apply only to the first load, since the model used for
               subsequent calls is a cached one
@@ -150,10 +155,12 @@ class Processor:
             output_format (Literal["srt", "joined"]): `srt` for sentence-level
                 SRT content, `joined` for a single joined string. Defaults to
                 `srt`
-            load_model_kwargs (dict | None): Argument overrides for
-                `whisper.load_model`
-            transcribe_kwargs (dict | None): Argument overrides for
-                `whisper.transcribe`
+            w_model_args (dict | None): Additional arguments for
+                `WhisperModel`. Overrides the ones set in
+                `mirumoji.server.processing.whisper.DEFAULT_MODEL_OPTS`
+            w_transcribe_args (dict | None): Additional arguments for
+                `WhisperModel.transcribe`. Overrides the ones set in
+                `mirumoji.server.processing.whisper.DEFAULT_TRANSCRIBE_OPTS`
 
         Returns:
             The raw transcription in the requested format
@@ -167,7 +174,6 @@ class Processor:
         """
         self._require_transcription()
         if self.backend == "modal":
-
             # Modal Backend
             runtime = self._get_runtime()
             rel = str(media.get_relative_path(media_path))
@@ -176,8 +182,8 @@ class Processor:
                     return await runtime.transcribe.remote.aio(
                         rel_media_fp=rel,
                         output_format=output_format,
-                        load_model_kwargs=load_model_kwargs,
-                        transcribe_kwargs=transcribe_kwargs,
+                        w_model_args=w_model_args,
+                        w_transcribe_args=w_transcribe_args,
                     )
             except MirumojiServerError:
                 # Domain exceptions are preserved across the Modal boundary
@@ -188,12 +194,12 @@ class Processor:
                 ) from e
 
         # Local Backend
-        model = self._get_model(load_model_kwargs)
+        model = self._get_model(w_model_args)
         segments, _info = await asyncio.to_thread(
             whisper.transcribe,
-            model,
-            media_path,
-            **(transcribe_kwargs or {}),
+            model=model,
+            audio_path=media_path,
+            w_transcribe_args=w_transcribe_args,
         )
         if output_format == "joined":
             return whisper.to_string(segments)
@@ -203,8 +209,8 @@ class Processor:
 
     async def convert_to_mp4(
         self,
-        src_path: str | os.PathLike[str],
-        out_path: str | os.PathLike[str],
+        input_path: str | os.PathLike[str],
+        output_path: str | os.PathLike[str],
         to_mp4_kwargs: dict | None = None,
     ) -> Path:
         """
@@ -221,9 +227,9 @@ class Processor:
               with `NVENC` capability, so `NVENC` enconding is used
 
         Args:
-            src_path (str | os.PathLike[str]): Absolute path to the source
+            input_path (str | os.PathLike[str]): Absolute path to the source
                 video
-            out_path (str | os.PathLike[str]): Absolute destination path for
+            output_path (str | os.PathLike[str]): Absolute destination path for
                 the MP4
             to_mp4_kwargs (dict | None): Argument overrides for `audio.to_mp4`
                 (resolution, target_bitrate, use_nvenc)
@@ -241,14 +247,13 @@ class Processor:
                 malformed (local or modal backend)
             ModalError: If the Modal conversion job fails
         """
-        out = Path(out_path)
+        out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
 
         if self.backend == "modal":
-
             # Modal Backend
             runtime = self._get_runtime()
-            rel = str(media.get_relative_path(src_path))
+            rel = str(media.get_relative_path(input_path))
             try:
                 async with (
                     runtime.app.run(),
@@ -273,7 +278,7 @@ class Processor:
         await asyncio.to_thread(
             audio.to_mp4,
             ffmpeg_path=audio.get_ffmpeg_path()["ffmpeg"],
-            input_path=str(src_path),
+            input_path=str(input_path),
             output_path=str(out),
             **kwargs,
         )

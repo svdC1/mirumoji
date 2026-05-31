@@ -10,7 +10,6 @@ info: Transcription-Only
 """
 
 import os
-from pathlib import Path
 from typing import Literal
 
 
@@ -18,8 +17,8 @@ def transcribe_job(
     rel_media_fp: str | os.PathLike[str],
     output_format: Literal["srt", "joined"] = "srt",
     *,
-    load_model_kwargs: dict | None = None,
-    transcribe_kwargs: dict | None = None,
+    w_model_args: dict | None = None,
+    w_transcribe_args: dict | None = None,
 ) -> str:
     """
     Transcribe media on a `Modal` GPU and return raw SRT content
@@ -38,10 +37,12 @@ def transcribe_job(
             `HOST_MEDIA_PATH`
         output_format (Literal["srt_str", "joined_str"]): How to format the
             transcription output. Defaults to `srt_str`
-        load_model_kwargs (dict | None): Argument overrides for
-            `mirumoji.server.processing.whisper.load_model`
-        transcribe_kwargs (dict | None): Overrides for
-            `mirumoji.server.processing.whisper.transcribe`
+        w_model_args (dict | None): Additional arguments for
+            `WhisperModel`. Overrides the ones set in
+            `mirumoji.server.processing.whisper.DEFAULT_MODEL_OPTS`
+        w_transcribe_args (dict | None): Additional arguments for
+            `WhisperModel.transcribe`. Overrides the ones set in
+            `mirumoji.server.processing.whisper.DEFAULT_TRANSCRIBE_OPTS`
 
     Returns:
         The raw transcription as `SRT` content
@@ -51,6 +52,7 @@ def transcribe_job(
         TranscriptionError: If transcription fails
     """
     import logging
+    from pathlib import Path
 
     from mirumoji.server.processing import whisper
 
@@ -62,22 +64,22 @@ def transcribe_job(
     )
     logger = logging.getLogger(__name__)
     logger.info(
-        f"'transcribe_job' started for media: '{rel_media_fp}'",
+        f"'transcribe_job' started for media : '{rel_media_fp}'"
+        f" with output format : '{output_format}'"
     )
 
-    load_model_kwargs = load_model_kwargs or {}
-
-    model = whisper.load_model(**load_model_kwargs)
+    model = whisper.load_model(w_model_args)
     input = Path(rel_media_fp)
 
-    transcribe_kwargs = transcribe_kwargs or {}
-
-    transcribe_kwargs.update(
-        model=model,
-        audio_path=input,
+    logger.info(
+        f"'model_opts' : {w_model_args} | "
+        f"'transcribe_opts': {w_transcribe_args}"
+    )
+    segments, _info = whisper.transcribe(
+        model=model, audio_path=input, w_transcribe_args=w_transcribe_args
     )
 
-    segments, _info = whisper.transcribe(**transcribe_kwargs)
+    logger.info("Transcription Succeeded")
 
     if output_format == "joined":
         return whisper.to_string(segments)

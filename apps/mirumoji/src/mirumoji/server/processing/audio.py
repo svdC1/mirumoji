@@ -338,7 +338,7 @@ def to_mp4(
         input_path (str | os.PathLike[str]): Source file
             (any container/codec supported by FFMPEG)
         output_path (str | os.PathLike[str] | None): Path in which to save the
-            MP4 file. When set to `None`, the file is saved to `input_path
+            MP4 file. When set to `None`, the file is saved to `input_path`
             with a `.mp4` suffix
         resolution (str): Target canvas `WxH`. Aspect is preserved.
             Defaults to `1280x720`

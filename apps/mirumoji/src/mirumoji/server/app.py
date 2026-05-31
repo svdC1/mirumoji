@@ -20,13 +20,11 @@ from fastapi.staticfiles import StaticFiles
 from mirumoji.exceptions import MirumojiServerError
 from mirumoji.server.constants import DB_URL
 from mirumoji.server.db import get_engine, init_db
-from mirumoji.server.routers.audio_router import audio_router
-from mirumoji.server.routers.dict_router import dict_router
-from mirumoji.server.routers.gpt_router import gpt_router
+from mirumoji.server.routers.audio import audio_router
+from mirumoji.server.routers.dict import dict_router
 from mirumoji.server.routers.health_router import health_router
-from mirumoji.server.routers.llm_router import llm_router
-from mirumoji.server.routers.profile_router import profile_router
-from mirumoji.server.routers.video_router import video_router
+from mirumoji.server.routers.llm import llm_router
+from mirumoji.server.routers.video import video_router
 
 from . import media
 from .config import using_modal
@@ -155,12 +153,10 @@ async def http_exception_handler(
     )
 
 
-app.include_router(gpt_router)
-app.include_router(audio_router)
 app.include_router(health_router)
-app.include_router(dict_router)
+app.include_router(audio_router)
 app.include_router(video_router)
-app.include_router(profile_router)
+app.include_router(dict_router)
 app.include_router(llm_router)
 
 

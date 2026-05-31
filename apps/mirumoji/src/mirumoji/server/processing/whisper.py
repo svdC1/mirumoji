@@ -16,14 +16,11 @@ info: Local Imports
       it's imported lazily inside `load_model`
 
     - Deployments that offload to Modal don't need it installed
-
-Attributes:
-    DEFAULT_TRANSCRIBE_OPTS (dict): Default `faster-whisper` transcribe options
-        tuned for long-form Japanese media
 """
 
 from __future__ import annotations
 
+import copy
 import datetime
 import logging
 import os
@@ -44,6 +41,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TRANSCRIBE_OPTS: dict[str, Any] = {
+    "language": "ja",
     "beam_size": 5,
     "word_timestamps": False,
     "vad_filter": False,
@@ -52,20 +50,30 @@ DEFAULT_TRANSCRIBE_OPTS: dict[str, Any] = {
     "condition_on_previous_text": False,
     "compression_ratio_threshold": 2.0,
 }
+"""
+Default keyword-arguments for `faster_whisper.WhisperModel.transcribe`, tuned
+for long-form Japanese media
+"""
 
 
-def load_model(
-    model_name: str = "large-v3",
-    device: str = "cuda",
-    compute_type: str = "float16",
-) -> WhisperModel:
+DEFAULT_MODEL_OPTS: dict[str, Any] = {
+    "model": "large-v3",
+    "device": "cuda",
+    "compute_type": "float16",
+}
+"""
+Default keyword-arguments for `faster_whisper.WhisperModel`, loads the
+`large-v3` model on `cuda`, with `float16` as the compute-type
+"""
+
+
+def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
     """
-    Load a `faster-whisper` `WhisperModel`
+    Loads a `faster_whisper.WhisperModel` object
 
     Args:
-        model_name (str): Whisper model name
-        device (str): Device to run on (`cuda`, `cpu`, or `auto`)
-        compute_type (str): Compute type (e.g `float16`, `int8`)
+        w_model_args (dict | None): Additional arguments for
+            `WhisperModel`. Overrides the ones set in `DEFAULT_MODEL_OPTS`
 
     Returns:
         A loaded `WhisperModel` object
@@ -82,14 +90,15 @@ def load_model(
             "(faster-whisper) to be installed",
         ) from e
     try:
-        return WhisperModel(
-            model_name,
-            device=device,
-            compute_type=compute_type,
-        )
+        opts = copy.deepcopy(DEFAULT_MODEL_OPTS)
+
+        if w_model_args:
+            opts.update(w_model_args)
+
+        return WhisperModel(**opts)
     except Exception as e:
         raise WhisperUnavailableError(
-            f"Failed to load Whisper model '{model_name}': {e}",
+            f"Failed to load Whisper model `{opts['model']}`: {e}",
         ) from e
 
 
@@ -97,8 +106,7 @@ def transcribe(
     model: WhisperModel,
     audio_path: str | os.PathLike[str],
     *,
-    language: str = "ja",
-    options: dict[str, Any] | None = None,
+    w_transcribe_args: dict[str, Any] | None = None,
 ) -> tuple[list[Segment], TranscriptionInfo]:
     """
     Transcribe an audio file into a list of segments
@@ -106,8 +114,9 @@ def transcribe(
     Args:
         model (WhisperModel): A loaded `WhisperModel` object
         audio_path (str | os.PathLike[str]): Path to the audio/video file
-        language (str): Language code to transcribe in
-        options (dict | None): Overrides for `DEFAULT_TRANSCRIBE_OPTS`
+        w_transcribe_args (dict | None): Additional arguments for
+            `WhisperModel.transcribe`. Overrides the ones set in
+            `DEFAULT_TRANSCRIBE_OPTS`
 
     Returns:
         Tuple containg the list of segment objects (each with `.start`, `.end`,
@@ -121,9 +130,10 @@ def transcribe(
     if not path.is_file():
         raise TranscriptionError(f"Audio File Not Found: '{audio_path}'")
 
-    opts = {**DEFAULT_TRANSCRIBE_OPTS, "language": language}
-    if options:
-        opts.update(options)
+    opts = copy.deepcopy(DEFAULT_TRANSCRIBE_OPTS)
+
+    if w_transcribe_args:
+        opts.update(w_transcribe_args)
 
     try:
         segments, info = model.transcribe(audio=str(path), **opts)

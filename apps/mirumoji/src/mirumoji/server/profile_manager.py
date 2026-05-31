@@ -1,33 +1,30 @@
 """
-Module defining helper functions meant to be run inside
-FastAPI endpoints for management of Mirumoji `Profiles`
+Defines FastAPI dependencies for managing Mirumoji `Profile` access
 
 Attributes:
-  LOGGER (logging.Logger): Module's Logging object.
+    LOGGER (logging.Logger): Module's logging object
 """
 
 import logging
 
 from fastapi import Depends, Header, HTTPException, status
 
-from mirumoji.server.db.db import DbManager
+from .db import UnitOfWork
 
 LOGGER = logging.getLogger(__name__)
-db_manager = DbManager()
 
 
 async def get_profile_id_from_header(
     x_profile_id: str = Header(None),
 ) -> str | None:
     """
-    Function meant to be run inside FastAPI endpoint which
-    extracts X-Profile-ID header if present.
+    Extracts the `X-Profile-ID` header, if present
 
     Args:
-      x_profile_id (str): The X-Profile-ID Header
+        x_profile_id (str): The `X-Profile-ID` header
 
     Returns:
-      The X-Profile-ID Header content.
+        The header value, or `None` when absent
     """
     return x_profile_id
 
@@ -36,50 +33,28 @@ async def ensure_profile_exists(
     profile_id: str = Depends(get_profile_id_from_header),
 ) -> str:
     """
-    Function meant to be run inside FastAPI endpoint which
-    ensures a profile exists for the given ID.
+    Dependency that requires `X-Profile-ID` and ensures the profile exists
+
+    Implicitly creates the profile when it doesn't exist yet
 
     Args:
-      profile_id (str): The profile ID to check.
+        profile_id (str): Profile id from the header
 
     Returns:
-      str: The profile ID from input if it exists or
-           could be created.
+        The validated profile id
 
     Raises:
-      HTTPException: If ID is None or profile
-                     doesn't exist and cannot be created
+        HTTPException: If the `X-Profile-ID` header is missing
+        DatabaseError: If the profile can't be read or created
     """
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="X-Profile-ID header is required for this operation.",
         )
-
-    profile = await db_manager.read(
-        "profiles",
-        {"id": profile_id},
-        fetch_one=True,
-    )
-    if not profile:
-        try:
-            values = {"id": profile_id, "name": profile_id}
-            await db_manager.create("profiles", values)
-            LOGGER.info(f"Implicitly created profile with ID: '{profile_id}'")
-        except Exception as e:
-            LOGGER.exception(f"Error creating profile '{profile_id}': '{e}'")
-
-            # Check if it was created by another request in the meantime
-            profile_check_after_error = await db_manager.read(
-                "profiles",
-                {"id": profile_id},
-                fetch_one=True,
-            )
-            if not profile_check_after_error:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Could not create or find profile '{profile_id}'.",
-                ) from e
+    async with UnitOfWork() as uow:
+        await uow.profiles.ensure(profile_id)
+        await uow.commit()
     return profile_id
 
 
@@ -87,48 +62,20 @@ async def get_profile_id_optional(
     profile_id: str = Depends(get_profile_id_from_header),
 ) -> str | None:
     """
-    Function meant to be run inside FastAPI endpoint which returns the content
-    of Profile ID Header.
+    Dependency that returns the profile id when present, ensuring it exists
 
     Args:
-      profile_id (str): Profile ID from header.
+        profile_id (str): Profile id from the header
 
     Returns:
-      If X-Profile-ID is provided and the profile
-        exists or could be implicitly created returns str,
-        otherwise returns None.
+        The validated profile id, or `None` when the header is absent
+
+    Raises:
+        DatabaseError: If the profile can't be read or created
     """
     if not profile_id:
         return None
-
-    # If header is provided, ensure profile exists (or create it)
-    profile = await db_manager.read(
-        "profiles",
-        {"id": profile_id},
-        fetch_one=True,
-    )
-    if not profile:
-        try:
-            values = {"id": profile_id, "name": profile_id}
-            await db_manager.create("profiles", values)
-            LOGGER.info(
-                f"Implicitly created profile with ID "
-                f"(optional context): '{profile_id}'",
-            )
-        except Exception:
-            LOGGER.exception(f"Error creating profile '{profile_id}'")
-
-            # Check again in case of race condition
-            profile_check_after_error = await db_manager.read(
-                "profiles",
-                {"id": profile_id},
-                fetch_one=True,
-            )
-            if not profile_check_after_error:
-                LOGGER.exception(
-                    f"Could not find or create profile"
-                    f" '{profile_id}' after error.",
-                )
-                return None
-
+    async with UnitOfWork() as uow:
+        await uow.profiles.ensure(profile_id)
+        await uow.commit()
     return profile_id

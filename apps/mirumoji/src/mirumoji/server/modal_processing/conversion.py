@@ -55,6 +55,7 @@ def video_conversion_job(
 
     logger.info(
         f"Converting '{input_local}' to '{output_local}' using `NVENC`"
+        f"with `to_mp4_kwargs` : {to_mp4_kwargs}"
     )
 
     # Get Container FFMPEG Path
