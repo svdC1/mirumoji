@@ -118,13 +118,13 @@ export const KanjiInfoDisplay = ({
             <div className="col-span-2">
                 <p>
                     <span className="font-semibold text-neutral-400">
-                        On'yomi:
+                        On&apos;yomi:
                     </span>{" "}
                     {kanjiInfo.onyomi.join("、")}
                 </p>
                 <p>
                     <span className="font-semibold text-neutral-400">
-                        Kun'yomi:
+                        Kun&apos;yomi:
                     </span>{" "}
                     {kanjiInfo.kunyomi.join("、")}
                 </p>

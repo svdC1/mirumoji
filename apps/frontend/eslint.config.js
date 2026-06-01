@@ -1,5 +1,6 @@
 // ESLint 9 flat config
 import js from "@eslint/js";
+import globals from "globals";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactPlugin from "eslint-plugin-react";
@@ -19,6 +20,9 @@ export default [
         sourceType: "module",
         ecmaFeatures: { jsx: true },
       },
+      // Browser runtime globals (window, document, fetch, File, console, ...)
+      // plus ES2021 built-ins, so they aren't flagged as no-undef.
+      globals: { ...globals.browser, ...globals.es2021 },
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
@@ -39,6 +43,11 @@ export default [
 
       // React hooks
       ...reactHooksPlugin.configs.recommended.rules,
+
+      // TypeScript itself checks for undefined identifiers, and no-undef
+      // false-positives on type-only names (RequestInit, BlobPart, ...);
+      // disabling it is the typescript-eslint–recommended setup.
+      "no-undef": "off",
 
       // Relax some rules that produce too much noise on an existing codebase
       "@typescript-eslint/no-explicit-any": "warn",

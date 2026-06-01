@@ -25,7 +25,8 @@ const NotFoundPage: React.FC = () => {
                     Page Not Found
                 </h2>
                 <p className="text-gray-300 mb-8 text-sm md:text-base">
-                    Oops! The page you're looking for doesn't seem to exist.
+                    Oops! The page you&apos;re looking for doesn&apos;t seem
+                    to exist.
                 </p>
                 <Link
                     to="/"

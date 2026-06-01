@@ -72,7 +72,7 @@ export default function PlayerPage() {
                         />
                     ) : (
                         <p className="text-gray-400">
-                            Load a video from the menu ☰ to begin.
+                            Load a video from the menu ☰ to begin.
                         </p>
                     )}
                 </main>

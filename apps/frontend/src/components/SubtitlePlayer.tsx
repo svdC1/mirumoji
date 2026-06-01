@@ -182,7 +182,7 @@ export default function SubtitlePlayer({
                 controls
                 playsInline
                 crossOrigin="anonymous"
-                webkit-playsinline="true"
+                {...{ "webkit-playsinline": "true" }}
                 className="w-full max-h-[92vh] bg-black rounded-xl overflow-hidden"
             />
 
