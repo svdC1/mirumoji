@@ -9,11 +9,12 @@
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx",
-        "types": ["node", "vite/client"],
+        "types": ["node", "vite/client", "vitest/globals"],
         "paths": {
             "vfile": ["./node_modules/vfile"],
             "vfile/*": ["./node_modules/vfile/*"],
