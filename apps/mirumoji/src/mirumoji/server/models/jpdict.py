@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+# --- Kotobase Data Models ---
+
 
 class JMWordSense(BaseModel):
     """
@@ -102,6 +104,50 @@ class KanjiInfo(BaseModel):
     jlpt_tanos: int | None = Field(default=None)
 
 
+class KotobaseData(BaseModel):
+    """
+    Represents all information extracted from `kotobase` for a single
+    query (either a single Japanese word, or a wildcard pattern matching
+    multiple words)
+
+    info: `meanings`
+        - Exposes the `gloss` attributes (English equivalent of the word) of
+          all `JMWordSense` models contained inside the first
+          Japanase-Multilingual Dictionary entry for the query
+
+        - If the query has only `JMNEntry` entries, the first entry's `gloss`
+          attribute is used
+
+    Args:
+      query (str): query literal (either a single Japanese word or a wildcard
+          pattern)
+      jmentries (list[JMEntry]): All Japanese-Multilingual Dictionary entries
+          for the query
+      jmnentries (list[JMNEntry]): All `Japanese-Multilingual Dictionary`
+          name entries for the query
+      kanji (list[KanjiInfo]): `KANJIDIC2` entries for all Kanji present in
+          the query
+      meanings (list[str]): All English equivalents contained in the first
+          `JMEntry`, or `JMNEntry`
+      jlpt (str): JLPT vocabulary level for the word extracted from the `Tanos`
+          list. Defaults to `Unknown` when it's a wildcard query or the word
+          is not in the list
+      examples (list[str]): List of example sentences containing the single
+          word or any words matched by the wildcard query
+    """
+
+    query: str
+    jmentries: list[JMEntry] | None = Field(default_factory=list)
+    jmnentries: list[JMNEntry] | None = Field(default_factory=list)
+    kanji: list[KanjiInfo] | None = Field(default_factory=list)
+    meanings: list[str] | None = Field(default_factory=list)
+    jlpt: str | None = Field(default="Unknown")
+    examples: list[str] | None = Field(default_factory=list)
+
+
+# --- Fugashi Data Models ---
+
+
 class Token(BaseModel):
     """
     Represents morphological data extracted for a single Japanese token
@@ -175,45 +221,7 @@ class Token(BaseModel):
         return data
 
 
-class KotobaseData(BaseModel):
-    """
-    Represents all information extracted from `kotobase` for a single
-    query (either a single Japanese word, or a wildcard pattern matching
-    multiple words)
-
-    info: `meanings`
-        - Exposes the `gloss` attributes (English equivalent of the word) of
-          all `JMWordSense` models contained inside the first
-          Japanase-Multilingual Dictionary entry for the query
-
-        - If the query has only `JMNEntry` entries, the first entry's `gloss`
-          attribute is used
-
-    Args:
-      query (str): query literal (either a single Japanese word or a wildcard
-          pattern)
-      jmentries (list[JMEntry]): All Japanese-Multilingual Dictionary entries
-          for the query
-      jmnentries (list[JMNEntry]): All `Japanese-Multilingual Dictionary`
-          name entries for the query
-      kanji (list[KanjiInfo]): `KANJIDIC2` entries for all Kanji present in
-          the query
-      meanings (list[str]): All English equivalents contained in the first
-          `JMEntry`, or `JMNEntry`
-      jlpt (str): JLPT vocabulary level for the word extracted from the `Tanos`
-          list. Defaults to `Unknown` when it's a wildcard query or the word
-          is not in the list
-      examples (list[str]): List of example sentences containing the single
-          word or any words matched by the wildcard query
-    """
-
-    query: str
-    jmentries: list[JMEntry] | None = Field(default_factory=list)
-    jmnentries: list[JMNEntry] | None = Field(default_factory=list)
-    kanji: list[KanjiInfo] | None = Field(default_factory=list)
-    meanings: list[str] | None = Field(default_factory=list)
-    jlpt: str | None = Field(default="Unknown")
-    examples: list[str] | None = Field(default_factory=list)
+# --- Aggregation Models ---
 
 
 class JapaneseWord(BaseModel):

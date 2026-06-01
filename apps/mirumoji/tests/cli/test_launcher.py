@@ -3,6 +3,7 @@ Smoke test: verify the Click CLI group is importable and has the expected comman
 """
 
 from click.testing import CliRunner
+
 from mirumoji.cli.launcher import cli
 
 

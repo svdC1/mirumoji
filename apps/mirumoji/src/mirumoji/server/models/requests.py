@@ -85,6 +85,24 @@ class ChatRequest(BaseModel):
     system_message: str | None = None
 
 
+# --- Profile Requests ---
+
+
+class LlmTemplateRequest(BaseModel):
+    """
+    Request for upserting a profile's LLM template
+
+    Args:
+        sys_msg (str): System message
+        prompt (str): Prompt template
+        model (str): Model selector in `provider:model` form
+    """
+
+    sys_msg: str
+    prompt: str
+    model: str
+
+
 # --- Media Query-Parameters Requests (Bound via Annotated[..., Query()]) ---
 
 

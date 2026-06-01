@@ -1,14 +1,16 @@
 """
 Defines the `FastAPI` Mirumoji Server API
 
-Exposes a `create_app` factory that builds and wires the application, plus a
-module-level `app = create_app()` singleton for the `mirumoji.server.app:app`
-import string (uvicorn, the Docker `CMD`, and the `mirumoji-server` script)
+Exposes custom exception handlers, a `create_app` factory that builds and
+wires the application, and a `run` function to start the application
 
-Importing this module has no side effects beyond constructing the app object
-logging configuration, storage/database initialisation, and startup logging all
-happen inside the lifespan handler, so the module is safe to import as a
-library
+abstract: Module Import
+    - Importing this module has no side effects beyond constructing the
+      `FastAPI` app object so that it can serve as an entry-point for
+      uvicorn and Docker
+
+    - logging configuration, storage/database initialisation, and startup
+      logging all happen inside the lifespan handler
 """
 
 import asyncio
@@ -26,14 +28,15 @@ from fastapi.staticfiles import StaticFiles
 
 from ..exceptions import MirumojiServerError
 from . import media
-from .config import setup_logging, using_modal
-from .constants import DB_URL
+from .config import setup_logging
+from .constants import DB_URL, HOST_LOG_PATH
 from .db import get_engine, init_db
 from .processing.processor import Processor
 from .routers.audio import audio_router
 from .routers.dict import dict_router
-from .routers.health_router import health_router
+from .routers.health import health_router
 from .routers.llm import llm_router
+from .routers.profile import profile_router
 from .routers.video import video_router
 
 LOGGER = logging.getLogger(__name__)
@@ -64,21 +67,40 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     Yields:
         Control back to the running application
     """
+
+    # Create Log Directory + Register Handlers
     setup_logging()
+    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH}'")
+
+    # Create / Initialise Database
     await init_db()
+    LOGGER.info(f"Database Set Up At {DB_URL} Complete")
+
+    # Create Media Directory If It Doesn't Exist
     media.init_storage()
+    LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'")
+
+    # Intialise Application-Scoped Stateful Processor
     app.state.processor = Processor()
-    LOGGER.info(f"Database URL: {DB_URL}")
-    LOGGER.info(f"USING_MODAL={using_modal()}")
-    LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'.")
-    LOGGER.info("Setup Complete")
+    LOGGER.info(f"Backend = '{app.state.processor.backend.upper()}'")
+
+    LOGGER.info("Configuration Complete")
     yield
     await get_engine().dispose()
-    await asyncio.to_thread(
-        shutil.rmtree,
-        media.TEMP_PATH,
-        ignore_errors=True,
-    )
+    LOGGER.info("Database Engine Disposed")
+
+    try:
+        await asyncio.to_thread(
+            shutil.rmtree,
+            media.TEMP_PATH,
+        )
+        LOGGER.info(f"Deleted Temporary Media At {media.TEMP_PATH}")
+    except Exception as e:
+        LOGGER.error(
+            f"Failed To Delete Temporary Media At {media.TEMP_PATH} : {e}"
+        )
+
+    LOGGER.info("Shut Down Complete")
 
 
 async def mirumoji_exception_handler(
@@ -193,13 +215,17 @@ def create_app() -> FastAPI:
         MirumojiServerError,
         mirumoji_exception_handler,  # type: ignore[arg-type]
     )
-    app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(
+        HTTPException,
+        http_exception_handler,  # type: ignore[arg-type]
+    )
 
     app.include_router(health_router)
     app.include_router(audio_router)
     app.include_router(video_router)
     app.include_router(dict_router)
     app.include_router(llm_router)
+    app.include_router(profile_router)
 
     return app
 

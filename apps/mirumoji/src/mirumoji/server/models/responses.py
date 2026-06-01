@@ -5,9 +5,8 @@ Defines Pydantic response models for the API's endpoints
 from pydantic import BaseModel
 
 from .jpdict import JapaneseWord
-from .llm import GptTemplateBase
 
-# --- LLM responses ---
+# --- LLM Responses ---
 
 
 class BreakdownResponse(BaseModel):
@@ -99,7 +98,100 @@ class ConvertVideoResponse(BaseModel):
     converted_video_url: str
 
 
-# --- Profile Responses (Deferred) ---
+# --- Profile Responses ---
+
+
+class LlmTemplateResponse(BaseModel):
+    """
+    Response representing a profile's LLM template
+
+    Args:
+        id (str): Database ID of the template
+        sys_msg (str): System message
+        prompt (str): Prompt template
+        model (str): Model selector in `provider:model` form
+    """
+
+    id: str
+    sys_msg: str
+    prompt: str
+    model: str
+
+
+class SaveClipResponse(BaseModel):
+    """
+    Response for the clip-save endpoint
+
+    Args:
+        clip_id (str): Database ID of the saved clip
+        file_id (str): Database ID of the saved clip's file record
+        clip_url (str): Media URL serving the stored clip
+    """
+
+    clip_id: str
+    file_id: str
+    clip_url: str
+
+
+class ClipResponse(BaseModel):
+    """
+    Response representing a saved clip
+
+    Args:
+        id (str): Database ID of the clip
+        file_id (str): Database ID of the clip's file record
+        clip_url (str): Media URL serving the clip file
+        start_time (float): Clip start time in seconds
+        end_time (float): Clip end time in seconds
+        breakdown (dict): The saved breakdown payload
+    """
+
+    id: str
+    file_id: str
+    clip_url: str
+    start_time: float
+    end_time: float
+    breakdown: dict
+
+
+class ProfileFileResponse(BaseModel):
+    """
+    Response representing a profile file
+
+    Args:
+        id (str): Database ID of the file
+        name (str): Base file name
+        url (str): Media URL serving the file
+        type (str | None): Optional file-type tag
+        created_at (str | None): ISO-8601 creation timestamp
+    """
+
+    id: str
+    name: str
+    url: str
+    type: str | None = None
+    created_at: str | None = None
+
+
+class ProfileTranscriptResponse(BaseModel):
+    """
+    Response representing a profile transcript
+
+    Args:
+        id (str): Database ID of the transcript
+        file_id (str): Database ID of the source file
+        text (str): Transcript text
+        llm_explanation (str | None): Optional saved LLM explanation
+        url (str | None): Media URL serving the source audio, when available
+        created_at (str | None): ISO-8601 creation timestamp
+    """
+
+    id: str
+    file_id: str
+    text: str
+    llm_explanation: str | None = None
+    url: str | None = None
+    created_at: str | None = None
 
 
 class AnkiExportResponse(BaseModel):
@@ -111,69 +203,3 @@ class AnkiExportResponse(BaseModel):
     """
 
     anki_deck_url: str
-
-
-class ClipResponse(BaseModel):
-    """
-    Response representing a saved clip
-
-    Args:
-        id (str): Clip's database ID
-        get_url (str): Media URL serving the clip file
-        breakdown_response (str): JSON string of the saved breakdown
-    """
-
-    id: str
-    get_url: str
-    breakdown_response: str
-
-
-class GptTemplateResponse(GptTemplateBase):
-    """
-    Response representing a profile's prompt template
-
-    Args:
-        id (str): The database ID of the template
-    """
-
-    id: str
-
-
-class ProfileFileResponse(BaseModel):
-    """
-    Response representing a profile file
-
-    Args:
-        id (str): The database ID of the file
-        file_name (str): Base file name
-        get_url (str): Media URL serving the file
-        file_type (str | None): Optional file-type tag
-        created_at (str | None): Optional creation date
-    """
-
-    id: str
-    file_name: str
-    get_url: str
-    file_type: str | None = None
-    created_at: str | None = None
-
-
-class ProfileTranscriptResponse(BaseModel):
-    """
-    Response representing a profile transcript
-
-    Args:
-        id (str): The database ID of the transcript
-        transcript (str): Transcript text
-        original_file_name (str | None): Optional source audio file name
-        gpt_explanation (str | None): Optional saved explanation
-        get_url (str | None): Optional media URL serving the audio
-        created_at (str | None): Optional creation date
-    """
-
-    id: str
-    transcript: str
-    original_file_name: str | None = None
-    gpt_explanation: str | None = None
-    get_url: str | None = None
-    created_at: str | None = None

@@ -3,7 +3,6 @@ Defines stateless helpers for exporting a profile's saved clips as an Anki
 deck using `genanki`
 
 Attributes:
-  LOGGER (logging.Logger): Module's logger
   VIDEO_CSS (str): Pre-defined CSS of the cards
   CARD_TEMPLATE (list): Pre-defined template of the cards for `genanki`
   MODEL_FIELDS (list): Pre-defined card model fields
@@ -186,7 +185,8 @@ def export_deck(cards: list[AnkiCard], output_path: str) -> None:
 
     genanki.Package(deck, media_files).write_to_file(output_path)
     LOGGER.info(
-        f"Anki Package -> '{output_path}';"
-        f"#Notes -> '{len(deck.notes)}';"
-        f"#Media -> '{len(media_files)}';",
+        f"Created Anki Package | "
+        f"File -> '{output_path}' | "
+        f"#Notes -> '{len(deck.notes)}' | "
+        f"#Media -> '{len(media_files)}' | ",
     )

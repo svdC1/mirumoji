@@ -11,7 +11,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # Set required env vars BEFORE any app module is imported.
 # Use plain sqlite:// so SQLAlchemy's sync create_engine (used for
@@ -31,8 +31,9 @@ os.environ.setdefault("MODAL_TOKEN_SECRET", "test-modal-secret")
 # the app so the module-level `processor = Processor()` gets a MagicMock
 # instead and MeCab is never touched.
 with patch("mirumoji.server.processing.Processor.Processor", MagicMock()):
-    from mirumoji.server.app import app
     from mirumoji.server.db.db import connect_db, disconnect_db
+
+    from mirumoji.server.app import app
 
 
 @pytest.fixture(scope="session")
