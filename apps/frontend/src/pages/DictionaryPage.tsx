@@ -5,14 +5,9 @@
  */
 
 import { useState } from "react";
-import {
-    apiWildcardQuery,
-    apiWordQuery,
-    filterDictWildcardLookup,
-    filterDictLookup,
-} from "../services/dictApi";
+import { apiDictQuery, isEmptyDict } from "../services/dictApi";
 import { SearchIcon } from "lucide-react";
-import { DictLookup, DictWildcardLookup } from "../types/types";
+import { KotobaseData } from "../types/types";
 import { ComprehensiveEntryCard, WildcardResults } from "../components/DictDisplays";
 
 /**
@@ -21,8 +16,8 @@ import { ComprehensiveEntryCard, WildcardResults } from "../components/DictDispl
  */
 export const DictionaryPage = () => {
     const [pattern, setPattern] = useState("");
-    const [wildcardResult, setWildcardResult] = useState<DictWildcardLookup | null>(null);
-    const [selectedWordResult, setSelectedWordResult] = useState<DictLookup | null>(null);
+    const [wildcardResult, setWildcardResult] = useState<KotobaseData | null>(null);
+    const [selectedWordResult, setSelectedWordResult] = useState<KotobaseData | null>(null);
     const [selectedWord, setSelectedWord] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -37,11 +32,12 @@ export const DictionaryPage = () => {
         setSelectedWordResult(null);
         setWildcardResult(null);
         try {
-            const result = await apiWildcardQuery(pattern);
-            const filteredResult = filterDictWildcardLookup(result);
-            setWildcardResult(filteredResult);
-            if (!filteredResult) {
+            const result = await apiDictQuery(pattern, true);
+            if (isEmptyDict(result)) {
+                setWildcardResult(null);
                 setError("No results found for your query.");
+            } else {
+                setWildcardResult(result);
             }
         } catch (err) {
             setError("Failed to fetch dictionary results.");
@@ -60,8 +56,8 @@ export const DictionaryPage = () => {
         setError(null);
         setSelectedWord(word);
         try {
-            const result = await apiWordQuery(word);
-            setSelectedWordResult(filterDictLookup(result));
+            const result = await apiDictQuery(word);
+            setSelectedWordResult(isEmptyDict(result) ? null : result);
         } catch (err) {
             setError("Failed to fetch details for the selected word.");
             console.error(err);

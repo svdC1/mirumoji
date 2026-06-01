@@ -201,33 +201,7 @@ export interface KanjiInfo {
     jlpt_tanos?: number;
 }
 
-/**
- * The shape of all the information from a dictionary lookup as
- * returned by the API endpoint
- */
-export interface DictLookup {
-    word: string;
-    jmentries: JMEntry[];
-    jmnentries: JMNEntry[];
-    kanji: KanjiInfo[];
-    meanings: string[];
-    jlpt: string;
-    examples: string[];
-}
-
-/**
- * The shape of all the information from a wildcard dictionary lookup as
- * returned by the API endpoint
- */
-export interface DictWildcardLookup {
-    pattern: string;
-    jmentries: JMEntry[];
-    jmnentries: JMNEntry[];
-    kanji: KanjiInfo[];
-    examples: string[];
-}
-
-/* Server tokenizer (Phase 0 — compared against kuromoji before the swap) */
+/* Server tokenizer */
 
 /**
  * A morphological token from the server tokenizer (fugashi / UniDic).

@@ -4,8 +4,7 @@
  */
 
 import { useState } from "react";
-import { JMEntry, JMNEntry, KanjiInfo } from "../types/types";
-import { DictWildcardLookup } from "../types/types";
+import { JMEntry, JMNEntry, KanjiInfo, KotobaseData } from "../types/types";
 /**
  * Displays a standard dictionary entry from JMdict.
  * @param {object} props - The component props.
@@ -215,7 +214,7 @@ export const ComprehensiveEntryCard = ({
 /**
  * Displays the tabbed results from a wildcard search.
  * @param {object} props - The component props.
- * @param {DictWildcardLookup} props.results - The wildcard search results.
+ * @param {KotobaseData} props.results - The wildcard search results.
  * @param {(word: string) => void} props.onWordSelect - Callback to handle when a word is selected.
  * @returns {JSX.Element} The wildcard results component.
  */
@@ -223,7 +222,7 @@ export const WildcardResults = ({
     results,
     onWordSelect,
 }: {
-    results: DictWildcardLookup;
+    results: KotobaseData;
     onWordSelect: (word: string) => void;
 }) => {
     const tabs = [];

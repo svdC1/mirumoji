@@ -11,9 +11,15 @@ import remarkBreaks from "remark-breaks";
 import { Copy, Check, Bookmark } from "lucide-react";
 import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
-import { apiWordQuery, filterDictLookup } from "../services/dictApi";
+import { apiDictQuery, isEmptyDict } from "../services/dictApi";
 import { toastApiError } from "../utils/apiErrorToaster";
-import { GptTemplate, WordDialogProps, DictLookup, ApiError, BreakdownData } from "../types/types";
+import {
+    GptTemplate,
+    WordDialogProps,
+    KotobaseData,
+    ApiError,
+    BreakdownData,
+} from "../types/types";
 import { createAndSaveClip } from "../utils/clipCreator";
 import {
     JmdictEntryDisplay,
@@ -56,7 +62,7 @@ export default function WordDialog({
     // Saving Clip State
     const [saving, setSaving] = useState(false);
     // Dictionary Data from API
-    const [dictData, setDictData] = useState<DictLookup | null | undefined>(undefined);
+    const [dictData, setDictData] = useState<KotobaseData | null | undefined>(undefined);
 
     const [screenWidth, setScreenWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 0
@@ -158,27 +164,26 @@ export default function WordDialog({
     useEffect(() => {
         if (tab !== "dict") return;
         setDictData(undefined);
-        apiWordQuery(word)
+        apiDictQuery(word)
             .then((entry) => {
-                const filteredEntry = filterDictLookup(entry);
-                if (filteredEntry) {
-                    setDictData(filteredEntry);
-                    // Set Default SubTab when common entries aren't available
-                    if (filteredEntry.jmentries.length === 0) {
-                        if (filteredEntry.jmnentries.length > 0) {
-                            setDictTab("jmnedict");
-                        } else if (filteredEntry.kanji.length > 0) {
-                            setDictTab("kanji");
-                        } else if (filteredEntry.examples.length > 0) {
-                            setDictTab("examples");
-                        }
-                    }
-                } else {
+                if (isEmptyDict(entry)) {
                     setDictData(null);
+                    return;
+                }
+                setDictData(entry);
+                // Set Default SubTab when common entries aren't available
+                if (entry.jmentries.length === 0) {
+                    if (entry.jmnentries.length > 0) {
+                        setDictTab("jmnedict");
+                    } else if (entry.kanji.length > 0) {
+                        setDictTab("kanji");
+                    } else if (entry.examples.length > 0) {
+                        setDictTab("examples");
+                    }
                 }
             })
             .catch((e) => {
-                console.error("apiWordQuery error", e);
+                console.error("apiDictQuery error", e);
                 setDictData(null);
                 toastApiError(e);
             });
