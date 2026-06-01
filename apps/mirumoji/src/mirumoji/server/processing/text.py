@@ -159,49 +159,43 @@ def query_kotobase(
             f"Kotobase Lookup Failed For '{query}' : {e}",
         ) from e
 
-    # Extract JLPT
-    jlpt = f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else None
+    # Extract JLPT (defaults to "Unknown" when the word isn't in the list)
+    jlpt = f"N{result.jlpt_vocab.level}" if result.jlpt_vocab else "Unknown"
 
     # Extract Examples
-    examples = [i.text for i in result.examples] if result.examples else None
+    examples = [i.text for i in result.examples] if result.examples else []
 
-    jmentries = []
-    jmnentries = []
-    kanji = []
-    meanings = None
-    jm_senses = None
+    jmentries: list[JMEntry] = []
+    jmnentries: list[JMNEntry] = []
+    kanji: list[KanjiInfo] = []
+    meanings: list[str] = []
 
     if result.entries:
         filtered = result.filter_entries()
         jm: list[JMDictEntryDTO] = filtered["jmdict"]
         jmne: list[JMNeDictEntryDTO] = filtered["jmnedict"]
 
-        # Build Meanings
+        # Build Meanings from the first available entry
         if jm:
-            glosses: list[str] = [s["gloss"] for s in jm[0].senses]
-            meanings = glosses
+            meanings = [s["gloss"] for s in jm[0].senses]
         elif jmne:
             meanings = jmne[0].gloss
 
         # Build JM Entries
         for entry in jm:
-            # Build Senses
-            if entry.senses:
-                jm_senses = [
-                    JMWordSense(
-                        order=sense["order"],
-                        pos=sense["pos"],
-                        gloss=sense["gloss"],
-                    )
-                    for sense in entry.senses
-                ]
-
             jmentries.append(
                 JMEntry(
                     rank=entry.rank,
-                    kana=entry.kana or None,
-                    kanji=entry.kanji or None,
-                    senses=jm_senses,
+                    kana=entry.kana or [],
+                    kanji=entry.kanji or [],
+                    senses=[
+                        JMWordSense(
+                            order=sense["order"],
+                            pos=sense["pos"],
+                            gloss=sense["gloss"],
+                        )
+                        for sense in (entry.senses or [])
+                    ],
                 ),
             )
 
@@ -209,10 +203,10 @@ def query_kotobase(
         for entry in jmne:
             jmnentries.append(
                 JMNEntry(
-                    kana=entry.kana or None,
-                    kanji=entry.kanji or None,
-                    translation_type=entry.translation_type or None,
-                    gloss=entry.gloss or None,
+                    kana=entry.kana or [],
+                    kanji=entry.kanji or [],
+                    translation_type=entry.translation_type or "",
+                    gloss=entry.gloss or [],
                 ),
             )
     # Build KanjiInfo
@@ -223,20 +217,20 @@ def query_kotobase(
                     literal=k.literal,
                     grade=k.grade,
                     stroke_count=k.stroke_count or None,
-                    meanings=k.meanings or None,
-                    onyomi=k.onyomi or None,
-                    kunyomi=k.kunyomi or None,
+                    meanings=k.meanings or [],
+                    onyomi=k.onyomi or [],
+                    kunyomi=k.kunyomi or [],
                     jlpt_kanjidic=k.jlpt_kanjidic,
                     jlpt_tanos=k.jlpt_tanos,
                 ),
             )
 
-    # Build Final Model
+    # Build Final Model (collections are always present, never null)
     return KotobaseData(
         query=query,
-        jmentries=jmentries or None,
-        jmnentries=jmnentries or None,
-        kanji=kanji or None,
+        jmentries=jmentries,
+        jmnentries=jmnentries,
+        kanji=kanji,
         meanings=meanings,
         jlpt=jlpt,
         examples=examples,

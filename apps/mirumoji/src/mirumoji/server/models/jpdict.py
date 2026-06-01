@@ -56,9 +56,9 @@ class JMEntry(BaseModel):
     """
 
     rank: int
-    kana: list[str] | None = Field(default_factory=list)
-    kanji: list[str] | None = Field(default_factory=list)
-    senses: list[JMWordSense] | None = Field(default_factory=list)
+    kana: list[str] = Field(default_factory=list)
+    kanji: list[str] = Field(default_factory=list)
+    senses: list[JMWordSense] = Field(default_factory=list)
 
 
 class JMNEntry(BaseModel):
@@ -73,10 +73,10 @@ class JMNEntry(BaseModel):
         gloss (list[str] | None): list of translation strings
     """
 
-    kana: list[str] | None = Field(default_factory=list)
-    kanji: list[str] | None = Field(default_factory=list)
-    translation_type: str | None = Field(default="")
-    gloss: list[str] | None = Field(default_factory=list)
+    kana: list[str] = Field(default_factory=list)
+    kanji: list[str] = Field(default_factory=list)
+    translation_type: str = Field(default="")
+    gloss: list[str] = Field(default_factory=list)
 
 
 class KanjiInfo(BaseModel):
@@ -97,9 +97,9 @@ class KanjiInfo(BaseModel):
     literal: str
     grade: int | None = Field(default=None)
     stroke_count: int | None = Field(default=None)
-    meanings: list[str] | None = Field(default_factory=list)
-    onyomi: list[str] | None = Field(default_factory=list)
-    kunyomi: list[str] | None = Field(default_factory=list)
+    meanings: list[str] = Field(default_factory=list)
+    onyomi: list[str] = Field(default_factory=list)
+    kunyomi: list[str] = Field(default_factory=list)
     jlpt_kanjidic: int | None = Field(default=None)
     jlpt_tanos: int | None = Field(default=None)
 
@@ -137,12 +137,12 @@ class KotobaseData(BaseModel):
     """
 
     query: str
-    jmentries: list[JMEntry] | None = Field(default_factory=list)
-    jmnentries: list[JMNEntry] | None = Field(default_factory=list)
-    kanji: list[KanjiInfo] | None = Field(default_factory=list)
-    meanings: list[str] | None = Field(default_factory=list)
-    jlpt: str | None = Field(default="Unknown")
-    examples: list[str] | None = Field(default_factory=list)
+    jmentries: list[JMEntry] = Field(default_factory=list)
+    jmnentries: list[JMNEntry] = Field(default_factory=list)
+    kanji: list[KanjiInfo] = Field(default_factory=list)
+    meanings: list[str] = Field(default_factory=list)
+    jlpt: str = Field(default="Unknown")
+    examples: list[str] = Field(default_factory=list)
 
 
 # --- Fugashi Data Models ---
