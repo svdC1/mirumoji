@@ -1,5 +1,6 @@
 """
-Smoke test: verify the Click CLI group is importable and has the expected commands.
+Smoke test: verify the Click CLI group is importable and has the expected
+commands
 """
 
 from click.testing import CliRunner

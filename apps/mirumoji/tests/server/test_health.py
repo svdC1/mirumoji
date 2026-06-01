@@ -1,10 +1,10 @@
 """
-Smoke test: GET /health/status returns {"status": "ok"}.
+Smoke test: GET /health/status returns {"status": "ok"}
 
-This is the minimal test that verifies:
-  - The FastAPI app can be instantiated.
-  - The DB lifecycle (connect / disconnect) works with SQLite in-memory.
-  - The /health/status endpoint responds correctly.
+This is the minimal test that verifies
+  - The FastAPI app can be instantiated
+  - The DB lifecycle (connect / disconnect) works with SQLite in-memory
+  - The /health/status endpoint responds correctly
 """
 
 import pytest
