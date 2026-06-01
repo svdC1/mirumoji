@@ -7,6 +7,36 @@ import { ApiError } from "../types/types";
 const BASE = "/api";
 
 /**
+ * Parses a server error body into a message + optional machine code/details.
+ *
+ * Understands the nested error envelope
+ * `{ success: false, error: { code, message, details } }` and falls back to
+ * the raw response text or a default.
+ *
+ * @param {string} body The raw response body.
+ * @param {string} fallback A default message when nothing better is found.
+ * @returns {{ message: string; code?: string; details?: unknown }} Parsed error.
+ */
+function parseApiError(
+    body: string,
+    fallback: string
+): { message: string; code?: string; details?: unknown } {
+    try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed === "object" && parsed.error) {
+            return {
+                message: parsed.error.message ?? fallback,
+                code: parsed.error.code,
+                details: parsed.error.details,
+            };
+        }
+    } catch {
+        // body wasn't JSON; fall through to the raw text
+    }
+    return { message: body || fallback };
+}
+
+/**
  * A fetch replacement that:
  *   - Auto-prefixes BASE for relative URLs
  *   - Adds X-Profile-ID header if a profile is set in localStorage
@@ -18,10 +48,7 @@ const BASE = "/api";
  * @returns {Promise<T>} A promise that resolves to the response data.
  * @template T
  */
-export async function apiFetch<T = unknown>(
-    url: string,
-    opts: RequestInit = {}
-): Promise<T> {
+export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {}): Promise<T> {
     // build the full URL
     const fullUrl = url.startsWith("http") ? url : `${BASE}/${url}`;
 
@@ -40,8 +67,9 @@ export async function apiFetch<T = unknown>(
     const res = await fetch(fullUrl, { ...opts, headers });
 
     if (!res.ok) {
-        const msg = (await res.text()) || res.statusText;
-        throw new ApiError(res.status, msg);
+        const body = await res.text();
+        const { message, code, details } = parseApiError(body, res.statusText);
+        throw new ApiError(res.status, message, code, details);
     }
 
     const ct = res.headers.get("content-type") ?? "";
@@ -79,12 +107,7 @@ export async function uploadFile<T = unknown>(
         const fullUrl = url.startsWith("http") ? url : `${BASE}/${url}`;
         const profileId = localStorage.getItem("currentProfileId");
         if (!profileId) {
-            return reject(
-                new ApiError(
-                    400,
-                    "No profile ID found. Please select a profile."
-                )
-            );
+            return reject(new ApiError(400, "No profile ID found. Please select a profile."));
         }
 
         const uploadId = `${file.name}-${Date.now()}`;
@@ -116,15 +139,14 @@ export async function uploadFile<T = unknown>(
                     const response = JSON.parse(xhr.responseText);
                     resolve(response as T);
                 } catch (e) {
-                    reject(
-                        new ApiError(500, "Failed to parse server response.")
-                    );
+                    reject(new ApiError(500, "Failed to parse server response."));
                 }
             } else {
-                const msg =
-                    xhr.responseText ||
-                    `Request failed with status ${xhr.status}`;
-                reject(new ApiError(xhr.status, msg));
+                const { message, code, details } = parseApiError(
+                    xhr.responseText,
+                    `Request failed with status ${xhr.status}`
+                );
+                reject(new ApiError(xhr.status, message, code, details));
             }
         };
 

@@ -13,10 +13,7 @@ import {
 } from "../services/dictApi";
 import { SearchIcon } from "lucide-react";
 import { DictLookup, DictWildcardLookup } from "../types/types";
-import {
-    ComprehensiveEntryCard,
-    WildcardResults,
-} from "../components/DictDisplays";
+import { ComprehensiveEntryCard, WildcardResults } from "../components/DictDisplays";
 
 /**
  * Renders the main dictionary search page.
@@ -24,10 +21,8 @@ import {
  */
 export const DictionaryPage = () => {
     const [pattern, setPattern] = useState("");
-    const [wildcardResult, setWildcardResult] =
-        useState<DictWildcardLookup | null>(null);
-    const [selectedWordResult, setSelectedWordResult] =
-        useState<DictLookup | null>(null);
+    const [wildcardResult, setWildcardResult] = useState<DictWildcardLookup | null>(null);
+    const [selectedWordResult, setSelectedWordResult] = useState<DictLookup | null>(null);
     const [selectedWord, setSelectedWord] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -77,9 +72,7 @@ export const DictionaryPage = () => {
 
     return (
         <div className="container select-none mx-auto p-4 sm:p-6 text-white min-h-screen">
-            <h1 className="text-4xl font-bold mb-6 text-center text-indigo-400">
-                Dictionary
-            </h1>
+            <h1 className="text-4xl font-bold mb-6 text-center text-indigo-400">Dictionary</h1>
             <div className="flex flex-col justify-center sm:flex-row gap-2 mb-6 max-w-xl mx-auto">
                 <input
                     type="text"
@@ -94,17 +87,14 @@ export const DictionaryPage = () => {
                     disabled={isLoading}
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white font-bold py-2 px-6 rounded-md transition-colors duration-200"
                 >
-                    {isLoading ? "..." : <SearchIcon size={20}/>}
+                    {isLoading ? "..." : <SearchIcon size={20} />}
                 </button>
             </div>
 
             {error && <p className="text-center text-red-400 mt-4">{error}</p>}
 
             {wildcardResult && !selectedWordResult && (
-                <WildcardResults
-                    results={wildcardResult}
-                    onWordSelect={handleWordSelect}
-                />
+                <WildcardResults results={wildcardResult} onWordSelect={handleWordSelect} />
             )}
 
             {selectedWordResult && (

@@ -34,17 +34,11 @@ function App() {
                     <Routes>
                         <Route path="/dashboard" element={<UserPage />} />
                         <Route path="/saved" element={<SavedPage />} />
-                        <Route
-                            path="/transcribe"
-                            element={<TranscribePage />}
-                        />
+                        <Route path="/transcribe" element={<TranscribePage />} />
                         <Route path="/" element={<HomePage />} />
                         <Route path="/player" element={<PlayerPage />} />
                         <Route path="/text" element={<TextPage />} />
-                        <Route
-                            path="/dictionary"
-                            element={<DictionaryPage />}
-                        />
+                        <Route path="/dictionary" element={<DictionaryPage />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                 </main>

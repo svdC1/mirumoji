@@ -3,7 +3,23 @@
  */
 
 import { apiFetch } from "../services/api";
-import { DictLookup, DictWildcardLookup } from "../types/types";
+import { DictLookup, DictWildcardLookup, JapaneseWord } from "../types/types";
+
+/**
+ * Tokenizes a Japanese sentence on the server (fugashi / UniDic), returning
+ * one `JapaneseWord` (token + dictionary data) per token.
+ *
+ * Phase-0 helper used to compare the server tokenizer against kuromoji before
+ * committing to the swap.
+ *
+ * @param {string} sentence The Japanese sentence to tokenize.
+ * @returns {Promise<JapaneseWord[]>} A promise that resolves to the tokens.
+ */
+export async function apiTokenize(sentence: string): Promise<JapaneseWord[]> {
+    return apiFetch<JapaneseWord[]>(`dict/tokenize?sentence=${encodeURIComponent(sentence)}`, {
+        method: "GET",
+    });
+}
 
 /**
  * Queries the dictionary API for a word.
@@ -24,15 +40,10 @@ export async function apiWordQuery(word: string): Promise<DictLookup> {
  * @param {string} pattern The pattern to query.
  * @returns {Promise<DictWildcardLookup>} A promise that resolves to the dictionary wilcard lookup data.
  */
-export async function apiWildcardQuery(
-    pattern: string
-): Promise<DictWildcardLookup> {
-    const result = apiFetch<DictWildcardLookup>(
-        `dict/wildcard?pattern=${pattern}`,
-        {
-            method: "GET",
-        }
-    );
+export async function apiWildcardQuery(pattern: string): Promise<DictWildcardLookup> {
+    const result = apiFetch<DictWildcardLookup>(`dict/wildcard?pattern=${pattern}`, {
+        method: "GET",
+    });
     return result;
 }
 
@@ -43,15 +54,11 @@ export async function apiWildcardQuery(
  * @param {DictLookup} dictLookup The DictLookup object
  * @returns {DictLookup | null} The filtered object or null
  */
-export function filterDictLookup(
-    dictLookup: DictLookup | null
-): DictLookup | null {
+export function filterDictLookup(dictLookup: DictLookup | null): DictLookup | null {
     // Filter Empty Elements
     if (dictLookup) {
         // Empty element has stroke count of `99`
-        dictLookup.kanji = dictLookup.kanji.filter(
-            (k) => k.stroke_count !== 99
-        );
+        dictLookup.kanji = dictLookup.kanji.filter((k) => k.stroke_count !== 99);
         // Empty element has no `kana` and no `kanji` and one sense with order of `99`
         dictLookup.jmentries = dictLookup.jmentries.filter(
             (jme) =>
@@ -97,9 +104,7 @@ export function filterDictWildcardLookup(
     // Filter Empty Elements
     if (dictLookup) {
         // Empty element has stroke count of `99`
-        dictLookup.kanji = dictLookup.kanji.filter(
-            (k) => k.stroke_count !== 99
-        );
+        dictLookup.kanji = dictLookup.kanji.filter((k) => k.stroke_count !== 99);
         // Empty element has no `kana` and no `kanji` and one sense with order of `99`
         dictLookup.jmentries = dictLookup.jmentries.filter(
             (jme) =>

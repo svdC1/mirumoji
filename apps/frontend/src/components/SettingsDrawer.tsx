@@ -88,21 +88,16 @@ export default function SettingsDrawer({
     // Reference to Subtitles
     const srtInputRef = useRef<HTMLInputElement | null>(null);
     // Subtitle Style Context
-    const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } =
-        useSubtitleSettings();
+    const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } = useSubtitleSettings();
     // Download Subtitle File URL
-    const [generatedSrtDownloadUrl, setGeneratedSrtDownloadUrl] = useState<
-        string | null
-    >(null);
+    const [generatedSrtDownloadUrl, setGeneratedSrtDownloadUrl] = useState<string | null>(null);
     // Downlod Video File URL
-    const [convertedVideoDownloadUrl, setConvertedVideoDownloadUrl] = useState<
-        string | null
-    >(null);
+    const [convertedVideoDownloadUrl, setConvertedVideoDownloadUrl] = useState<string | null>(null);
 
     // Active Tab State
-    const [activeTab, setActiveTab] = useState<
-        "nowPlayingTab" | "subtitleSettingsTab" | "loadTab"
-    >("loadTab");
+    const [activeTab, setActiveTab] = useState<"nowPlayingTab" | "subtitleSettingsTab" | "loadTab">(
+        "loadTab"
+    );
 
     // Generating Subtitle State
     const [generatingSrt, setGeneratingSrt] = useState(false);
@@ -112,13 +107,8 @@ export default function SettingsDrawer({
     const [profileFiles, setProfileFiles] = useState<ProfileFile[]>([]);
     // Set Profile Context
     const { profileId } = useProfile();
-    const {
-        videoFileName,
-        setVideoFileName,
-        srtFileName,
-        setSrtFileName,
-        clearPlayerState,
-    } = usePlayer();
+    const { videoFileName, setVideoFileName, srtFileName, setSrtFileName, clearPlayerState } =
+        usePlayer();
 
     const fetchProfileFiles = async () => {
         try {
@@ -200,11 +190,9 @@ export default function SettingsDrawer({
 
             if (result.srt_content) {
                 // Create SRT File from string response
-                const generatedSrtFile = new File(
-                    [result.srt_content],
-                    `${video.name}.srt`,
-                    { type: "application/x-subrip" }
-                );
+                const generatedSrtFile = new File([result.srt_content], `${video.name}.srt`, {
+                    type: "application/x-subrip",
+                });
                 onSrt(generatedSrtFile);
                 setSrtFileName(generatedSrtFile.name);
                 toast.success("Subtitles Generated!", { id: tId });
@@ -249,12 +237,8 @@ export default function SettingsDrawer({
             );
 
             if (result.converted_video_url) {
-                onVideoUrl?.(
-                    formatStaticUrl(API_BASE, result.converted_video_url)
-                );
-                setConvertedVideoDownloadUrl(
-                    formatStaticUrl(API_BASE, result.converted_video_url)
-                );
+                onVideoUrl?.(formatStaticUrl(API_BASE, result.converted_video_url));
+                setConvertedVideoDownloadUrl(formatStaticUrl(API_BASE, result.converted_video_url));
                 setVideoFileName(result.converted_video_url);
                 toast.success("Conversion complete!", { id: tId });
             } else {
@@ -323,9 +307,7 @@ export default function SettingsDrawer({
                     {activeTab === "nowPlayingTab" ? (
                         <section className="space-y-10">
                             <div className="space-y-3">
-                                <h3 className="text-lg font-semibold text-center mb-2">
-                                    Video
-                                </h3>
+                                <h3 className="text-lg font-semibold text-center mb-2">Video</h3>
                                 {videoFileName ? (
                                     <p className="text-neutral-500 text-center text-base italic truncate">
                                         {videoFileName}
@@ -360,9 +342,7 @@ export default function SettingsDrawer({
                                     disabled={!video || isBusy}
                                     className="w-full mb-3 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {generatingSrt
-                                        ? "Generating..."
-                                        : "Generate SRT from Video"}
+                                    {generatingSrt ? "Generating..." : "Generate SRT from Video"}
                                 </button>
 
                                 <button
@@ -370,9 +350,7 @@ export default function SettingsDrawer({
                                     disabled={!video || isBusy}
                                     className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {convertingVideo
-                                        ? "Converting…"
-                                        : "Convert Video to MP4"}
+                                    {convertingVideo ? "Converting…" : "Convert Video to MP4"}
                                 </button>
                                 <button
                                     onClick={clearPlayerState}
@@ -385,9 +363,7 @@ export default function SettingsDrawer({
                             {generatedSrtDownloadUrl && (
                                 <a
                                     href={generatedSrtDownloadUrl}
-                                    download={`${
-                                        video?.name || "generated"
-                                    }.srt`}
+                                    download={`${video?.name || "generated"}.srt`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-3 block text-center text-sm text-emerald-400 hover:underline"
@@ -454,9 +430,7 @@ export default function SettingsDrawer({
                                             onChange={(e) =>
                                                 setSubtitleStyle({
                                                     ...subtitleStyle,
-                                                    fontSize: Number(
-                                                        e.target.value
-                                                    ),
+                                                    fontSize: Number(e.target.value),
                                                 })
                                             }
                                             className="w-full h-1 mb-6 bg-gray-200 rounded-lg appearance-none cursor-pointer range-sm dark:bg-gray-700"
@@ -469,11 +443,7 @@ export default function SettingsDrawer({
                                         className="block mb-2 text-sm font-medium text-neutral-500 italic"
                                     >
                                         Background Opacity :{" "}
-                                        {(
-                                            subtitleStyle.backgroundOpacity *
-                                            100
-                                        ).toFixed(0)}
-                                        %
+                                        {(subtitleStyle.backgroundOpacity * 100).toFixed(0)}%
                                     </label>
                                     <div className="flex items-center justify-between">
                                         <input
@@ -482,15 +452,11 @@ export default function SettingsDrawer({
                                             min="0"
                                             max="1"
                                             step="0.1"
-                                            value={
-                                                subtitleStyle.backgroundOpacity
-                                            }
+                                            value={subtitleStyle.backgroundOpacity}
                                             onChange={(e) =>
                                                 setSubtitleStyle({
                                                     ...subtitleStyle,
-                                                    backgroundOpacity: Number(
-                                                        e.target.value
-                                                    ),
+                                                    backgroundOpacity: Number(e.target.value),
                                                 })
                                             }
                                             className="w-full h-1 mb-6 bg-gray-200 rounded-lg appearance-none cursor-pointer range-sm dark:bg-gray-700"
@@ -515,9 +481,7 @@ export default function SettingsDrawer({
                                             onChange={(e) =>
                                                 setSubtitleStyle({
                                                     ...subtitleStyle,
-                                                    position: Number(
-                                                        e.target.value
-                                                    ),
+                                                    position: Number(e.target.value),
                                                 })
                                             }
                                             className="w-full h-1 mb-6 bg-gray-200 rounded-lg appearance-none cursor-pointer range-sm dark:bg-gray-700"
@@ -557,14 +521,11 @@ export default function SettingsDrawer({
                                         <input
                                             id="bg-color"
                                             type="color"
-                                            value={
-                                                subtitleStyle.backgroundColor
-                                            }
+                                            value={subtitleStyle.backgroundColor}
                                             onChange={(e) =>
                                                 setSubtitleStyle({
                                                     ...subtitleStyle,
-                                                    backgroundColor:
-                                                        e.target.value,
+                                                    backgroundColor: e.target.value,
                                                 })
                                             }
                                             className="w-12 h-8 rounded-md bg-inherit"
@@ -586,15 +547,11 @@ export default function SettingsDrawer({
                                     From Device
                                 </h3>
                                 <button
-                                    onClick={() =>
-                                        videoInputRef.current?.click()
-                                    }
+                                    onClick={() => videoInputRef.current?.click()}
                                     disabled={isBusy}
                                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {videoFileName
-                                        ? "Change Video"
-                                        : "Select Video"}
+                                    {videoFileName ? "Change Video" : "Select Video"}
                                 </button>
                                 <input
                                     ref={videoInputRef}
@@ -610,9 +567,7 @@ export default function SettingsDrawer({
                                     disabled={isBusy}
                                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {srtFileName
-                                        ? "Change Subtitles"
-                                        : "Select Subtitles"}
+                                    {srtFileName ? "Change Subtitles" : "Select Subtitles"}
                                 </button>
                                 <input
                                     ref={srtInputRef}
@@ -636,11 +591,7 @@ export default function SettingsDrawer({
                                             videoFiles.map((file) => (
                                                 <li
                                                     key={file.id}
-                                                    onClick={() =>
-                                                        handleProfileFileSelect(
-                                                            file
-                                                        )
-                                                    }
+                                                    onClick={() => handleProfileFileSelect(file)}
                                                     className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
                                                 >
                                                     {file.file_name}
@@ -662,11 +613,7 @@ export default function SettingsDrawer({
                                             subtitleFiles.map((file) => (
                                                 <li
                                                     key={file.id}
-                                                    onClick={() =>
-                                                        handleProfileFileSelect(
-                                                            file
-                                                        )
-                                                    }
+                                                    onClick={() => handleProfileFileSelect(file)}
                                                     className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
                                                 >
                                                     {file.file_name}

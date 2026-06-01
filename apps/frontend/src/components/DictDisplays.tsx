@@ -13,13 +13,7 @@ import { DictWildcardLookup } from "../types/types";
  * @param {boolean} props.isLast - True if this is the last item in a list, to omit the bottom border.
  * @returns {JSX.Element} The rendered JMdict entry.
  */
-export const JmdictEntryDisplay = ({
-    entry,
-    isLast,
-}: {
-    entry: JMEntry;
-    isLast: boolean;
-}) => (
+export const JmdictEntryDisplay = ({ entry, isLast }: { entry: JMEntry; isLast: boolean }) => (
     <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
         <div className="flex items-center">
             <h3 className="text-lg font-bold mr-2">{entry.kanji.join("、")}</h3>
@@ -29,8 +23,7 @@ export const JmdictEntryDisplay = ({
             <div key={i} className="ml-4 mt-1">
                 <p className="text-neutral-400 text-sm">({sense.pos})</p>
                 <p>
-                    <span className="text-neutral-400">{i + 1}.</span>{" "}
-                    {sense.gloss}
+                    <span className="text-neutral-400">{i + 1}.</span> {sense.gloss}
                 </p>
             </div>
         ))}
@@ -44,19 +37,11 @@ export const JmdictEntryDisplay = ({
  * @param {boolean} props.isLast - True if this is the last item in a list, to omit the bottom border.
  * @returns {JSX.Element} The rendered example.
  */
-export const ExampleDisplay = ({
-    example,
-    isLast,
-}: {
-    example: string;
-    isLast: boolean;
-}) => (
+export const ExampleDisplay = ({ example, isLast }: { example: string; isLast: boolean }) => (
     <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
         <div className="flex items-center">
             <div className="ml-4 mt-1">
-                <p className="text-neutral-400 text-lg text-center">
-                    ({example})
-                </p>
+                <p className="text-neutral-400 text-lg text-center">({example})</p>
             </div>
         </div>
     </div>
@@ -69,13 +54,7 @@ export const ExampleDisplay = ({
  * @param {boolean} props.isLast - True if this is the last item in a list, to omit the bottom border.
  * @returns {JSX.Element} The rendered JMnedict entry.
  */
-export const JmnedictEntryDisplay = ({
-    entry,
-    isLast,
-}: {
-    entry: JMNEntry;
-    isLast: boolean;
-}) => (
+export const JmnedictEntryDisplay = ({ entry, isLast }: { entry: JMNEntry; isLast: boolean }) => (
     <div className={`py-2 ${!isLast ? "border-b border-neutral-700" : ""}`}>
         <div className="flex items-center">
             <h3 className="text-lg font-bold mr-2">{entry.kanji.join("、")}</h3>
@@ -117,23 +96,17 @@ export const KanjiInfoDisplay = ({
             </p>
             <div className="col-span-2">
                 <p>
-                    <span className="font-semibold text-neutral-400">
-                        On&apos;yomi:
-                    </span>{" "}
+                    <span className="font-semibold text-neutral-400">On&apos;yomi:</span>{" "}
                     {kanjiInfo.onyomi.join("、")}
                 </p>
                 <p>
-                    <span className="font-semibold text-neutral-400">
-                        Kun&apos;yomi:
-                    </span>{" "}
+                    <span className="font-semibold text-neutral-400">Kun&apos;yomi:</span>{" "}
                     {kanjiInfo.kunyomi.join("、")}
                 </p>
             </div>
             <div className="col-span-2">
                 <p>
-                    <span className="font-semibold text-neutral-400">
-                        Meanings:
-                    </span>{" "}
+                    <span className="font-semibold text-neutral-400">Meanings:</span>{" "}
                     {kanjiInfo.meanings.join(", ")}
                 </p>
             </div>
@@ -184,10 +157,7 @@ export const ComprehensiveEntryCard = ({
             <h2 className="text-4xl font-bold mb-4 text-center">{word}</h2>
 
             <div className="border-b border-neutral-700 mb-4">
-                <nav
-                    className="-mb-px flex justify-center space-x-4"
-                    aria-label="Tabs"
-                >
+                <nav className="-mb-px flex justify-center space-x-4" aria-label="Tabs">
                     {tabs.map((tab) => (
                         <button
                             key={tab}
@@ -267,10 +237,7 @@ export const WildcardResults = ({
     return (
         <div className="bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg mt-6 max-w-4xl mx-auto">
             <div className="border-b border-neutral-700">
-                <nav
-                    className="-mb-px flex justify-center space-x-4 px-4"
-                    aria-label="Tabs"
-                >
+                <nav className="-mb-px flex justify-center space-x-4 px-4" aria-label="Tabs">
                     {tabs.map((tab) => (
                         <button
                             key={tab}
@@ -289,34 +256,19 @@ export const WildcardResults = ({
             <div className="p-4 h-96 overflow-y-auto">
                 {activeTab === "JMdict" &&
                     results.jmentries.map((entry, i) => (
-                        <JMEntryRow
-                            key={i}
-                            entry={entry}
-                            onSelect={onWordSelect}
-                        />
+                        <JMEntryRow key={i} entry={entry} onSelect={onWordSelect} />
                     ))}
                 {activeTab === "JMnedict" &&
                     results.jmnentries.map((entry, i) => (
-                        <JMNEntryRow
-                            key={i}
-                            entry={entry}
-                            onSelect={onWordSelect}
-                        />
+                        <JMNEntryRow key={i} entry={entry} onSelect={onWordSelect} />
                     ))}
                 {activeTab === "Kanji" &&
                     results.kanji.map((kanji, i) => (
-                        <KanjiRow
-                            key={i}
-                            kanji={kanji}
-                            onSelect={onWordSelect}
-                        />
+                        <KanjiRow key={i} kanji={kanji} onSelect={onWordSelect} />
                     ))}
                 {activeTab === "Examples" &&
                     results.examples.map((ex, i) => (
-                        <p
-                            key={i}
-                            className="py-2 px-3 text-center text-neutral-300"
-                        >
+                        <p key={i} className="py-2 px-3 text-center text-neutral-300">
                             {ex}
                         </p>
                     ))}
@@ -345,9 +297,7 @@ export const JMEntryRow = ({
     >
         <p className="font-semibold">{entry.kanji.join("、")}</p>
         <p className="text-neutral-300">{entry.kana.join("、")}</p>
-        <p className="text-sm text-neutral-400">
-            {entry.senses.map((s) => s.pos).join(", ")}
-        </p>
+        <p className="text-sm text-neutral-400">{entry.senses.map((s) => s.pos).join(", ")}</p>
     </div>
 );
 
@@ -394,8 +344,6 @@ export const KanjiRow = ({
         className="grid grid-cols-3 gap-4 items-center text-center py-2 px-3 rounded-md hover:bg-neutral-700 cursor-pointer transition-colors duration-150"
     >
         <p className="font-bold text-lg col-span-1">{kanji.literal}</p>
-        <p className="text-sm text-neutral-400 col-span-2">
-            {kanji.meanings.join(", ")}
-        </p>
+        <p className="text-sm text-neutral-400 col-span-2">{kanji.meanings.join(", ")}</p>
     </div>
 );

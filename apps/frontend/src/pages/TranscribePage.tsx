@@ -3,13 +3,7 @@
  * It allows the user to record or upload audio and have it transcribed.
  */
 
-import {
-    useRef,
-    useState,
-    useLayoutEffect,
-    ChangeEvent,
-    useEffect,
-} from "react";
+import { useRef, useState, useLayoutEffect, ChangeEvent, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { uploadFile } from "../services/api";
 import AudioPlayer from "react-h5-audio-player";
@@ -42,8 +36,7 @@ export default function TranscribePage() {
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>("");
     const [sending, setSending] = useState(false);
-    const [tokenizer, setTokenizer] =
-        useState<Tokenizer<IpadicFeatures> | null>(null);
+    const [tokenizer, setTokenizer] = useState<Tokenizer<IpadicFeatures> | null>(null);
     const [dialog, setDialog] = useState<{
         sentence: string;
         word: string;
@@ -116,9 +109,7 @@ export default function TranscribePage() {
                 setRecordedFile(file);
                 setPreviewUrl(URL.createObjectURL(file));
                 if (mediaStreamRef.current) {
-                    mediaStreamRef.current
-                        .getTracks()
-                        .forEach((track) => track.stop());
+                    mediaStreamRef.current.getTracks().forEach((track) => track.stop());
                     mediaStreamRef.current = null;
                 }
             };
@@ -130,9 +121,7 @@ export default function TranscribePage() {
             console.error("Error starting recording:", error);
             toast.error("Unable to access microphone.");
             if (mediaStreamRef.current) {
-                mediaStreamRef.current
-                    .getTracks()
-                    .forEach((track) => track.stop());
+                mediaStreamRef.current.getTracks().forEach((track) => track.stop());
                 mediaStreamRef.current = null;
             }
         }
@@ -230,14 +219,10 @@ export default function TranscribePage() {
                 });
             }
 
-            setMessages((prev) => [
-                ...prev.filter((m) => m.id !== loaderId),
-                ...newMessages,
-            ]);
+            setMessages((prev) => [...prev.filter((m) => m.id !== loaderId), ...newMessages]);
             deleteMedia();
         } catch (err: any) {
-            let errorMessage =
-                "An unknown error occurred during transcription.";
+            let errorMessage = "An unknown error occurred during transcription.";
             if (err instanceof ApiError) {
                 errorMessage = `Error ${err.status}: ${err.message}`;
             } else if (err instanceof Error) {

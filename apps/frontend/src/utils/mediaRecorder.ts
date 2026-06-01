@@ -6,15 +6,11 @@
  */
 
 // Create single shared audio context
-const sharedAudioCtx = new (window.AudioContext ||
-    (window as any).webkitAudioContext)();
+const sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
 // Cache one MediaElementAudioSourceNode per video element since a single <video>
 // may only be connected to one MediaElementSource node in the page’s lifetime.
-const elementSourceMap = new WeakMap<
-    HTMLMediaElement,
-    MediaElementAudioSourceNode
->();
+const elementSourceMap = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
 
 /**
  * Gets a MediaStream from a video element, using a canvas fallback if necessary.
@@ -74,11 +70,7 @@ export async function getStream(
 
     let animationFrameId: number;
     const drawFrame = () => {
-        if (
-            videoElement.paused ||
-            videoElement.ended ||
-            videoElement.currentTime >= endTime
-        ) {
+        if (videoElement.paused || videoElement.ended || videoElement.currentTime >= endTime) {
             cancelAnimationFrame(animationFrameId);
             return;
         }
@@ -121,22 +113,15 @@ export function createRecordingPromise(
                 const blob = new Blob(chunks, {
                     type: recordingOptions.mimeType,
                 });
-                const file = new File(
-                    [blob],
-                    `clip.${recordingOptions.fileExtension}`,
-                    { type: recordingOptions.mimeType }
-                );
+                const file = new File([blob], `clip.${recordingOptions.fileExtension}`, {
+                    type: recordingOptions.mimeType,
+                });
                 resolve(file);
             };
 
             recorder.onerror = (event: any) => {
                 stream.getTracks().forEach((track) => track.stop());
-                reject(
-                    new Error(
-                        "MediaRecorder error: " + event.error?.name ||
-                            "Unknown error"
-                    )
-                );
+                reject(new Error("MediaRecorder error: " + event.error?.name || "Unknown error"));
             };
 
             recorder.start();
@@ -192,9 +177,7 @@ export async function recordMediaStream(
 ): Promise<File> {
     const duration = (endTime - startTime) * 1000;
     if (duration <= 0) {
-        return Promise.reject(
-            new Error("Recording duration must be positive.")
-        );
+        return Promise.reject(new Error("Recording duration must be positive."));
     }
 
     // Store original element state
@@ -212,17 +195,11 @@ export async function recordMediaStream(
 
         const recordingOptions = getSupportedMimeType();
         if (!recordingOptions) {
-            throw new Error(
-                "No supported MediaRecorder MIME type found for this browser."
-            );
+            throw new Error("No supported MediaRecorder MIME type found for this browser.");
         }
 
         const stream = await getStream(videoElement, endTime);
-        const recordedFile = await createRecordingPromise(
-            stream,
-            duration,
-            recordingOptions
-        );
+        const recordedFile = await createRecordingPromise(stream, duration, recordingOptions);
 
         return recordedFile;
     } catch (error) {

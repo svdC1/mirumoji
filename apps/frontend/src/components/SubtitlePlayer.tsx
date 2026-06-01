@@ -161,10 +161,7 @@ export default function SubtitlePlayer({
     const computedSubtitleStyle: React.CSSProperties = {
         color: subtitleStyle.fontColor,
         fontSize: `${subtitleStyle.fontSize}px`,
-        backgroundColor: hexToRgba(
-            subtitleStyle.backgroundColor,
-            subtitleStyle.backgroundOpacity
-        ),
+        backgroundColor: hexToRgba(subtitleStyle.backgroundColor, subtitleStyle.backgroundOpacity),
         textShadow: subtitleStyle.textShadow,
         bottom: `${subtitleStyle.position}%`,
     };

@@ -13,13 +13,7 @@ import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
 import { apiWordQuery, filterDictLookup } from "../services/dictApi";
 import { toastApiError } from "../utils/apiErrorToaster";
-import {
-    GptTemplate,
-    WordDialogProps,
-    DictLookup,
-    ApiError,
-    BreakdownData,
-} from "../types/types";
+import { GptTemplate, WordDialogProps, DictLookup, ApiError, BreakdownData } from "../types/types";
 import { createAndSaveClip } from "../utils/clipCreator";
 import {
     JmdictEntryDisplay,
@@ -52,23 +46,17 @@ export default function WordDialog({
 }: WordDialogProps) {
     // Key for Cache
     const key = `${sentence}__${word}`;
-    const [data, setData] = useState<BreakdownData | null>(
-        gptCache.get(key) ?? null
-    );
+    const [data, setData] = useState<BreakdownData | null>(gptCache.get(key) ?? null);
     // Main Tabs State
     const [tab, setTab] = useState<"gpt" | "dict">("dict");
     // Dictionary SubTabs State
-    const [dictTab, setDictTab] = useState<
-        "jmdict" | "jmnedict" | "kanji" | "examples"
-    >("jmdict");
+    const [dictTab, setDictTab] = useState<"jmdict" | "jmnedict" | "kanji" | "examples">("jmdict");
     // Copied to Clipboard State
     const [copied, setCopied] = useState(false);
     // Saving Clip State
     const [saving, setSaving] = useState(false);
     // Dictionary Data from API
-    const [dictData, setDictData] = useState<DictLookup | null | undefined>(
-        undefined
-    );
+    const [dictData, setDictData] = useState<DictLookup | null | undefined>(undefined);
 
     const [screenWidth, setScreenWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 0
@@ -103,9 +91,7 @@ export default function WordDialog({
 
         try {
             // Fetch Profile Custom Template if existent
-            const customTemplate = await apiFetch<GptTemplate | null>(
-                "/profiles/gpt_template"
-            );
+            const customTemplate = await apiFetch<GptTemplate | null>("/profiles/gpt_template");
 
             // Validate Custom Template
             if (
@@ -129,9 +115,7 @@ export default function WordDialog({
                     prompt: backendPrompt,
                     version: customTemplate.version,
                 };
-                console.log(
-                    "Using custom GPT template for breakdown (from profile)."
-                );
+                console.log("Using custom GPT template for breakdown (from profile).");
             } else {
                 console.log(
                     customTemplate
@@ -140,13 +124,8 @@ export default function WordDialog({
                 );
             }
         } catch (templateError) {
-            if (
-                templateError instanceof ApiError &&
-                templateError.status === 404
-            ) {
-                console.log(
-                    "No GPT template set for this profile. Using default breakdown."
-                );
+            if (templateError instanceof ApiError && templateError.status === 404) {
+                console.log("No GPT template set for this profile. Using default breakdown.");
             } else {
                 console.warn(
                     "Failed to fetch profile GPT template, using default breakdown:",
@@ -254,10 +233,7 @@ export default function WordDialog({
             }
 
             // Handle clipCreator callback on UI
-            const onProgress = (
-                message: string,
-                type: "success" | "error" | "loading"
-            ) => {
+            const onProgress = (message: string, type: "success" | "error" | "loading") => {
                 switch (type) {
                     case "loading":
                         toast.loading(message, { id: clipToastId });
@@ -312,9 +288,7 @@ export default function WordDialog({
                         {canSaveClip && (
                             <button
                                 className={`text-2xl transition-colors ${
-                                    saving
-                                        ? "text-gray-500"
-                                        : "hover:text-emerald-400"
+                                    saving ? "text-gray-500" : "hover:text-emerald-400"
                                 }`}
                                 onClick={handleSave}
                                 disabled={saving}
@@ -330,11 +304,7 @@ export default function WordDialog({
                         >
                             {copied ? <Check size={22} /> : <Copy size={22} />}
                         </button>
-                        <button
-                            className="text-2xl"
-                            onClick={onClose}
-                            aria-label="Close"
-                        >
+                        <button className="text-2xl" onClick={onClose} aria-label="Close">
                             ×
                         </button>
                     </div>
@@ -377,11 +347,8 @@ export default function WordDialog({
                             </div>
                         ) : (
                             <>
-                                <h2 className="text-xl font-bold mb-1">
-                                    {data.focus.word}
-                                </h2>
-                                {data.focus.reading ||
-                                data.focus.meanings?.length ? (
+                                <h2 className="text-xl font-bold mb-1">{data.focus.word}</h2>
+                                {data.focus.reading || data.focus.meanings?.length ? (
                                     <div className="mt-1 mb-3 text-neutral-300 text-base leading-relaxed">
                                         {data.focus.reading && (
                                             <span className="mr-2 italic">
@@ -389,9 +356,7 @@ export default function WordDialog({
                                             </span>
                                         )}
                                         {data.focus.meanings?.length && (
-                                            <span>
-                                                {data.focus.meanings.join("；")}
-                                            </span>
+                                            <span>{data.focus.meanings.join("；")}</span>
                                         )}
                                     </div>
                                 ) : (
@@ -408,9 +373,7 @@ export default function WordDialog({
                             </>
                         )
                     ) : dictData === undefined ? (
-                        <p className="italic text-center text-neutral-400">
-                            Loading dictionary…
-                        </p>
+                        <p className="italic text-center text-neutral-400">Loading dictionary…</p>
                     ) : dictData === null ? (
                         <p className="italic text-neutral-400 text-center">
                             No dictionary entry found for &quot;{word}&quot;.
@@ -473,10 +436,7 @@ export default function WordDialog({
                                         <JmdictEntryDisplay
                                             key={i}
                                             entry={entry}
-                                            isLast={
-                                                i ===
-                                                dictData.jmentries.length - 1
-                                            }
+                                            isLast={i === dictData.jmentries.length - 1}
                                         />
                                     ))}
                                 </div>
@@ -486,10 +446,7 @@ export default function WordDialog({
                                         <JmnedictEntryDisplay
                                             key={i}
                                             entry={entry}
-                                            isLast={
-                                                i ===
-                                                dictData.jmnentries.length - 1
-                                            }
+                                            isLast={i === dictData.jmnentries.length - 1}
                                         />
                                     ))}
                                 </div>
@@ -499,9 +456,7 @@ export default function WordDialog({
                                         <KanjiInfoDisplay
                                             key={i}
                                             kanjiInfo={kanji}
-                                            isLast={
-                                                i === dictData.kanji.length - 1
-                                            }
+                                            isLast={i === dictData.kanji.length - 1}
                                         />
                                     ))}
                                 </div>
@@ -511,10 +466,7 @@ export default function WordDialog({
                                         <ExampleDisplay
                                             key={i}
                                             example={ex}
-                                            isLast={
-                                                i ===
-                                                dictData.examples.length - 1
-                                            }
+                                            isLast={i === dictData.examples.length - 1}
                                         ></ExampleDisplay>
                                     ))}
                                 </div>

@@ -2,13 +2,7 @@
  * @packageDocumentation This file provides a context for managing the subtitle settings.
  */
 
-import React, {
-    createContext,
-    useContext,
-    useState,
-    useEffect,
-    ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 import { SubtitleStyle } from "../types/types";
 
@@ -33,9 +27,7 @@ const defaultSubtitleStyle: SubtitleStyle = {
 };
 
 // Create the context with a default value
-const SubtitleSettingsContext = createContext<
-    SubtitleSettingsContextType | undefined
->(undefined);
+const SubtitleSettingsContext = createContext<SubtitleSettingsContextType | undefined>(undefined);
 
 /**
  * A provider for the SubtitleSettingsContext.
@@ -43,39 +35,22 @@ const SubtitleSettingsContext = createContext<
  * @param {{ children: ReactNode }} props The props for the component.
  * @returns {JSX.Element} The SubtitleSettingsProvider component.
  */
-export const SubtitleSettingsProvider = ({
-    children,
-}: {
-    children: ReactNode;
-}) => {
-    const [subtitleStyle, setSubtitleStyleState] = useState<SubtitleStyle>(
-        () => {
-            try {
-                const storedStyle = localStorage.getItem("subtitleStyle");
-                return storedStyle
-                    ? JSON.parse(storedStyle)
-                    : defaultSubtitleStyle;
-            } catch (error) {
-                console.error(
-                    "Failed to parse subtitle style from localStorage",
-                    error
-                );
-                return defaultSubtitleStyle;
-            }
+export const SubtitleSettingsProvider = ({ children }: { children: ReactNode }) => {
+    const [subtitleStyle, setSubtitleStyleState] = useState<SubtitleStyle>(() => {
+        try {
+            const storedStyle = localStorage.getItem("subtitleStyle");
+            return storedStyle ? JSON.parse(storedStyle) : defaultSubtitleStyle;
+        } catch (error) {
+            console.error("Failed to parse subtitle style from localStorage", error);
+            return defaultSubtitleStyle;
         }
-    );
+    });
 
     useEffect(() => {
         try {
-            localStorage.setItem(
-                "subtitleStyle",
-                JSON.stringify(subtitleStyle)
-            );
+            localStorage.setItem("subtitleStyle", JSON.stringify(subtitleStyle));
         } catch (error) {
-            console.error(
-                "Failed to save subtitle style to localStorage",
-                error
-            );
+            console.error("Failed to save subtitle style to localStorage", error);
         }
     }, [subtitleStyle]);
 
@@ -104,9 +79,7 @@ export const SubtitleSettingsProvider = ({
 export const useSubtitleSettings = () => {
     const context = useContext(SubtitleSettingsContext);
     if (context === undefined) {
-        throw new Error(
-            "useSubtitleSettings must be used within a SubtitleSettingsProvider"
-        );
+        throw new Error("useSubtitleSettings must be used within a SubtitleSettingsProvider");
     }
     return context;
 };

@@ -10,11 +10,7 @@
  * @param {number} [endChars=4] The number of characters to keep at the end of the filename.
  * @returns {string} The truncated filename.
  */
-export const truncateFilename = (
-    filename: string | undefined,
-    startChars = 8,
-    endChars = 4
-) => {
+export const truncateFilename = (filename: string | undefined, startChars = 8, endChars = 4) => {
     if (!filename) return "Unknown";
     if (filename.length > startChars + endChars + 3) {
         return `${filename.substring(0, startChars)}...${filename.substring(

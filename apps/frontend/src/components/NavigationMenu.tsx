@@ -5,11 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import {
-    Bars3Icon,
-    XMarkIcon,
-    UserCircleIcon,
-} from "@heroicons/react/24/outline";
+import { Bars3Icon, XMarkIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { useProfile } from "../contexts/ProfileContext";
 
 /**
@@ -73,9 +69,7 @@ export default function NavigationMenu() {
             >
                 {/* Header */}
                 <div className="relative flex items-center justify-center h-16 border-b border-gray-700 px-4 flex-shrink-0">
-                    <span className="text-lg font-semibold text-white">
-                        Menu
-                    </span>
+                    <span className="text-lg font-semibold text-white">Menu</span>
                     <button
                         onClick={() => setOpen(false)}
                         className="absolute right-4 p-2 rounded-full focus:outline-none focus:ring hover:bg-gray-700"
@@ -93,9 +87,7 @@ export default function NavigationMenu() {
                                 Profile: {profileId}
                             </span>
                         ) : (
-                            <span className="ml-2 text-sm text-gray-300">
-                                No active profile
-                            </span>
+                            <span className="ml-2 text-sm text-gray-300">No active profile</span>
                         )}
                     </div>
                     <input

@@ -2,13 +2,7 @@
  * @packageDocumentation This file provides a context for managing the user's profile.
  */
 
-import React, {
-    createContext,
-    useContext,
-    useState,
-    useEffect,
-    ReactNode,
-} from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 /**
  * The context for managing the user's profile.
@@ -29,9 +23,7 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
  * @param {{ children: ReactNode }} props The props for the component.
  * @returns {JSX.Element} The ProfileProvider component.
  */
-export const ProfileProvider: React.FC<{ children: ReactNode }> = ({
-    children,
-}) => {
+export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [profileId, setProfileIdState] = useState<string | null>(() => {
         return localStorage.getItem("currentProfileId");
     });

@@ -53,9 +53,7 @@ export default function SavedPage() {
     const parsedBreakdownData = useMemo(() => {
         if (selectedClip) {
             try {
-                return JSON.parse(
-                    selectedClip.breakdown_response
-                ) as BreakdownData;
+                return JSON.parse(selectedClip.breakdown_response) as BreakdownData;
             } catch (error) {
                 console.error("Error parsing breakdown_response:", error);
                 toast.error("Error displaying clip details.");
@@ -103,10 +101,9 @@ export default function SavedPage() {
         const toastId = toast.loading("Generating Anki deck...");
 
         try {
-            const ankiDetails = await apiFetch<AnkiExportResponse>(
-                "profiles/anki_export",
-                { method: "GET" }
-            );
+            const ankiDetails = await apiFetch<AnkiExportResponse>("profiles/anki_export", {
+                method: "GET",
+            });
 
             if (!ankiDetails || !ankiDetails.anki_deck_url) {
                 throw new Error("Anki deck URL not found in response.");
@@ -114,9 +111,7 @@ export default function SavedPage() {
 
             toast.loading("Downloading Deck...", { id: toastId });
 
-            const response = await fetch(
-                formatStaticUrl(API_BASE, ankiDetails.anki_deck_url)
-            );
+            const response = await fetch(formatStaticUrl(API_BASE, ankiDetails.anki_deck_url));
             if (!response.ok) {
                 throw new Error(
                     `Failed to download Anki deck: ${response.status} ${response.statusText}`
@@ -144,10 +139,7 @@ export default function SavedPage() {
     const showProfileMessage = (message: string) => (
         <div className="p-6 text-center text-gray-500 dark:text-gray-400">
             <p>{message}</p>
-            <p>
-                Please set or create a profile using the menu (☰) to manage
-                saved items.
-            </p>
+            <p>Please set or create a profile using the menu (☰) to manage saved items.</p>
         </div>
     );
 
@@ -156,9 +148,7 @@ export default function SavedPage() {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
                 <div className="max-w-4xl mx-auto px-4 py-8">
-                    <h1 className="text-3xl font-bold text-center mb-6">
-                        Saved Clips
-                    </h1>
+                    <h1 className="text-3xl font-bold text-center mb-6">Saved Clips</h1>
                     {showProfileMessage("No profile selected.")}
                 </div>
             </div>
@@ -176,9 +166,7 @@ export default function SavedPage() {
                             disabled={isGeneratingAnki || clipsLoading}
                             className="px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-green-600 hover:bg-green-500 text-white disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
                         >
-                            {isGeneratingAnki
-                                ? "Generating Anki Deck..."
-                                : "Save All to Anki"}
+                            {isGeneratingAnki ? "Generating Anki Deck..." : "Save All to Anki"}
                         </button>
                     )}
                 </div>
@@ -186,27 +174,17 @@ export default function SavedPage() {
                 {selectedClip && parsedBreakdownData && (
                     <div className="flex flex-col mb-8 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
                         <video
-                            key={formatStaticUrl(
-                                API_BASE,
-                                selectedClip.get_url
-                            )}
+                            key={formatStaticUrl(API_BASE, selectedClip.get_url)}
                             controls
-                            src={formatStaticUrl(
-                                API_BASE,
-                                selectedClip.get_url
-                            )}
+                            src={formatStaticUrl(API_BASE, selectedClip.get_url)}
                             className="w-full rounded-lg mb-4 aspect-video bg-black"
                         >
                             Your browser does not support the video tag.
                         </video>
-                        <h2 className="text-xl font-semibold mb-2">
-                            Clip Details
-                        </h2>
+                        <h2 className="text-xl font-semibold mb-2">Clip Details</h2>
                         {parsedBreakdownData.focus && (
                             <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded">
-                                <h3 className="text-lg font-semibold mb-1">
-                                    Focus Word
-                                </h3>
+                                <h3 className="text-lg font-semibold mb-1">Focus Word</h3>
                                 <p className="text-md">
                                     <span className="font-bold">
                                         {parsedBreakdownData.focus.word}
@@ -215,18 +193,13 @@ export default function SavedPage() {
                                         ` (${parsedBreakdownData.focus.reading})`}
                                 </p>
                                 {parsedBreakdownData.focus.meanings &&
-                                    parsedBreakdownData.focus.meanings.length >
-                                        0 && (
+                                    parsedBreakdownData.focus.meanings.length > 0 && (
                                         <div className="text-sm text-gray-600 dark:text-gray-300">
-                                            <span className="font-semibold">
-                                                Meanings:
-                                            </span>
+                                            <span className="font-semibold">Meanings:</span>
                                             <ul className="list-disc list-inside ml-2">
                                                 {parsedBreakdownData.focus.meanings.map(
                                                     (meaning, index) => (
-                                                        <li key={index}>
-                                                            {meaning}
-                                                        </li>
+                                                        <li key={index}>{meaning}</li>
                                                     )
                                                 )}
                                             </ul>
@@ -236,22 +209,14 @@ export default function SavedPage() {
                         )}
                         {parsedBreakdownData.sentence && (
                             <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded">
-                                <h3 className="text-lg font-semibold mb-1">
-                                    Sentence
-                                </h3>
-                                <p className="text-md italic">
-                                    {parsedBreakdownData.sentence}
-                                </p>
+                                <h3 className="text-lg font-semibold mb-1">Sentence</h3>
+                                <p className="text-md italic">{parsedBreakdownData.sentence}</p>
                             </div>
                         )}
                         {parsedBreakdownData.gpt_explanation && (
                             <div className="prose dark:prose-invert prose-sm max-w-none mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded">
-                                <h3 className="text-lg font-semibold mb-1">
-                                    GPT Explanation
-                                </h3>
-                                <ReactMarkdown
-                                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                                >
+                                <h3 className="text-lg font-semibold mb-1">GPT Explanation</h3>
+                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                                     {parsedBreakdownData.gpt_explanation}
                                 </ReactMarkdown>
                             </div>
@@ -265,18 +230,11 @@ export default function SavedPage() {
                     </div>
                 )}
 
-                {!selectedClip &&
-                    !clipsLoading &&
-                    !clipsError &&
-                    clips &&
-                    clips.length > 0 && (
-                        <div className=" mb-8 p-6 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
-                            <p>
-                                Select a clip from the list below to view its
-                                details and video.
-                            </p>
-                        </div>
-                    )}
+                {!selectedClip && !clipsLoading && !clipsError && clips && clips.length > 0 && (
+                    <div className=" mb-8 p-6 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+                        <p>Select a clip from the list below to view its details and video.</p>
+                    </div>
+                )}
 
                 <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
                     {clipsLoading ? (
@@ -285,14 +243,13 @@ export default function SavedPage() {
                         </p>
                     ) : clipsError ? (
                         <p className="text-center text-red-500 py-4">
-                            Error loading clips. Please ensure your profile is
-                            set and backend is running.
+                            Error loading clips. Please ensure your profile is set and backend is
+                            running.
                         </p>
                     ) : !clips || clips.length === 0 ? (
                         <div className="text-center">
                             <p className="text-gray-600 dark:text-gray-400 py-4">
-                                Profile <strong>{profileId}</strong> has no
-                                clips.
+                                Profile <strong>{profileId}</strong> has no clips.
                             </p>
                             <p className="text-gray-600 dark:text-gray-400 py-4">
                                 Create some from the Player page!
@@ -309,8 +266,7 @@ export default function SavedPage() {
                                     const parsed = JSON.parse(
                                         clip.breakdown_response
                                     ) as Partial<BreakdownData>;
-                                    previewBreakdown.sentence =
-                                        parsed.sentence || "N/A";
+                                    previewBreakdown.sentence = parsed.sentence || "N/A";
                                     previewBreakdown.gpt_explanation =
                                         parsed.gpt_explanation || "N/A";
                                 } catch (e) {
@@ -332,27 +288,19 @@ export default function SavedPage() {
                                                 {previewBreakdown.sentence}
                                             </div>
                                             <p className="text-sm text-gray-600 dark:text-gray-300">
-                                                {truncateText(
-                                                    previewBreakdown.gpt_explanation
-                                                )}
+                                                {truncateText(previewBreakdown.gpt_explanation)}
                                             </p>
                                         </div>
                                         <div className="flex space-x-2 flex-shrink-0">
                                             <button
-                                                onClick={() =>
-                                                    handleViewClip(clip)
-                                                }
+                                                onClick={() => handleViewClip(clip)}
                                                 className="px-3 py-1 text-sm font-semibold rounded-md transition-colors bg-blue-600 hover:bg-blue-500 text-white"
                                             >
                                                 View Clip
                                             </button>
                                             <button
-                                                onClick={() =>
-                                                    handleDeleteClip(clip.id)
-                                                }
-                                                disabled={
-                                                    deletingClipId === clip.id
-                                                }
+                                                onClick={() => handleDeleteClip(clip.id)}
+                                                disabled={deletingClipId === clip.id}
                                                 className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors text-white ${
                                                     deletingClipId === clip.id
                                                         ? "bg-red-700 cursor-not-allowed"

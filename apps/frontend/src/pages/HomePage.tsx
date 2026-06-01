@@ -90,12 +90,11 @@ export default function HomePage() {
                 {/* Hero Section */}
                 <section className="text-center py-20 md:py-32 px-6">
                     <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 leading-tight text-white">
-                        Immerse in Japanese with{" "}
-                        <span className="text-indigo-400">Mirumoji</span>
+                        Immerse in Japanese with <span className="text-indigo-400">Mirumoji</span>
                     </h1>
                     <p className="max-w-2xl mx-auto text-lg sm:text-xl md:text-2xl text-gray-300 mb-10">
-                        Mirumoji uses AI to turn your favorite content into
-                        immersive Japanese lessons.
+                        Mirumoji uses AI to turn your favorite content into immersive Japanese
+                        lessons.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-5">
                         <Link
@@ -114,10 +113,7 @@ export default function HomePage() {
                 </section>
 
                 {/* Features Section - Enhanced Cards */}
-                <section
-                    id="features"
-                    className="py-16 md:py-24 px-6 bg-slate-900/70 scroll-mt-20"
-                >
+                <section id="features" className="py-16 md:py-24 px-6 bg-slate-900/70 scroll-mt-20">
                     <div className="max-w-7xl mx-auto">
                         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-16 md:mb-20 text-white">
                             Immersion Toolkit
@@ -149,9 +145,7 @@ export default function HomePage() {
 
                 {/* Footer */}
                 <footer className="flex flex-col items-center py-16 border-t border-slate-700/50">
-                    <p className="text-gray-500 text-sm">
-                        © {new Date().getFullYear()} svdC1
-                    </p>
+                    <p className="text-gray-500 text-sm">© {new Date().getFullYear()} svdC1</p>
                     <a
                         className="text-blue-500 text-sm"
                         href="https://github.com/svdC1/mirumoji/blob/main/LICENSE"

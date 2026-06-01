@@ -91,11 +91,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setTimestamp,
     };
 
-    return (
-        <PlayerContext.Provider value={value}>
-            {children}
-        </PlayerContext.Provider>
-    );
+    return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 };
 
 /**

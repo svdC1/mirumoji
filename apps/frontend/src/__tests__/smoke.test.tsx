@@ -6,12 +6,12 @@
 import { describe, it, expect } from "vitest";
 
 describe("Frontend test harness", () => {
-  it("vitest + jsdom can run a basic assertion", () => {
-    expect(1 + 1).toBe(2);
-  });
+    it("vitest + jsdom can run a basic assertion", () => {
+        expect(1 + 1).toBe(2);
+    });
 
-  it("document is available in jsdom", () => {
-    expect(document).toBeDefined();
-    expect(document.createElement("div")).toBeTruthy();
-  });
+    it("document is available in jsdom", () => {
+        expect(document).toBeDefined();
+        expect(document.createElement("div")).toBeTruthy();
+    });
 });

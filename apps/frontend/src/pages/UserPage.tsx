@@ -10,17 +10,8 @@ import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
-import {
-    GptTemplate,
-    ProfileFile,
-    ProfileTranscript,
-    ApiError,
-} from "../types/types";
-import {
-    getFileExtension,
-    truncateFilename,
-    formatStaticUrl,
-} from "../utils/fileUtils";
+import { GptTemplate, ProfileFile, ProfileTranscript, ApiError } from "../types/types";
+import { getFileExtension, truncateFilename, formatStaticUrl } from "../utils/fileUtils";
 import {
     tabs,
     API_BASE,
@@ -47,33 +38,23 @@ export default function UserPage() {
     const [activeTab, setActiveTab] = useState<string>("profile");
     const { profileId } = useProfile();
     const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
-    const [deletingTranscriptId, setDeletingTranscriptId] = useState<
-        string | null
-    >(null);
-    const [downloadingTranscriptId, setDownloadingTranscriptId] = useState<
-        string | null
-    >(null);
+    const [deletingTranscriptId, setDeletingTranscriptId] = useState<string | null>(null);
+    const [downloadingTranscriptId, setDownloadingTranscriptId] = useState<string | null>(null);
 
     // GPT Template states
     const [gptSysMsg, setGptSysMsg] = useState("");
     const [gptPrompt, setGptPrompt] = useState("");
     const [gptVersion, setGptVersion] = useState(validGptModels[3]); // Default : gpt-4.1-mini
-    const [currentGptTemplate, setCurrentGptTemplate] =
-        useState<GptTemplate | null>(null); // Store the fetched template object
+    const [currentGptTemplate, setCurrentGptTemplate] = useState<GptTemplate | null>(null); // Store the fetched template object
     const [isSavingGptTemplate, setIsSavingGptTemplate] = useState(false);
     const [isDeletingGptTemplate, setIsDeletingGptTemplate] = useState(false);
 
     // SWR fetch keys - will use profileId
-    const filesSWRKey =
-        profileId && activeTab === "files" ? `profiles/files` : null;
+    const filesSWRKey = profileId && activeTab === "files" ? `profiles/files` : null;
     const transcriptsSWRKey =
-        profileId && activeTab === "transcripts"
-            ? `profiles/transcripts`
-            : null;
+        profileId && activeTab === "transcripts" ? `profiles/transcripts` : null;
     const gptTemplateSWRKey =
-        profileId && activeTab === "gpt-template"
-            ? `profiles/gpt_template`
-            : null;
+        profileId && activeTab === "gpt-template" ? `profiles/gpt_template` : null;
 
     // Fetch files
     const {
@@ -123,11 +104,7 @@ export default function UserPage() {
             setGptPrompt(gptTemplateData.prompt);
             setGptVersion(gptTemplateData.version);
             setCurrentGptTemplate(gptTemplateData);
-        } else if (
-            profileId &&
-            activeTab === "gpt-template" &&
-            !gptTemplateLoading
-        ) {
+        } else if (profileId && activeTab === "gpt-template" && !gptTemplateLoading) {
             // If no template data but profile active
             setGptSysMsg(defaultSysMsg); // Clear or set to defaults for new template creation
             setGptPrompt(defaultPrompt);
@@ -181,11 +158,8 @@ export default function UserPage() {
         }
         setDownloadingTranscriptId(transcript.id);
         try {
-            const response = await fetch(
-                formatStaticUrl(API_BASE, transcript.get_url)
-            );
-            if (!response.ok)
-                throw new Error(`HTTP error! status: ${response.status}`);
+            const response = await fetch(formatStaticUrl(API_BASE, transcript.get_url));
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -234,11 +208,7 @@ export default function UserPage() {
                 method: method,
                 body: JSON.stringify(payload),
             });
-            toast.success(
-                currentGptTemplate?.id
-                    ? "Template updated!"
-                    : "Template created!"
-            );
+            toast.success(currentGptTemplate?.id ? "Template updated!" : "Template created!");
             mutate(gptTemplateSWRKey);
         } catch (error) {
             console.error("Error saving GPT template:", error);
@@ -346,15 +316,11 @@ export default function UserPage() {
                             ))}
                         {activeTab === "files" &&
                             (!profileId ? (
-                                showProfileMessage(
-                                    "Set a profile to view your files."
-                                )
+                                showProfileMessage("Set a profile to view your files.")
                             ) : filesLoading ? (
                                 <p className="text-center">Loading files…</p>
                             ) : filesError ? (
-                                <p className="text-red-500 text-center">
-                                    Error loading files.
-                                </p>
+                                <p className="text-red-500 text-center">Error loading files.</p>
                             ) : files && files.length > 0 ? (
                                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                                     {files.map((file) => (
@@ -363,26 +329,17 @@ export default function UserPage() {
                                             className="flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow"
                                         >
                                             <a
-                                                href={formatStaticUrl(
-                                                    API_BASE,
-                                                    file.get_url
-                                                )}
+                                                href={formatStaticUrl(API_BASE, file.get_url)}
                                                 download={file.file_name}
                                                 className="flex-1 mr-4 overflow-hidden"
                                             >
                                                 <div className="font-medium text-gray-800 dark:text-gray-100 truncate">
-                                                    {truncateFilename(
-                                                        file.file_name
-                                                    )}
+                                                    {truncateFilename(file.file_name)}
                                                 </div>
                                             </a>
                                             <button
-                                                onClick={() =>
-                                                    handleDeleteFile(file.id)
-                                                }
-                                                disabled={
-                                                    deletingFileId === file.id
-                                                }
+                                                onClick={() => handleDeleteFile(file.id)}
+                                                disabled={deletingFileId === file.id}
                                                 className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${
                                                     deletingFileId === file.id
                                                         ? "bg-red-800 cursor-not-allowed"
@@ -397,19 +354,13 @@ export default function UserPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-center">
-                                    No files found for this profile.
-                                </p>
+                                <p className="text-center">No files found for this profile.</p>
                             ))}
                         {activeTab === "transcripts" &&
                             (!profileId ? (
-                                showProfileMessage(
-                                    "Set a profile to view your transcripts."
-                                )
+                                showProfileMessage("Set a profile to view your transcripts.")
                             ) : transcriptsLoading ? (
-                                <p className="text-center">
-                                    Loading transcripts…
-                                </p>
+                                <p className="text-center">Loading transcripts…</p>
                             ) : transcriptsError ? (
                                 <p className="text-red-500 text-center">
                                     Error loading transcripts.
@@ -424,11 +375,7 @@ export default function UserPage() {
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-1 mr-4 break-all">
                                                     Transcript ID:{" "}
-                                                    {truncateFilename(
-                                                        transcript.id,
-                                                        4,
-                                                        4
-                                                    )}
+                                                    {truncateFilename(transcript.id, 4, 4)}
                                                     {transcript.original_file_name &&
                                                         ` (from ${truncateFilename(
                                                             transcript.original_file_name
@@ -437,9 +384,7 @@ export default function UserPage() {
                                                 <div className="flex space-x-2">
                                                     <button
                                                         onClick={() =>
-                                                            handleDownloadTranscript(
-                                                                transcript
-                                                            )
+                                                            handleDownloadTranscript(transcript)
                                                         }
                                                         disabled={
                                                             downloadingTranscriptId ===
@@ -452,30 +397,24 @@ export default function UserPage() {
                                                                 : "bg-blue-600 hover:bg-blue-500"
                                                         }`}
                                                     >
-                                                        {downloadingTranscriptId ===
-                                                        transcript.id
+                                                        {downloadingTranscriptId === transcript.id
                                                             ? "Downloading…"
                                                             : "Download Audio"}
                                                     </button>
                                                     <button
                                                         onClick={() =>
-                                                            handleDeleteTranscript(
-                                                                transcript.id
-                                                            )
+                                                            handleDeleteTranscript(transcript.id)
                                                         }
                                                         disabled={
-                                                            deletingTranscriptId ===
-                                                            transcript.id
+                                                            deletingTranscriptId === transcript.id
                                                         }
                                                         className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${
-                                                            deletingTranscriptId ===
-                                                            transcript.id
+                                                            deletingTranscriptId === transcript.id
                                                                 ? "bg-red-800 cursor-not-allowed"
                                                                 : "bg-red-600 hover:bg-red-500"
                                                         }`}
                                                     >
-                                                        {deletingTranscriptId ===
-                                                        transcript.id
+                                                        {deletingTranscriptId === transcript.id
                                                             ? "Deleting…"
                                                             : "Delete"}
                                                     </button>
@@ -486,14 +425,8 @@ export default function UserPage() {
                                             </div>
                                             {transcript.gpt_explanation && (
                                                 <div className="prose dark:prose-invert prose-sm max-w-none border-t border-zinc-700 pt-3 mt-3">
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[
-                                                            remarkBreaks,
-                                                        ]}
-                                                    >
-                                                        {
-                                                            transcript.gpt_explanation
-                                                        }
+                                                    <ReactMarkdown remarkPlugins={[remarkBreaks]}>
+                                                        {transcript.gpt_explanation}
                                                     </ReactMarkdown>
                                                 </div>
                                             )}
@@ -508,13 +441,9 @@ export default function UserPage() {
 
                         {activeTab === "gpt-template" &&
                             (!profileId ? (
-                                showProfileMessage(
-                                    "Set a profile to manage GPT templates."
-                                )
+                                showProfileMessage("Set a profile to manage GPT templates.")
                             ) : gptTemplateLoading ? (
-                                <p className="text-center">
-                                    Loading GPT Template...
-                                </p>
+                                <p className="text-center">Loading GPT Template...</p>
                             ) : gptTemplateError &&
                               (gptTemplateError as ApiError).status !== 404 ? (
                                 <p className="text-red-500 text-center">
@@ -523,10 +452,9 @@ export default function UserPage() {
                             ) : (
                                 <div className="space-y-6 flex flex-col">
                                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Customize your GPT template for word
-                                        explanations. Use{" "}
-                                        <code>{"{sentence}"}</code> and{" "}
-                                        <code>{"{focus}"}</code> placeholders.
+                                        Customize your GPT template for word explanations. Use{" "}
+                                        <code>{"{sentence}"}</code> and <code>{"{focus}"}</code>{" "}
+                                        placeholders.
                                     </p>
                                     <div>
                                         <label
@@ -539,15 +467,10 @@ export default function UserPage() {
                                             id="gptVersion"
                                             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                             value={gptVersion}
-                                            onChange={(e) =>
-                                                setGptVersion(e.target.value)
-                                            }
+                                            onChange={(e) => setGptVersion(e.target.value)}
                                         >
                                             {validGptModels.map((version) => (
-                                                <option
-                                                    key={version}
-                                                    value={version}
-                                                >
+                                                <option key={version} value={version}>
                                                     {version}
                                                 </option>
                                             ))}
@@ -561,16 +484,10 @@ export default function UserPage() {
                                         <textarea
                                             id="gptSysMsg"
                                             value={gptSysMsg}
-                                            onChange={(e) =>
-                                                setGptSysMsg(e.target.value)
-                                            }
+                                            onChange={(e) => setGptSysMsg(e.target.value)}
                                             rows={6}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 resize-none overflow-auto"
-                                            placeholder={
-                                                currentGptTemplate
-                                                    ? ""
-                                                    : defaultSysMsg
-                                            }
+                                            placeholder={currentGptTemplate ? "" : defaultSysMsg}
                                         />
                                     </div>
                                     <div>
@@ -583,25 +500,16 @@ export default function UserPage() {
                                         <textarea
                                             id="gptPrompt"
                                             value={gptPrompt}
-                                            onChange={(e) =>
-                                                setGptPrompt(e.target.value)
-                                            }
+                                            onChange={(e) => setGptPrompt(e.target.value)}
                                             rows={8}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 resize-none overflow-auto"
-                                            placeholder={
-                                                currentGptTemplate
-                                                    ? ""
-                                                    : defaultPrompt
-                                            }
+                                            placeholder={currentGptTemplate ? "" : defaultPrompt}
                                         />
                                     </div>
                                     <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 mt-4">
                                         <button
                                             onClick={handleSaveGptTemplate}
-                                            disabled={
-                                                isSavingGptTemplate ||
-                                                isDeletingGptTemplate
-                                            }
+                                            disabled={isSavingGptTemplate || isDeletingGptTemplate}
                                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                         >
                                             {isSavingGptTemplate
@@ -613,24 +521,18 @@ export default function UserPage() {
                                         {currentGptTemplate && (
                                             <>
                                                 <button
-                                                    onClick={
-                                                        handleRevertToDefaultGptTemplate
-                                                    }
+                                                    onClick={handleRevertToDefaultGptTemplate}
                                                     disabled={
-                                                        isSavingGptTemplate ||
-                                                        isDeletingGptTemplate
+                                                        isSavingGptTemplate || isDeletingGptTemplate
                                                     }
                                                     className="w-full sm:w-auto px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                                 >
                                                     Revert to Default
                                                 </button>
                                                 <button
-                                                    onClick={
-                                                        handleDeleteGptTemplate
-                                                    }
+                                                    onClick={handleDeleteGptTemplate}
                                                     disabled={
-                                                        isDeletingGptTemplate ||
-                                                        isSavingGptTemplate
+                                                        isDeletingGptTemplate || isSavingGptTemplate
                                                     }
                                                     className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                                 >

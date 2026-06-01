@@ -25,9 +25,7 @@ export async function createAndSaveClip(
     onProgress: (message: string, type: "success" | "error" | "loading") => void
 ): Promise<void> {
     // Get Video Element
-    const videoElement = document.getElementById(
-        videoElementId
-    ) as HTMLVideoElement;
+    const videoElement = document.getElementById(videoElementId) as HTMLVideoElement;
     if (!videoElement) {
         onProgress("Video player not found.", "error");
         throw new Error("Video player not found.");
@@ -42,11 +40,7 @@ export async function createAndSaveClip(
 
     // Avoid cueEnd getting bigger than video duration due to 1s padding.
     const videoDuration = videoElement.duration;
-    if (
-        typeof videoDuration === "number" &&
-        !isNaN(videoDuration) &&
-        isFinite(videoDuration)
-    ) {
+    if (typeof videoDuration === "number" && !isNaN(videoDuration) && isFinite(videoDuration)) {
         if (cueStart >= videoDuration) {
             onProgress("Clip start time is at or after video end.", "error");
             throw new Error("Clip start time is at or after video end.");
@@ -62,11 +56,7 @@ export async function createAndSaveClip(
     try {
         onProgress("Recording...", "loading");
         // Get File
-        const clipFile = await recordMediaStream(
-            videoElement,
-            cueStart,
-            adjustedCueEnd
-        );
+        const clipFile = await recordMediaStream(videoElement, cueStart, adjustedCueEnd);
 
         onProgress("Uploading...", "loading");
 
@@ -74,9 +64,7 @@ export async function createAndSaveClip(
         const headers = {
             "clip-start-time": cueStart.toString(),
             "clip-end-time": adjustedCueEnd.toString(),
-            "gpt-breakdown-response": encodeURIComponent(
-                JSON.stringify(gptData)
-            ),
+            "gpt-breakdown-response": encodeURIComponent(JSON.stringify(gptData)),
             "original-video-file-name": videoElement.currentSrc,
             "original-video-url": videoElement.currentSrc,
         };
@@ -95,17 +83,11 @@ export async function createAndSaveClip(
         if (response.success) {
             onProgress(response.message || "Clip saved!", "success");
         } else {
-            throw new Error(
-                response.message || "Failed to save clip on the server."
-            );
+            throw new Error(response.message || "Failed to save clip on the server.");
         }
     } catch (error: any) {
         console.error("Error during clip saving process:", error);
-        onProgress(
-            error.message ||
-                "An unexpected error occurred while saving the clip.",
-            "error"
-        );
+        onProgress(error.message || "An unexpected error occurred while saving the clip.", "error");
         throw error; // Re-throw to allow the caller to handle it if needed.
     }
 }

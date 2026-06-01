@@ -71,9 +71,7 @@ export default function PlayerPage() {
                             showFurigana={showFurigana}
                         />
                     ) : (
-                        <p className="text-gray-400">
-                            Load a video from the menu ☰ to begin.
-                        </p>
+                        <p className="text-gray-400">Load a video from the menu ☰ to begin.</p>
                     )}
                 </main>
             </div>

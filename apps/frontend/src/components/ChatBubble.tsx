@@ -25,16 +25,11 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
     const containerClass = msg.isAudioMessage
         ? "w-full max-w-md sm:max-w-lg md:max-w-2xl"
         : "w-fit max-w-[90%]";
-    const bubbleColor =
-        msg.type === "user" ? "bg-indigo-600 ml-auto" : "bg-zinc-800 mr-auto";
+    const bubbleColor = msg.type === "user" ? "bg-indigo-600 ml-auto" : "bg-zinc-800 mr-auto";
     const rawSentence = msg.isTranscription && msg.text ? msg.text : "";
 
     return (
-        <div
-            className={`flex ${
-                msg.type === "user" ? "justify-end" : "justify-start"
-            }`}
-        >
+        <div className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}>
             <div
                 className={`${containerClass} ${bubbleColor} px-4 py-3 rounded-2xl text-white text-sm shadow-md`}
             >
@@ -65,17 +60,13 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                             const lookupForm = !(token.basic_form === "*")
                                 ? token.basic_form
                                 : token.surface_form;
-                            const furiganaText = showFurigana
-                                ? toHiragana(token.reading!)
-                                : null;
+                            const furiganaText = showFurigana ? toHiragana(token.reading!) : null;
 
                             return (
                                 <button
                                     key={i}
                                     className="inline-flex flex-col items-center mx-1 group align-bottom"
-                                    onClick={() =>
-                                        onWordClick(rawSentence, lookupForm)
-                                    }
+                                    onClick={() => onWordClick(rawSentence, lookupForm)}
                                 >
                                     {showFurigana && furiganaText && (
                                         <span className="text-xs text-gray-400 group-hover:text-yellow-300">
@@ -93,9 +84,7 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                     msg.text && (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkBreaks]}
-                            className={
-                                "prose text-sm max-w-prose whitespace-pre-wrap"
-                            }
+                            className={"prose text-sm max-w-prose whitespace-pre-wrap"}
                         >
                             {msg.text}
                         </ReactMarkdown>

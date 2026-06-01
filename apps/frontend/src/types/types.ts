@@ -227,6 +227,75 @@ export interface DictWildcardLookup {
     examples: string[];
 }
 
+/* Server tokenizer (Phase 0 — compared against kuromoji before the swap) */
+
+/**
+ * A morphological token from the server tokenizer (fugashi / UniDic).
+ *
+ * Keys match the API's serialized aliases (FastAPI emits the response model
+ * by alias): e.g. `kana` is the katakana reading and `pos1` the top-level
+ * part of speech.
+ */
+export interface Token {
+    surface: string;
+    lemma: string;
+    kana: string;
+    pos1: string;
+    pos2: string;
+    pos3: string;
+    pos4: string;
+    cType: string;
+    cForm: string;
+    lForm: string;
+    orth: string;
+    pron: string;
+    orthBase: string;
+    pronBase: string;
+    goshu: string;
+    iType: string;
+    iForm: string;
+    fType: string;
+    fForm: string;
+}
+
+/**
+ * Dictionary data for a single query (replaces `DictLookup`/`DictWildcardLookup`
+ * in the new contract; `query` replaces the old `word`/`pattern`).
+ */
+export interface KotobaseData {
+    query: string;
+    jmentries: JMEntry[];
+    jmnentries: JMNEntry[];
+    kanji: KanjiInfo[];
+    meanings: string[];
+    jlpt: string;
+    examples: string[];
+}
+
+/**
+ * A useful word stitched from one or more UniDic short-unit tokens, as
+ * returned by `GET /dict/tokenize`.
+ *
+ * `surface`/`reading` are the component pieces joined; `lemma` is the
+ * dictionary-lookup form; `tokens` keeps the original short units.
+ */
+export interface JapaneseWord {
+    surface: string;
+    reading: string;
+    lemma: string;
+    pos: string;
+    tokens: Token[];
+}
+
+/**
+ * A `JapaneseWord` paired with its dictionary data, as returned by
+ * `GET /dict/analyze`.
+ */
+export interface EnrichedJapaneseWord {
+    word: JapaneseWord;
+    kotobase_data: KotobaseData;
+}
+
 /*TranscribePage*/
 
 /**
@@ -280,9 +349,17 @@ export interface SubtitleStyle {
 
 /**
  * An error class for API errors.
+ *
+ * `code` is the server's machine-readable identifier from the error envelope
+ * (`{ success: false, error: { code, message, details } }`), when present.
  */
 export class ApiError extends Error {
-    constructor(public status: number, message: string) {
+    constructor(
+        public status: number,
+        message: string,
+        public code?: string,
+        public details?: unknown
+    ) {
         super(message);
     }
 }

@@ -18,15 +18,12 @@ const NotFoundPage: React.FC = () => {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12 bg-gray-900 text-white">
             <div className="bg-gray-800/70 backdrop-blur-sm p-8 md:p-12 rounded-xl shadow-xl max-w-md w-full">
-                <h1 className="text-6xl md:text-8xl font-extrabold text-indigo-400 mb-4">
-                    404
-                </h1>
+                <h1 className="text-6xl md:text-8xl font-extrabold text-indigo-400 mb-4">404</h1>
                 <h2 className="text-2xl md:text-3xl font-semibold mb-3 text-white">
                     Page Not Found
                 </h2>
                 <p className="text-gray-300 mb-8 text-sm md:text-base">
-                    Oops! The page you&apos;re looking for doesn&apos;t seem
-                    to exist.
+                    Oops! The page you&apos;re looking for doesn&apos;t seem to exist.
                 </p>
                 <Link
                     to="/"
