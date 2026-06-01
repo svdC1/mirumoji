@@ -11,7 +11,11 @@ import logging
 
 from fastapi import APIRouter, Query
 
-from ..models.jpdict import JapaneseWord, KotobaseData
+from ..models.jpdict import (
+    EnrichedJapaneseWord,
+    JapaneseWord,
+    KotobaseData,
+)
 from ..processing import text
 
 LOGGER = logging.getLogger(__name__)
@@ -47,16 +51,41 @@ async def query(
 @dict_router.get("/tokenize", response_model=list[JapaneseWord])
 async def tokenize(sentence: str = Query(...)) -> list[JapaneseWord]:
     """
-    Tokenizes a sentence into words enriched with their dictionary data
+    Tokenizes a sentence into useful, stitched words (no dictionary lookups)
+
+    This is the fast path for rendering clickable text. Call `/dict/analyze`
+    or `/dict/query` to fetch dictionary data for a word
 
     Args:
         sentence (str): The Japanese sentence to tokenize
 
     Returns:
-        A list of `JapaneseWord` models, one per token
+        A list of `JapaneseWord` models, one per stitched word
+
+    Raises:
+        FugashiError: If tokenization fails
+    """
+    return await asyncio.to_thread(text.segment, sentence)
+
+
+@dict_router.get("/analyze", response_model=list[EnrichedJapaneseWord])
+async def analyze(
+    sentence: str = Query(...),
+) -> list[EnrichedJapaneseWord]:
+    """
+    Tokenizes a sentence and enriches every stitched word with dictionary data
+
+    Slower than `/dict/tokenize` (one dictionary lookup per word). Intended for
+    on-demand analysis rather than bulk rendering
+
+    Args:
+        sentence (str): The Japanese sentence to analyze
+
+    Returns:
+        A list of `EnrichedJapaneseWord` models, one per stitched word
 
     Raises:
         FugashiError: If tokenization fails
         KotobaseError: If a dictionary lookup fails
     """
-    return await asyncio.to_thread(text.process_sentence, sentence)
+    return await asyncio.to_thread(text.enrich, sentence)

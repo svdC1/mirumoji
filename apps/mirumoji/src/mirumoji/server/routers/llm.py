@@ -55,7 +55,7 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
         req (BreakdownRequest): The breakdown request
 
     Returns:
-        The focused word's `JapaneseWord` (when a focus is given) and the LLM
+        The focused `EnrichedJapaneseWord` (when a focus is given) and the LLM
             explanation
 
     Raises:
@@ -89,7 +89,7 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
 
     focus_word = None
     if req.focus:
-        words = await asyncio.to_thread(text.process_sentence, req.focus)
+        words = await asyncio.to_thread(text.enrich, req.focus)
         focus_word = words[0] if words else None
 
     return BreakdownResponse(focus=focus_word, explanation=explanation)

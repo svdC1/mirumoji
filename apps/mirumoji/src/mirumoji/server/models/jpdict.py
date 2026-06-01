@@ -226,14 +226,56 @@ class Token(BaseModel):
 
 class JapaneseWord(BaseModel):
     """
-    Represents all information extracted from both `fugashi` and `kotobase`
-    for a single word within a tokenized Japanese sentence
+    Represents a single useful word stitched from one or more UniDic short-unit
+    tokens
+
+    abstract: Stitching
+        - UniDic segments at the short-unit level, which is often too granular
+          to be useful (e.g. `図書館` -> `図書` + `館`, or a verb split from
+          its auxiliaries)
+
+        - A `JapaneseWord` re-bundles those short units into the
+          word a learner actually wants to click
+
+        - The original short-unit `Token` models are kept in `tokens` so no
+          morphological detail is lost
+
+    example: the word built from 読み + まし + た
+        - surface = "読みました" (the pieces joined as written)
+        - reading = "ヨミマシタ" (their katakana readings joined)
+        - lemma = "読む" (the dictionary form, for look-ups)
+        - pos = "動詞" (verb -- the head piece's part of speech)
+        - tokens = [読み, まし, た] (the three original short units)
 
     Args:
-        token (Token): The `fugashi` token information for the word
-        kotobase_data (KotobaseData): The information extracted from `kotobase`
-            for this word
+        surface (str): The bundle's combined surface form
+        reading (str): The combined katakana reading of the component tokens
+        lemma (str): Dictionary-lookup form (the head token's UniDic's
+            `orthBase` for inflected words, or the combined surface for noun
+            compounds)
+        pos (str): The head token's top-level part of speech
+        tokens (list[Token]): The component short-unit tokens, in order
     """
 
-    token: Token
+    surface: str
+    reading: str
+    lemma: str
+    pos: str
+    tokens: list[Token]
+
+
+class EnrichedJapaneseWord(BaseModel):
+    """
+    A `JapaneseWord` paired with its dictionary data
+
+    Returned by the enrichment endpoint (one `kotobase` lookup per stitched
+    word), as opposed to the fast tokenize endpoint which returns bare
+    `JapaneseWord` models
+
+    Args:
+        word (JapaneseWord): The stitched word
+        kotobase_data (KotobaseData): The dictionary data for the word's lemma
+    """
+
+    word: JapaneseWord
     kotobase_data: KotobaseData

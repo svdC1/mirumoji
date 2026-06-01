@@ -4,7 +4,7 @@ Defines Pydantic response models for the API's endpoints
 
 from pydantic import BaseModel
 
-from .jpdict import JapaneseWord
+from .jpdict import EnrichedJapaneseWord
 
 # --- LLM Responses ---
 
@@ -14,19 +14,19 @@ class BreakdownResponse(BaseModel):
     Response for the `/llm/breakdown` endpoint
 
     warning: `focus`
-        - For all tokens in a sentence use the `/dict/tokenize` endpoint
+        - To tokenize a whole sentence use the `/dict/tokenize` endpoint
           instead
 
-        - This only carries the focused word's `Token` + `KotobaseData` models
-          and its LLM explanation within the sentence
+        - This only carries the focused word (its stitched token + dictionary
+          data) and the LLM explanation of its use within the sentence
 
     Args:
-        focus (JapaneseWord | None): The focused word's token + dictionary
-            info, or `None` when no focus was provided
+        focus (EnrichedJapaneseWord | None): The focused word + its dictionary
+            data, or `None` when no focus was provided
         explanation (str): The LLM explanation
     """
 
-    focus: JapaneseWord | None = None
+    focus: EnrichedJapaneseWord | None = None
     explanation: str
 
 
