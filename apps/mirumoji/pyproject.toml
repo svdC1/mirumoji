@@ -71,8 +71,13 @@ server = [
 ]
 
 # Local Whisper Transcription (Modal Offload Deployments Don't Need This)
+# huggingface_hub / sentencepiece / requests support model download + the
+# faster-whisper tokenizer
 whisper-local = [
-    "faster-whisper==1.1.1"
+    "faster-whisper==1.1.1",
+    "huggingface_hub",
+    "sentencepiece",
+    "requests"
 ]
 
 
@@ -110,6 +115,11 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Ship the Dockerfiles as package data so the CLI/GUI can build images from an
+# installed wheel
+[tool.setuptools.package-data]
+mirumoji = ["docker/*"]
 
 # --- Ruff ---
 [tool.ruff]

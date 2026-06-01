@@ -3,7 +3,7 @@ FROM python:3.11-slim-bookworm
 # --- Set working directory ---
 WORKDIR /app
 
-# --- Set env ---
+# --- Set Env ---
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}"
@@ -23,10 +23,11 @@ RUN apt-get update && \
 RUN python3.11 -m ensurepip --upgrade && \
     python3.11 -m pip install --no-cache-dir --upgrade pip
 
-# --- Copy package files and install server dependencies ---
-# CPU image is the Modal-offload deployment: no local Whisper, so no torch.
-# Transcription is handled by Modal GPU containers; the LLM provider SDKs are
-# included so breakdowns/explanations work without GPU.
+# --- Copy Files and Install Server Deps ---
+# CPU Image is the Modal-Offload Deployment
+# No faster-whisper or torch
+# Transcription is handled by Modal GPU containers
+# LLM provider SDKs are included so breakdowns/explanations work without GPU
 COPY pyproject.toml README.md ./
 COPY src/ src/
 RUN python3.11 -m pip install --no-cache-dir ".[server]"

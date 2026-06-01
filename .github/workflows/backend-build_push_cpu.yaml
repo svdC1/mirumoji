@@ -73,7 +73,7 @@ jobs:
               uses: docker/build-push-action@v6
               with:
                   context: ./apps/mirumoji # Build context is backend root
-                  file: ./apps/mirumoji/Dockerfile.cpu # Path to the Dockerfile
+                  file: ./apps/mirumoji/src/mirumoji/docker/Dockerfile.cpu # Path to the Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step

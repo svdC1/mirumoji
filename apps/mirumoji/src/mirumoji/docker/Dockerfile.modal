@@ -1,4 +1,4 @@
-# ── CUDA 12.3 + cuDNN 9 runtime ──────────────────────────────────────
+# --- CUDA 12.3 + cuDNN 9 runtime ---
 FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 
 # Set Workdir
@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
 
-# ── System deps & Python shim ────────────────────────────────────────
+# --- System deps & Python shim ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     git \
@@ -26,25 +26,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Set PYTHONPATH
-ENV PYTHONPATH="/app:${PYTHONPATH}"
-
-# ── Core Python packages (CUDA 12.4 wheels) ──────────────────────────
+# --- Install PyTorch (CUDA 12.4 wheels) ---
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
     python3.11 -m pip install --no-cache-dir \
     torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    faster-whisper==1.1.1 \
-    huggingface_hub \
-    srt \
-    requests \
-    sentencepiece \
-    openai \
-    python-dotenv \
-    pydantic \
-    modal
+    --index-url https://download.pytorch.org/whl/cu124
 
-# ── Pre-cache the Faster-Whisper model ──────
+# --- Install server + local-whisper ---
+# Modal ships live source into container at run time
+# (include_source=True), so the image only needs the runtime dependencies
+COPY pyproject.toml README.md ./
+COPY src/ src/
+RUN python3.11 -m pip install --no-cache-dir ".[server,whisper-local]"
+
+# --- Pre-cache the Faster-Whisper model ---
 RUN python3.11 -c "from huggingface_hub import snapshot_download; \
     snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
-
-COPY . .

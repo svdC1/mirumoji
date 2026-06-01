@@ -40,7 +40,7 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                   context: ./apps/mirumoji # Backend root
-                  file: ./apps/mirumoji/src/mirumoji/server/modal_processing/Dockerfile.modal
+                  file: ./apps/mirumoji/src/mirumoji/docker/Dockerfile.modal
                   platforms: linux/amd64
                   tags: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
                   outputs: type=registry
