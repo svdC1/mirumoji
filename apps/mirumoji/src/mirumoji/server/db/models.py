@@ -89,7 +89,7 @@ class SafeORMModel(BaseModel):
         loaded_data = base.instance_dict(data)
 
         # Build A Safe Dictionary For Pydantic
-        safe_dict = {}
+        safe_dict: dict[str, Any] = {}
         for field_name in cls.model_fields:
             if field_name in unloaded_fields:
                 # Set relationship fields that haven't been laoded to None

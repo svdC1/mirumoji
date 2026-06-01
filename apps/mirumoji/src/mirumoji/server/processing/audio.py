@@ -211,7 +211,7 @@ def extract_audio(
             f"Audio Processing - Input {input_path} is already an "
             f"audio file ({ext}), no extraction needed"
         )
-        return input_path
+        return Path(input_path)
 
     LOGGER.info(f"Audio Processing - Extracting audio from '{input_path}'")
 

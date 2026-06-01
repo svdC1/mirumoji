@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from types import TracebackType
+from typing import Any
 
-import aiosqlite
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -37,7 +37,7 @@ LOGGER = logging.getLogger("mirumoji")
 
 
 def _set_sqlite_pragma(
-    dbapi_connection: aiosqlite.Connection,
+    dbapi_connection: Any,
     connection_record: _ConnectionRecord,
 ) -> None:
     """
@@ -47,7 +47,8 @@ def _set_sqlite_pragma(
     better concurrency and performance
 
     Args:
-        dbapi_connection (aiosqlite.Connection): The raw DBAPI connection
+        dbapi_connection (Any): The raw DBAPI connection passed by SQLAlchemy's
+            sync `connect` event (the aiosqlite DBAPI adapter)
         connection_record (_ConnectionRecord): The connection record
     """
     cursor = dbapi_connection.cursor()

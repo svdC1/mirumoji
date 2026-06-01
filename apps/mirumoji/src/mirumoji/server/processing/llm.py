@@ -25,6 +25,7 @@ from functools import lru_cache
 from typing import Protocol
 
 from anthropic import Anthropic
+from anthropic.types import TextBlock
 from openai import OpenAI
 
 from ...exceptions import (
@@ -165,7 +166,7 @@ class AnthropicClient:
             return "".join(
                 block.text
                 for block in msg.content
-                if getattr(block, "type", None) == "text"
+                if isinstance(block, TextBlock)
             )
         except Exception as e:
             raise LLMRequestError(f"LLM request failed: {e}") from e
