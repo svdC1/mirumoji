@@ -287,8 +287,8 @@ async def write_file(
         StorageError: If the file cannot be written
     """
     path = BASE_PATH / file_path_relative
-    path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(path, "a+", encoding="utf-8") as f:
             await f.write(content)
     except OSError as e:

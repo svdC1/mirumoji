@@ -86,6 +86,9 @@ def tokenize(sentence: str) -> list[Token]:
 
     Returns:
         list of `Token` models containing extracted token information
+
+    Raises:
+        FugashiError: If the tagger can't be initialised or tokenisation fails
     """
     tagger = _get_tagger()
     tokens: list[Token] = []
@@ -138,6 +141,9 @@ def query_kotobase(
     Returns:
         Pydantic model containing all information extracted from `kotobase`
             for the query word
+
+    Raises:
+        KotobaseError: If the `kotobase` lookup fails
     """
     try:
         result = Kotobase().lookup(
@@ -247,6 +253,10 @@ def process_sentence(sentence: str) -> list[JapaneseWord]:
     Returns:
         A list of pydantic models containing token information extracted from
         `fugashi` and `kotobase`
+
+    Raises:
+        FugashiError: If tokenisation fails
+        KotobaseError: If a dictionary lookup fails
     """
     tokens = tokenize(sentence)
     data_lst = [query_kotobase(query=tok.surface) for tok in tokens]

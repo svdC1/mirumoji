@@ -53,6 +53,8 @@ async def generate_srt(
         The saved SRT file's id, the raw SRT content, and its media URL
 
     Raises:
+        MissingFFmpegError: If the FFMPEG executable can't be located
+        MissingFFprobeError: If the FFPROBE executable can't be located
         FFmpegError: If audio extraction fails
         TranscriptionError: If transcription fails
         WhisperUnavailableError: If no transcription backend is available
@@ -129,7 +131,10 @@ async def convert_to_mp4(
         The converted MP4's media URL
 
     Raises:
+        MissingFFmpegError: If the FFMPEG executable can't be located
+        MissingFFprobeError: If the FFPROBE executable can't be located
         FFmpegError: If conversion fails
+        ValueError: If the resolution is malformed
         ModalError: If a Modal job fails
         StorageError: If storing the converted file fails
         DatabaseError: If persistence fails

@@ -266,7 +266,7 @@ def filter_audio(
     Args:
         ffmpeg_path (str): Path to the system's FFMPEG executable
         input_path (str): Path to the audio / video file to use
-        output_wav (str): Path in which to save the resulting WAV file
+        output_path (str): Path in which to save the resulting WAV file
         highpass (int): Cut everything below this frequency (Hz)
         lowpass (int): Cut everything above this frequency (Hz)
 
@@ -275,7 +275,7 @@ def filter_audio(
         ValueError: If `input_path` doesn't exist or is not a file
 
     Returns:
-       The extracted 16kHz mono WAV aduio file extracted fro
+        The path to the extracted 16 kHz mono WAV audio file
     """
 
     input = Path(input_path).resolve()
@@ -490,6 +490,8 @@ def to_mp4(
             f"{input.as_posix()} failed"
         ) from e
 
+    return output
+
 
 def to_webm(
     ffmpeg_path: str,
@@ -644,3 +646,5 @@ def to_webm(
             f"Audio Processing - CPU WebM conversion for"
             f"{input.as_posix()} failed"
         ) from e
+
+    return output

@@ -35,8 +35,8 @@ def transcribe_job(
     Args:
         rel_media_fp (str | os.PathLike[str]): Path to the media relative to
             `HOST_MEDIA_PATH`
-        output_format (Literal["srt_str", "joined_str"]): How to format the
-            transcription output. Defaults to `srt_str`
+        output_format (Literal["srt", "joined"]): `srt` for sentence-level SRT
+            content, `joined` for a single joined string. Defaults to `srt`
         w_model_args (dict | None): Additional arguments for
             `WhisperModel`. Overrides the ones set in
             `mirumoji.server.processing.whisper.DEFAULT_MODEL_OPTS`

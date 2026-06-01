@@ -170,6 +170,8 @@ class Processor:
                 or the local model fails to load
             TranscriptionError: If transcription fails (raised locally, or
                 propagated unchanged from the Modal job when preserved)
+            InvalidMediaPathError: If the media path is outside the media
+                directory (Modal backend)
             ModalError: If the Modal job fails for any other reason
         """
         self._require_transcription()
@@ -245,6 +247,8 @@ class Processor:
             FFmpegError: If an FFMPEG command fails (local or modal backend)
             ValueError: If the source isn't a valid file or the resolution is
                 malformed (local or modal backend)
+            InvalidMediaPathError: If the source path is outside the media
+                directory (Modal backend)
             ModalError: If the Modal conversion job fails
         """
         out = Path(output_path)

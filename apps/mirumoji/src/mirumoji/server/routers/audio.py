@@ -56,6 +56,8 @@ async def transcribe(
             audio's media URL
 
     Raises:
+        MissingFFmpegError: If FFMPEG can't be located (when `clean_audio`)
+        MissingFFprobeError: If FFPROBE can't be located (when `clean_audio`)
         FFmpegError: If audio cleaning fails
         TranscriptionError: If transcription fails
         WhisperUnavailableError: If no transcription backend is available
