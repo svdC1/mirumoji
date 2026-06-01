@@ -177,7 +177,7 @@ def query_kotobase(
 
         # Build Meanings
         if jm:
-            glosses: list[str] = [s["gloss"] for s in jm[0].entries]
+            glosses: list[str] = [s["gloss"] for s in jm[0].senses]
             meanings = glosses
         elif jmne:
             meanings = jmne[0].gloss
