@@ -37,7 +37,7 @@ coverage.xml
 .ruff_cache/
 
 # --- IDE ---
-.vscode/*
+.vscode/
 
 # --- Node / Vite ---
 node_modules/

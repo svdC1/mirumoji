@@ -16,6 +16,7 @@
         "jsx": "react-jsx",
         "types": ["node", "vite/client", "vitest/globals"],
         "paths": {
+            "@/*": ["./src/*"],
             "vfile": ["./node_modules/vfile"],
             "vfile/*": ["./node_modules/vfile/*"],
             "vfile-message": ["./node_modules/vfile-message"],

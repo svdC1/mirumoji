@@ -1,0 +1,87 @@
+/**
+ * Mirumoji Design Tokens — "Sumi & Shu" (墨と朱) Style
+ *
+ * A dark-only, editorial ink-on-washi theme. Colors are stored as
+ * space-separated RGB channel triplets so Tailwind can apply opacity via the
+ * `rgb(var(--x) / <alpha-value>)` syntax (see tailwind-preset.ts)
+ */
+
+:root {
+    /* Surfaces — warm sumi ink */
+    --bg: 21 18 15;
+    --surface: 32 27 22;
+    --surface-2: 42 36 29;
+
+    /* Ink — washi off-white + muted steps (also used for hairline borders) */
+    --ink: 244 238 227;
+    --ink-muted: 183 173 156;
+    --ink-faint: 126 117 103;
+
+    /* Accents — vermilion (朱) primary, indigo (藍) support */
+    --shu: 226 83 59;
+    --shu-soft: 240 138 110;
+    --ai: 94 131 164;
+
+    /* Status — matcha success, brick danger */
+    --matcha: 138 160 106;
+    --danger: 200 80 61;
+
+    /* Radii */
+    --radius-card: 0.625rem; /* 10px */
+    --radius-control: 0.5rem; /* 8px */
+}
+
+/* Base element styling */
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    background-color: rgb(var(--bg));
+    color: rgb(var(--ink));
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern";
+}
+
+h1,
+h2,
+h3 {
+    font-family: "Newsreader", Georgia, serif;
+}
+
+/* Japanese text (tokens, furigana, subtitles) renders in Mincho */
+:lang(ja) {
+    font-family: "Noto Serif JP", serif;
+}
+
+::selection {
+    background-color: rgb(var(--shu) / 0.3);
+}
+
+/* Atmosphere — a faint warm vignette behind the whole app */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 0%, rgb(42 36 29 / 0.55) 0%, rgb(var(--bg)) 60%);
+}
+
+/* Slim, theme-matched scrollbars */
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+::-webkit-scrollbar-thumb {
+    background: rgb(var(--ink) / 0.14);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--ink) / 0.24);
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}

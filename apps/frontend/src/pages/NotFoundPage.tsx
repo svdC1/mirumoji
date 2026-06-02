@@ -1,39 +1,28 @@
 /**
- * @packageDocumentation This component is the 404 page of the application.
+ * @packageDocumentation The 404 page.
  */
 
-import React from "react";
 import { Link } from "react-router-dom";
+import { buttonClasses, Card } from "@/shared/ui";
 
 /**
- * The NotFoundPage component.
- *
- * This component is responsible for the following:
- * - Displaying a 404 error message.
- * - Providing a link to the home page.
+ * The NotFoundPage component — a 404 message with a link home.
  *
  * @returns {JSX.Element} The NotFoundPage component.
  */
-const NotFoundPage: React.FC = () => {
+export default function NotFoundPage() {
     return (
-        <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12 bg-gray-900 text-white">
-            <div className="bg-gray-800/70 backdrop-blur-sm p-8 md:p-12 rounded-xl shadow-xl max-w-md w-full">
-                <h1 className="text-6xl md:text-8xl font-extrabold text-indigo-400 mb-4">404</h1>
-                <h2 className="text-2xl md:text-3xl font-semibold mb-3 text-white">
-                    Page Not Found
-                </h2>
-                <p className="text-gray-300 mb-8 text-sm md:text-base">
-                    Oops! The page you&apos;re looking for doesn&apos;t seem to exist.
+        <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+            <Card className="w-full max-w-md p-8 md:p-12">
+                <p className="font-display text-7xl font-semibold text-shu md:text-8xl">404</p>
+                <h1 className="mt-4 font-display text-2xl text-ink md:text-3xl">Page not found</h1>
+                <p className="mb-8 mt-3 text-sm text-ink-muted md:text-base">
+                    The page you&apos;re looking for doesn&apos;t exist.
                 </p>
-                <Link
-                    to="/"
-                    className="inline-block px-6 py-3 text-base font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors duration-200"
-                >
-                    Go to Homepage
+                <Link to="/" className={buttonClasses("primary", "lg")}>
+                    Go to Home
                 </Link>
-            </div>
+            </Card>
         </div>
     );
-};
-
-export default NotFoundPage;
+}
