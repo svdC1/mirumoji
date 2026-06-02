@@ -5,15 +5,15 @@
 
 import { recordMediaStream } from "./mediaRecorder";
 import { uploadFile } from "../services/api";
-import { SaveClipResponse, BreakdownData } from "../types/types";
+import { SaveClipResponse, ClipBreakdown } from "../types/types";
 /**
  * Creates and saves a video clip by recording a segment from a video element,
- * bundling it with GPT data, and uploading it to the server.
+ * bundling it with its breakdown data, and uploading it to the server.
  *
  * @param {string} videoElementId The ID of the HTMLVideoElement to record from.
  * @param {number} cueStart The start time of the clip in seconds.
  * @param {number} cueEnd The end time of the clip in seconds.
- * @param {any} gptData The GPT breakdown data associated with the clip.
+ * @param {ClipBreakdown} breakdown The breakdown data associated with the clip.
  * @param {(message: string, type: 'success' | 'error' | 'loading') => void} onProgress A callback to report the progress of the operation.
  * @returns {Promise<void>} A promise that resolves when the operation is complete or rejects on error.
  */
@@ -21,7 +21,7 @@ export async function createAndSaveClip(
     videoElementId: string,
     cueStart: number,
     cueEnd: number,
-    gptData: BreakdownData,
+    breakdown: ClipBreakdown,
     onProgress: (message: string, type: "success" | "error" | "loading") => void
 ): Promise<void> {
     // Get Video Element
@@ -60,18 +60,17 @@ export async function createAndSaveClip(
 
         onProgress("Uploading...", "loading");
 
-        // Request API endpoint to save the clip
+        // Request API endpoint to save the clip. Clip metadata travels as
+        // headers since the request body is the streamed file.
         const headers = {
-            "clip-start-time": cueStart.toString(),
-            "clip-end-time": adjustedCueEnd.toString(),
-            "gpt-breakdown-response": encodeURIComponent(JSON.stringify(gptData)),
-            "original-video-file-name": videoElement.currentSrc,
-            "original-video-url": videoElement.currentSrc,
+            "X-Clip-Start-Time": cueStart.toString(),
+            "X-Clip-End-Time": adjustedCueEnd.toString(),
+            "X-Breakdown": encodeURIComponent(JSON.stringify(breakdown)),
         };
 
         const response = await uploadFile<SaveClipResponse>(
             clipFile,
-            "profiles/clips/save",
+            "profiles/clips",
             headers,
             (progress: number) => {
                 onProgress(`Uploading... ${progress.toFixed(0)}%`, "loading");
@@ -80,10 +79,10 @@ export async function createAndSaveClip(
                 onProgress("Saving...", "loading");
             }
         );
-        if (response.success) {
-            onProgress(response.message || "Clip saved!", "success");
+        if (response.clip_id) {
+            onProgress("Clip saved!", "success");
         } else {
-            throw new Error(response.message || "Failed to save clip on the server.");
+            throw new Error("Failed to save clip on the server.");
         }
     } catch (error: any) {
         console.error("Error during clip saving process:", error);

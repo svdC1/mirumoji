@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { ChatBubbleProps } from "../types/types";
-import { isKanji, toHiragana } from "../utils/languageUtils";
+import TokenizedText from "./TokenizedText";
 import AudioPlayer from "react-h5-audio-player";
 
 /**
@@ -21,7 +21,7 @@ import AudioPlayer from "react-h5-audio-player";
  * @param {ChatBubbleProps} props The props for the component.
  * @returns {JSX.Element} The ChatBubble component.
  */
-const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
+const ChatBubble = ({ msg, onWordClick }: ChatBubbleProps) => {
     const containerClass = msg.isAudioMessage
         ? "w-full max-w-md sm:max-w-lg md:max-w-2xl"
         : "w-fit max-w-[90%]";
@@ -50,35 +50,14 @@ const ChatBubble = ({ msg, tokenizer, onWordClick }: ChatBubbleProps) => {
                         className="mt-2 rounded-md"
                     />
                 )}
-                {msg.tokens && msg.tokens.length > 0 ? (
+                {msg.words && msg.words.length > 0 ? (
                     <span className="inline-block mx-auto max-w-[95%] break-words text-xl sm:text-2xl md:text-3xl lg:text-4xl">
-                        {msg.tokens.map((token, i) => {
-                            const showFurigana =
-                                token.reading &&
-                                token.surface_form !== token.reading &&
-                                token.surface_form.split("").some(isKanji);
-                            const lookupForm = !(token.basic_form === "*")
-                                ? token.basic_form
-                                : token.surface_form;
-                            const furiganaText = showFurigana ? toHiragana(token.reading!) : null;
-
-                            return (
-                                <button
-                                    key={i}
-                                    className="inline-flex flex-col items-center mx-1 group align-bottom"
-                                    onClick={() => onWordClick(rawSentence, lookupForm)}
-                                >
-                                    {showFurigana && furiganaText && (
-                                        <span className="text-xs text-gray-400 group-hover:text-yellow-300">
-                                            {furiganaText}
-                                        </span>
-                                    )}
-                                    <span className="underline group-hover:text-yellow-300">
-                                        {token.surface_form}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                        <TokenizedText
+                            words={msg.words}
+                            sentence={rawSentence}
+                            showFurigana={true}
+                            onWordClick={onWordClick}
+                        />
                     </span>
                 ) : (
                     msg.text && (

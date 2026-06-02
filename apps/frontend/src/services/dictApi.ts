@@ -19,6 +19,20 @@ export async function apiTokenize(sentence: string): Promise<JapaneseWord[]> {
 }
 
 /**
+ * Tokenizes many sentences in one request, returning one stitched
+ * `JapaneseWord` list per sentence (used to pre-tokenize a whole subtitle file).
+ *
+ * @param {string[]} sentences The sentences to tokenize, in order.
+ * @returns {Promise<JapaneseWord[][]>} One word list per input sentence.
+ */
+export async function apiTokenizeBatch(sentences: string[]): Promise<JapaneseWord[][]> {
+    return apiFetch<JapaneseWord[][]>("dict/tokenize", {
+        method: "POST",
+        body: JSON.stringify({ sentences }),
+    });
+}
+
+/**
  * Looks up dictionary data for a single word or a wildcard pattern.
  *
  * @param {string} word The word or wildcard pattern to look up.

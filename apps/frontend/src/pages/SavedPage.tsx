@@ -3,7 +3,7 @@
  * It allows the user to view, delete, and export their clips to Anki.
  */
 
-import React, { useState, useMemo } from "react";
+import { useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
 import { apiFetch } from "../services/api";
@@ -14,7 +14,7 @@ import remarkGfm from "remark-gfm";
 import { toastApiError } from "../utils/apiErrorToaster";
 import { formatStaticUrl } from "../utils/fileUtils";
 import { truncateText } from "../utils/fileUtils";
-import { Clip, BreakdownData, AnkiExportResponse } from "../types/types";
+import { Clip, AnkiExportResponse } from "../types/types";
 import { API_BASE } from "../constants/user-page";
 
 /**
@@ -50,18 +50,7 @@ export default function SavedPage() {
         },
     });
 
-    const parsedBreakdownData = useMemo(() => {
-        if (selectedClip) {
-            try {
-                return JSON.parse(selectedClip.breakdown_response) as BreakdownData;
-            } catch (error) {
-                console.error("Error parsing breakdown_response:", error);
-                toast.error("Error displaying clip details.");
-                return null;
-            }
-        }
-        return null;
-    }, [selectedClip]);
+    const breakdown = selectedClip ? selectedClip.breakdown : null;
 
     const handleDeleteClip = async (clipId: string) => {
         if (!profileId) {
@@ -171,53 +160,52 @@ export default function SavedPage() {
                     )}
                 </div>
 
-                {selectedClip && parsedBreakdownData && (
+                {selectedClip && breakdown && (
                     <div className="flex flex-col mb-8 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
                         <video
-                            key={formatStaticUrl(API_BASE, selectedClip.get_url)}
+                            key={formatStaticUrl(API_BASE, selectedClip.clip_url)}
                             controls
-                            src={formatStaticUrl(API_BASE, selectedClip.get_url)}
+                            src={formatStaticUrl(API_BASE, selectedClip.clip_url)}
                             className="w-full rounded-lg mb-4 aspect-video bg-black"
                         >
                             Your browser does not support the video tag.
                         </video>
                         <h2 className="text-xl font-semibold mb-2">Clip Details</h2>
-                        {parsedBreakdownData.focus && (
+                        {breakdown.focus && (
                             <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded">
                                 <h3 className="text-lg font-semibold mb-1">Focus Word</h3>
                                 <p className="text-md">
                                     <span className="font-bold">
-                                        {parsedBreakdownData.focus.word}
+                                        {breakdown.focus.word.surface}
                                     </span>
-                                    {parsedBreakdownData.focus.reading &&
-                                        ` (${parsedBreakdownData.focus.reading})`}
+                                    {breakdown.focus.word.reading &&
+                                        ` (${breakdown.focus.word.reading})`}
                                 </p>
-                                {parsedBreakdownData.focus.meanings &&
-                                    parsedBreakdownData.focus.meanings.length > 0 && (
-                                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                                            <span className="font-semibold">Meanings:</span>
-                                            <ul className="list-disc list-inside ml-2">
-                                                {parsedBreakdownData.focus.meanings.map(
-                                                    (meaning, index) => (
-                                                        <li key={index}>{meaning}</li>
-                                                    )
-                                                )}
-                                            </ul>
-                                        </div>
-                                    )}
+                                {breakdown.focus.kotobase_data.meanings.length > 0 && (
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                                        <span className="font-semibold">Meanings:</span>
+                                        <ul className="list-disc list-inside ml-2">
+                                            {breakdown.focus.kotobase_data.meanings.map(
+                                                (meaning, index) => (
+                                                    <li key={index}>{meaning}</li>
+                                                )
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                         )}
-                        {parsedBreakdownData.sentence && (
+                        {breakdown.sentence && (
                             <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded">
                                 <h3 className="text-lg font-semibold mb-1">Sentence</h3>
-                                <p className="text-md italic">{parsedBreakdownData.sentence}</p>
+                                <p className="text-md italic">{breakdown.sentence}</p>
                             </div>
                         )}
-                        {parsedBreakdownData.gpt_explanation && (
+                        {breakdown.explanation && (
                             <div className="prose dark:prose-invert prose-sm max-w-none mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded">
-                                <h3 className="text-lg font-semibold mb-1">GPT Explanation</h3>
+                                <h3 className="text-lg font-semibold mb-1">LLM Explanation</h3>
                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                                    {parsedBreakdownData.gpt_explanation}
+                                    {breakdown.explanation}
                                 </ReactMarkdown>
                             </div>
                         )}
@@ -258,23 +246,10 @@ export default function SavedPage() {
                     ) : (
                         <div className="grid gap-4 grid-cols-1">
                             {clips.map((clip) => {
-                                let previewBreakdown = {
-                                    sentence: "N/A",
-                                    gpt_explanation: "N/A",
+                                const previewBreakdown = {
+                                    sentence: clip.breakdown.sentence || "N/A",
+                                    explanation: clip.breakdown.explanation || "N/A",
                                 };
-                                try {
-                                    const parsed = JSON.parse(
-                                        clip.breakdown_response
-                                    ) as Partial<BreakdownData>;
-                                    previewBreakdown.sentence = parsed.sentence || "N/A";
-                                    previewBreakdown.gpt_explanation =
-                                        parsed.gpt_explanation || "N/A";
-                                } catch (e) {
-                                    console.error(
-                                        "Error parsing breakdown_response for preview:",
-                                        e
-                                    );
-                                }
                                 return (
                                     <div
                                         key={clip.id}
@@ -288,7 +263,7 @@ export default function SavedPage() {
                                                 {previewBreakdown.sentence}
                                             </div>
                                             <p className="text-sm text-gray-600 dark:text-gray-300">
-                                                {truncateText(previewBreakdown.gpt_explanation)}
+                                                {truncateText(previewBreakdown.explanation)}
                                             </p>
                                         </div>
                                         <div className="flex space-x-2 flex-shrink-0">

@@ -29,7 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from ..exceptions import MirumojiServerError
 from . import media
 from .config import setup_logging
-from .constants import DB_URL, HOST_LOG_PATH
+from .constants import HOST_LOG_PATH
 from .db import get_engine, init_db
 from .processing.processor import Processor
 from .routers.audio import audio_router
@@ -70,19 +70,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
     # Create Log Directory + Register Handlers
     setup_logging()
-    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH}'")
+    LOGGER.info(f"Storing Logs At `{HOST_LOG_PATH}`")
 
     # Create / Initialise Database
     await init_db()
-    LOGGER.info(f"Database Set Up At {DB_URL} Complete")
 
     # Create Media Directory If It Doesn't Exist
     media.init_storage()
-    LOGGER.info(f"Serving '{media.BASE_PATH}' at '/media'")
+    LOGGER.info(f"Serving `{media.BASE_PATH}` at `/media`")
 
     # Intialise Application-Scoped Stateful Processor
     app.state.processor = Processor()
-    LOGGER.info(f"Backend = '{app.state.processor.backend.upper()}'")
 
     LOGGER.info("Configuration Complete")
     yield
@@ -94,10 +92,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
             shutil.rmtree,
             media.TEMP_PATH,
         )
-        LOGGER.info(f"Deleted Temporary Media At {media.TEMP_PATH}")
+        LOGGER.info(f"Deleted Temporary Media At `{media.TEMP_PATH}`")
     except Exception as e:
         LOGGER.error(
-            f"Failed To Delete Temporary Media At {media.TEMP_PATH} : {e}"
+            f"Failed To Delete Temporary Media At `{media.TEMP_PATH}` : `{e}`"
         )
 
     LOGGER.info("Shut Down Complete")

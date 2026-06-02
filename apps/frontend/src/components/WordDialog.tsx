@@ -9,17 +9,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Copy, Check, Bookmark } from "lucide-react";
-import { apiFetch } from "../services/api";
 import { toast } from "react-hot-toast";
 import { apiDictQuery, isEmptyDict } from "../services/dictApi";
+import { apiBreakdown, apiGetTemplate } from "../services/llmApi";
 import { toastApiError } from "../utils/apiErrorToaster";
-import {
-    GptTemplate,
-    WordDialogProps,
-    KotobaseData,
-    ApiError,
-    BreakdownData,
-} from "../types/types";
+import { WordDialogProps, KotobaseData, BreakdownResponse, ClipBreakdown } from "../types/types";
 import { createAndSaveClip } from "../utils/clipCreator";
 import {
     JmdictEntryDisplay,
@@ -27,9 +21,14 @@ import {
     KanjiInfoDisplay,
     ExampleDisplay,
 } from "./DictDisplays";
+import { toHiragana } from "../utils/languageUtils";
 
-// Cache GPT responses for already clicked words
-const gptCache = new Map<string, BreakdownData | null>();
+// Cache breakdown responses for already-clicked words
+const breakdownCache = new Map<string, BreakdownResponse>();
+
+// A profile template's prompt uses {sentence}/{focus}; the API expects {0}/{1}.
+const toApiPrompt = (prompt: string): string =>
+    prompt.replace(/{sentence}/g, "{0}").replace(/{focus}/g, "{1}");
 
 /**
  * The WordDialog component.
@@ -52,9 +51,11 @@ export default function WordDialog({
 }: WordDialogProps) {
     // Key for Cache
     const key = `${sentence}__${word}`;
-    const [data, setData] = useState<BreakdownData | null>(gptCache.get(key) ?? null);
+    const [data, setData] = useState<BreakdownResponse | null>(breakdownCache.get(key) ?? null);
     // Main Tabs State
-    const [tab, setTab] = useState<"gpt" | "dict">("dict");
+    const [tab, setTab] = useState<"llm" | "dict">("dict");
+    // Whether the profile has an LLM model configured (gates the LLM tab)
+    const [noModel, setNoModel] = useState(false);
     // Dictionary SubTabs State
     const [dictTab, setDictTab] = useState<"jmdict" | "jmnedict" | "kanji" | "examples">("jmdict");
     // Copied to Clipboard State
@@ -81,72 +82,35 @@ export default function WordDialog({
     // Check if loaded on a player context
     const canSaveClip = !!(videoFile || videoUrl);
 
-    const fetchGptData = async () => {
-        // Return Cache if existent
-        if (gptCache.has(key)) {
-            const cacheData = gptCache.get(key);
-            if (cacheData) {
-                setData(cacheData);
-                return cacheData;
-            }
+    const fetchBreakdown = async (): Promise<BreakdownResponse | null> => {
+        // Return cache if present
+        const cached = breakdownCache.get(key);
+        if (cached) {
+            setData(cached);
+            return cached;
         }
 
-        // Configure Data
-        let endpointUrl = "/gpt/breakdown";
-        let requestBody: any = { sentence, focus: word };
-
         try {
-            // Fetch Profile Custom Template if existent
-            const customTemplate = await apiFetch<GptTemplate | null>("/profiles/gpt_template");
-
-            // Validate Custom Template
-            if (
-                customTemplate &&
-                customTemplate.sysMsg &&
-                customTemplate.prompt &&
-                customTemplate.version &&
-                customTemplate.prompt.includes("{sentence}") &&
-                customTemplate.prompt.includes("{focus}")
-            ) {
-                endpointUrl = "/gpt/custom_breakdown";
-
-                // Format variables to format expected by API
-                const backendPrompt = customTemplate.prompt
-                    .replace(/{sentence}/g, "{0}")
-                    .replace(/{focus}/g, "{1}");
-                requestBody = {
-                    sentence,
-                    focus: word,
-                    sysMsg: customTemplate.sysMsg,
-                    prompt: backendPrompt,
-                    version: customTemplate.version,
-                };
-                console.log("Using custom GPT template for breakdown (from profile).");
-            } else {
-                console.log(
-                    customTemplate
-                        ? "Custom template from profile is invalid. Using default."
-                        : "No custom template from profile. Using default breakdown."
-                );
+            // The model (+ optional sys_msg/prompt) comes from the profile's
+            // LLM template; without one, the LLM features stay disabled.
+            const template = await apiGetTemplate();
+            if (!template) {
+                setNoModel(true);
+                return null;
             }
-        } catch (templateError) {
-            if (templateError instanceof ApiError && templateError.status === 404) {
-                console.log("No GPT template set for this profile. Using default breakdown.");
-            } else {
-                console.warn(
-                    "Failed to fetch profile GPT template, using default breakdown:",
-                    templateError
-                );
-            }
-        }
-        // Request Endpoint
-        try {
-            const json = await apiFetch<BreakdownData>(endpointUrl, {
-                method: "POST",
-                body: JSON.stringify(requestBody),
+            setNoModel(false);
+
+            const useCustomPrompt =
+                template.prompt.includes("{sentence}") && template.prompt.includes("{focus}");
+
+            const json = await apiBreakdown({
+                sentence,
+                focus: word,
+                model: template.model,
+                sys_msg: template.sys_msg || undefined,
+                prompt: useCustomPrompt ? toApiPrompt(template.prompt) : undefined,
             });
-            // Cache Request
-            gptCache.set(key, json);
+            breakdownCache.set(key, json);
             setData(json);
             return json;
         } catch (e) {
@@ -157,9 +121,24 @@ export default function WordDialog({
     };
 
     useEffect(() => {
-        if (data || tab !== "gpt") return;
-        fetchGptData();
+        if (data || tab !== "llm") return;
+        fetchBreakdown().catch(() => {});
     }, [key, data, sentence, word, tab, onClose]);
+
+    // Typewriter reveal of the explanation
+    const [typed, setTyped] = useState("");
+    useEffect(() => {
+        const full = data?.explanation ?? "";
+        setTyped("");
+        if (!full) return;
+        let i = 0;
+        const id = window.setInterval(() => {
+            i += 2;
+            setTyped(full.slice(0, i));
+            if (i >= full.length) window.clearInterval(id);
+        }, 12);
+        return () => window.clearInterval(id);
+    }, [data]);
 
     useEffect(() => {
         if (tab !== "dict") return;
@@ -193,14 +172,15 @@ export default function WordDialog({
     const handleCopy = () => {
         let textToCopy = "";
 
-        // Copy GPT Data as string
-        if (tab === "gpt" && data) {
+        // Copy LLM Data as string
+        if (tab === "llm" && data) {
+            const focus = data.focus;
             textToCopy = [
-                data.focus.word,
-                ...(data.focus.reading ? [data.focus.reading] : []),
-                ...(data.focus.meanings ?? []),
+                ...(focus ? [focus.word.surface] : []),
+                ...(focus?.word.reading ? [toHiragana(focus.word.reading)] : []),
+                ...(focus?.kotobase_data.meanings ?? []),
                 "",
-                data.gpt_explanation,
+                data.explanation,
             ].join("\n");
             // Copy Dict Data as JSON String
         } else if (tab === "dict" && dictData) {
@@ -223,19 +203,21 @@ export default function WordDialog({
         }
         setSaving(true);
         try {
-            let gptData = data;
-            if (!gptData) {
-                toast.loading("Fetching GPT data...", { id: clipToastId });
-                gptData = await fetchGptData();
+            let breakdown = data;
+            if (!breakdown) {
+                toast.loading("Fetching explanation...", { id: clipToastId });
+                breakdown = await fetchBreakdown();
             }
 
-            if (!gptData) {
-                toast.error("Could not fetch GPT data. Please try again.", {
+            if (!breakdown) {
+                toast.error("Configure an LLM model in your Profile to save clips.", {
                     id: clipToastId,
                 });
                 setSaving(false);
                 return;
             }
+
+            const clipBreakdown: ClipBreakdown = { ...breakdown, sentence };
 
             // Handle clipCreator callback on UI
             const onProgress = (message: string, type: "success" | "error" | "loading") => {
@@ -256,7 +238,7 @@ export default function WordDialog({
                 "mirumoji-player", // The ID of the main video player
                 cueStart,
                 cueEnd,
-                gptData,
+                clipBreakdown,
                 onProgress
             );
         } catch (error) {
@@ -320,13 +302,13 @@ export default function WordDialog({
                     >
                         <button
                             className={`flex-1 py-2 text-sm sm:text-base ${
-                                tab === "gpt"
+                                tab === "llm"
                                     ? "border-b-2 border-emerald-400 text-white"
                                     : "text-neutral-400 hover:text-neutral-200"
                             }`}
-                            onClick={() => setTab("gpt")}
+                            onClick={() => setTab("llm")}
                         >
-                            GPT
+                            LLM
                         </button>
                         <button
                             className={`flex-1 py-2 text-sm sm:text-base ${
@@ -339,8 +321,13 @@ export default function WordDialog({
                             Dictionary
                         </button>
                     </div>
-                    {tab === "gpt" ? (
-                        !data ? (
+                    {tab === "llm" ? (
+                        noModel ? (
+                            <div className="text-center text-neutral-400 italic py-6">
+                                Configure an LLM model in your Profile (Dashboard &rarr; LLM
+                                Template) to enable explanations.
+                            </div>
+                        ) : !data ? (
                             <div className="w-full space-y-4">
                                 <div className="h-6 w-1/3 rounded bg-neutral-700 animate-pulse" />
                                 {Array.from({ length: 4 }).map((_, i) => (
@@ -352,28 +339,30 @@ export default function WordDialog({
                             </div>
                         ) : (
                             <>
-                                <h2 className="text-xl font-bold mb-1">{data.focus.word}</h2>
-                                {data.focus.reading || data.focus.meanings?.length ? (
+                                <h2 className="text-xl font-bold mb-1">
+                                    {data.focus?.word.surface ?? word}
+                                </h2>
+                                {data.focus &&
+                                (data.focus.word.reading ||
+                                    data.focus.kotobase_data.meanings.length) ? (
                                     <div className="mt-1 mb-3 text-neutral-300 text-base leading-relaxed">
-                                        {data.focus.reading && (
+                                        {data.focus.word.reading && (
                                             <span className="mr-2 italic">
-                                                {data.focus.reading}
+                                                {toHiragana(data.focus.word.reading)}
                                             </span>
                                         )}
-                                        {data.focus.meanings?.length && (
-                                            <span>{data.focus.meanings.join("；")}</span>
+                                        {data.focus.kotobase_data.meanings.length > 0 && (
+                                            <span>
+                                                {data.focus.kotobase_data.meanings.join("；")}
+                                            </span>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="mt-1 mb-3 text-neutral-300 text-base leading-relaxed">
-                                        No Reading/Meaning Found
-                                    </div>
-                                )}
+                                ) : null}
                                 <ReactMarkdown
                                     className="prose prose-sm sm:prose-base prose-invert max-w-none whitespace-pre-wrap"
                                     remarkPlugins={[remarkGfm, remarkBreaks]}
                                 >
-                                    {data.gpt_explanation}
+                                    {typed}
                                 </ReactMarkdown>
                             </>
                         )

@@ -57,7 +57,7 @@ for long-form Japanese media
 
 
 DEFAULT_MODEL_OPTS: dict[str, Any] = {
-    "model": "large-v3",
+    "model_size_or_path": "large-v3",
     "device": "cuda",
     "compute_type": "float16",
 }

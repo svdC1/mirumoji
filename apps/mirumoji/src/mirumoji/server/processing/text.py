@@ -511,6 +511,25 @@ def segment(sentence: str) -> list[JapaneseWord]:
     return stitch(tokenize(sentence))
 
 
+def segment_batch(sentences: list[str]) -> list[list[JapaneseWord]]:
+    """
+    Segments many sentences in one call (see `segment`)
+
+    Used to tokenize a whole subtitle file up front in a single request, so the
+    player never tokenizes per-cue mid-playback
+
+    Args:
+        sentences (list[str]): The sentences to segment, in order
+
+    Returns:
+        One stitched-word list per input sentence, in the same order
+
+    Raises:
+        FugashiError: If tokenisation fails
+    """
+    return [segment(sentence) for sentence in sentences]
+
+
 def enrich(sentence: str) -> list[EnrichedJapaneseWord]:
     """
     Segments a sentence and enriches each stitched word with dictionary data

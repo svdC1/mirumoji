@@ -3,18 +3,16 @@
  * It allows the user to record or upload audio and have it transcribed.
  */
 
-import { useRef, useState, useLayoutEffect, ChangeEvent, useEffect } from "react";
+import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
 import { uploadFile } from "../services/api";
+import { apiTokenize } from "../services/dictApi";
+import { apiExplainSentence, apiGetTemplate } from "../services/llmApi";
 import AudioPlayer from "react-h5-audio-player";
 import "react-h5-audio-player/lib/styles.css";
-import { getTokenizer } from "../services/tokenizer";
-import { Tokenizer, IpadicFeatures } from "kuromoji";
 import WordDialog from "../components/WordDialog";
-import { Message, TranscriptionResponse, ApiError } from "../types/types";
+import { Message, AudioTranscriptResponse, ApiError } from "../types/types";
 import ChatBubble from "../components/ChatBubble";
-import { useProfile } from "../contexts/ProfileContext";
-import { API_BASE } from "../constants/user-page";
 /**
  * The TranscribePage component.
  *
@@ -30,33 +28,22 @@ import { API_BASE } from "../constants/user-page";
 export default function TranscribePage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [cleanAudio, setCleanAudio] = useState(false);
-    const [gptExplain, setGptExplain] = useState(false);
+    const [llmExplain, setLlmExplain] = useState(false);
     const [recording, setRecording] = useState(false);
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>("");
     const [sending, setSending] = useState(false);
-    const [tokenizer, setTokenizer] = useState<Tokenizer<IpadicFeatures> | null>(null);
     const [dialog, setDialog] = useState<{
         sentence: string;
         word: string;
     } | null>(null);
 
-    const { profileId } = useProfile();
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const chunksRef = useRef<BlobPart[]>([]);
     const chatEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    useEffect(() => {
-        getTokenizer()
-            .then(setTokenizer)
-            .catch((err) => {
-                console.error("Failed to load tokenizer:", err);
-                toast.error("Failed to load tokenizer for Furigana.");
-            });
-    }, []);
 
     useLayoutEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -177,14 +164,11 @@ export default function TranscribePage() {
         ]);
 
         try {
-            const headers = {
-                "X-Clean-Audio": String(cleanAudio),
-                "X-Gpt-Explain": String(gptExplain),
-            };
-            const result = await uploadFile<TranscriptionResponse>(
+            const query = `clean_audio=${cleanAudio}&language=ja`;
+            const result = await uploadFile<AudioTranscriptResponse>(
                 fileToSend,
-                "audio/transcribe_from_audio",
-                headers,
+                `audio/transcribe?${query}`,
+                {},
                 (progress: number) => {
                     toast.loading(`Uploading... ${progress.toFixed(0)}%`, {
                         id: tId,
@@ -198,25 +182,42 @@ export default function TranscribePage() {
             const newMessages: Message[] = [];
 
             if (result.transcript) {
-                const tokenizedResult = tokenizer
-                    ? tokenizer.tokenize(result.transcript)
-                    : undefined;
+                // Tokenize the transcript on the server for clickable furigana
+                let words;
+                try {
+                    words = await apiTokenize(result.transcript);
+                } catch (e) {
+                    console.error("Failed to tokenize transcript:", e);
+                }
                 newMessages.push({
                     id: `text-${Date.now() + 2}`,
                     type: "bot",
                     text: result.transcript,
-                    tokens: tokenizedResult,
+                    words,
                     isTranscription: true,
                     rawText: result.transcript,
                 });
             }
-            if (gptExplain && result.gpt_explanation) {
-                newMessages.push({
-                    id: `explain-${Date.now() + 3}`,
-                    type: "bot",
-                    text: result.gpt_explanation,
-                    isExplanation: true,
-                });
+
+            // Optional sentence explanation (separate LLM call, model from the
+            // profile template)
+            if (llmExplain && result.transcript) {
+                const template = await apiGetTemplate();
+                if (!template) {
+                    toast.error("Configure an LLM model in your Profile to enable explanations.");
+                } else {
+                    const { explanation } = await apiExplainSentence({
+                        sentence: result.transcript,
+                        model: template.model,
+                        sys_msg: template.sys_msg || undefined,
+                    });
+                    newMessages.push({
+                        id: `explain-${Date.now() + 3}`,
+                        type: "bot",
+                        text: explanation,
+                        isExplanation: true,
+                    });
+                }
             }
 
             setMessages((prev) => [...prev.filter((m) => m.id !== loaderId), ...newMessages]);
@@ -254,12 +255,7 @@ export default function TranscribePage() {
         <div className="flex flex-col h-screen bg-black text-white">
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
                 {messages.map((msg) => (
-                    <ChatBubble
-                        key={msg.id}
-                        msg={msg}
-                        tokenizer={tokenizer}
-                        onWordClick={handleWordClick}
-                    />
+                    <ChatBubble key={msg.id} msg={msg} onWordClick={handleWordClick} />
                 ))}
                 <div ref={chatEndRef} />
             </div>
@@ -296,12 +292,12 @@ export default function TranscribePage() {
                         Clean Audio
                     </button>
                     <button
-                        onClick={() => setGptExplain((prev) => !prev)}
+                        onClick={() => setLlmExplain((prev) => !prev)}
                         className={`flex-1 py-2 rounded-full font-semibold transition-all ${
-                            gptExplain ? "bg-indigo-600" : "bg-zinc-700"
+                            llmExplain ? "bg-indigo-600" : "bg-zinc-700"
                         }`}
                     >
-                        GPT Explain
+                        LLM Explain
                     </button>
                     <button
                         onClick={clearChat}

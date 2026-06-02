@@ -475,12 +475,12 @@ async def export_anki_deck(
             continue
         breakdown = clip.llm_breakdown_response or {}
         focus = breakdown.get("focus") or {}
-        token = focus.get("token") or {}
+        word = focus.get("word") or {}
         kotobase = focus.get("kotobase_data") or {}
         cards.append(
             anki.AnkiCard(
                 clip_path=str(media.BASE_PATH / clip.file.path),
-                word=token.get("surface", ""),
+                word=word.get("surface", ""),
                 meanings=", ".join(kotobase.get("meanings") or []),
                 sentence=breakdown.get("sentence", ""),
                 explanation=breakdown.get("explanation", ""),

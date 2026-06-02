@@ -14,6 +14,20 @@ tip: LLM Request Defaults
 
 from pydantic import BaseModel
 
+# --- Dictionary Requests ---
+
+
+class TokenizeBatchRequest(BaseModel):
+    """
+    Request for the batch tokenize endpoint (`POST /dict/tokenize`)
+
+    Args:
+        sentences (list[str]): The sentences to tokenize, in order
+    """
+
+    sentences: list[str]
+
+
 # --- LLM requests ---
 
 

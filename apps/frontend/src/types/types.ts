@@ -2,22 +2,7 @@
  * @packageDocumentation This file contains all the type definitions for the application.
  */
 
-import { Tokenizer, IpadicFeatures } from "kuromoji";
-
 /* UserPage*/
-
-/**
- * The shape of a GPT template.
- *
- * @deprecated Legacy shape still used by WordDialog's GPT tab; replaced by
- * {@link LlmTemplate} once the breakdown migration lands.
- */
-export interface GptTemplate {
-    id: string;
-    sysMsg: string;
-    prompt: string;
-    version: string;
-}
 
 /**
  * The shape of a profile's LLM template (`/profiles/template`).
@@ -79,112 +64,25 @@ export interface SettingsDrawerProps {
 }
 
 /**
- * The shape of the response from the generate SRT endpoint.
+ * The shape of the response from the `/video/generate_srt` endpoint.
  */
 export interface GenerateSrtResponse {
+    file_id: string;
     srt_content: string;
+    srt_url: string;
 }
 
 /**
- * The shape of the response from the convert video endpoint.
+ * The shape of the response from the `/video/convert_to_mp4` endpoint.
  */
 export interface ConvertVideoResponse {
     converted_video_url: string;
 }
 
-/* WordDialog*/
+/* Dictionary models (kotobase / fugashi) */
 
 /**
- * The shape of the response from the save clip endpoint.
- */
-export interface SaveClipResponse {
-    success: boolean;
-    message: string;
-    clip_id?: string;
-}
-
-/* SavedPage*/
-
-/**
- * The shape of a clip.
- */
-export type Clip = {
-    id: string;
-    get_url: string;
-    breakdown_response: string;
-    sentence_preview?: string;
-    gpt_explanation_preview?: string;
-};
-
-/**
- * The shape of the focus of a breakdown.
- */
-export interface BreakdownFocus {
-    word: string;
-    reading: string;
-    meanings: string[];
-    jlpt?: string;
-    examples?: any[];
-}
-
-/**
- * The shape of a breakdown response from the API
- */
-export interface BreakdownData {
-    sentence: string;
-    focus: BreakdownFocus;
-    tokens: any[];
-    gpt_explanation: string;
-}
-
-/**
- * The shape of the response from the Anki export endpoint.
- */
-export interface AnkiExportResponse {
-    anki_deck_url: string;
-}
-
-/*SubtitlePlayer */
-
-/**
- * The shape of a subtitle cue.
- */
-export interface Cue {
-    start: number;
-    end: number;
-    tokens: IpadicFeatures[];
-    raw: string;
-}
-
-/**
- * The props for the SubtitlePlayer component.
- */
-export interface SubtitlePlayerProps {
-    video: File;
-    videoUrl?: string;
-    srt: File | null;
-    showFurigana: boolean;
-}
-
-/*WordDialog */
-
-/**
- * The props for the WordDialog component.
- */
-export interface WordDialogProps {
-    sentence: string;
-    word: string;
-    onClose: () => void;
-    cueStart: number;
-    cueEnd: number;
-    videoFile: File | null;
-    videoUrl?: string;
-}
-
-/*dict_api*/
-
-/**
- * The shape of a single sense withing a JMEntry
+ * The shape of a single sense within a JMEntry
  */
 export interface WordSense {
     order: number;
@@ -217,23 +115,31 @@ export interface JMNEntry {
  */
 export interface KanjiInfo {
     literal: string;
-    grade?: number;
-    stroke_count: number;
+    grade?: number | null;
+    stroke_count?: number | null;
     meanings: string[];
     onyomi: string[];
     kunyomi: string[];
-    jlpt_kanjidic?: number;
-    jlpt_tanos?: number;
+    jlpt_kanjidic?: number | null;
+    jlpt_tanos?: number | null;
 }
 
-/* Server tokenizer */
+/**
+ * Dictionary data for a single query (`/dict/query`), keyed by `query`.
+ */
+export interface KotobaseData {
+    query: string;
+    jmentries: JMEntry[];
+    jmnentries: JMNEntry[];
+    kanji: KanjiInfo[];
+    meanings: string[];
+    jlpt: string;
+    examples: string[];
+}
 
 /**
- * A morphological token from the server tokenizer (fugashi / UniDic).
- *
- * Keys match the API's serialized aliases (FastAPI emits the response model
- * by alias): e.g. `kana` is the katakana reading and `pos1` the top-level
- * part of speech.
+ * A morphological token from the server tokenizer (fugashi / UniDic). Keys
+ * match the API's serialized aliases (e.g. `kana` is the katakana reading).
  */
 export interface Token {
     surface: string;
@@ -258,20 +164,6 @@ export interface Token {
 }
 
 /**
- * Dictionary data for a single query (replaces `DictLookup`/`DictWildcardLookup`
- * in the new contract; `query` replaces the old `word`/`pattern`).
- */
-export interface KotobaseData {
-    query: string;
-    jmentries: JMEntry[];
-    jmnentries: JMNEntry[];
-    kanji: KanjiInfo[];
-    meanings: string[];
-    jlpt: string;
-    examples: string[];
-}
-
-/**
  * A useful word stitched from one or more UniDic short-unit tokens, as
  * returned by `GET /dict/tokenize`.
  *
@@ -288,11 +180,121 @@ export interface JapaneseWord {
 
 /**
  * A `JapaneseWord` paired with its dictionary data, as returned by
- * `GET /dict/analyze`.
+ * `GET /dict/analyze` and carried as the `focus` of a breakdown.
  */
 export interface EnrichedJapaneseWord {
     word: JapaneseWord;
     kotobase_data: KotobaseData;
+}
+
+/* LLM (breakdown / explanation) */
+
+/**
+ * The response from `/llm/breakdown`: the focused word (with dictionary data)
+ * and its explanation within the sentence.
+ */
+export interface BreakdownResponse {
+    focus: EnrichedJapaneseWord | null;
+    explanation: string;
+}
+
+/**
+ * The response from `/llm/explain_sentence`.
+ */
+export interface ExplanationResponse {
+    explanation: string;
+}
+
+/**
+ * The breakdown payload stored with a saved clip: a {@link BreakdownResponse}
+ * plus the sentence it came from (used by the Anki export).
+ */
+export interface ClipBreakdown {
+    focus: EnrichedJapaneseWord | null;
+    explanation: string;
+    sentence: string;
+}
+
+/* SavedPage*/
+
+/**
+ * The shape of a saved clip (`/profiles/clips`).
+ */
+export type Clip = {
+    id: string;
+    file_id: string;
+    clip_url: string;
+    start_time: number;
+    end_time: number;
+    breakdown: ClipBreakdown;
+};
+
+/**
+ * The shape of the response from the clip-save endpoint.
+ */
+export interface SaveClipResponse {
+    clip_id: string;
+    file_id: string;
+    clip_url: string;
+}
+
+/**
+ * The shape of the response from the Anki export endpoint.
+ */
+export interface AnkiExportResponse {
+    anki_deck_url: string;
+}
+
+/*SubtitlePlayer */
+
+/**
+ * The shape of a subtitle cue. `words` is populated lazily (server tokenizer)
+ * when the cue becomes active.
+ */
+export interface Cue {
+    start: number;
+    end: number;
+    raw: string;
+    words?: JapaneseWord[];
+}
+
+/**
+ * The props for the SubtitlePlayer component.
+ */
+export interface SubtitlePlayerProps {
+    video: File;
+    videoUrl?: string;
+    srt: File | null;
+    showFurigana: boolean;
+}
+
+/*WordDialog */
+
+/**
+ * The props for the WordDialog component.
+ */
+export interface WordDialogProps {
+    sentence: string;
+    word: string;
+    onClose: () => void;
+    cueStart: number;
+    cueEnd: number;
+    videoFile: File | null;
+    videoUrl?: string;
+}
+
+/* TokenizedText */
+
+/**
+ * The props for the TokenizedText component, which renders a list of stitched
+ * words as clickable tokens with optional furigana.
+ */
+export interface TokenizedTextProps {
+    words: JapaneseWord[];
+    sentence: string;
+    showFurigana: boolean;
+    onWordClick: (sentence: string, word: string) => void;
+    selectedLemma?: string | null;
 }
 
 /*TranscribePage*/
@@ -304,7 +306,7 @@ export interface Message {
     id: string;
     type: "user" | "bot";
     text?: string;
-    tokens?: IpadicFeatures[];
+    words?: JapaneseWord[];
     rawText?: string;
     audioUrl?: string;
     loading?: boolean;
@@ -318,16 +320,17 @@ export interface Message {
  */
 export interface ChatBubbleProps {
     msg: Message;
-    tokenizer: Tokenizer<IpadicFeatures> | null;
     onWordClick: (sentence: string, word: string) => void;
 }
 
 /**
- * The shape of the response from the transcribe endpoint.
+ * The shape of the response from the `/audio/transcribe` endpoint.
  */
-export interface TranscriptionResponse {
+export interface AudioTranscriptResponse {
+    transcript_id: string;
     transcript: string;
-    gpt_explanation?: string;
+    original_file_name: string;
+    audio_url: string;
 }
 
 /*SubtitleSettingsContext*/

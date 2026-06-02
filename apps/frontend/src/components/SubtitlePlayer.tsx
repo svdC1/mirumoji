@@ -6,11 +6,10 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import SrtParser2 from "srt-parser-2";
-import { getTokenizer } from "../services/tokenizer";
+import { apiTokenizeBatch } from "../services/dictApi";
 import WordDialog from "./WordDialog";
-import { isKanji, toHiragana } from "../utils/languageUtils";
+import TokenizedText from "./TokenizedText";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
-import { IpadicFeatures } from "kuromoji";
 import { Cue, SubtitlePlayerProps } from "../types/types";
 import { toSec, hexToRgba } from "../utils/formatters";
 import { usePlayer } from "../contexts/PlayerContext";
@@ -69,8 +68,13 @@ export default function SubtitlePlayer({
         videoRef.current?.load();
     }, [blobUrl]);
 
-    // Parse SRT file and tokenize cues
+    // Whether the SRT is being parsed + tokenized
+    const [preparing, setPreparing] = useState(false);
+
+    // Parse the SRT and pre-tokenize every cue in a single batch request, so
+    // playback never tokenizes per-cue (no mid-video lag/flicker).
     useEffect(() => {
+        let cancelled = false;
         (async () => {
             if (!srt) {
                 setCues([]);
@@ -78,48 +82,27 @@ export default function SubtitlePlayer({
             }
             const txt = await srt.text();
             const parser = new SrtParser2();
-            const raw = parser.fromSrt(txt.trim());
+            const parsed: Cue[] = parser.fromSrt(txt.trim()).map((c) => ({
+                start: toSec(c.startTime),
+                end: toSec(c.endTime),
+                raw: c.text.replace(/<[^>]+>/g, "").trim(),
+            }));
+
+            setPreparing(true);
             try {
-                const tokenizer = await getTokenizer();
-                // Tokenize raw Cues with Kurmoji
-                const processed: Cue[] = raw.map((c) => {
-                    const sentence = c.text.replace(/<[^>]+>/g, "").trim();
-                    const tokens = tokenizer.tokenize(sentence);
-                    return {
-                        start: toSec(c.startTime),
-                        end: toSec(c.endTime),
-                        tokens,
-                        raw: sentence,
-                    };
-                });
-                setCues(processed);
+                const wordsList = await apiTokenizeBatch(parsed.map((c) => c.raw));
+                if (cancelled) return;
+                setCues(parsed.map((cue, i) => ({ ...cue, words: wordsList[i] })));
             } catch (err) {
-                console.error("Tokenizer Failed, falling back", err);
-                // Empty Fallback Cue Array Which Splits on Every Character
-                const fallback: Cue[] = raw.map((c) => ({
-                    start: toSec(c.startTime),
-                    end: toSec(c.endTime),
-                    tokens: c.text
-                        .trim()
-                        .split("")
-                        .map((char) => ({
-                            surface_form: char,
-                            reading: char,
-                            word_type: "UNKNOWN",
-                            pos: "名詞",
-                            pos_detail_1: "一般",
-                            pos_detail_2: "*",
-                            pos_detail_3: "*",
-                            conjugated_type: "*",
-                            conjugated_form: "*",
-                            basic_form: char,
-                            pronunciation: char,
-                        })) as IpadicFeatures[],
-                    raw: c.text.trim(),
-                }));
-                setCues(fallback);
+                console.error("Failed to tokenize subtitles:", err);
+                if (!cancelled) setCues(parsed); // fall back to raw text
+            } finally {
+                if (!cancelled) setPreparing(false);
             }
         })();
+        return () => {
+            cancelled = true;
+        };
     }, [srt]);
 
     // Sync Cues with Video
@@ -165,10 +148,6 @@ export default function SubtitlePlayer({
         textShadow: subtitleStyle.textShadow,
         bottom: `${subtitleStyle.position}%`,
     };
-    // Set Furigana CSS Properties based on Style Context
-    const computedFuriganaStyle: React.CSSProperties = {
-        fontSize: `${Math.trunc(subtitleStyle.fontSize / 2.5)}px`,
-    };
 
     return (
         <div className="relative w-full flex flex-col items-center">
@@ -183,6 +162,12 @@ export default function SubtitlePlayer({
                 className="w-full max-h-[92vh] bg-black rounded-xl overflow-hidden"
             />
 
+            {preparing && (
+                <div className="absolute top-2 right-2 px-3 py-1 rounded-md bg-black/70 text-white text-xs animate-pulse pointer-events-none">
+                    Preparing subtitles…
+                </div>
+            )}
+
             {activeCue && (
                 <div
                     className="absolute select-none w-full px-2 text-center pointer-events-none"
@@ -192,48 +177,23 @@ export default function SubtitlePlayer({
                         className="inline-block mx-auto px-2 sm:px-4 md:px-6 py-1 sm:py-2 md:py-3 rounded-lg pointer-events-auto font-semibold shadow-xl max-w-[95%] break-words"
                         style={computedSubtitleStyle}
                     >
-                        {activeCue.tokens.map((token, i) => {
-                            const shouldDisplayFurigana =
-                                showFurigana &&
-                                token.reading &&
-                                token.surface_form !== token.reading &&
-                                token.surface_form.split("").some(isKanji);
-                            const furiganaText = shouldDisplayFurigana
-                                ? toHiragana(token.reading!)
-                                : null;
-
-                            return (
-                                // Clickable Subtitle Tokens
-                                <button
-                                    key={i}
-                                    className="inline-flex flex-col items-center mx-1 group align-bottom hover:text-yellow-300"
-                                    onClick={() => {
-                                        setDialog({
-                                            sentence: activeCue.raw,
-                                            word: !(token.basic_form === "*")
-                                                ? token.basic_form
-                                                : token.surface_form,
-                                            cueStart: activeCue.start,
-                                            cueEnd: activeCue.end,
-                                        });
-                                    }}
-                                >
-                                    {/*Furigana*/}
-                                    {shouldDisplayFurigana && furiganaText && (
-                                        <span
-                                            className=" text-gray-400 group-hover:text-yellow-300"
-                                            style={computedFuriganaStyle}
-                                        >
-                                            {furiganaText}
-                                        </span>
-                                    )}
-                                    {/*Token*/}
-                                    <span className="group-hover:text-yellow-300">
-                                        {token.surface_form}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                        {activeCue.words && activeCue.words.length > 0 ? (
+                            <TokenizedText
+                                words={activeCue.words}
+                                sentence={activeCue.raw}
+                                showFurigana={showFurigana}
+                                onWordClick={(sentence, word) =>
+                                    setDialog({
+                                        sentence,
+                                        word,
+                                        cueStart: activeCue.start,
+                                        cueEnd: activeCue.end,
+                                    })
+                                }
+                            />
+                        ) : (
+                            activeCue.raw
+                        )}
                     </span>
                 </div>
             )}

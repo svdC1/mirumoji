@@ -16,6 +16,7 @@ from ..models.jpdict import (
     JapaneseWord,
     KotobaseData,
 )
+from ..models.requests import TokenizeBatchRequest
 from ..processing import text
 
 LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,28 @@ async def tokenize(sentence: str = Query(...)) -> list[JapaneseWord]:
         FugashiError: If tokenization fails
     """
     return await asyncio.to_thread(text.segment, sentence)
+
+
+@dict_router.post("/tokenize", response_model=list[list[JapaneseWord]])
+async def tokenize_batch(
+    req: TokenizeBatchRequest,
+) -> list[list[JapaneseWord]]:
+    """
+    Tokenizes many sentences in one request (stitched words, no dict data)
+
+    Lets a client tokenize a whole subtitle file up front in a single call, so
+    playback never tokenizes per-cue
+
+    Args:
+        req (TokenizeBatchRequest): The sentences to tokenize
+
+    Returns:
+        One `JapaneseWord` list per input sentence, in the same order
+
+    Raises:
+        FugashiError: If tokenization fails
+    """
+    return await asyncio.to_thread(text.segment_batch, req.sentences)
 
 
 @dict_router.get("/analyze", response_model=list[EnrichedJapaneseWord])
