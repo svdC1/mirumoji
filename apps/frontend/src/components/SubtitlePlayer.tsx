@@ -6,12 +6,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import SrtParser2 from "srt-parser-2";
-import { apiTokenizeBatch } from "../services/dictApi";
-import WordDialog from "./WordDialog";
-import TokenizedText from "./TokenizedText";
+import { apiTokenizeBatch } from "@/shared/dict/api";
+import WordDialog from "@/shared/components/WordDialog";
+import TokenizedText from "@/shared/components/TokenizedText";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
-import { Cue, SubtitlePlayerProps } from "../types/types";
-import { toSec, hexToRgba } from "../utils/formatters";
+import type { Cue, SubtitlePlayerProps } from "@/features/player/types";
+import { toSec } from "@/shared/format/time";
+import { hexToRgba } from "@/shared/format/color";
 import { usePlayer } from "../contexts/PlayerContext";
 
 /**

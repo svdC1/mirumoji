@@ -5,8 +5,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { ChatBubbleProps } from "../types/types";
-import TokenizedText from "./TokenizedText";
+import type { ChatBubbleProps } from "@/features/transcribe/types";
+import TokenizedText from "@/shared/components/TokenizedText";
 import AudioPlayer from "react-h5-audio-player";
 
 /**

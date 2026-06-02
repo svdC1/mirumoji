@@ -6,20 +6,16 @@
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
-import { apiFetch } from "../services/api";
-import { apiProviders, parseModel, formatModel } from "../services/llmApi";
+import { apiFetch } from "@/shared/api/client";
+import { apiProviders, parseModel, formatModel } from "@/shared/llm/api";
+import { ApiError } from "@/shared/api/errors";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
-import {
-    LlmTemplate,
-    ProviderStatus,
-    ProfileFile,
-    ProfileTranscript,
-    ApiError,
-} from "../types/types";
-import { getFileExtension, truncateFilename, formatStaticUrl } from "../utils/fileUtils";
-import { tabs, API_BASE, defaultSysMsg, defaultPrompt, defaultModel } from "../constants/user-page";
+import type { LlmTemplate, ProviderStatus } from "@/shared/llm/types";
+import type { ProfileFile, ProfileTranscript } from "@/features/profile/types";
+import { getFileExtension, truncateFilename, staticUrl } from "@/shared/format/files";
+import { tabs, defaultSysMsg, defaultPrompt, defaultModel } from "@/features/profile/constants";
 
 /**
  * The UserPage component.
@@ -53,8 +49,8 @@ export default function UserPage() {
     const filesSWRKey = profileId && activeTab === "files" ? `profiles/files` : null;
     const transcriptsSWRKey =
         profileId && activeTab === "transcripts" ? `profiles/transcripts` : null;
-    const templateSWRKey = profileId && activeTab === "gpt-template" ? `profiles/template` : null;
-    const providersSWRKey = activeTab === "gpt-template" ? `llm/providers` : null;
+    const templateSWRKey = profileId && activeTab === "llm-template" ? `profiles/template` : null;
+    const providersSWRKey = activeTab === "llm-template" ? `llm/providers` : null;
 
     // Fetch files
     const {
@@ -114,7 +110,7 @@ export default function UserPage() {
             setProvider(parsed.provider);
             setModelName(parsed.name);
             setCurrentTemplate(templateData);
-        } else if (profileId && activeTab === "gpt-template" && !templateLoading) {
+        } else if (profileId && activeTab === "llm-template" && !templateLoading) {
             // No template yet: seed the form with defaults for creation
             setSysMsg(defaultSysMsg);
             setPromptText(defaultPrompt);
@@ -174,7 +170,7 @@ export default function UserPage() {
         }
         setDownloadingTranscriptId(transcript.id);
         try {
-            const response = await fetch(formatStaticUrl(API_BASE, transcript.url));
+            const response = await fetch(staticUrl(transcript.url));
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -340,7 +336,7 @@ export default function UserPage() {
                                             className="flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow"
                                         >
                                             <a
-                                                href={formatStaticUrl(API_BASE, file.url)}
+                                                href={staticUrl(file.url)}
                                                 download={file.name}
                                                 className="flex-1 mr-4 overflow-hidden"
                                             >
@@ -449,7 +445,7 @@ export default function UserPage() {
                                 </p>
                             ))}
 
-                        {activeTab === "gpt-template" &&
+                        {activeTab === "llm-template" &&
                             (!profileId ? (
                                 showProfileMessage("Set a profile to manage LLM templates.")
                             ) : templateLoading ? (

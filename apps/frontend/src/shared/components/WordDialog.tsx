@@ -1,44 +1,58 @@
 /**
- * @packageDocumentation This component displays a dialog with information about a word.
- * It includes a GPT-powered explanation, dictionary definitions, and the ability to save a clip of the word being used.
+ * @packageDocumentation A draggable word lookup: an LLM nuance explanation
+ * (typewriter reveal) + dictionary definitions, with an optional "save clip"
+ * action when opened from a video. Shared by the player, text analyzer, and
+ * transcribe pages.
  */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Copy, Check, Bookmark } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { apiDictQuery, isEmptyDict } from "../services/dictApi";
-import { apiBreakdown, apiGetTemplate } from "../services/llmApi";
-import { toastApiError } from "../utils/apiErrorToaster";
-import { WordDialogProps, KotobaseData, BreakdownResponse, ClipBreakdown } from "../types/types";
-import { createAndSaveClip } from "../utils/clipCreator";
+import { apiDictQuery, isEmptyDict } from "@/shared/dict/api";
+import { apiBreakdown, apiGetTemplate } from "@/shared/llm/api";
+import { toastApiError } from "@/shared/api/errors";
+import { toHiragana } from "@/shared/japanese/kana";
+import { createAndSaveClip } from "@/shared/clips/create";
+import { cn } from "@/shared/ui";
+import type { KotobaseData } from "@/shared/dict/types";
+import type { BreakdownResponse } from "@/shared/llm/types";
+import type { ClipBreakdown } from "@/shared/clips/types";
 import {
     JmdictEntryDisplay,
     JmnedictEntryDisplay,
     KanjiInfoDisplay,
     ExampleDisplay,
 } from "./DictDisplays";
-import { toHiragana } from "../utils/languageUtils";
 
-// Cache breakdown responses for already-clicked words
+export interface WordDialogProps {
+    sentence: string;
+    word: string;
+    onClose: () => void;
+    cueStart: number;
+    cueEnd: number;
+    videoFile: File | null;
+    videoUrl?: string;
+}
+
+// Cache breakdown responses for already-clicked words.
 const breakdownCache = new Map<string, BreakdownResponse>();
 
 // A profile template's prompt uses {sentence}/{focus}; the API expects {0}/{1}.
 const toApiPrompt = (prompt: string): string =>
     prompt.replace(/{sentence}/g, "{0}").replace(/{focus}/g, "{1}");
 
+type MainTab = "llm" | "dict";
+type DictTab = "jmdict" | "jmnedict" | "kanji" | "examples";
+
 /**
  * The WordDialog component.
  *
- * This component is responsible for the following:
- * - Displaying information about a word, including a GPT-powered explanation and dictionary definitions.
- * - Allowing the user to save a clip of the word being used in the video.
- *
- * @param {WordDialogProps} props The props for the component.
- * @returns {JSX.Element} The WordDialog component.
+ * @param {WordDialogProps} props The props.
+ * @returns {JSX.Element} The dialog.
  */
 export default function WordDialog({
     sentence,
@@ -49,20 +63,13 @@ export default function WordDialog({
     videoFile,
     videoUrl,
 }: WordDialogProps) {
-    // Key for Cache
     const key = `${sentence}__${word}`;
     const [data, setData] = useState<BreakdownResponse | null>(breakdownCache.get(key) ?? null);
-    // Main Tabs State
-    const [tab, setTab] = useState<"llm" | "dict">("dict");
-    // Whether the profile has an LLM model configured (gates the LLM tab)
+    const [tab, setTab] = useState<MainTab>("dict");
     const [noModel, setNoModel] = useState(false);
-    // Dictionary SubTabs State
-    const [dictTab, setDictTab] = useState<"jmdict" | "jmnedict" | "kanji" | "examples">("jmdict");
-    // Copied to Clipboard State
+    const [dictTab, setDictTab] = useState<DictTab>("jmdict");
     const [copied, setCopied] = useState(false);
-    // Saving Clip State
     const [saving, setSaving] = useState(false);
-    // Dictionary Data from API
     const [dictData, setDictData] = useState<KotobaseData | null | undefined>(undefined);
 
     const [screenWidth, setScreenWidth] = useState(
@@ -79,20 +86,17 @@ export default function WordDialog({
     }, []);
 
     const isMobile = screenWidth < 1380;
-    // Check if loaded on a player context
     const canSaveClip = !!(videoFile || videoUrl);
 
     const fetchBreakdown = async (): Promise<BreakdownResponse | null> => {
-        // Return cache if present
         const cached = breakdownCache.get(key);
         if (cached) {
             setData(cached);
             return cached;
         }
-
         try {
-            // The model (+ optional sys_msg/prompt) comes from the profile's
-            // LLM template; without one, the LLM features stay disabled.
+            // Model (+ optional sys_msg/prompt) comes from the profile template;
+            // without one, the LLM features stay disabled.
             const template = await apiGetTemplate();
             if (!template) {
                 setNoModel(true);
@@ -123,9 +127,10 @@ export default function WordDialog({
     useEffect(() => {
         if (data || tab !== "llm") return;
         fetchBreakdown().catch(() => {});
-    }, [key, data, sentence, word, tab, onClose]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [key, data, tab]);
 
-    // Typewriter reveal of the explanation
+    // Typewriter reveal of the explanation.
     const [typed, setTyped] = useState("");
     useEffect(() => {
         const full = data?.explanation ?? "";
@@ -150,15 +155,10 @@ export default function WordDialog({
                     return;
                 }
                 setDictData(entry);
-                // Set Default SubTab when common entries aren't available
                 if (entry.jmentries.length === 0) {
-                    if (entry.jmnentries.length > 0) {
-                        setDictTab("jmnedict");
-                    } else if (entry.kanji.length > 0) {
-                        setDictTab("kanji");
-                    } else if (entry.examples.length > 0) {
-                        setDictTab("examples");
-                    }
+                    if (entry.jmnentries.length > 0) setDictTab("jmnedict");
+                    else if (entry.kanji.length > 0) setDictTab("kanji");
+                    else if (entry.examples.length > 0) setDictTab("examples");
                 }
             })
             .catch((e) => {
@@ -168,11 +168,8 @@ export default function WordDialog({
             });
     }, [tab, word]);
 
-    // Copy to Clipboard Functionality
     const handleCopy = () => {
         let textToCopy = "";
-
-        // Copy LLM Data as string
         if (tab === "llm" && data) {
             const focus = data.focus;
             textToCopy = [
@@ -182,7 +179,6 @@ export default function WordDialog({
                 "",
                 data.explanation,
             ].join("\n");
-            // Copy Dict Data as JSON String
         } else if (tab === "dict" && dictData) {
             textToCopy = JSON.stringify(dictData);
         }
@@ -194,11 +190,10 @@ export default function WordDialog({
         }
     };
 
-    // Save Clip Functionality
     const handleSave = async () => {
         const clipToastId = "clip-save-toast";
         if (!canSaveClip) {
-            toast.error("No video source available");
+            toast.error("No Video Source Available");
             return;
         }
         setSaving(true);
@@ -208,9 +203,8 @@ export default function WordDialog({
                 toast.loading("Fetching explanation...", { id: clipToastId });
                 breakdown = await fetchBreakdown();
             }
-
             if (!breakdown) {
-                toast.error("Configure an LLM model in your Profile to save clips.", {
+                toast.error("Configure An LLM Model In Your Profile To Save Clips.", {
                     id: clipToastId,
                 });
                 setSaving(false);
@@ -218,65 +212,62 @@ export default function WordDialog({
             }
 
             const clipBreakdown: ClipBreakdown = { ...breakdown, sentence };
-
-            // Handle clipCreator callback on UI
             const onProgress = (message: string, type: "success" | "error" | "loading") => {
-                switch (type) {
-                    case "loading":
-                        toast.loading(message, { id: clipToastId });
-                        break;
-                    case "success":
-                        toast.success(message, { id: clipToastId });
-                        break;
-                    case "error":
-                        toast.error(message, { id: clipToastId });
-                        break;
-                }
+                if (type === "loading") toast.loading(message, { id: clipToastId });
+                else if (type === "success") toast.success(message, { id: clipToastId });
+                else toast.error(message, { id: clipToastId });
             };
 
-            await createAndSaveClip(
-                "mirumoji-player", // The ID of the main video player
-                cueStart,
-                cueEnd,
-                clipBreakdown,
-                onProgress
-            );
+            await createAndSaveClip("mirumoji-player", cueStart, cueEnd, clipBreakdown, onProgress);
         } catch (error) {
             console.error("Failed to save clip from WordDialog:", error);
-            toast.error("Failed to Save Clip", { id: clipToastId });
+            toast.error("Failed To Save Clip", { id: clipToastId });
         } finally {
             setSaving(false);
         }
     };
 
+    const tabClasses = (active: boolean) =>
+        cn(
+            "flex-1 py-2 text-sm transition-colors sm:text-base",
+            active ? "border-b-2 border-shu text-ink" : "text-ink-faint hover:text-ink-muted"
+        );
+
+    const dictSubTab = (active: boolean) =>
+        cn(
+            "flex-1 py-2 text-sm transition-colors",
+            active ? "border-b-2 border-ai text-ink" : "text-ink-faint hover:text-ink-muted"
+        );
+
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 pointer-events-none p-4">
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-                drag={true}
+                drag
                 dragListener={!isMobile}
                 dragControls={dragControls}
                 dragMomentum={false}
-                className="bg-neutral-800 rounded-xl p-6 w-full max-w-lg max-h-[70vh] overflow-y-auto relative text-lg pointer-events-auto"
+                className="pointer-events-auto relative max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-card border border-ink/10 bg-surface p-6 text-lg text-ink shadow-lift"
             >
                 {isMobile && (
                     <div
                         onPointerDown={(event) =>
                             dragControls.start(event, { snapToCursor: false })
                         }
-                        className="absolute top-0 left-0 right-0 h-10 flex justify-center items-center cursor-grab z-20"
+                        className="absolute left-0 right-0 top-0 z-20 flex h-10 cursor-grab items-center justify-center"
                         style={{ touchAction: "none" }}
                     >
-                        <div className="w-10 h-1.5 bg-neutral-500 rounded-full mt-1" />
+                        <div className="mt-1 h-1.5 w-10 rounded-full bg-ink/30" />
                     </div>
                 )}
 
-                <div className={`${isMobile ? "pt-8" : ""}`}>
-                    <div className="absolute top-3 right-4 flex space-x-3 z-30">
+                <div className={isMobile ? "pt-8" : ""}>
+                    <div className="absolute right-4 top-3 z-30 flex space-x-3">
                         {canSaveClip && (
                             <button
-                                className={`text-2xl transition-colors ${
-                                    saving ? "text-gray-500" : "hover:text-emerald-400"
-                                }`}
+                                className={cn(
+                                    "transition-colors",
+                                    saving ? "text-ink-faint" : "text-ink-muted hover:text-matcha"
+                                )}
                                 onClick={handleSave}
                                 disabled={saving}
                                 aria-label="Save clip"
@@ -285,69 +276,65 @@ export default function WordDialog({
                             </button>
                         )}
                         <button
-                            className="text-2xl hover:text-teal-300 transition-colors"
+                            className="text-ink-muted transition-colors hover:text-ai"
                             onClick={handleCopy}
                             aria-label="Copy content"
                         >
                             {copied ? <Check size={22} /> : <Copy size={22} />}
                         </button>
-                        <button className="text-2xl" onClick={onClose} aria-label="Close">
+                        <button
+                            className="text-2xl leading-none text-ink-muted hover:text-ink"
+                            onClick={onClose}
+                            aria-label="Close"
+                        >
                             ×
                         </button>
                     </div>
+
                     <div
-                        className={`flex border-b border-neutral-700 mb-4 ${
+                        className={cn(
+                            "mb-4 flex border-b border-ink/10",
                             isMobile ? "mt-6" : "mt-2"
-                        }`}
+                        )}
                     >
-                        <button
-                            className={`flex-1 py-2 text-sm sm:text-base ${
-                                tab === "llm"
-                                    ? "border-b-2 border-emerald-400 text-white"
-                                    : "text-neutral-400 hover:text-neutral-200"
-                            }`}
-                            onClick={() => setTab("llm")}
-                        >
+                        <button className={tabClasses(tab === "llm")} onClick={() => setTab("llm")}>
                             LLM
                         </button>
                         <button
-                            className={`flex-1 py-2 text-sm sm:text-base ${
-                                tab === "dict"
-                                    ? "border-b-2 border-emerald-400 text-white"
-                                    : "text-neutral-400 hover:text-neutral-200"
-                            }`}
+                            className={tabClasses(tab === "dict")}
                             onClick={() => setTab("dict")}
                         >
                             Dictionary
                         </button>
                     </div>
+
                     {tab === "llm" ? (
                         noModel ? (
-                            <div className="text-center text-neutral-400 italic py-6">
+                            <div className="py-6 text-center italic text-ink-muted">
                                 Configure an LLM model in your Profile (Dashboard &rarr; LLM
                                 Template) to enable explanations.
                             </div>
                         ) : !data ? (
                             <div className="w-full space-y-4">
-                                <div className="h-6 w-1/3 rounded bg-neutral-700 animate-pulse" />
+                                <div className="h-6 w-1/3 animate-pulse rounded bg-ink/10" />
                                 {Array.from({ length: 4 }).map((_, i) => (
                                     <div
                                         key={i}
-                                        className="h-4 w-full rounded bg-neutral-700 animate-pulse"
+                                        className="h-4 w-full animate-pulse rounded bg-ink/10"
                                     />
                                 ))}
                             </div>
                         ) : (
                             <>
-                                <h2 className="text-xl font-bold mb-1">
+                                <h2 lang="ja" className="mb-1 font-display text-xl font-bold">
                                     {data.focus?.word.surface ?? word}
                                 </h2>
                                 {data.focus &&
                                 (data.focus.word.reading ||
                                     data.focus.kotobase_data.meanings.length) ? (
-                                    <div className="mt-1 mb-3 text-neutral-300 text-base leading-relaxed">
+                                    <div className="mb-3 mt-1 text-base leading-relaxed text-ink-muted">
                                         {data.focus.word.reading && (
-                                            <span className="mr-2 italic">
+                                            <span lang="ja" className="mr-2 italic">
                                                 {toHiragana(data.focus.word.reading)}
                                             </span>
                                         )}
@@ -359,7 +346,7 @@ export default function WordDialog({
                                     </div>
                                 ) : null}
                                 <ReactMarkdown
-                                    className="prose prose-sm sm:prose-base prose-invert max-w-none whitespace-pre-wrap"
+                                    className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap sm:prose-base"
                                     remarkPlugins={[remarkGfm, remarkBreaks]}
                                 >
                                     {typed}
@@ -367,21 +354,17 @@ export default function WordDialog({
                             </>
                         )
                     ) : dictData === undefined ? (
-                        <p className="italic text-center text-neutral-400">Loading dictionary…</p>
+                        <p className="text-center italic text-ink-muted">Loading dictionary…</p>
                     ) : dictData === null ? (
-                        <p className="italic text-neutral-400 text-center">
+                        <p className="text-center italic text-ink-muted">
                             No dictionary entry found for &quot;{word}&quot;.
                         </p>
                     ) : (
                         <div>
-                            <div className="flex border-b border-neutral-700 mb-2">
+                            <div className="mb-2 flex border-b border-ink/10">
                                 {dictData.jmentries.length > 0 && (
                                     <button
-                                        className={`flex-1 py-2 text-sm ${
-                                            dictTab === "jmdict"
-                                                ? "border-b-2 border-teal-400 text-white"
-                                                : "text-neutral-400 hover:text-neutral-200"
-                                        }`}
+                                        className={dictSubTab(dictTab === "jmdict")}
                                         onClick={() => setDictTab("jmdict")}
                                     >
                                         Common
@@ -389,11 +372,7 @@ export default function WordDialog({
                                 )}
                                 {dictData.jmnentries.length > 0 && (
                                     <button
-                                        className={`flex-1 py-2 text-sm ${
-                                            dictTab === "jmnedict"
-                                                ? "border-b-2 border-teal-400 text-white"
-                                                : "text-neutral-400 hover:text-neutral-200"
-                                        }`}
+                                        className={dictSubTab(dictTab === "jmnedict")}
                                         onClick={() => setDictTab("jmnedict")}
                                     >
                                         Proper Nouns
@@ -401,11 +380,7 @@ export default function WordDialog({
                                 )}
                                 {dictData.kanji.length > 0 && (
                                     <button
-                                        className={`flex-1 py-2 text-sm ${
-                                            dictTab === "kanji"
-                                                ? "border-b-2 border-teal-400 text-white"
-                                                : "text-neutral-400 hover:text-neutral-200"
-                                        }`}
+                                        className={dictSubTab(dictTab === "kanji")}
                                         onClick={() => setDictTab("kanji")}
                                     >
                                         Kanji
@@ -413,11 +388,7 @@ export default function WordDialog({
                                 )}
                                 {dictData.examples.length > 0 && (
                                     <button
-                                        className={`flex-1 py-2 text-sm ${
-                                            dictTab === "examples"
-                                                ? "border-b-2 border-teal-400 text-white"
-                                                : "text-neutral-400 hover:text-neutral-200"
-                                        }`}
+                                        className={dictSubTab(dictTab === "examples")}
                                         onClick={() => setDictTab("examples")}
                                     >
                                         Examples
@@ -461,7 +432,7 @@ export default function WordDialog({
                                             key={i}
                                             example={ex}
                                             isLast={i === dictData.examples.length - 1}
-                                        ></ExampleDisplay>
+                                        />
                                     ))}
                                 </div>
                             )}

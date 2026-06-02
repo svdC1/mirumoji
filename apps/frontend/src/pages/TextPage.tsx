@@ -4,11 +4,11 @@
  * tokens with furigana; clicking a token opens its WordDialog.
  */
 import React, { useState } from "react";
-import { apiTokenize } from "../services/dictApi";
-import { toastApiError } from "../utils/apiErrorToaster";
-import WordDialog from "../components/WordDialog";
-import TokenizedText from "../components/TokenizedText";
-import { JapaneseWord } from "../types/types";
+import { apiTokenize } from "@/shared/dict/api";
+import { toastApiError } from "@/shared/api/errors";
+import WordDialog from "@/shared/components/WordDialog";
+import TokenizedText from "@/shared/components/TokenizedText";
+import type { JapaneseWord } from "@/shared/dict/types";
 
 /**
  * The TextPage component.

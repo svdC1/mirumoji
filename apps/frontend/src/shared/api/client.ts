@@ -1,21 +1,17 @@
 /**
- * @packageDocumentation This file contains the apiFetch function, which is a wrapper around the native fetch function.
+ * @packageDocumentation A `fetch` wrapper + a progress-tracked
+ * file upload, both injecting the active profile header and parsing the
+ * server's structured error envelope.
  */
 
-import { ApiError } from "../types/types";
+import { ApiError } from "./errors";
 
-const BASE = "/api";
+/** Single source of truth for the API base (dev server proxies `/api`). */
+export const API_BASE = "/api";
 
 /**
- * Parses a server error body into a message + optional machine code/details.
- *
- * Understands the nested error envelope
- * `{ success: false, error: { code, message, details } }` and falls back to
- * the raw response text or a default.
- *
- * @param {string} body The raw response body.
- * @param {string} fallback A default message when nothing better is found.
- * @returns {{ message: string; code?: string; details?: unknown }} Parsed error.
+ * Parses a server error body into a message + optional machine code/details,
+ * understanding the nested `{ error: { code, message, details } }` envelope.
  */
 function parseApiError(
     body: string,
@@ -37,28 +33,23 @@ function parseApiError(
 }
 
 /**
- * A fetch replacement that:
- *   - Auto-prefixes BASE for relative URLs
- *   - Adds X-Profile-ID header if a profile is set in localStorage
- *   - Throws ApiError on non-2xx
- *   - Parses JSON/text/blob based on content-type
+ * A `fetch` replacement that prefixes the API base for relative URLs, injects
+ * the `X-Profile-ID` header, throws {@link ApiError} on non-2xx, and parses the
+ * response by content-type.
  *
- * @param {string} url The URL to fetch.
- * @param {RequestInit} [opts={}] The options for the fetch request.
- * @returns {Promise<T>} A promise that resolves to the response data.
+ * @param {string} url Relative API path (or absolute URL).
+ * @param {RequestInit} [opts={}] Fetch options.
+ * @returns {Promise<T>} The parsed response.
  * @template T
  */
 export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {}): Promise<T> {
-    // build the full URL
-    const fullUrl = url.startsWith("http") ? url : `${BASE}/${url}`;
+    const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
 
-    // merge / build headers
     const headers = new Headers(opts.headers as HeadersInit);
     if (!(opts.body instanceof FormData) && !headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json");
     }
 
-    // Add Profile ID header if available
     const profileId = localStorage.getItem("currentProfileId");
     if (profileId) {
         headers.set("X-Profile-ID", profileId);
@@ -79,32 +70,30 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
     if (ct.startsWith("text/")) {
         return res.text() as unknown as T;
     }
-    // fallback to blob
     return res.blob() as unknown as T;
 }
 
 /**
- * Uploads a file to the server using a streaming request with progress tracking.
- * It mirrors the behavior of `apiFetch` by automatically adding the profile ID,
- * handling errors with `ApiError`, and providing a consistent API.
+ * Uploads a file via a streaming `XMLHttpRequest` with progress, mirroring
+ * `apiFetch` (profile header, {@link ApiError}, JSON response).
  *
- * @template T The expected type of the JSON response.
+ * @template T The expected JSON response type.
  * @param {File} file The file to upload.
- * @param {string} url The API endpoint to upload the file to.
- * @param {Object.<string, string>} headers A dictionary of additional headers to send with the request.
- * @param {(percent: number) => void} onProgress A callback function that receives the upload progress as a percentage.
- * @param {() => void} onUploadComplete A callback function that is triggered when the upload portion is 100% complete.
- * @returns {Promise<T>} A promise that resolves with the JSON response from the server.
+ * @param {string} url The API endpoint.
+ * @param {Record<string, string>} headers Additional request headers.
+ * @param {(percent: number) => void} onProgress Upload progress callback.
+ * @param {() => void} onUploadComplete Called when the upload hits 100%.
+ * @returns {Promise<T>} The parsed JSON response.
  */
 export async function uploadFile<T = unknown>(
     file: File,
     url: string,
-    headers: { [key: string]: string },
+    headers: Record<string, string>,
     onProgress: (percent: number) => void,
     onUploadComplete: () => void
 ): Promise<T> {
     return new Promise((resolve, reject) => {
-        const fullUrl = url.startsWith("http") ? url : `${BASE}/${url}`;
+        const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
         const profileId = localStorage.getItem("currentProfileId");
         if (!profileId) {
             return reject(new ApiError(400, "No profile ID found. Please select a profile."));
@@ -136,9 +125,8 @@ export async function uploadFile<T = unknown>(
         xhr.onload = () => {
             if (xhr.status >= 200 && xhr.status < 300) {
                 try {
-                    const response = JSON.parse(xhr.responseText);
-                    resolve(response as T);
-                } catch (e) {
+                    resolve(JSON.parse(xhr.responseText) as T);
+                } catch {
                     reject(new ApiError(500, "Failed to parse server response."));
                 }
             } else {
@@ -150,10 +138,7 @@ export async function uploadFile<T = unknown>(
             }
         };
 
-        xhr.onerror = () => {
-            reject(new ApiError(500, "Network Error"));
-        };
-
+        xhr.onerror = () => reject(new ApiError(500, "Network Error"));
         xhr.send(file);
     });
 }

@@ -2,20 +2,20 @@
  * @packageDocumentation Client helpers for the provider-agnostic LLM API.
  */
 
-import { apiFetch } from "../services/api";
-import {
-    ApiError,
+import { apiFetch } from "@/shared/api/client";
+import { ApiError } from "@/shared/api/errors";
+import type {
     BreakdownResponse,
     ExplanationResponse,
+    FixSrtResponse,
     LlmTemplate,
     ProviderStatus,
-} from "../types/types";
+} from "./types";
 
 /**
- * Lists which LLM providers are usable in this deployment.
+ * Lists which LLM providers are usable in this deployment (`/llm/providers`).
  *
- * @returns {Promise<ProviderStatus[]>} A promise that resolves to the
- *     provider availability list from `/llm/providers`.
+ * @returns {Promise<ProviderStatus[]>} The provider availability list.
  */
 export async function apiProviders(): Promise<ProviderStatus[]> {
     const res = await apiFetch<{ providers: ProviderStatus[] }>("llm/providers", { method: "GET" });
@@ -24,9 +24,6 @@ export async function apiProviders(): Promise<ProviderStatus[]> {
 
 /**
  * Fetches the active profile's LLM template, or `null` when none is set.
- *
- * The model selector (and optional sys_msg/prompt) for LLM calls live here, so
- * callers use this to discover whether LLM features are configured.
  *
  * @returns {Promise<LlmTemplate | null>} The template, or `null` on 404.
  */
@@ -47,8 +44,7 @@ export async function apiGetTemplate(): Promise<LlmTemplate | null> {
  * @param {string} req.focus The word to explain in context.
  * @param {string} req.model The `provider:model` selector.
  * @param {string} [req.sys_msg] Optional custom system message.
- * @param {string} [req.prompt] Optional custom prompt template (`{0}`=sentence,
- *     `{1}`=focus).
+ * @param {string} [req.prompt] Optional custom prompt (`{0}`=sentence, `{1}`=focus).
  * @returns {Promise<BreakdownResponse>} The focus word + explanation.
  */
 export async function apiBreakdown(req: {
@@ -71,7 +67,7 @@ export async function apiBreakdown(req: {
  * @param {string} req.sentence The sentence to explain.
  * @param {string} req.model The `provider:model` selector.
  * @param {string} [req.sys_msg] Optional custom system message.
- * @param {string} [req.prompt] Optional custom prompt template (`{0}`=sentence).
+ * @param {string} [req.prompt] Optional custom prompt (`{0}`=sentence).
  * @returns {Promise<ExplanationResponse>} The explanation.
  */
 export async function apiExplainSentence(req: {
@@ -87,11 +83,30 @@ export async function apiExplainSentence(req: {
 }
 
 /**
- * Splits a `provider:model` selector into its parts (provider defaults to
- * `openai` when no prefix is present).
+ * Cleans up raw SRT content with an LLM (`/llm/fix_srt`).
  *
- * @param {string} model The `provider:model` selector.
- * @returns {{ provider: string; name: string }} The provider and model name.
+ * @param {object} req The SRT-fix request.
+ * @param {string} req.srt The raw SRT content.
+ * @param {string} req.model The `provider:model` selector.
+ * @param {string} [req.sys_msg] Optional custom system message.
+ * @returns {Promise<FixSrtResponse>} The cleaned-up SRT content.
+ */
+export async function apiFixSrt(req: {
+    srt: string;
+    model: string;
+    sys_msg?: string;
+}): Promise<FixSrtResponse> {
+    return apiFetch<FixSrtResponse>("llm/fix_srt", {
+        method: "POST",
+        body: JSON.stringify(req),
+    });
+}
+
+/**
+ * Splits a `provider:model` selector (provider defaults to `openai`).
+ *
+ * @param {string} model The selector.
+ * @returns {{ provider: string; name: string }} Provider + model name.
  */
 export function parseModel(model: string): { provider: string; name: string } {
     const idx = model.indexOf(":");
@@ -100,11 +115,11 @@ export function parseModel(model: string): { provider: string; name: string } {
 }
 
 /**
- * Joins a provider and model name into a `provider:model` selector.
+ * Joins a provider + model name into a `provider:model` selector.
  *
- * @param {string} provider The provider id (e.g. `openai`).
- * @param {string} name The model name (e.g. `gpt-4.1-mini`).
- * @returns {string} The combined `provider:model` selector.
+ * @param {string} provider The provider id.
+ * @param {string} name The model name.
+ * @returns {string} The combined selector.
  */
 export function formatModel(provider: string, name: string): string {
     return `${provider}:${name}`;

@@ -7,19 +7,18 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { apiFetch, uploadFile } from "../services/api";
-import { toastApiError } from "../utils/apiErrorToaster";
-import { formatStaticUrl } from "../utils/fileUtils";
-import {
+import { apiFetch, uploadFile } from "@/shared/api/client";
+import { toastApiError } from "@/shared/api/errors";
+import { staticUrl } from "@/shared/format/files";
+import type {
     ConvertVideoResponse,
     GenerateSrtResponse,
     SettingsDrawerProps,
-    ProfileFile,
-} from "../types/types";
+} from "@/features/player/types";
+import type { ProfileFile } from "@/features/profile/types";
 import { useProfile } from "../contexts/ProfileContext";
 import { useSubtitleSettings } from "../contexts/SubtitleSettingsContext";
 import { usePlayer } from "../contexts/PlayerContext";
-import { API_BASE } from "../constants/user-page";
 
 const comprehensiveVideoAcceptList = [
     // Common Formats
@@ -149,7 +148,7 @@ export default function SettingsDrawer({
     };
 
     const handleProfileFileSelect = async (file: ProfileFile) => {
-        const fullUrl = formatStaticUrl(API_BASE, file.url);
+        const fullUrl = staticUrl(file.url);
         if (file.type === "mp4") {
             onVideoUrl?.(fullUrl);
             setVideoFileName(file.url);
@@ -237,8 +236,8 @@ export default function SettingsDrawer({
             );
 
             if (result.converted_video_url) {
-                onVideoUrl?.(formatStaticUrl(API_BASE, result.converted_video_url));
-                setConvertedVideoDownloadUrl(formatStaticUrl(API_BASE, result.converted_video_url));
+                onVideoUrl?.(staticUrl(result.converted_video_url));
+                setConvertedVideoDownloadUrl(staticUrl(result.converted_video_url));
                 setVideoFileName(result.converted_video_url);
                 toast.success("Conversion complete!", { id: tId });
             } else {

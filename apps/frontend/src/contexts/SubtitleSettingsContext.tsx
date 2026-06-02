@@ -4,7 +4,17 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-import { SubtitleStyle } from "../types/types";
+/**
+ * The shape of the subtitle style settings.
+ */
+export interface SubtitleStyle {
+    fontSize: number;
+    fontColor: string;
+    backgroundColor: string;
+    backgroundOpacity: number;
+    textShadow: string;
+    position: number;
+}
 
 /**
  * @interface SubtitleSettingsContextType

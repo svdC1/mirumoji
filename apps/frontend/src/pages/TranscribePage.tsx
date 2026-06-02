@@ -5,13 +5,14 @@
 
 import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
-import { uploadFile } from "../services/api";
-import { apiTokenize } from "../services/dictApi";
-import { apiExplainSentence, apiGetTemplate } from "../services/llmApi";
+import { uploadFile } from "@/shared/api/client";
+import { apiTokenize } from "@/shared/dict/api";
+import { apiExplainSentence, apiGetTemplate } from "@/shared/llm/api";
+import { ApiError } from "@/shared/api/errors";
 import AudioPlayer from "react-h5-audio-player";
 import "react-h5-audio-player/lib/styles.css";
-import WordDialog from "../components/WordDialog";
-import { Message, AudioTranscriptResponse, ApiError } from "../types/types";
+import WordDialog from "@/shared/components/WordDialog";
+import type { Message, AudioTranscriptResponse } from "@/features/transcribe/types";
 import ChatBubble from "../components/ChatBubble";
 /**
  * The TranscribePage component.
@@ -195,7 +196,6 @@ export default function TranscribePage() {
                     text: result.transcript,
                     words,
                     isTranscription: true,
-                    rawText: result.transcript,
                 });
             }
 
@@ -215,7 +215,6 @@ export default function TranscribePage() {
                         id: `explain-${Date.now() + 3}`,
                         type: "bot",
                         text: explanation,
-                        isExplanation: true,
                     });
                 }
             }

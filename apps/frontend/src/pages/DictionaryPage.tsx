@@ -5,10 +5,10 @@
  */
 
 import { useState } from "react";
-import { apiDictQuery, isEmptyDict } from "../services/dictApi";
+import { apiDictQuery, isEmptyDict } from "@/shared/dict/api";
 import { SearchIcon } from "lucide-react";
-import { KotobaseData } from "../types/types";
-import { ComprehensiveEntryCard, WildcardResults } from "../components/DictDisplays";
+import type { KotobaseData } from "@/shared/dict/types";
+import { ComprehensiveEntryCard, WildcardResults } from "@/shared/components/DictDisplays";
 
 /**
  * Renders the main dictionary search page.

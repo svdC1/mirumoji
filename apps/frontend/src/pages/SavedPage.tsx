@@ -6,16 +6,15 @@
 import { useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
-import { apiFetch } from "../services/api";
+import { apiFetch } from "@/shared/api/client";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { toastApiError } from "../utils/apiErrorToaster";
-import { formatStaticUrl } from "../utils/fileUtils";
-import { truncateText } from "../utils/fileUtils";
-import { Clip, AnkiExportResponse } from "../types/types";
-import { API_BASE } from "../constants/user-page";
+import { toastApiError } from "@/shared/api/errors";
+import { staticUrl, truncateText } from "@/shared/format/files";
+import type { Clip } from "@/shared/clips/types";
+import type { AnkiExportResponse } from "@/features/profile/types";
 
 /**
  * The SavedPage component.
@@ -100,7 +99,7 @@ export default function SavedPage() {
 
             toast.loading("Downloading Deck...", { id: toastId });
 
-            const response = await fetch(formatStaticUrl(API_BASE, ankiDetails.anki_deck_url));
+            const response = await fetch(staticUrl(ankiDetails.anki_deck_url));
             if (!response.ok) {
                 throw new Error(
                     `Failed to download Anki deck: ${response.status} ${response.statusText}`
@@ -163,9 +162,9 @@ export default function SavedPage() {
                 {selectedClip && breakdown && (
                     <div className="flex flex-col mb-8 p-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
                         <video
-                            key={formatStaticUrl(API_BASE, selectedClip.clip_url)}
+                            key={staticUrl(selectedClip.clip_url)}
                             controls
-                            src={formatStaticUrl(API_BASE, selectedClip.clip_url)}
+                            src={staticUrl(selectedClip.clip_url)}
                             className="w-full rounded-lg mb-4 aspect-video bg-black"
                         >
                             Your browser does not support the video tag.
