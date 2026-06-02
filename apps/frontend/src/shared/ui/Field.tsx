@@ -1,27 +1,12 @@
 import React from "react";
 import { cn } from "./cn";
-
-const CONTROL =
-    "w-full rounded-control border border-ink/10 bg-surface-2 px-3 py-2 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-shu/60 focus:outline-none focus:ring-2 focus:ring-shu/30 disabled:opacity-50";
+import { controlClasses } from "./control";
 
 export const Input = React.forwardRef<
     HTMLInputElement,
     React.InputHTMLAttributes<HTMLInputElement>
 >(function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn(CONTROL, className)} {...rest} />;
-});
-
-export const Textarea = React.forwardRef<
-    HTMLTextAreaElement,
-    React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(function Textarea({ className, ...rest }, ref) {
-    return (
-        <textarea
-            ref={ref}
-            className={cn(CONTROL, "resize-none leading-relaxed", className)}
-            {...rest}
-        />
-    );
+    return <input ref={ref} className={cn(controlClasses, className)} {...rest} />;
 });
 
 export const Select = React.forwardRef<
@@ -29,7 +14,7 @@ export const Select = React.forwardRef<
     React.SelectHTMLAttributes<HTMLSelectElement>
 >(function Select({ className, children, ...rest }, ref) {
     return (
-        <select ref={ref} className={cn(CONTROL, "cursor-pointer", className)} {...rest}>
+        <select ref={ref} className={cn(controlClasses, "cursor-pointer", className)} {...rest}>
             {children}
         </select>
     );

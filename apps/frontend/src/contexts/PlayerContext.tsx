@@ -5,7 +5,7 @@
  * between pages.
  */
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 
 /**
  * @interface PlayerContextState
@@ -60,7 +60,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     /**
      * Resets all player-related state to their initial default values.
      */
-    const clearPlayerState = () => {
+    const clearPlayerState = useCallback(() => {
         setVideo(null);
         setVideoFileName(null);
         setSrt(null);
@@ -69,27 +69,42 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setDrawerOpen(true);
         setShowFurigana(true);
         setTimestamp(null);
-    };
+    }, []);
 
-    const value = {
-        video,
-        setVideo,
-        videoFileName,
-        setVideoFileName,
-        srt,
-        setSrt,
-        srtFileName,
-        setSrtFileName,
-        videoUrl,
-        setVideoUrl,
-        drawerOpen,
-        setDrawerOpen,
-        showFurigana,
-        setShowFurigana,
-        clearPlayerState,
-        timestamp,
-        setTimestamp,
-    };
+    // Memoize the context value so consumers don't re-render on every provider
+    // render
+    const value = useMemo<PlayerContextState>(
+        () => ({
+            video,
+            setVideo,
+            videoFileName,
+            setVideoFileName,
+            srt,
+            setSrt,
+            srtFileName,
+            setSrtFileName,
+            videoUrl,
+            setVideoUrl,
+            drawerOpen,
+            setDrawerOpen,
+            showFurigana,
+            setShowFurigana,
+            clearPlayerState,
+            timestamp,
+            setTimestamp,
+        }),
+        [
+            video,
+            videoFileName,
+            srt,
+            srtFileName,
+            videoUrl,
+            drawerOpen,
+            showFurigana,
+            timestamp,
+            clearPlayerState,
+        ]
+    );
 
     return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 };

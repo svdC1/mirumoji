@@ -1,0 +1,167 @@
+/**
+ * @packageDocumentation The app shell's primary navigation: a collapsible icon
+ * rail that expands on hover (desktop). On the immersive Player route it hides
+ * and is reachable via a floating menu button as a left drawer. Profile lives at
+ * the foot (not in the nav).
+ */
+
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+    Home,
+    Clapperboard,
+    Mic,
+    Languages,
+    BookOpen,
+    GraduationCap,
+    LayoutDashboard,
+    Menu,
+    X,
+} from "lucide-react";
+import { ProfileChip } from "./ProfileChip";
+import { cn, IconButton } from "@/shared/ui";
+
+interface NavEntry {
+    to: string;
+    label: string;
+    icon: typeof Home;
+    end?: boolean;
+}
+
+const NAV: NavEntry[] = [
+    { to: "/", label: "Home", icon: Home, end: true },
+    { to: "/player", label: "Player", icon: Clapperboard },
+    { to: "/transcribe", label: "Transcribe", icon: Mic },
+    { to: "/text", label: "Text", icon: Languages },
+    { to: "/dictionary", label: "Dictionary", icon: BookOpen },
+    { to: "/guide", label: "Guide", icon: GraduationCap },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+];
+
+function isActive(pathname: string, entry: NavEntry): boolean {
+    if (entry.end) return pathname === entry.to;
+    return pathname === entry.to || pathname.startsWith(`${entry.to}/`);
+}
+
+function RailBody({
+    expanded,
+    pathname,
+    onNavigate,
+}: {
+    expanded: boolean;
+    pathname: string;
+    onNavigate: () => void;
+}) {
+    return (
+        <div className="flex h-full flex-col">
+            <Link to="/" onClick={onNavigate} className="flex h-16 items-center gap-3 px-[1.05rem]">
+                <span
+                    lang="ja"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-shu/15 font-jp text-lg text-shu"
+                >
+                    見
+                </span>
+                {expanded && <span className="font-display text-lg text-ink">Mirumoji</span>}
+            </Link>
+
+            <nav className="flex-1 space-y-1 px-2 py-2">
+                {NAV.map((entry) => {
+                    const active = isActive(pathname, entry);
+                    const Icon = entry.icon;
+                    return (
+                        <Link
+                            key={entry.to}
+                            to={entry.to}
+                            onClick={onNavigate}
+                            title={entry.label}
+                            className={cn(
+                                "flex h-11 items-center gap-3 rounded-control px-[0.9rem] transition-colors",
+                                active
+                                    ? "bg-shu/15 text-shu"
+                                    : "text-ink-muted hover:bg-ink/5 hover:text-ink"
+                            )}
+                        >
+                            <Icon size={20} className="shrink-0" />
+                            {expanded && (
+                                <span className="truncate text-sm font-medium">{entry.label}</span>
+                            )}
+                        </Link>
+                    );
+                })}
+            </nav>
+
+            <div className="border-t border-ink/10 p-2">
+                <ProfileChip expanded={expanded} />
+            </div>
+        </div>
+    );
+}
+
+/**
+ * The AppSidebar component.
+ *
+ * @param {{ immersive: boolean }} props Whether the current route is immersive
+ *     (the Player), where the rail hides behind a floating menu button.
+ * @returns {JSX.Element} The sidebar.
+ */
+export function AppSidebar({ immersive }: { immersive: boolean }) {
+    const { pathname } = useLocation();
+    const [hovered, setHovered] = useState(false);
+    const [open, setOpen] = useState(false);
+
+    if (immersive) {
+        return (
+            <>
+                {!open && (
+                    <IconButton
+                        label="Open menu"
+                        onClick={() => setOpen(true)}
+                        className="fixed left-3 top-3 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
+                    >
+                        <Menu size={20} />
+                    </IconButton>
+                )}
+                {open && (
+                    <div
+                        className="fixed inset-0 z-40 bg-black/50"
+                        onClick={() => setOpen(false)}
+                    />
+                )}
+                <aside
+                    className={cn(
+                        "fixed left-0 top-0 z-50 h-screen w-60 border-r border-ink/10 bg-surface transition-transform duration-200",
+                        open ? "translate-x-0 shadow-lift" : "-translate-x-full"
+                    )}
+                >
+                    <div className="flex h-full flex-col">
+                        <div className="flex justify-end px-2 pt-2">
+                            <IconButton label="Close menu" onClick={() => setOpen(false)}>
+                                <X size={18} />
+                            </IconButton>
+                        </div>
+                        <div className="min-h-0 flex-1">
+                            <RailBody
+                                expanded
+                                pathname={pathname}
+                                onNavigate={() => setOpen(false)}
+                            />
+                        </div>
+                    </div>
+                </aside>
+            </>
+        );
+    }
+
+    return (
+        <aside
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            className={cn(
+                "fixed left-0 top-0 z-40 h-screen overflow-hidden border-r border-ink/10 bg-surface transition-[width] duration-200",
+                hovered ? "w-60 shadow-lift" : "w-16"
+            )}
+        >
+            <RailBody expanded={hovered} pathname={pathname} onNavigate={() => undefined} />
+        </aside>
+    );
+}

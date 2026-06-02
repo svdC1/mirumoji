@@ -2,7 +2,15 @@
  * @packageDocumentation This file provides a context for managing the user's profile.
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    useCallback,
+    useMemo,
+    ReactNode,
+} from "react";
 
 /**
  * The context for managing the user's profile.
@@ -36,15 +44,13 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     }, [profileId]);
 
-    const setProfileId = (id: string | null) => {
+    const setProfileId = useCallback((id: string | null) => {
         setProfileIdState(id);
-    };
+    }, []);
 
-    return (
-        <ProfileContext.Provider value={{ profileId, setProfileId }}>
-            {children}
-        </ProfileContext.Provider>
-    );
+    const value = useMemo(() => ({ profileId, setProfileId }), [profileId, setProfileId]);
+
+    return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };
 
 /**

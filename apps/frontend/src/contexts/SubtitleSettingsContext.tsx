@@ -2,7 +2,15 @@
  * @packageDocumentation This file provides a context for managing the subtitle settings.
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    useCallback,
+    useMemo,
+    ReactNode,
+} from "react";
 
 /**
  * The shape of the subtitle style settings.
@@ -64,18 +72,21 @@ export const SubtitleSettingsProvider = ({ children }: { children: ReactNode }) 
         }
     }, [subtitleStyle]);
 
-    const setSubtitleStyle = (newStyle: SubtitleStyle) => {
+    const setSubtitleStyle = useCallback((newStyle: SubtitleStyle) => {
         setSubtitleStyleState(newStyle);
-    };
+    }, []);
 
-    const resetSubtitleStyle = () => {
+    const resetSubtitleStyle = useCallback(() => {
         setSubtitleStyleState(defaultSubtitleStyle);
-    };
+    }, []);
+
+    const value = useMemo(
+        () => ({ subtitleStyle, setSubtitleStyle, resetSubtitleStyle }),
+        [subtitleStyle, setSubtitleStyle, resetSubtitleStyle]
+    );
 
     return (
-        <SubtitleSettingsContext.Provider
-            value={{ subtitleStyle, setSubtitleStyle, resetSubtitleStyle }}
-        >
+        <SubtitleSettingsContext.Provider value={value}>
             {children}
         </SubtitleSettingsContext.Provider>
     );
