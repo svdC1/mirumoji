@@ -149,15 +149,15 @@ export default function SettingsDrawer({
     };
 
     const handleProfileFileSelect = async (file: ProfileFile) => {
-        const fullUrl = formatStaticUrl(API_BASE, file.get_url);
-        if (file.file_type === "mp4") {
+        const fullUrl = formatStaticUrl(API_BASE, file.url);
+        if (file.type === "mp4") {
             onVideoUrl?.(fullUrl);
-            setVideoFileName(file.get_url);
-        } else if (file.file_type === "srt") {
+            setVideoFileName(file.url);
+        } else if (file.type === "srt") {
             try {
                 const response = await fetch(fullUrl);
                 const srtContent = await response.text();
-                const srtFile = new File([srtContent], file.file_name, {
+                const srtFile = new File([srtContent], file.name, {
                     type: "application/x-subrip",
                 });
                 onSrt(srtFile);
@@ -254,9 +254,9 @@ export default function SettingsDrawer({
     // Disable UI request elements while True
     const isBusy = generatingSrt || convertingVideo;
     // Converted videos from profile
-    const videoFiles = profileFiles.filter((f) => f.file_type === "mp4");
+    const videoFiles = profileFiles.filter((f) => f.type === "mp4");
     // Generated SRT files from profile
-    const subtitleFiles = profileFiles.filter((f) => f.file_type === "srt");
+    const subtitleFiles = profileFiles.filter((f) => f.type === "srt");
     return (
         <motion.aside
             initial={{ width: 0 }}
@@ -594,7 +594,7 @@ export default function SettingsDrawer({
                                                     onClick={() => handleProfileFileSelect(file)}
                                                     className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
                                                 >
-                                                    {file.file_name}
+                                                    {file.name}
                                                 </li>
                                             ))
                                         ) : (
@@ -616,7 +616,7 @@ export default function SettingsDrawer({
                                                     onClick={() => handleProfileFileSelect(file)}
                                                     className="cursor-pointer hover:text-emerald-400 truncate p-1 rounded bg-neutral-800"
                                                 >
-                                                    {file.file_name}
+                                                    {file.name}
                                                 </li>
                                             ))
                                         ) : (

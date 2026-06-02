@@ -8,6 +8,9 @@ import { Tokenizer, IpadicFeatures } from "kuromoji";
 
 /**
  * The shape of a GPT template.
+ *
+ * @deprecated Legacy shape still used by WordDialog's GPT tab; replaced by
+ * {@link LlmTemplate} once the breakdown migration lands.
  */
 export interface GptTemplate {
     id: string;
@@ -17,24 +20,46 @@ export interface GptTemplate {
 }
 
 /**
- * The shape of a profile file.
+ * The shape of a profile's LLM template (`/profiles/template`).
+ *
+ * `model` is a `provider:model` selector (e.g. `"openai:gpt-4.1-mini"`).
+ */
+export interface LlmTemplate {
+    id: string;
+    sys_msg: string;
+    prompt: string;
+    model: string;
+}
+
+/**
+ * Availability of an LLM provider, as reported by `/llm/providers`.
+ */
+export interface ProviderStatus {
+    provider: string;
+    available: boolean;
+}
+
+/**
+ * The shape of a profile file (`/profiles/files`).
  */
 export type ProfileFile = {
     id: string;
-    file_name: string;
-    get_url: string;
-    file_type: string;
+    name: string;
+    url: string;
+    type: string | null;
+    created_at?: string | null;
 };
 
 /**
- * The shape of a profile transcript.
+ * The shape of a profile transcript (`/profiles/transcripts`).
  */
 export type ProfileTranscript = {
     id: string;
-    original_file_name?: string;
-    transcript: string;
-    gpt_explanation?: string;
-    get_url: string;
+    file_id: string;
+    text: string;
+    llm_explanation?: string | null;
+    url?: string | null;
+    created_at?: string | null;
 };
 
 /* SettingsDrawer*/

@@ -1,36 +1,34 @@
 /**
  * @packageDocumentation This component is the user page of the application.
- * It allows the user to view their profile, files, transcripts, and GPT template.
+ * It allows the user to view their profile, files, transcripts, and LLM template.
  */
 
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import useSWR, { mutate } from "swr";
 import { apiFetch } from "../services/api";
+import { apiProviders, parseModel, formatModel } from "../services/llmApi";
 import { toast } from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
-import { GptTemplate, ProfileFile, ProfileTranscript, ApiError } from "../types/types";
-import { getFileExtension, truncateFilename, formatStaticUrl } from "../utils/fileUtils";
 import {
-    tabs,
-    API_BASE,
-    defaultSysMsg,
-    defaultPrompt,
-    validGptModels,
-} from "../constants/user-page";
+    LlmTemplate,
+    ProviderStatus,
+    ProfileFile,
+    ProfileTranscript,
+    ApiError,
+} from "../types/types";
+import { getFileExtension, truncateFilename, formatStaticUrl } from "../utils/fileUtils";
+import { tabs, API_BASE, defaultSysMsg, defaultPrompt, defaultModel } from "../constants/user-page";
 
 /**
  * The UserPage component.
  *
  * This component is responsible for the following:
- * - Displaying the user's profile.
- * - Displaying the user's files.
- * - Displaying the user's transcripts.
- * - Displaying the user's GPT template.
- * - Allowing the user to delete their files and transcripts.
- * - Allowing the user to download their transcripts.
- * - Allowing the user to save, update, and delete their GPT template.
+ * - Displaying the user's profile, files, and transcripts.
+ * - Managing the profile's LLM template (system message, prompt, and
+ *   provider:model selector, with the provider list driven by /llm/providers).
+ * - Allowing the user to delete/download files and transcripts.
  *
  * @returns {JSX.Element} The UserPage component.
  */
@@ -41,20 +39,22 @@ export default function UserPage() {
     const [deletingTranscriptId, setDeletingTranscriptId] = useState<string | null>(null);
     const [downloadingTranscriptId, setDownloadingTranscriptId] = useState<string | null>(null);
 
-    // GPT Template states
-    const [gptSysMsg, setGptSysMsg] = useState("");
-    const [gptPrompt, setGptPrompt] = useState("");
-    const [gptVersion, setGptVersion] = useState(validGptModels[3]); // Default : gpt-4.1-mini
-    const [currentGptTemplate, setCurrentGptTemplate] = useState<GptTemplate | null>(null); // Store the fetched template object
-    const [isSavingGptTemplate, setIsSavingGptTemplate] = useState(false);
-    const [isDeletingGptTemplate, setIsDeletingGptTemplate] = useState(false);
+    // LLM template states
+    const [sysMsg, setSysMsg] = useState("");
+    const [promptText, setPromptText] = useState("");
+    const defaults = parseModel(defaultModel);
+    const [provider, setProvider] = useState(defaults.provider);
+    const [modelName, setModelName] = useState(defaults.name);
+    const [currentTemplate, setCurrentTemplate] = useState<LlmTemplate | null>(null);
+    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
 
     // SWR fetch keys - will use profileId
     const filesSWRKey = profileId && activeTab === "files" ? `profiles/files` : null;
     const transcriptsSWRKey =
         profileId && activeTab === "transcripts" ? `profiles/transcripts` : null;
-    const gptTemplateSWRKey =
-        profileId && activeTab === "gpt-template" ? `profiles/gpt_template` : null;
+    const templateSWRKey = profileId && activeTab === "gpt-template" ? `profiles/template` : null;
+    const providersSWRKey = activeTab === "gpt-template" ? `llm/providers` : null;
 
     // Fetch files
     const {
@@ -82,36 +82,48 @@ export default function UserPage() {
         },
     });
 
-    // Fetch GPT template
+    // Fetch the available LLM providers (drives the provider picker)
+    const { data: providers } = useSWR<ProviderStatus[]>(providersSWRKey, () => apiProviders(), {
+        revalidateOnFocus: false,
+        onError: (err) => {
+            console.error("Error fetching providers:", err);
+        },
+    });
+
+    // Fetch the profile's LLM template
     const {
-        data: gptTemplateData,
-        error: gptTemplateError,
-        isLoading: gptTemplateLoading,
-    } = useSWR<GptTemplate | null>(gptTemplateSWRKey, apiFetch, {
+        data: templateData,
+        error: templateError,
+        isLoading: templateLoading,
+    } = useSWR<LlmTemplate | null>(templateSWRKey, apiFetch, {
         revalidateOnFocus: false,
         onError: (err: ApiError) => {
             if (err.status !== 404) {
                 // 404 means no template set, which is fine
-                console.error("Error fetching GPT template:", err);
-                toast.error("Failed to load GPT template.");
+                console.error("Error fetching LLM template:", err);
+                toast.error("Failed to load LLM template.");
             }
         },
     });
 
     useEffect(() => {
-        if (gptTemplateData) {
-            setGptSysMsg(gptTemplateData.sysMsg);
-            setGptPrompt(gptTemplateData.prompt);
-            setGptVersion(gptTemplateData.version);
-            setCurrentGptTemplate(gptTemplateData);
-        } else if (profileId && activeTab === "gpt-template" && !gptTemplateLoading) {
-            // If no template data but profile active
-            setGptSysMsg(defaultSysMsg); // Clear or set to defaults for new template creation
-            setGptPrompt(defaultPrompt);
-            setGptVersion(validGptModels[3]);
-            setCurrentGptTemplate(null);
+        if (templateData) {
+            setSysMsg(templateData.sys_msg);
+            setPromptText(templateData.prompt);
+            const parsed = parseModel(templateData.model);
+            setProvider(parsed.provider);
+            setModelName(parsed.name);
+            setCurrentTemplate(templateData);
+        } else if (profileId && activeTab === "gpt-template" && !templateLoading) {
+            // No template yet: seed the form with defaults for creation
+            setSysMsg(defaultSysMsg);
+            setPromptText(defaultPrompt);
+            const parsed = parseModel(defaultModel);
+            setProvider(parsed.provider);
+            setModelName(parsed.name);
+            setCurrentTemplate(null);
         }
-    }, [gptTemplateData, profileId, activeTab, gptTemplateLoading]);
+    }, [templateData, profileId, activeTab, templateLoading]);
 
     const handleDeleteFile = async (fileId: string) => {
         if (!profileId) {
@@ -156,23 +168,20 @@ export default function UserPage() {
             toast.error("Set a profile to download items.");
             return;
         }
+        if (!transcript.url) {
+            toast.error("No audio available for this transcript.");
+            return;
+        }
         setDownloadingTranscriptId(transcript.id);
         try {
-            const response = await fetch(formatStaticUrl(API_BASE, transcript.get_url));
+            const response = await fetch(formatStaticUrl(API_BASE, transcript.url));
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            const fileExtension =
-                getFileExtension(transcript.get_url) ||
-                getFileExtension(transcript.original_file_name) ||
-                "audio";
-            const baseFileName = truncateFilename(
-                transcript.original_file_name || transcript.id,
-                10,
-                5
-            );
+            const fileExtension = getFileExtension(transcript.url) || "audio";
+            const baseFileName = truncateFilename(transcript.id, 10, 5);
             a.download = `${baseFileName}.${fileExtension}`;
             document.body.appendChild(a);
             a.click();
@@ -187,87 +196,89 @@ export default function UserPage() {
         }
     };
 
-    const handleSaveGptTemplate = async () => {
+    const handleSaveTemplate = async () => {
         if (!profileId) {
-            toast.error("Set a profile to save a GPT template.");
+            toast.error("Set a profile to save an LLM template.");
             return;
         }
-        setIsSavingGptTemplate(true);
+        setIsSavingTemplate(true);
         try {
-            const method = "POST";
-            const payload: Partial<GptTemplate> = {
-                sysMsg: gptSysMsg,
-                prompt: gptPrompt,
-                version: gptVersion,
-            };
-            if (currentGptTemplate?.id) {
-                payload.id = currentGptTemplate.id;
-            }
-
-            await apiFetch(`profiles/gpt_template`, {
-                method: method,
-                body: JSON.stringify(payload),
+            await apiFetch(`profiles/template`, {
+                method: "POST",
+                body: JSON.stringify({
+                    sys_msg: sysMsg,
+                    prompt: promptText,
+                    model: formatModel(provider, modelName),
+                }),
             });
-            toast.success(currentGptTemplate?.id ? "Template updated!" : "Template created!");
-            mutate(gptTemplateSWRKey);
+            toast.success(currentTemplate ? "Template updated!" : "Template created!");
+            mutate(templateSWRKey);
         } catch (error) {
-            console.error("Error saving GPT template:", error);
+            console.error("Error saving LLM template:", error);
             toast.error("Failed to save template. Please try again.");
         } finally {
-            setIsSavingGptTemplate(false);
+            setIsSavingTemplate(false);
         }
     };
 
-    const handleRevertToDefaultGptTemplate = async () => {
+    const handleRevertToDefaultTemplate = async () => {
         if (!profileId) {
             toast.error("Set a profile to manage templates.");
             return;
         }
-        setIsSavingGptTemplate(true);
+        setIsSavingTemplate(true);
         try {
-            await apiFetch(`profiles/gpt_template`, {
+            await apiFetch(`profiles/template`, {
                 method: "POST",
                 body: JSON.stringify({
-                    sysMsg: defaultSysMsg,
+                    sys_msg: defaultSysMsg,
                     prompt: defaultPrompt,
-                    version: validGptModels[3],
+                    model: defaultModel,
                 }),
             });
-            setGptSysMsg(defaultSysMsg);
-            setGptPrompt(defaultPrompt);
-            setGptVersion(validGptModels[3]);
+            setSysMsg(defaultSysMsg);
+            setPromptText(defaultPrompt);
+            const parsed = parseModel(defaultModel);
+            setProvider(parsed.provider);
+            setModelName(parsed.name);
             toast.success("Template reverted to default!");
-            mutate(gptTemplateSWRKey);
+            mutate(templateSWRKey);
         } catch (error) {
-            console.error("Error reverting GPT template:", error);
+            console.error("Error reverting LLM template:", error);
             toast.error("Failed to revert template. Please try again.");
         } finally {
-            setIsSavingGptTemplate(false);
+            setIsSavingTemplate(false);
         }
     };
 
-    const handleDeleteGptTemplate = async () => {
-        if (!profileId || !currentGptTemplate?.id) {
+    const handleDeleteTemplate = async () => {
+        if (!profileId || !currentTemplate?.id) {
             toast.error("No template to delete or profile not set.");
             return;
         }
-        setIsDeletingGptTemplate(true);
+        setIsDeletingTemplate(true);
         try {
-            await apiFetch(`profiles/gpt_template`, { method: "DELETE" });
-            mutate(gptTemplateSWRKey, null, { revalidate: false });
+            await apiFetch(`profiles/template`, { method: "DELETE" });
+            mutate(templateSWRKey, null, { revalidate: false });
             toast.success("Template deleted!");
-            setGptSysMsg(defaultSysMsg);
-            setGptPrompt(defaultPrompt);
-            setGptVersion(validGptModels[3]);
-            setCurrentGptTemplate(null);
-            mutate(gptTemplateSWRKey);
+            setSysMsg(defaultSysMsg);
+            setPromptText(defaultPrompt);
+            const parsed = parseModel(defaultModel);
+            setProvider(parsed.provider);
+            setModelName(parsed.name);
+            setCurrentTemplate(null);
         } catch (error) {
-            console.error("Error deleting GPT template:", error);
+            console.error("Error deleting LLM template:", error);
             toast.error("Failed to delete template. Please try again.");
         } finally {
-            setIsDeletingGptTemplate(false);
+            setIsDeletingTemplate(false);
         }
     };
+
+    // The provider options always include the current provider, even if it
+    // isn't configured in this deployment, so the select stays in sync.
+    const providerOptions: ProviderStatus[] = providers ?? [];
+    const hasCurrentProvider = providerOptions.some((p) => p.provider === provider);
 
     const showProfileMessage = (message: string) => (
         <div className="p-6 text-center text-gray-500 dark:text-gray-400">
@@ -329,12 +340,12 @@ export default function UserPage() {
                                             className="flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 shadow"
                                         >
                                             <a
-                                                href={formatStaticUrl(API_BASE, file.get_url)}
-                                                download={file.file_name}
+                                                href={formatStaticUrl(API_BASE, file.url)}
+                                                download={file.name}
                                                 className="flex-1 mr-4 overflow-hidden"
                                             >
                                                 <div className="font-medium text-gray-800 dark:text-gray-100 truncate">
-                                                    {truncateFilename(file.file_name)}
+                                                    {truncateFilename(file.name)}
                                                 </div>
                                             </a>
                                             <button
@@ -376,31 +387,30 @@ export default function UserPage() {
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 flex-1 mr-4 break-all">
                                                     Transcript ID:{" "}
                                                     {truncateFilename(transcript.id, 4, 4)}
-                                                    {transcript.original_file_name &&
-                                                        ` (from ${truncateFilename(
-                                                            transcript.original_file_name
-                                                        )})`}
                                                 </div>
                                                 <div className="flex space-x-2">
-                                                    <button
-                                                        onClick={() =>
-                                                            handleDownloadTranscript(transcript)
-                                                        }
-                                                        disabled={
-                                                            downloadingTranscriptId ===
+                                                    {transcript.url && (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDownloadTranscript(transcript)
+                                                            }
+                                                            disabled={
+                                                                downloadingTranscriptId ===
+                                                                transcript.id
+                                                            }
+                                                            className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${
+                                                                downloadingTranscriptId ===
+                                                                transcript.id
+                                                                    ? "bg-blue-800 cursor-not-allowed"
+                                                                    : "bg-blue-600 hover:bg-blue-500"
+                                                            }`}
+                                                        >
+                                                            {downloadingTranscriptId ===
                                                             transcript.id
-                                                        }
-                                                        className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${
-                                                            downloadingTranscriptId ===
-                                                            transcript.id
-                                                                ? "bg-blue-800 cursor-not-allowed"
-                                                                : "bg-blue-600 hover:bg-blue-500"
-                                                        }`}
-                                                    >
-                                                        {downloadingTranscriptId === transcript.id
-                                                            ? "Downloading…"
-                                                            : "Download Audio"}
-                                                    </button>
+                                                                ? "Downloading…"
+                                                                : "Download Audio"}
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() =>
                                                             handleDeleteTranscript(transcript.id)
@@ -421,12 +431,12 @@ export default function UserPage() {
                                                 </div>
                                             </div>
                                             <div className="text-gray-800 dark:text-gray-100 mb-2 whitespace-pre-wrap">
-                                                {transcript.transcript}
+                                                {transcript.text}
                                             </div>
-                                            {transcript.gpt_explanation && (
+                                            {transcript.llm_explanation && (
                                                 <div className="prose dark:prose-invert prose-sm max-w-none border-t border-zinc-700 pt-3 mt-3">
                                                     <ReactMarkdown remarkPlugins={[remarkBreaks]}>
-                                                        {transcript.gpt_explanation}
+                                                        {transcript.llm_explanation}
                                                     </ReactMarkdown>
                                                 </div>
                                             )}
@@ -441,102 +451,129 @@ export default function UserPage() {
 
                         {activeTab === "gpt-template" &&
                             (!profileId ? (
-                                showProfileMessage("Set a profile to manage GPT templates.")
-                            ) : gptTemplateLoading ? (
-                                <p className="text-center">Loading GPT Template...</p>
-                            ) : gptTemplateError &&
-                              (gptTemplateError as ApiError).status !== 404 ? (
+                                showProfileMessage("Set a profile to manage LLM templates.")
+                            ) : templateLoading ? (
+                                <p className="text-center">Loading LLM Template...</p>
+                            ) : templateError && (templateError as ApiError).status !== 404 ? (
                                 <p className="text-red-500 text-center">
-                                    Error loading GPT Template.
+                                    Error loading LLM Template.
                                 </p>
                             ) : (
                                 <div className="space-y-6 flex flex-col">
                                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                                        Customize your GPT template for word explanations. Use{" "}
+                                        Customize your LLM template for word explanations. Use{" "}
                                         <code>{"{sentence}"}</code> and <code>{"{focus}"}</code>{" "}
                                         placeholders.
                                     </p>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <label
+                                                htmlFor="provider"
+                                                className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                                            >
+                                                Provider
+                                            </label>
+                                            <select
+                                                id="provider"
+                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                                value={provider}
+                                                onChange={(e) => setProvider(e.target.value)}
+                                            >
+                                                {!hasCurrentProvider && (
+                                                    <option value={provider}>{provider}</option>
+                                                )}
+                                                {providerOptions.map((p) => (
+                                                    <option
+                                                        key={p.provider}
+                                                        value={p.provider}
+                                                        disabled={!p.available}
+                                                    >
+                                                        {p.provider}
+                                                        {p.available ? "" : " (not configured)"}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label
+                                                htmlFor="modelName"
+                                                className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                                            >
+                                                Model
+                                            </label>
+                                            <input
+                                                id="modelName"
+                                                type="text"
+                                                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                                value={modelName}
+                                                onChange={(e) => setModelName(e.target.value)}
+                                                placeholder="e.g. gpt-4.1-mini"
+                                            />
+                                        </div>
+                                    </div>
                                     <div>
                                         <label
-                                            htmlFor="gptVersion"
-                                            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-                                        >
-                                            Model Version
-                                        </label>
-                                        <select
-                                            id="gptVersion"
-                                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                            value={gptVersion}
-                                            onChange={(e) => setGptVersion(e.target.value)}
-                                        >
-                                            {validGptModels.map((version) => (
-                                                <option key={version} value={version}>
-                                                    {version}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <label
-                                            htmlFor="gptSysMsg"
+                                            htmlFor="sysMsg"
                                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                                         >
                                             System Message
                                         </label>
                                         <textarea
-                                            id="gptSysMsg"
-                                            value={gptSysMsg}
-                                            onChange={(e) => setGptSysMsg(e.target.value)}
+                                            id="sysMsg"
+                                            value={sysMsg}
+                                            onChange={(e) => setSysMsg(e.target.value)}
                                             rows={6}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 resize-none overflow-auto"
-                                            placeholder={currentGptTemplate ? "" : defaultSysMsg}
+                                            placeholder={currentTemplate ? "" : defaultSysMsg}
                                         />
                                     </div>
                                     <div>
                                         <label
-                                            htmlFor="gptPrompt"
+                                            htmlFor="promptText"
                                             className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                                         >
                                             User Prompt
                                         </label>
                                         <textarea
-                                            id="gptPrompt"
-                                            value={gptPrompt}
-                                            onChange={(e) => setGptPrompt(e.target.value)}
+                                            id="promptText"
+                                            value={promptText}
+                                            onChange={(e) => setPromptText(e.target.value)}
                                             rows={8}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 resize-none overflow-auto"
-                                            placeholder={currentGptTemplate ? "" : defaultPrompt}
+                                            placeholder={currentTemplate ? "" : defaultPrompt}
                                         />
                                     </div>
                                     <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 mt-4">
                                         <button
-                                            onClick={handleSaveGptTemplate}
-                                            disabled={isSavingGptTemplate || isDeletingGptTemplate}
+                                            onClick={handleSaveTemplate}
+                                            disabled={isSavingTemplate || isDeletingTemplate}
                                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                         >
-                                            {isSavingGptTemplate
+                                            {isSavingTemplate
                                                 ? "Saving..."
-                                                : currentGptTemplate
+                                                : currentTemplate
                                                   ? "Update Template"
                                                   : "Create Template"}
                                         </button>
-                                        {currentGptTemplate && (
+                                        {currentTemplate && (
                                             <>
                                                 <button
-                                                    onClick={handleRevertToDefaultGptTemplate}
+                                                    onClick={handleRevertToDefaultTemplate}
                                                     disabled={
-                                                        isSavingGptTemplate || isDeletingGptTemplate
+                                                        isSavingTemplate || isDeletingTemplate
                                                     }
                                                     className="w-full sm:w-auto px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                                 >
                                                     Revert to Default
                                                 </button>
                                                 <button
-                                                    onClick={handleDeleteGptTemplate}
+                                                    onClick={handleDeleteTemplate}
                                                     disabled={
-                                                        isDeletingGptTemplate || isSavingGptTemplate
+                                                        isDeletingTemplate || isSavingTemplate
                                                     }
                                                     className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                                                 >
-                                                    {isDeletingGptTemplate
+                                                    {isDeletingTemplate
                                                         ? "Deleting..."
                                                         : "Delete Template"}
                                                 </button>
