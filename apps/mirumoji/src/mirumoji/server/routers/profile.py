@@ -73,6 +73,8 @@ async def get_template(
         sys_msg=template.sys_msg,
         prompt=template.prompt,
         model=template.model,
+        srt_sys_msg=template.srt_sys_msg,
+        srt_model=template.srt_model,
     )
 
 
@@ -100,6 +102,8 @@ async def upsert_template(
             sys_msg=req.sys_msg,
             prompt=req.prompt,
             model=req.model,
+            srt_sys_msg=req.srt_sys_msg,
+            srt_model=req.srt_model,
         )
         await uow.commit()
     return LlmTemplateResponse(
@@ -107,6 +111,8 @@ async def upsert_template(
         sys_msg=template.sys_msg,
         prompt=template.prompt,
         model=template.model,
+        srt_sys_msg=template.srt_sys_msg,
+        srt_model=template.srt_model,
     )
 
 

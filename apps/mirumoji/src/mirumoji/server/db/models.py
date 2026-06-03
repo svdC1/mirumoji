@@ -245,6 +245,8 @@ class LlmTemplate(Base):
         sys_msg (str): System message
         prompt (str): Prompt template
         model (str): Model selector in `provider:model` form
+        srt_sys_msg (str): Subtitle-fix system message (empty = default)
+        srt_model (str): Subtitle-fix model override (empty = use `model`)
     """
 
     __tablename__ = "llm_templates"
@@ -272,6 +274,18 @@ class LlmTemplate(Base):
 
     model: Mapped[str] = mapped_column(
         String(100),
+    )
+
+    # Subtitle-Fix (LLM `/llm/fix_srt`) Overrides
+    # Falls back to `model` and Server Default SRT SysMsg
+    srt_sys_msg: Mapped[str] = mapped_column(
+        Text,
+        default="",
+    )
+
+    srt_model: Mapped[str] = mapped_column(
+        String(100),
+        default="",
     )
 
 
@@ -402,6 +416,8 @@ class LlmTemplateDTO(SafeORMModel):
         sys_msg (str): System message
         prompt (str): Prompt template
         model (str): Model selector in `provider:model` form
+        srt_sys_msg (str): Subtitle-fix system message (empty = default)
+        srt_model (str): Subtitle-fix model override (empty = use `model`)
     """
 
     id: uuid.UUID
@@ -410,6 +426,8 @@ class LlmTemplateDTO(SafeORMModel):
     sys_msg: str
     prompt: str
     model: str
+    srt_sys_msg: str = ""
+    srt_model: str = ""
 
 
 class ClipDTO(SafeORMModel):

@@ -13,6 +13,10 @@ export interface LlmTemplate {
     sys_msg: string;
     prompt: string;
     model: string;
+    /** Subtitle-fix system message (empty = server default). */
+    srt_sys_msg: string;
+    /** Subtitle-fix model selector (empty = fall back to `model`). */
+    srt_model: string;
 }
 
 /** Availability of an LLM provider, from `/llm/providers`. */

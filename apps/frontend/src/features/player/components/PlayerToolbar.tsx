@@ -111,7 +111,11 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 return;
             }
             const text = await srt.text();
-            const { srt: fixed } = await apiFixSrt({ srt: text, model: template.model });
+            const { srt: fixed } = await apiFixSrt({
+                srt: text,
+                model: template.srt_model || template.model,
+                sys_msg: template.srt_sys_msg || undefined,
+            });
 
             // Persist the fixed SRT to the profile (replacing the source file in
             // place when it's a known profile file), then re-tokenize locally.

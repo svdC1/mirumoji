@@ -429,6 +429,8 @@ class LlmTemplateRepository:
         sys_msg: str,
         prompt: str,
         model: str,
+        srt_sys_msg: str = "",
+        srt_model: str = "",
     ) -> LlmTemplateDTO:
         """
         Creates or updates the unique template for a profile
@@ -438,6 +440,8 @@ class LlmTemplateRepository:
             sys_msg (str): System message
             prompt (str): Prompt template
             model (str): Model selector in `provider:model` form
+            srt_sys_msg (str): Subtitle-fix system message (empty = default)
+            srt_model (str): Subtitle-fix model override (empty = use `model`)
 
         Returns:
             The created or updated `LlmTemplateDTO`
@@ -456,12 +460,16 @@ class LlmTemplateRepository:
                     sys_msg=sys_msg,
                     prompt=prompt,
                     model=model,
+                    srt_sys_msg=srt_sys_msg,
+                    srt_model=srt_model,
                 )
                 self.session.add(template)
             else:
                 template.sys_msg = sys_msg
                 template.prompt = prompt
                 template.model = model
+                template.srt_sys_msg = srt_sys_msg
+                template.srt_model = srt_model
             await self.session.flush()
             return LlmTemplateDTO.model_validate(template)
         except Exception as e:

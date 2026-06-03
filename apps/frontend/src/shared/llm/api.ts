@@ -49,6 +49,8 @@ export async function apiUpsertTemplate(req: {
     sys_msg: string;
     prompt: string;
     model: string;
+    srt_sys_msg?: string;
+    srt_model?: string;
 }): Promise<LlmTemplate> {
     return apiFetch<LlmTemplate>("profiles/template", {
         method: "POST",

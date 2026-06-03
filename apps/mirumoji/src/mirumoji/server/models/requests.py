@@ -110,11 +110,15 @@ class LlmTemplateRequest(BaseModel):
         sys_msg (str): System message
         prompt (str): Prompt template
         model (str): Model selector in `provider:model` form
+        srt_sys_msg (str): Subtitle-fix system message (empty = server default)
+        srt_model (str): Subtitle-fix model override (empty = use `model`)
     """
 
     sys_msg: str
     prompt: str
     model: str
+    srt_sys_msg: str = ""
+    srt_model: str = ""
 
 
 class SaveSubtitlesRequest(BaseModel):
