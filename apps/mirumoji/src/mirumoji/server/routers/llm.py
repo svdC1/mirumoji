@@ -26,6 +26,7 @@ from ..models.responses import (
     FixSrtResponse,
 )
 from ..processing import llm, text
+from ..processing.subtitles import sanitize_srt
 
 LOGGER = logging.getLogger(__name__)
 llm_router = APIRouter(prefix="/llm")
@@ -163,7 +164,8 @@ async def fix_srt(req: FixSrtRequest) -> FixSrtResponse:
         prompt=req.srt,
         model=model,
     )
-    return FixSrtResponse(srt=fixed)
+    # Repair any timestamps the LLM may have corrupted before returning/saving.
+    return FixSrtResponse(srt=sanitize_srt(fixed))
 
 
 @llm_router.post("/stream")
