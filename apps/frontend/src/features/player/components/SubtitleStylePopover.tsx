@@ -81,7 +81,7 @@ export function SubtitleStylePopover({ className }: { className?: string }) {
             <Popover open={open} onClose={() => setOpen(false)} align="left" className="w-72 p-4">
                 <div className="space-y-4">
                     <Range
-                        label={`Font size · ${subtitleStyle.fontSize}px`}
+                        label={`Font Size · ${subtitleStyle.fontSize}px`}
                         value={subtitleStyle.fontSize}
                         min={12}
                         max={48}
@@ -106,14 +106,14 @@ export function SubtitleStylePopover({ className }: { className?: string }) {
                     />
                     <div className="space-y-2">
                         <ColorField
-                            label="Text color"
+                            label="Text Color"
                             value={subtitleStyle.fontColor}
                             onChange={(fontColor) =>
                                 setSubtitleStyle({ ...subtitleStyle, fontColor })
                             }
                         />
                         <ColorField
-                            label="Background color"
+                            label="Background Color"
                             value={subtitleStyle.backgroundColor}
                             onChange={(backgroundColor) =>
                                 setSubtitleStyle({ ...subtitleStyle, backgroundColor })

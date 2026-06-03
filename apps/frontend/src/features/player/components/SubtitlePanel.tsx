@@ -65,7 +65,7 @@ export function SubtitlePanel({
         <aside className="flex h-full w-80 shrink-0 flex-col border-l border-ink/10 bg-surface lg:w-96">
             <div className="flex items-center gap-2 border-b border-ink/10 px-3 py-2.5">
                 <h2 className="flex-1 font-display text-sm text-ink">Subtitles</h2>
-                <span className="text-2xs text-ink-faint">{cues.length} cues</span>
+                <span className="text-2xs text-ink-faint">{cues.length} Cues</span>
                 <IconButton label="Hide subtitles" size="sm" onClick={onToggle}>
                     <PanelRightClose size={16} />
                 </IconButton>
@@ -80,19 +80,16 @@ export function SubtitlePanel({
                     <Input
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search subtitles…"
+                        placeholder="Search Subtitles ..."
                         className="pl-8"
                     />
                 </div>
             </div>
 
             {cues.length === 0 ? (
-                <EmptyState
-                    title="No subtitles"
-                    description="Load or generate an SRT to navigate cues here."
-                />
+                <EmptyState title="No Subtitles" description="Load / Generate SRT" />
             ) : rows.length === 0 ? (
-                <EmptyState title="No matches" description={`Nothing matches “${query}”.`} />
+                <EmptyState title="No Matches" description={`Nothing Matches “${query}”`} />
             ) : (
                 <ul className="min-h-0 flex-1 overflow-y-auto p-2">
                     {rows.map(({ cue, idx }) => {

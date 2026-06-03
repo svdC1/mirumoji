@@ -91,7 +91,7 @@ export function VideoStage({
 
             {preparing && (
                 <div className="pointer-events-none absolute right-3 top-3 animate-pulse rounded-md bg-black/70 px-3 py-1 text-xs text-ink">
-                    Preparing subtitles…
+                    Loading Subs ...
                 </div>
             )}
 

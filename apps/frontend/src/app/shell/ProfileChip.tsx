@@ -61,7 +61,7 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                             {profileId ?? "No profile"}
                         </span>
                         <span className="block text-2xs text-ink-faint">
-                            {profileId ? "Switch / clear" : "Tap to set"}
+                            {profileId ? "Switch / Clear" : "Tap To Set"}
                         </span>
                     </span>
                 )}
@@ -71,16 +71,15 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                 <div className="space-y-4 p-6">
                     <h2 className="font-display text-xl text-ink">Profile</h2>
                     <p className="text-sm text-ink-muted">
-                        Your data (files, clips, transcripts, LLM template) is scoped to a profile
-                        name stored on this device.
+                        Set a Profile To Persist Data On The Server
                     </p>
                     <div>
-                        <Label htmlFor="profile-input">Profile name</Label>
+                        <Label htmlFor="profile-input">Name</Label>
                         <Input
                             id="profile-input"
                             value={draft}
                             autoFocus
-                            placeholder="e.g. tanaka"
+                            placeholder="e.g. Tanaka"
                             onChange={(e) => setDraft(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && save()}
                         />

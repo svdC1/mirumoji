@@ -140,8 +140,6 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
 
     return (
         <div className="relative z-30 flex items-center gap-1.5 border-b border-ink/10 bg-surface/80 py-2 pl-16 pr-3 backdrop-blur">
-            <LoadMediaPopover />
-            <SubtitleStylePopover />
             <button
                 onClick={() => setShowFurigana(!showFurigana)}
                 className={cn(
@@ -155,7 +153,10 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
             >
                 ふり
             </button>
+            <span className="mx-1 h-6 w-px bg-ink/10" />
 
+            <LoadMediaPopover />
+            <SubtitleStylePopover />
             <span className="mx-1 h-6 w-px bg-ink/10" />
 
             <Button
@@ -164,6 +165,7 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 onClick={handleGenerate}
                 loading={generating}
                 disabled={!video || busy}
+                title="Transcribe Audio Into Subtitles Using Whisper"
             >
                 <FileText size={15} /> Generate SRT
             </Button>
@@ -173,6 +175,7 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 onClick={handleConvert}
                 loading={converting}
                 disabled={!video || busy}
+                title="Convert Video To MP4 Using FFMPEG"
             >
                 <Clapperboard size={15} /> To MP4
             </Button>
@@ -182,7 +185,7 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 onClick={handleFixSrt}
                 loading={fixing}
                 disabled={!srt || busy}
-                title="Clean up the subtitles with an LLM"
+                title="Improve Subtitles With An LLM"
             >
                 <Sparkles size={15} /> Fix SRT
             </Button>

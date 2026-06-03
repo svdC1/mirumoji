@@ -142,7 +142,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                             className="w-full"
                             onClick={() => videoInputRef.current?.click()}
                         >
-                            Select video
+                            Select Video
                         </Button>
                         <Button
                             variant="secondary"
@@ -150,7 +150,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                             className="w-full"
                             onClick={() => srtInputRef.current?.click()}
                         >
-                            Select subtitles
+                            Select Subtitles
                         </Button>
                         <input
                             ref={videoInputRef}

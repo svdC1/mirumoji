@@ -39,6 +39,15 @@ export function useCues(srt: File | null): UseCuesResult {
                 raw: c.text.replace(/<[^>]+>/g, "").trim(),
             }));
 
+            // Clamp each cue's end to the next cue's start so a malformed/overlong
+            // cue (e.g. an LLM-fix typo like 00:04:24 instead of 00:00:24) can't
+            // bleed across the gaps that follow and "stick" on screen.
+            for (let i = 0; i < parsed.length - 1; i++) {
+                if (parsed[i].end > parsed[i + 1].start) {
+                    parsed[i].end = parsed[i + 1].start;
+                }
+            }
+
             setPreparing(true);
             try {
                 const wordsList = await apiTokenizeBatch(parsed.map((c) => c.raw));
