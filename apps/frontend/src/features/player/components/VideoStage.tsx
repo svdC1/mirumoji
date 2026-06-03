@@ -1,15 +1,17 @@
 /**
  * @packageDocumentation The video surface: the video fills the stage via
  * `object-contain` (so it's as large as possible, up- or down-scaled, never
- * distorted), and click-through overlay subtitles are anchored to the *painted*
- * frame (computed by useVideoBox) rather than the element box.
+ * distorted), with custom on-theme controls (VideoControls) and click-through
+ * overlay subtitles anchored to the *painted* frame (computed by useVideoBox).
  */
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import TokenizedText from "@/shared/components/TokenizedText";
 import { hexToRgba } from "@/shared/format/color";
 import { useSubtitleSettings } from "@/contexts/SubtitleSettingsContext";
+import { cn } from "@/shared/ui";
 import { useVideoBox } from "../hooks/useVideoBox";
+import { VideoControls } from "./VideoControls";
 import type { Cue } from "../types";
 
 export interface VideoStageProps {
@@ -25,7 +27,7 @@ export interface VideoStageProps {
  * The VideoStage component.
  *
  * @param {VideoStageProps} props The props.
- * @returns {JSX.Element} The video + overlay subtitles.
+ * @returns {JSX.Element} The video + custom controls + overlay subtitles.
  */
 export function VideoStage({
     onVideoEl,
@@ -46,14 +48,37 @@ export function VideoStage({
     );
     const box = useVideoBox(el);
 
-    // Click the video body to toggle play/pause, but leave the native control
-    // strip (bottom ~48px) to the browser so its buttons keep working.
-    const togglePlay = (e: React.MouseEvent<HTMLVideoElement>) => {
-        const v = e.currentTarget;
-        if (e.clientY > v.getBoundingClientRect().bottom - 48) return;
-        if (v.paused) v.play().catch(() => undefined);
-        else v.pause();
+    // Controls auto-hide while playing; stay shown while paused.
+    const [controlsVisible, setControlsVisible] = useState(true);
+    const [paused, setPaused] = useState(true);
+    const hideRef = useRef<number | undefined>(undefined);
+
+    useEffect(() => {
+        if (!el) return;
+        const onPlay = () => setPaused(false);
+        const onPause = () => setPaused(true);
+        setPaused(el.paused);
+        el.addEventListener("play", onPlay);
+        el.addEventListener("pause", onPause);
+        return () => {
+            el.removeEventListener("play", onPlay);
+            el.removeEventListener("pause", onPause);
+        };
+    }, [el]);
+
+    const revealControls = () => {
+        setControlsVisible(true);
+        if (hideRef.current) window.clearTimeout(hideRef.current);
+        hideRef.current = window.setTimeout(() => setControlsVisible(false), 2600);
     };
+
+    const togglePlay = () => {
+        if (!el) return;
+        if (el.paused) el.play().catch(() => undefined);
+        else el.pause();
+    };
+
+    const controlsShown = controlsVisible || paused;
 
     const textStyle: React.CSSProperties = {
         color: subtitleStyle.fontColor,
@@ -63,28 +88,37 @@ export function VideoStage({
     };
 
     // Anchor the overlay to the painted frame when known, else the element box.
+    // While the controls are shown, lift the subtitle clear of the control bar
+    // (~84px tall) so it never drops onto / gets covered by the controls, even
+    // when the user sets a very low subtitle position.
+    const lift = controlsShown ? 88 : 0;
     const overlayPos: React.CSSProperties = box
         ? {
               left: box.left,
               width: box.width,
-              bottom: box.top + (subtitleStyle.position / 100) * box.height,
+              bottom: box.top + (subtitleStyle.position / 100) * box.height + lift,
+              transition: "bottom 200ms ease",
           }
-        : { left: 0, right: 0, bottom: `${subtitleStyle.position}%` };
+        : {
+              left: 0,
+              right: 0,
+              bottom: `calc(${subtitleStyle.position}% + ${lift}px)`,
+              transition: "bottom 200ms ease",
+          };
 
     return (
-        <div className="relative h-full w-full bg-black">
+        <div
+            className={cn("relative h-full w-full bg-black", !controlsShown && "cursor-none")}
+            onMouseMove={revealControls}
+            onMouseLeave={() => !paused && setControlsVisible(false)}
+        >
             <video
                 id="mirumoji-player"
                 ref={setRef}
                 src={blobUrl ?? undefined}
-                controls
                 playsInline
                 crossOrigin="anonymous"
                 onClick={togglePlay}
-                // Native fullscreen would show only the <video>, dropping the
-                // overlay subtitles, so disable it (+ PiP).
-                controlsList="nofullscreen noremoteplayback"
-                disablePictureInPicture
                 {...{ "webkit-playsinline": "true" }}
                 className="h-full w-full object-contain focus:outline-none"
             />
@@ -118,6 +152,8 @@ export function VideoStage({
                     </span>
                 </div>
             )}
+
+            <VideoControls video={el} visible={controlsShown} />
         </div>
     );
 }

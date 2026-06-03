@@ -90,6 +90,7 @@ export default function DictionaryPage() {
                         jmnedictEntries={selectedWordResult.jmnentries}
                         kanjiInfo={selectedWordResult.kanji}
                         examples={selectedWordResult.examples}
+                        onWordSelect={handleWordSelect}
                     />
                     <Button
                         variant="secondary"

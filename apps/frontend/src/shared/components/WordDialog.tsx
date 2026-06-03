@@ -10,22 +10,22 @@ import { motion, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { Copy, Check, Bookmark } from "lucide-react";
+import { Copy, Check, Bookmark, Sparkles, BookOpen, ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { apiDictQuery, isEmptyDict } from "@/shared/dict/api";
+import { apiDictQuery, apiTokenize, isEmptyDict } from "@/shared/dict/api";
 import { apiBreakdown, apiGetTemplate } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import { toHiragana } from "@/shared/japanese/kana";
 import { createAndSaveClip } from "@/shared/clips/create";
 import { cn } from "@/shared/ui";
-import type { KotobaseData } from "@/shared/dict/types";
+import type { KotobaseData, Token } from "@/shared/dict/types";
 import type { BreakdownResponse } from "@/shared/llm/types";
 import type { ClipBreakdown } from "@/shared/clips/types";
 import {
     JmdictEntryDisplay,
     JmnedictEntryDisplay,
     KanjiInfoDisplay,
-    ExampleDisplay,
+    TokenizedExamples,
 } from "./DictDisplays";
 
 export interface WordDialogProps {
@@ -46,7 +46,56 @@ const toApiPrompt = (prompt: string): string =>
     prompt.replace(/{sentence}/g, "{0}").replace(/{focus}/g, "{1}");
 
 type MainTab = "llm" | "dict";
-type DictTab = "jmdict" | "jmnedict" | "kanji" | "examples";
+type DictTab = "jmdict" | "jmnedict" | "kanji" | "examples" | "grammar";
+
+/**
+ * Renders the morphological detail carried by a stitched word's underlying
+ * UniDic tokens — surface, reading, part-of-speech hierarchy, conjugation, and
+ * the dictionary base form — that the dictionary entries don't show.
+ *
+ * @param {{ tokens: Token[] }} props The word's constituent tokens.
+ * @returns {JSX.Element | null} The grammar breakdown, or `null` when empty.
+ */
+function TokenGrammar({ tokens }: { tokens: Token[] }) {
+    if (!tokens || tokens.length === 0) {
+        return <p className="py-4 text-center italic text-ink-muted">No grammar data.</p>;
+    }
+    const clean = (v: string) => (v && v !== "*" ? v : "");
+    const fieldsOf = (t: Token): [string, string][] => {
+        const reading = clean(t.kana) ? toHiragana(t.kana) : "";
+        const pos = [t.pos1, t.pos2, t.pos3, t.pos4].map(clean).filter(Boolean).join(" · ");
+        const conj = [t.cType, t.cForm].map(clean).filter(Boolean).join(" · ");
+        const base = clean(t.orthBase) && t.orthBase !== t.surface ? t.orthBase : "";
+        const rows: [string, string][] = [];
+        if (reading) rows.push(["Reading", reading]);
+        if (pos) rows.push(["Part Of Speech", pos]);
+        if (conj) rows.push(["Conjugation", conj]);
+        if (base) rows.push(["Base Form", base]);
+        if (clean(t.goshu)) rows.push(["Word Origin", t.goshu]);
+        return rows;
+    };
+    return (
+        <div className="space-y-3">
+            {tokens.map((t, i) => (
+                <div key={i} className="rounded-control border border-ink/10 p-3">
+                    <div lang="ja" className="mb-2 font-display text-xl text-ink">
+                        {t.surface}
+                    </div>
+                    <dl className="space-y-1 text-sm">
+                        {fieldsOf(t).map(([label, val]) => (
+                            <div key={label} className="flex gap-3">
+                                <dt className="w-32 shrink-0 text-ink-faint">{label}</dt>
+                                <dd lang="ja" className="text-ink">
+                                    {val}
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            ))}
+        </div>
+    );
+}
 
 /**
  * The WordDialog component.
@@ -71,6 +120,12 @@ export default function WordDialog({
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
     const [dictData, setDictData] = useState<KotobaseData | null | undefined>(undefined);
+    // The dictionary tab can drill into another word (e.g. by clicking a word in
+    // an example sentence) without affecting the LLM breakdown's focus.
+    const [dictWord, setDictWord] = useState(word);
+    // Morphology of the current dict word (tokenized directly, no LLM needed) so
+    // the grammar breakdown is available on the always-visible dictionary tab.
+    const [dictTokens, setDictTokens] = useState<Token[]>([]);
 
     const [screenWidth, setScreenWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 0
@@ -145,10 +200,13 @@ export default function WordDialog({
         return () => window.clearInterval(id);
     }, [data]);
 
+    // Reset the dictionary drill-in target whenever the dialog's word changes.
+    useEffect(() => setDictWord(word), [word]);
+
     useEffect(() => {
         if (tab !== "dict") return;
         setDictData(undefined);
-        apiDictQuery(word)
+        apiDictQuery(dictWord)
             .then((entry) => {
                 if (isEmptyDict(entry)) {
                     setDictData(null);
@@ -166,7 +224,20 @@ export default function WordDialog({
                 setDictData(null);
                 toastApiError(e);
             });
-    }, [tab, word]);
+    }, [tab, dictWord]);
+
+    // Tokenize the current dict word for its grammar breakdown (no LLM needed).
+    useEffect(() => {
+        if (tab !== "dict") return;
+        let cancelled = false;
+        setDictTokens([]);
+        apiTokenize(dictWord)
+            .then((ws) => !cancelled && setDictTokens(ws[0]?.tokens ?? []))
+            .catch(() => !cancelled && setDictTokens([]));
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, dictWord]);
 
     const handleCopy = () => {
         let textToCopy = "";
@@ -246,7 +317,7 @@ export default function WordDialog({
                 dragListener={!isMobile}
                 dragControls={dragControls}
                 dragMomentum={false}
-                className="pointer-events-auto relative max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-card border border-ink/10 bg-surface p-6 text-lg text-ink shadow-lift"
+                className="pointer-events-auto relative max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-card border border-ink/10 bg-surface p-5 text-ink shadow-lift"
             >
                 {isMobile && (
                     <div
@@ -297,14 +368,21 @@ export default function WordDialog({
                             isMobile ? "mt-6" : "mt-2"
                         )}
                     >
-                        <button className={tabClasses(tab === "llm")} onClick={() => setTab("llm")}>
-                            LLM
+                        <button
+                            className={tabClasses(tab === "llm")}
+                            onClick={() => setTab("llm")}
+                            aria-label="LLM Explanation"
+                            title="LLM Explanation"
+                        >
+                            <Sparkles size={18} className="mx-auto" />
                         </button>
                         <button
                             className={tabClasses(tab === "dict")}
                             onClick={() => setTab("dict")}
+                            aria-label="Dictionary"
+                            title="Dictionary"
                         >
-                            Dictionary
+                            <BookOpen size={18} className="mx-auto" />
                         </button>
                     </div>
 
@@ -326,27 +404,28 @@ export default function WordDialog({
                             </div>
                         ) : (
                             <>
-                                <h2 lang="ja" className="mb-1 font-display text-xl font-bold">
-                                    {data.focus?.word.surface ?? word}
-                                </h2>
-                                {data.focus &&
-                                (data.focus.word.reading ||
-                                    data.focus.kotobase_data.meanings.length) ? (
-                                    <div className="mb-3 mt-1 text-base leading-relaxed text-ink-muted">
-                                        {data.focus.word.reading && (
-                                            <span lang="ja" className="mr-2 italic">
+                                <div className="mb-3 border-b border-ink/10 pb-3">
+                                    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                                        <h2 lang="ja" className="font-display text-2xl font-bold">
+                                            {data.focus?.word.surface ?? word}
+                                        </h2>
+                                        {data.focus?.word.reading && (
+                                            <span
+                                                lang="ja"
+                                                className="text-base italic text-ink-muted"
+                                            >
                                                 {toHiragana(data.focus.word.reading)}
                                             </span>
                                         )}
-                                        {data.focus.kotobase_data.meanings.length > 0 && (
-                                            <span>
-                                                {data.focus.kotobase_data.meanings.join("；")}
-                                            </span>
-                                        )}
                                     </div>
-                                ) : null}
+                                    {data.focus && data.focus.kotobase_data.meanings.length > 0 && (
+                                        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                                            {data.focus.kotobase_data.meanings.join("；")}
+                                        </p>
+                                    )}
+                                </div>
                                 <ReactMarkdown
-                                    className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap sm:prose-base"
+                                    className="prose prose-invert max-w-none whitespace-pre-wrap"
                                     remarkPlugins={[remarkGfm, remarkBreaks]}
                                 >
                                     {typed}
@@ -357,10 +436,32 @@ export default function WordDialog({
                         <p className="text-center italic text-ink-muted">Loading dictionary…</p>
                     ) : dictData === null ? (
                         <p className="text-center italic text-ink-muted">
-                            No dictionary entry found for &quot;{word}&quot;.
+                            No dictionary entry found for &quot;{dictWord}&quot;.
                         </p>
                     ) : (
                         <div>
+                            <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-ink/10 pb-3">
+                                {dictWord !== word && (
+                                    <button
+                                        onClick={() => setDictWord(word)}
+                                        aria-label="Back to original word"
+                                        title="Back"
+                                        className="text-ink-muted transition-colors hover:text-ink"
+                                    >
+                                        <ArrowLeft size={20} />
+                                    </button>
+                                )}
+                                <h2 lang="ja" className="font-display text-2xl font-bold">
+                                    {dictData.query || dictWord}
+                                </h2>
+                                {(dictData.jmentries[0]?.kana[0] ||
+                                    dictData.jmnentries[0]?.kana[0]) && (
+                                    <span lang="ja" className="text-base italic text-ink-muted">
+                                        {dictData.jmentries[0]?.kana[0] ||
+                                            dictData.jmnentries[0]?.kana[0]}
+                                    </span>
+                                )}
+                            </div>
                             <div className="mb-2 flex border-b border-ink/10">
                                 {dictData.jmentries.length > 0 && (
                                     <button
@@ -394,6 +495,14 @@ export default function WordDialog({
                                         Examples
                                     </button>
                                 )}
+                                {dictTokens.length > 0 && (
+                                    <button
+                                        className={dictSubTab(dictTab === "grammar")}
+                                        onClick={() => setDictTab("grammar")}
+                                    >
+                                        Grammar
+                                    </button>
+                                )}
                             </div>
                             {dictTab === "jmdict" ? (
                                 <div>
@@ -425,16 +534,13 @@ export default function WordDialog({
                                         />
                                     ))}
                                 </div>
+                            ) : dictTab === "examples" ? (
+                                <TokenizedExamples
+                                    examples={dictData.examples}
+                                    onWordClick={(_, w) => setDictWord(w)}
+                                />
                             ) : (
-                                <div>
-                                    {dictData.examples.map((ex, i) => (
-                                        <ExampleDisplay
-                                            key={i}
-                                            example={ex}
-                                            isLast={i === dictData.examples.length - 1}
-                                        />
-                                    ))}
-                                </div>
+                                <TokenGrammar tokens={dictTokens} />
                             )}
                         </div>
                     )}

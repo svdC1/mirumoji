@@ -207,18 +207,21 @@ class Token(BaseModel):
     @classmethod
     def clear_asterisks(cls, data: dict) -> dict:
         """
-        Cleans incoming dictionary fields by converting asterisks to empty
-        strings
+        Cleans incoming dictionary fields by converting UniDic's "*" sentinel
+        and any missing (`None`) feature to an empty string, since unknown /
+        out-of-vocabulary tokens leave some features unset
 
         Args:
             data (dict): Raw dictionary data containing morphological fields
 
         Returns:
-            dict: The modified dictionary with "*" values replaced by ""
+            dict: The modified dictionary with "*"/`None` values replaced by ""
         """
-        if isinstance(data, dict):
-            return {k: ("" if v == "*" else v) for k, v in data.items()}
-        return data
+        if not isinstance(data, dict):
+            return data
+        return {
+            k: ("" if v is None or v == "*" else v) for k, v in data.items()
+        }
 
 
 # --- Aggregation Models ---
