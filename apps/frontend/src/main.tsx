@@ -48,6 +48,32 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 </BrowserRouter>
             </SubtitleSettingsProvider>
         </ProfileProvider>
-        <Toaster position="top-center" />
+        <Toaster
+            position="top-center"
+            toastOptions={{
+                duration: 4000,
+                // "Sumi & Shu" surface + hairline + washi ink, so toasts blend
+                // into the theme instead of the library's default white pills.
+                style: {
+                    background: "rgb(var(--surface))",
+                    color: "rgb(var(--ink))",
+                    border: "1px solid rgb(var(--ink) / 0.1)",
+                    borderRadius: "var(--radius-card)",
+                    boxShadow: "0 12px 32px -12px rgb(0 0 0 / 0.6)",
+                    fontSize: "0.875rem",
+                    padding: "0.6rem 0.85rem",
+                    maxWidth: "24rem",
+                },
+                success: {
+                    iconTheme: { primary: "rgb(var(--matcha))", secondary: "rgb(var(--surface))" },
+                },
+                error: {
+                    iconTheme: { primary: "rgb(var(--danger))", secondary: "rgb(var(--surface))" },
+                },
+                loading: {
+                    iconTheme: { primary: "rgb(var(--shu))", secondary: "rgb(var(--surface))" },
+                },
+            }}
+        />
     </React.StrictMode>
 );

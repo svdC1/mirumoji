@@ -33,6 +33,15 @@ const MESSAGE_BY_CODE: Record<string, string> = {
     Upload: "⬆️ Upload Failed",
     Storage: "💾 The Server Failed To Store The File",
     Database: "💾 A Database Error Occurred",
+    FFmpeg: "🎬 Video Processing Failed",
+    Fugashi: "🈂️ The Tokenizer Is Unavailable",
+    Kotobase: "📖 The Dictionary Is Unavailable",
+    LLM: "🤖 The LLM Request Failed",
+    Transcription: "🎤 Transcription Failed",
+    Modal: "☁️ The Remote GPU Job Failed",
+    Media: "💾 A Media Error Occurred",
+    MediaNotFound: "🔍 Media File Not Found",
+    InvalidMediaPath: "🚫 Invalid Media Path",
 };
 
 /**
@@ -50,18 +59,21 @@ export function toastApiError(err: unknown, toastId?: string) {
             toast.error(MESSAGE_BY_CODE[err.code], opts);
             return;
         }
-        switch (err.status) {
-            case 403:
-                toast.error("🚫 Not Allowed", opts);
-                return;
-            case 404:
-                toast.error("🔍 Could Not Find Resource", opts);
-                return;
-            default:
-                console.error(`API Error ${err.status}:`, err.message, err);
-                toast.error(`⚠️ Server Error (${err.status})`, opts);
-                return;
+        if (err.status === 403) {
+            toast.error("🚫 Not Allowed", opts);
+            return;
         }
+        // No friendly mapping: show the server envelope's own human-readable
+        // message (capped) rather than a generic "Server Error".
+        if (err.message) {
+            console.error(`API Error ${err.status}:`, err.message, err);
+            const msg = err.message.length > 160 ? `${err.message.slice(0, 157)}…` : err.message;
+            toast.error(msg, opts);
+            return;
+        }
+        console.error(`API Error ${err.status}:`, err);
+        toast.error(`⚠️ Server Error (${err.status})`, opts);
+        return;
     }
 
     console.error("Unexpected Error:", err);

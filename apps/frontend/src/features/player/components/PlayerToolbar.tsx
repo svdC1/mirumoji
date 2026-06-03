@@ -44,20 +44,24 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
     } = usePlayer();
     const { profileId } = useProfile();
 
-    const [generating, setGenerating] = useState(false);
-    const [converting, setConverting] = useState(false);
-    const [fixing, setFixing] = useState(false);
+    // Progress/status lives in the buttons (a non-null string = busy), so the
+    // long-running actions don't need progress toasts — only success/error.
+    const [genStatus, setGenStatus] = useState<string | null>(null);
+    const [convStatus, setConvStatus] = useState<string | null>(null);
+    const [fixStatus, setFixStatus] = useState<string | null>(null);
+    const generating = genStatus !== null;
+    const converting = convStatus !== null;
+    const fixing = fixStatus !== null;
     const busy = generating || converting || fixing;
 
     const handleGenerate = async () => {
         if (!video) return;
-        setGenerating(true);
-        const tId = toast.loading("Uploading…");
+        setGenStatus("Uploading 0%");
         try {
             const result = await generateSrt(
                 video,
-                (p) => toast.loading(`Uploading… ${p.toFixed(0)}%`, { id: tId }),
-                () => toast.loading("Generating…", { id: tId })
+                (p) => setGenStatus(`Uploading ${p.toFixed(0)}%`),
+                () => setGenStatus("Generating …")
             );
             const file = new File([result.srt_content], `${video.name}.srt`, {
                 type: "application/x-subrip",
@@ -65,11 +69,11 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
             setSrt(file);
             setSrtFileName(file.name);
             setSrtFileId(result.file_id); // generated SRT is persisted server-side
-            toast.success("Subtitles Generated", { id: tId });
+            toast.success("Subtitles Generated");
         } catch (err) {
-            toastApiError(err, tId);
+            toastApiError(err);
         } finally {
-            setGenerating(false);
+            setGenStatus(null);
         }
     };
 
@@ -79,36 +83,33 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
             toast.success("Already MP4");
             return;
         }
-        setConverting(true);
-        const tId = toast.loading("Uploading…");
+        setConvStatus("Uploading 0%");
         try {
             const result = await convertToMp4(
                 video,
-                (p) => toast.loading(`Uploading… ${p.toFixed(0)}%`, { id: tId }),
-                () => toast.loading("Converting…", { id: tId })
+                (p) => setConvStatus(`Uploading ${p.toFixed(0)}%`),
+                () => setConvStatus("Converting …")
             );
             setVideo(null);
             setVideoUrl(staticUrl(result.converted_video_url));
             setVideoFileName(result.converted_video_url);
-            toast.success("Conversion Complete", { id: tId });
+            toast.success("Conversion Complete");
         } catch (err) {
-            toastApiError(err, tId);
+            toastApiError(err);
         } finally {
-            setConverting(false);
+            setConvStatus(null);
         }
     };
 
     const handleFixSrt = async () => {
         if (!srt) return;
-        setFixing(true);
-        const tId = toast.loading("Checking model…");
+        setFixStatus("Fixing …");
         try {
             const template = await apiGetTemplate();
             if (!template) {
-                toast.error("Configure An LLM Model In Your Profile To Fix Subtitles", { id: tId });
+                toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
                 return;
             }
-            toast.loading("Fixing subtitles…", { id: tId });
             const text = await srt.text();
             const { srt: fixed } = await apiFixSrt({ srt: text, model: template.model });
 
@@ -130,11 +131,11 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
             const file = new File([fixed], srt.name, { type: "application/x-subrip" });
             setSrt(file);
             setSrtFileName(file.name);
-            toast.success("Subtitles Fixed", { id: tId });
+            toast.success("Subtitles Fixed");
         } catch (err) {
-            toastApiError(err, tId);
+            toastApiError(err);
         } finally {
-            setFixing(false);
+            setFixStatus(null);
         }
     };
 
@@ -167,7 +168,13 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 disabled={!video || busy}
                 title="Transcribe Audio Into Subtitles Using Whisper"
             >
-                <FileText size={15} /> Generate SRT
+                {generating ? (
+                    <span className="tabular-nums">{genStatus}</span>
+                ) : (
+                    <>
+                        <FileText size={15} /> Generate SRT
+                    </>
+                )}
             </Button>
             <Button
                 variant="secondary"
@@ -177,7 +184,13 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 disabled={!video || busy}
                 title="Convert Video To MP4 Using FFMPEG"
             >
-                <Clapperboard size={15} /> To MP4
+                {converting ? (
+                    <span className="tabular-nums">{convStatus}</span>
+                ) : (
+                    <>
+                        <Clapperboard size={15} /> To MP4
+                    </>
+                )}
             </Button>
             <Button
                 variant="secondary"
@@ -187,7 +200,13 @@ export function PlayerToolbar({ panelCollapsed, onTogglePanel }: PlayerToolbarPr
                 disabled={!srt || busy}
                 title="Improve Subtitles With An LLM"
             >
-                <Sparkles size={15} /> Fix SRT
+                {fixing ? (
+                    fixStatus
+                ) : (
+                    <>
+                        <Sparkles size={15} /> Fix SRT
+                    </>
+                )}
             </Button>
 
             <div className="ml-auto flex items-center gap-1.5">

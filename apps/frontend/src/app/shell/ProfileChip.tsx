@@ -61,7 +61,7 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                 {expanded && (
                     <span className="min-w-0 flex-1 pr-3">
                         <span className="block truncate text-sm text-ink">
-                            {profileId ?? "No profile"}
+                            {profileId ?? "No Profile"}
                         </span>
                         <span className="block text-2xs text-ink-faint">
                             {profileId ? "Switch / Clear" : "Tap To Set"}
