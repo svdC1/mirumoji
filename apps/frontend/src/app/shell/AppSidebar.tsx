@@ -54,17 +54,22 @@ function RailBody({
 }) {
     return (
         <div className="flex h-full flex-col">
-            <Link to="/" onClick={onNavigate} className="flex h-16 items-center gap-3 px-[1.05rem]">
-                <span
-                    lang="ja"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-shu/15 font-jp text-lg text-shu"
-                >
-                    見
+            <Link to="/" onClick={onNavigate} className="flex h-16 items-center">
+                {/* Fixed w-16 leading slot keeps every glyph on one centered
+                    column (32px) so the brand, nav icons, and profile avatar
+                    line up in the collapsed rail. */}
+                <span className="flex w-16 shrink-0 items-center justify-center">
+                    <span
+                        lang="ja"
+                        className="grid h-9 w-9 place-items-center rounded-lg bg-shu/15 font-jp text-lg text-shu"
+                    >
+                        見
+                    </span>
                 </span>
                 {expanded && <span className="font-display text-lg text-ink">Mirumoji</span>}
             </Link>
 
-            <nav className="flex-1 space-y-1 px-2 py-2">
+            <nav className="flex-1 py-2">
                 {NAV.map((entry) => {
                     const active = isActive(pathname, entry);
                     const Icon = entry.icon;
@@ -75,13 +80,15 @@ function RailBody({
                             onClick={onNavigate}
                             title={entry.label}
                             className={cn(
-                                "flex h-11 items-center gap-3 rounded-control px-[0.9rem] transition-colors",
+                                "flex h-11 items-center transition-colors",
                                 active
                                     ? "bg-shu/15 text-shu"
                                     : "text-ink-muted hover:bg-ink/5 hover:text-ink"
                             )}
                         >
-                            <Icon size={20} className="shrink-0" />
+                            <span className="flex w-16 shrink-0 items-center justify-center">
+                                <Icon size={20} />
+                            </span>
                             {expanded && (
                                 <span className="truncate text-sm font-medium">{entry.label}</span>
                             )}
@@ -90,7 +97,7 @@ function RailBody({
                 })}
             </nav>
 
-            <div className="border-t border-ink/10 p-2">
+            <div className="border-t border-ink/10 py-2">
                 <ProfileChip expanded={expanded} />
             </div>
         </div>

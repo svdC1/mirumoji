@@ -41,22 +41,25 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                 onClick={() => setOpen(true)}
                 title={profileId ? `Profile: ${profileId}` : "Set a profile"}
                 className={cn(
-                    "flex h-11 w-full items-center gap-3 rounded-control px-[0.9rem] text-left transition-colors hover:bg-ink/5",
+                    "flex h-11 w-full items-center text-left transition-colors hover:bg-ink/5",
                     !profileId && "text-ink-faint"
                 )}
             >
-                <span
-                    className={cn(
-                        "grid h-7 w-7 shrink-0 place-items-center rounded-full border",
-                        profileId
-                            ? "border-shu/40 bg-shu/15 text-shu"
-                            : "border-ink/15 text-ink-faint"
-                    )}
-                >
-                    <User size={15} />
+                {/* Same w-16 centered slot as the nav icons + brand. */}
+                <span className="flex w-16 shrink-0 items-center justify-center">
+                    <span
+                        className={cn(
+                            "grid h-7 w-7 place-items-center rounded-full border",
+                            profileId
+                                ? "border-shu/40 bg-shu/15 text-shu"
+                                : "border-ink/15 text-ink-faint"
+                        )}
+                    >
+                        <User size={15} />
+                    </span>
                 </span>
                 {expanded && (
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 pr-3">
                         <span className="block truncate text-sm text-ink">
                             {profileId ?? "No profile"}
                         </span>

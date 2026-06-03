@@ -3,7 +3,7 @@
  * routing, wrapped in the global PlayerProvider.
  */
 
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppSidebar } from "./shell/AppSidebar";
 import HomePage from "@/pages/HomePage";
@@ -11,8 +11,7 @@ import PlayerPage from "@/features/player/PlayerPage";
 import TranscribePage from "@/pages/TranscribePage";
 import TextPage from "@/pages/TextPage";
 import { DictionaryPage } from "@/pages/DictionaryPage";
-import UserPage from "@/pages/UserPage";
-import SavedPage from "@/pages/SavedPage";
+import DashboardPage from "@/features/profile/DashboardPage";
 import GuidePage from "@/features/guide/GuidePage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -36,8 +35,8 @@ export default function App() {
                     <Route path="/transcribe" element={<TranscribePage />} />
                     <Route path="/text" element={<TextPage />} />
                     <Route path="/dictionary" element={<DictionaryPage />} />
-                    <Route path="/dashboard" element={<UserPage />} />
-                    <Route path="/saved" element={<SavedPage />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/saved" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/guide" element={<GuidePage />} />
                     <Route path="*" element={<NotFoundPage />} />
                 </Routes>

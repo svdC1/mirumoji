@@ -37,6 +37,35 @@ export async function apiGetTemplate(): Promise<LlmTemplate | null> {
 }
 
 /**
+ * Creates or updates the active profile's LLM template (`POST /profiles/template`).
+ *
+ * @param {object} req The template fields.
+ * @param {string} req.sys_msg The system message.
+ * @param {string} req.prompt The prompt template.
+ * @param {string} req.model The `provider:model` selector.
+ * @returns {Promise<LlmTemplate>} The saved template.
+ */
+export async function apiUpsertTemplate(req: {
+    sys_msg: string;
+    prompt: string;
+    model: string;
+}): Promise<LlmTemplate> {
+    return apiFetch<LlmTemplate>("profiles/template", {
+        method: "POST",
+        body: JSON.stringify(req),
+    });
+}
+
+/**
+ * Deletes the active profile's LLM template (`DELETE /profiles/template`).
+ *
+ * @returns {Promise<void>} Resolves when deleted.
+ */
+export async function apiDeleteTemplate(): Promise<void> {
+    await apiFetch("profiles/template", { method: "DELETE" });
+}
+
+/**
  * Explains the nuance of a focus word within a sentence (`/llm/breakdown`).
  *
  * @param {object} req The breakdown request.
