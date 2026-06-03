@@ -6,14 +6,12 @@
 import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
 import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
-import AudioPlayer from "react-h5-audio-player";
-import "react-h5-audio-player/lib/styles.css";
 import { uploadFile } from "@/shared/api/client";
 import { apiTokenize } from "@/shared/dict/api";
 import { apiExplainSentence, apiGetTemplate } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import WordDialog from "@/shared/components/WordDialog";
-import { Button, buttonClasses, cn } from "@/shared/ui";
+import { AudioPlayer, Button, buttonClasses, cn } from "@/shared/ui";
 import type { Message, AudioTranscriptResponse } from "./types";
 import ChatBubble from "./components/ChatBubble";
 
@@ -208,15 +206,23 @@ export default function TranscribePage() {
 
     return (
         <div className="flex h-screen flex-col bg-bg text-ink">
-            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
-                {messages.map((msg) => (
-                    <ChatBubble
-                        key={msg.id}
-                        msg={msg}
-                        onWordClick={(s, w) => setDialog({ sentence: s, word: w })}
-                    />
-                ))}
-                <div ref={chatEndRef} />
+            <div className="flex-1 overflow-y-auto">
+                <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
+                    {messages.length === 0 ? (
+                        <p className="pt-20 text-center text-sm text-ink-faint">
+                            Record Or Upload Audio To Get A Clickable Transcript
+                        </p>
+                    ) : (
+                        messages.map((msg) => (
+                            <ChatBubble
+                                key={msg.id}
+                                msg={msg}
+                                onWordClick={(s, w) => setDialog({ sentence: s, word: w })}
+                            />
+                        ))
+                    )}
+                    <div ref={chatEndRef} />
+                </div>
             </div>
 
             {dialog && (
@@ -230,84 +236,78 @@ export default function TranscribePage() {
                 />
             )}
 
-            <div className="select-none space-y-4 border-t border-ink/10 p-4">
-                {previewUrl && (
-                    <AudioPlayer
-                        src={previewUrl}
-                        layout="horizontal"
-                        showJumpControls={false}
-                        customAdditionalControls={[]}
-                        className="rounded-md"
-                    />
-                )}
+            <div className="select-none border-t border-ink/10 bg-surface/60 backdrop-blur">
+                <div className="mx-auto max-w-3xl space-y-3 p-4">
+                    {previewUrl && <AudioPlayer src={previewUrl} />}
 
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setCleanAudio((v) => !v)}
-                        className={toggleClass(cleanAudio)}
-                    >
-                        Clean Audio
-                    </button>
-                    <button
-                        onClick={() => setLlmExplain((v) => !v)}
-                        className={toggleClass(llmExplain)}
-                    >
-                        LLM Explain
-                    </button>
-                    <Button variant="ghost" className="flex-1" onClick={clearChat}>
-                        Clear Chat
-                    </Button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setCleanAudio((v) => !v)}
+                            className={toggleClass(cleanAudio)}
+                        >
+                            Clean Audio
+                        </button>
+                        <button
+                            onClick={() => setLlmExplain((v) => !v)}
+                            className={toggleClass(llmExplain)}
+                        >
+                            LLM Explain
+                        </button>
+                        <Button variant="ghost" className="flex-1" onClick={clearChat}>
+                            Clear Chat
+                        </Button>
+                    </div>
+
+                    {previewUrl ? (
+                        <div className="flex gap-2">
+                            <Button
+                                variant="danger"
+                                className="flex-1"
+                                onClick={deleteMedia}
+                                disabled={sending}
+                            >
+                                <Trash2 size={16} /> Delete
+                            </Button>
+                            <Button className="flex-1" onClick={sendAudio} loading={sending}>
+                                <Send size={16} /> Send Audio
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Button
+                                variant={recording ? "danger" : "primary"}
+                                className="flex-1"
+                                onClick={recording ? stopRecording : startRecording}
+                                disabled={sending}
+                            >
+                                {recording ? <Square size={16} /> : <Mic size={16} />}
+                                {recording ? "Stop Recording" : "Start Recording"}
+                            </Button>
+                            <label
+                                htmlFor="file-upload"
+                                className={buttonClasses(
+                                    "secondary",
+                                    "md",
+                                    cn(
+                                        "flex-1 cursor-pointer",
+                                        sending && "pointer-events-none opacity-50"
+                                    )
+                                )}
+                            >
+                                <Upload size={16} /> Upload Audio
+                            </label>
+                            <input
+                                id="file-upload"
+                                type="file"
+                                accept="audio/*"
+                                ref={fileInputRef}
+                                onChange={handleFileUpload}
+                                className="hidden"
+                                disabled={sending}
+                            />
+                        </div>
+                    )}
                 </div>
-
-                {previewUrl ? (
-                    <div className="flex gap-2">
-                        <Button
-                            variant="danger"
-                            className="flex-1"
-                            onClick={deleteMedia}
-                            disabled={sending}
-                        >
-                            <Trash2 size={16} /> Delete
-                        </Button>
-                        <Button className="flex-1" onClick={sendAudio} loading={sending}>
-                            <Send size={16} /> Send Audio
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="flex gap-2">
-                        <Button
-                            variant={recording ? "danger" : "primary"}
-                            className="flex-1"
-                            onClick={recording ? stopRecording : startRecording}
-                            disabled={sending}
-                        >
-                            {recording ? <Square size={16} /> : <Mic size={16} />}
-                            {recording ? "Stop Recording" : "Start Recording"}
-                        </Button>
-                        <label
-                            htmlFor="file-upload"
-                            className={buttonClasses(
-                                "secondary",
-                                "md",
-                                cn(
-                                    "flex-1 cursor-pointer",
-                                    sending && "pointer-events-none opacity-50"
-                                )
-                            )}
-                        >
-                            <Upload size={16} /> Upload Audio
-                        </label>
-                        <input
-                            id="file-upload"
-                            type="file"
-                            accept="audio/*"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            disabled={sending}
-                        />
-                    </div>
-                )}
             </div>
         </div>
     );

@@ -1,14 +1,14 @@
 /**
- * @packageDocumentation A transcribe-chat message bubble: audio player,
- * tokenized transcript (clickable furigana), or an LLM explanation (markdown).
+ * @packageDocumentation A transcribe-chat message: the audio renders as the
+ * themed AudioPlayer; a transcript renders as clickable furigana tokens; an LLM
+ * explanation renders as markdown — each in an aligned bubble.
  */
 
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import AudioPlayer from "react-h5-audio-player";
 import TokenizedText from "@/shared/components/TokenizedText";
-import { cn } from "@/shared/ui";
+import { AudioPlayer, cn } from "@/shared/ui";
 import type { ChatBubbleProps } from "../types";
 
 /**
@@ -18,55 +18,47 @@ import type { ChatBubbleProps } from "../types";
  * @returns {JSX.Element} The chat bubble.
  */
 export default function ChatBubble({ msg, onWordClick }: ChatBubbleProps) {
+    const isUser = msg.type === "user";
+
+    // The uploaded/recorded audio renders as the standalone themed player.
+    if (msg.audioUrl) {
+        return (
+            <div className="flex justify-end">
+                <AudioPlayer src={msg.audioUrl} className="w-full max-w-md sm:max-w-lg" />
+            </div>
+        );
+    }
+
     const rawSentence = msg.isTranscription && msg.text ? msg.text : "";
 
     return (
-        <div className={cn("flex", msg.type === "user" ? "justify-end" : "justify-start")}>
+        <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
             <div
                 className={cn(
-                    "rounded-2xl px-4 py-3 text-sm shadow-soft",
-                    msg.isAudioMessage
-                        ? "w-full max-w-md sm:max-w-lg md:max-w-2xl"
-                        : "w-fit max-w-[90%]",
-                    msg.type === "user"
-                        ? "bg-shu/90 text-ink"
-                        : "border border-ink/10 bg-surface-2 text-ink"
+                    "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-soft",
+                    isUser ? "bg-shu/90 text-ink" : "border border-ink/10 bg-surface text-ink"
                 )}
             >
-                {msg.loading && (
-                    <div className="animate-pulse italic text-ink-muted">
+                {msg.loading ? (
+                    <span className="animate-pulse italic text-ink-muted">
                         {msg.isAudioMessage
-                            ? "Uploading And Transcribing …"
-                            : "Generating Explanation …"}
-                    </div>
-                )}
-                {msg.audioUrl && (
-                    <AudioPlayer
-                        src={msg.audioUrl}
-                        layout="stacked"
-                        showJumpControls={false}
-                        customAdditionalControls={[]}
-                        customVolumeControls={[]}
-                        className="mt-2 rounded-md"
-                    />
-                )}
-                {msg.words && msg.words.length > 0 ? (
-                    <span
-                        lang="ja"
-                        className="mx-auto inline-block max-w-[95%] break-words text-xl sm:text-2xl md:text-3xl"
-                    >
+                            ? "Uploading And Transcribing ..."
+                            : "Generating Explanation ..."}
+                    </span>
+                ) : msg.words && msg.words.length > 0 ? (
+                    <p lang="ja" className="text-lg leading-relaxed sm:text-xl">
                         <TokenizedText
                             words={msg.words}
                             sentence={rawSentence}
                             showFurigana
                             onWordClick={onWordClick}
                         />
-                    </span>
+                    </p>
                 ) : (
                     msg.text && (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkBreaks]}
-                            className="prose prose-invert prose-sm max-w-prose whitespace-pre-wrap"
+                            className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap"
                         >
                             {msg.text}
                         </ReactMarkdown>

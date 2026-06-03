@@ -31,3 +31,5 @@ export type { EmptyStateProps } from "./EmptyState";
 export { Skeleton } from "./Skeleton";
 export { Tooltip } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
+export { AudioPlayer } from "./AudioPlayer";
+export type { AudioPlayerProps } from "./AudioPlayer";
