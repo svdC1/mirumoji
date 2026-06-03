@@ -15,12 +15,12 @@ export default function NotFoundPage() {
         <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
             <Card className="w-full max-w-md p-8 md:p-12">
                 <p className="font-display text-7xl font-semibold text-shu md:text-8xl">404</p>
-                <h1 className="mt-4 font-display text-2xl text-ink md:text-3xl">Page not found</h1>
+                <h1 className="mt-4 font-display text-2xl text-ink md:text-3xl">Page Not Found</h1>
                 <p className="mb-8 mt-3 text-sm text-ink-muted md:text-base">
-                    The page you&apos;re looking for doesn&apos;t exist.
+                    The Page You&apos;re Looking For Doesn&apos;t Exist
                 </p>
                 <Link to="/" className={buttonClasses("primary", "lg")}>
-                    Go to Home
+                    Go To Home
                 </Link>
             </Card>
         </div>

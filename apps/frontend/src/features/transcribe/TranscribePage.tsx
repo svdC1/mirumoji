@@ -1,30 +1,26 @@
 /**
- * @packageDocumentation This component is the transcribe page of the application.
- * It allows the user to record or upload audio and have it transcribed.
+ * @packageDocumentation The Transcribe page: record or upload audio, transcribe
+ * it (clickable furigana), and optionally get an LLM sentence explanation.
  */
 
 import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
+import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
+import AudioPlayer from "react-h5-audio-player";
+import "react-h5-audio-player/lib/styles.css";
 import { uploadFile } from "@/shared/api/client";
 import { apiTokenize } from "@/shared/dict/api";
 import { apiExplainSentence, apiGetTemplate } from "@/shared/llm/api";
-import { ApiError } from "@/shared/api/errors";
-import AudioPlayer from "react-h5-audio-player";
-import "react-h5-audio-player/lib/styles.css";
+import { toastApiError } from "@/shared/api/errors";
 import WordDialog from "@/shared/components/WordDialog";
-import type { Message, AudioTranscriptResponse } from "@/features/transcribe/types";
-import ChatBubble from "../components/ChatBubble";
+import { Button, buttonClasses, cn } from "@/shared/ui";
+import type { Message, AudioTranscriptResponse } from "./types";
+import ChatBubble from "./components/ChatBubble";
+
 /**
  * The TranscribePage component.
  *
- * This component is responsible for the following:
- * - Recording audio.
- * - Uploading audio.
- * - Transcribing audio.
- * - Displaying the transcription.
- * - Displaying a GPT-powered explanation of the transcription.
- *
- * @returns {JSX.Element} The TranscribePage component.
+ * @returns {JSX.Element} The transcribe page.
  */
 export default function TranscribePage() {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -33,12 +29,9 @@ export default function TranscribePage() {
     const [recording, setRecording] = useState(false);
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string>("");
+    const [previewUrl, setPreviewUrl] = useState("");
     const [sending, setSending] = useState(false);
-    const [dialog, setDialog] = useState<{
-        sentence: string;
-        word: string;
-    } | null>(null);
+    const [dialog, setDialog] = useState<{ sentence: string; word: string } | null>(null);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -58,24 +51,17 @@ export default function TranscribePage() {
             "audio/aac",
             "audio/webm",
         ];
-        for (const type of types) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                return type;
-            }
-        }
-        return null;
+        return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? null;
     };
 
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaStreamRef.current = stream;
             const mimeType = getSupportedMimeType();
             if (!mimeType) {
-                toast.error("No supported audio MIME type found.");
-                stream.getTracks().forEach((track) => track.stop());
+                toast.error("No Supported Audio Format Found");
+                stream.getTracks().forEach((t) => t.stop());
                 return;
             }
             const recorder = new MediaRecorder(stream, { mimeType });
@@ -86,18 +72,13 @@ export default function TranscribePage() {
             };
             recorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: mimeType });
-                let fileExtension = mimeType.split(/[/;]+/)[1] || "ogg";
-                if (fileExtension === "opus") fileExtension = "webm";
-                if (fileExtension === "mp4") fileExtension = "mp4";
-                if (fileExtension === "wav") fileExtension = "wav";
-                if (fileExtension === "aac") fileExtension = "aac";
-                const file = new File([blob], `recording.${fileExtension}`, {
-                    type: mimeType,
-                });
+                let ext = mimeType.split(/[/;]+/)[1] || "ogg";
+                if (ext === "opus") ext = "webm";
+                const file = new File([blob], `recording.${ext}`, { type: mimeType });
                 setRecordedFile(file);
                 setPreviewUrl(URL.createObjectURL(file));
                 if (mediaStreamRef.current) {
-                    mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+                    mediaStreamRef.current.getTracks().forEach((t) => t.stop());
                     mediaStreamRef.current = null;
                 }
             };
@@ -107,9 +88,9 @@ export default function TranscribePage() {
             setPreviewUrl("");
         } catch (error) {
             console.error("Error starting recording:", error);
-            toast.error("Unable to access microphone.");
+            toast.error("Unable To Access Microphone");
             if (mediaStreamRef.current) {
-                mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+                mediaStreamRef.current.getTracks().forEach((t) => t.stop());
                 mediaStreamRef.current = null;
             }
         }
@@ -126,11 +107,9 @@ export default function TranscribePage() {
         setRecordedFile(null);
         setUploadedFile(null);
         setPreviewUrl("");
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
+        if (fileInputRef.current) fileInputRef.current.value = "";
         if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
             mediaStreamRef.current = null;
         }
     };
@@ -149,18 +128,13 @@ export default function TranscribePage() {
         if (!fileToSend) return;
 
         setSending(true);
-        const tId = toast.loading("Uploading...");
+        const tId = toast.loading("Uploading …");
         const loaderId = `loader-${Date.now()}`;
         const userMessageId = `user-${Date.now() + 1}`;
 
         setMessages((prev) => [
             ...prev,
-            {
-                id: userMessageId,
-                type: "user",
-                audioUrl: previewUrl,
-                isAudioMessage: true,
-            },
+            { id: userMessageId, type: "user", audioUrl: previewUrl, isAudioMessage: true },
             { id: loaderId, type: "bot", loading: true, isAudioMessage: true },
         ]);
 
@@ -170,20 +144,14 @@ export default function TranscribePage() {
                 fileToSend,
                 `audio/transcribe?${query}`,
                 {},
-                (progress: number) => {
-                    toast.loading(`Uploading... ${progress.toFixed(0)}%`, {
-                        id: tId,
-                    });
-                },
-                () => {
-                    toast.dismiss(tId);
-                }
+                (progress: number) =>
+                    toast.loading(`Uploading … ${progress.toFixed(0)}%`, { id: tId }),
+                () => toast.dismiss(tId)
             );
 
             const newMessages: Message[] = [];
 
             if (result.transcript) {
-                // Tokenize the transcript on the server for clickable furigana
                 let words;
                 try {
                     words = await apiTokenize(result.transcript);
@@ -199,12 +167,10 @@ export default function TranscribePage() {
                 });
             }
 
-            // Optional sentence explanation (separate LLM call, model from the
-            // profile template)
             if (llmExplain && result.transcript) {
                 const template = await apiGetTemplate();
                 if (!template) {
-                    toast.error("Configure an LLM model in your Profile to enable explanations.");
+                    toast.error("Configure An LLM Model In Your Profile To Enable Explanations");
                 } else {
                     const { explanation } = await apiExplainSentence({
                         sentence: result.transcript,
@@ -221,21 +187,9 @@ export default function TranscribePage() {
 
             setMessages((prev) => [...prev.filter((m) => m.id !== loaderId), ...newMessages]);
             deleteMedia();
-        } catch (err: any) {
-            let errorMessage = "An unknown error occurred during transcription.";
-            if (err instanceof ApiError) {
-                errorMessage = `Error ${err.status}: ${err.message}`;
-            } else if (err instanceof Error) {
-                errorMessage = err.message;
-            }
-            setMessages((prev) => [
-                ...prev.filter((m) => m.id !== loaderId),
-                {
-                    id: `err-${Date.now()}`,
-                    type: "bot",
-                    text: errorMessage,
-                },
-            ]);
+        } catch (err) {
+            toastApiError(err);
+            setMessages((prev) => prev.filter((m) => m.id !== loaderId));
         } finally {
             setSending(false);
         }
@@ -246,15 +200,21 @@ export default function TranscribePage() {
         deleteMedia();
     };
 
-    const handleWordClick = (sentence: string, word: string) => {
-        setDialog({ sentence, word });
-    };
+    const toggleClass = (active: boolean) =>
+        cn(
+            "flex-1 rounded-control py-2 text-sm font-medium transition-colors",
+            active ? "bg-shu/15 text-shu" : "bg-surface-2 text-ink-muted hover:text-ink"
+        );
 
     return (
-        <div className="flex flex-col h-screen bg-black text-white">
-            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <div className="flex h-screen flex-col bg-bg text-ink">
+            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
                 {messages.map((msg) => (
-                    <ChatBubble key={msg.id} msg={msg} onWordClick={handleWordClick} />
+                    <ChatBubble
+                        key={msg.id}
+                        msg={msg}
+                        onWordClick={(s, w) => setDialog({ sentence: s, word: w })}
+                    />
                 ))}
                 <div ref={chatEndRef} />
             </div>
@@ -270,7 +230,7 @@ export default function TranscribePage() {
                 />
             )}
 
-            <div className="p-4 border-t select-none border-zinc-700 space-y-4">
+            <div className="select-none space-y-4 border-t border-ink/10 p-4">
                 {previewUrl && (
                     <AudioPlayer
                         src={previewUrl}
@@ -281,70 +241,61 @@ export default function TranscribePage() {
                     />
                 )}
 
-                <div className="flex gap-2 text-sm">
+                <div className="flex gap-2">
                     <button
-                        onClick={() => setCleanAudio((prev) => !prev)}
-                        className={`flex-1 py-2 rounded-full font-semibold transition-all ${
-                            cleanAudio ? "bg-indigo-600" : "bg-zinc-700"
-                        }`}
+                        onClick={() => setCleanAudio((v) => !v)}
+                        className={toggleClass(cleanAudio)}
                     >
                         Clean Audio
                     </button>
                     <button
-                        onClick={() => setLlmExplain((prev) => !prev)}
-                        className={`flex-1 py-2 rounded-full font-semibold transition-all ${
-                            llmExplain ? "bg-indigo-600" : "bg-zinc-700"
-                        }`}
+                        onClick={() => setLlmExplain((v) => !v)}
+                        className={toggleClass(llmExplain)}
                     >
                         LLM Explain
                     </button>
-                    <button
-                        onClick={clearChat}
-                        className="flex-1 py-2 rounded-full font-semibold transition-all bg-red-600 hover:bg-red-500"
-                    >
+                    <Button variant="ghost" className="flex-1" onClick={clearChat}>
                         Clear Chat
-                    </button>
+                    </Button>
                 </div>
 
                 {previewUrl ? (
                     <div className="flex gap-2">
-                        <button
+                        <Button
+                            variant="danger"
+                            className="flex-1"
                             onClick={deleteMedia}
                             disabled={sending}
-                            className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
                         >
-                            Delete
-                        </button>
-                        <button
-                            onClick={sendAudio}
-                            disabled={sending}
-                            className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
-                        >
-                            {sending ? "Sending…" : "Send Audio"}
-                        </button>
+                            <Trash2 size={16} /> Delete
+                        </Button>
+                        <Button className="flex-1" onClick={sendAudio} loading={sending}>
+                            <Send size={16} /> Send Audio
+                        </Button>
                     </div>
                 ) : (
                     <div className="flex gap-2">
-                        <button
+                        <Button
+                            variant={recording ? "danger" : "primary"}
+                            className="flex-1"
                             onClick={recording ? stopRecording : startRecording}
                             disabled={sending}
-                            className={`flex-1 py-2 rounded-lg text-white disabled:opacity-50 ${
-                                recording
-                                    ? "bg-red-600 hover:bg-red-500"
-                                    : "bg-green-600 hover:bg-green-500"
-                            }`}
                         >
+                            {recording ? <Square size={16} /> : <Mic size={16} />}
                             {recording ? "Stop Recording" : "Start Recording"}
-                        </button>
+                        </Button>
                         <label
                             htmlFor="file-upload"
-                            className={`flex-1 py-2 rounded-lg text-white text-center cursor-pointer ${
-                                sending
-                                    ? "bg-zinc-700 opacity-50 cursor-not-allowed"
-                                    : "bg-blue-600 hover:bg-blue-500"
-                            }`}
+                            className={buttonClasses(
+                                "secondary",
+                                "md",
+                                cn(
+                                    "flex-1 cursor-pointer",
+                                    sending && "pointer-events-none opacity-50"
+                                )
+                            )}
                         >
-                            Upload Audio
+                            <Upload size={16} /> Upload Audio
                         </label>
                         <input
                             id="file-upload"

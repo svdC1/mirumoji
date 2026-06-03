@@ -9,7 +9,7 @@ import { FolderOpen } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiFetch } from "@/shared/api/client";
 import { toastApiError } from "@/shared/api/errors";
-import { staticUrl } from "@/shared/format/files";
+import { staticUrl, truncateFilename } from "@/shared/format/files";
 import { IconButton, Popover, Button, cn } from "@/shared/ui";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -50,9 +50,9 @@ function FileList({
                         <li key={f.id}>
                             <button
                                 onClick={() => onSelect(f)}
-                                className="w-full truncate rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu"
+                                className="w-full rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu"
                             >
-                                {f.name}
+                                {truncateFilename(f.name, 12, 12)}
                             </button>
                         </li>
                     ))
