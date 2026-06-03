@@ -46,7 +46,7 @@ export default function TokenizedText({
                         lang="ja"
                         onClick={() => onWordClick(sentence, word.lemma)}
                         className={cn(
-                            "group/token relative inline-flex flex-col items-center rounded-[0.3em] px-[0.15em] align-bottom leading-tight transition-colors",
+                            "group/token pointer-events-auto relative inline-flex flex-col items-center rounded-[0.3em] px-[0.15em] align-bottom leading-tight transition-colors",
                             "hover:bg-shu/20 focus:outline-none focus-visible:bg-shu/20",
                             selected && "bg-shu/15"
                         )}

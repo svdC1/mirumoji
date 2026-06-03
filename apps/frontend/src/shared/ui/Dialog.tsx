@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "./cn";
 
@@ -17,7 +18,9 @@ export interface DialogProps {
  * common confirm/edit modal
  */
 export function Dialog({ open, onClose, children, className, disableBackdropClose }: DialogProps) {
-    return (
+    // Portal to <body> so a transformed ancestor (e.g. the sliding sidebar)
+    // never becomes the containing block for these fixed-positioned layers.
+    return createPortal(
         <AnimatePresence>
             {open && (
                 <motion.div
@@ -46,6 +49,7 @@ export function Dialog({ open, onClose, children, className, disableBackdropClos
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }

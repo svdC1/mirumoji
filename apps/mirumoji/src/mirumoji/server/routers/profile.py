@@ -22,7 +22,7 @@ from ...exceptions import RecordNotFoundError
 from .. import media
 from ..db import UnitOfWork
 from ..dependencies import ensure_profile_exists, get_stream_file
-from ..models.requests import LlmTemplateRequest
+from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
     ClipResponse,
@@ -365,6 +365,82 @@ async def delete_file(
         await uow.commit()
     await media.delete_file(file.path)
     return {"success": True, "message": "File deleted successfully."}
+
+
+@profile_router.post("/subtitles", response_model=ProfileFileResponse)
+async def save_subtitles(
+    req: SaveSubtitlesRequest,
+    profile_id: str = Depends(ensure_profile_exists),
+) -> ProfileFileResponse:
+    """
+    Persists SRT content under the active profile
+
+    Used by the player's "Fix SRT" action: when `file_id` points at an existing
+    SRT file owned by the profile, its content is overwritten in place;
+    otherwise a new SRT file is stored
+
+    Args:
+        req (SaveSubtitlesRequest): The SRT content (+ optional file id / name)
+        profile_id (str): Validated profile id
+
+    Returns:
+        The stored SRT file's id, name, media URL, type, and timestamp
+
+    Raises:
+        StorageError: If writing the SRT fails
+        DatabaseError: If persistence fails
+    """
+    # Try to resolve an existing, owned SRT file to overwrite.
+    existing = None
+    if req.file_id:
+        try:
+            async with UnitOfWork() as uow:
+                candidate = await uow.files.get(uuid.UUID(req.file_id))
+            if candidate.profile_id == profile_id and candidate.type == "srt":
+                existing = candidate
+        except (ValueError, RecordNotFoundError):
+            existing = None
+
+    if existing is not None:
+        # Overwrite in place (write_file appends, so clear it first).
+        await media.delete_file(existing.path)
+        await media.write_file(existing.path, req.content)
+        created = (
+            existing.created_at.isoformat() if existing.created_at else None
+        )
+        return ProfileFileResponse(
+            id=str(existing.id),
+            name=existing.name,
+            url=f"/media/{Path(existing.path).as_posix()}",
+            type=existing.type,
+            created_at=created,
+        )
+
+    # Create a new SRT file under the profile.
+    op_id = uuid.uuid4().hex
+    subtitles_dir = media.get_profile_dir(profile_id, "subtitles")
+    srt_loc = subtitles_dir / f"{op_id}.srt"
+    rel_srt = media.get_relative_path(srt_loc)
+    await media.write_file(rel_srt, req.content)
+
+    async with UnitOfWork() as uow:
+        file_rec = await uow.files.add(
+            profile_id=profile_id,
+            name=req.name or srt_loc.name,
+            path=str(rel_srt),
+            type="srt",
+        )
+        await uow.commit()
+
+    return ProfileFileResponse(
+        id=str(file_rec.id),
+        name=file_rec.name,
+        url=f"/media/{rel_srt.as_posix()}",
+        type="srt",
+        created_at=(
+            file_rec.created_at.isoformat() if file_rec.created_at else None
+        ),
+    )
 
 
 # --- Transcripts ---

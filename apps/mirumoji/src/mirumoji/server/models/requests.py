@@ -117,6 +117,28 @@ class LlmTemplateRequest(BaseModel):
     model: str
 
 
+class SaveSubtitlesRequest(BaseModel):
+    """
+    Request for persisting SRT content to the active profile
+    (`POST /profiles/subtitles`)
+
+    abstract: Replace vs Create
+        - When `file_id` references an existing SRT file owned by the profile,
+          that file's content is overwritten in place (same id / path)
+
+        - Otherwise a new SRT file is created under the profile
+
+    Args:
+        content (str): The SRT content to store
+        file_id (str | None): Existing SRT file id to overwrite, if any
+        name (str | None): Optional file name for a newly created file
+    """
+
+    content: str
+    file_id: str | None = None
+    name: str | None = None
+
+
 # --- Media Query-Parameters Requests (Bound via Annotated[..., Query()]) ---
 
 

@@ -20,6 +20,8 @@ export interface PlayerContextState {
     setSrt: (file: File | null) => void;
     srtFileName: string | null;
     setSrtFileName: (name: string | null) => void;
+    srtFileId: string | null;
+    setSrtFileId: (id: string | null) => void;
     videoUrl: string | null;
     setVideoUrl: (url: string | null) => void;
     drawerOpen: boolean;
@@ -52,6 +54,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [videoFileName, setVideoFileName] = useState<string | null>(null);
     const [srt, setSrt] = useState<File | null>(null);
     const [srtFileName, setSrtFileName] = useState<string | null>(null);
+    const [srtFileId, setSrtFileId] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [showFurigana, setShowFurigana] = useState<boolean>(true);
@@ -65,6 +68,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setVideoFileName(null);
         setSrt(null);
         setSrtFileName(null);
+        setSrtFileId(null);
         setVideoUrl(null);
         setDrawerOpen(true);
         setShowFurigana(true);
@@ -83,6 +87,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             setSrt,
             srtFileName,
             setSrtFileName,
+            srtFileId,
+            setSrtFileId,
             videoUrl,
             setVideoUrl,
             drawerOpen,
@@ -98,6 +104,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             videoFileName,
             srt,
             srtFileName,
+            srtFileId,
             videoUrl,
             drawerOpen,
             showFurigana,

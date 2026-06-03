@@ -7,7 +7,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppSidebar } from "./shell/AppSidebar";
 import HomePage from "@/pages/HomePage";
-import PlayerPage from "@/pages/PlayerPage";
+import PlayerPage from "@/features/player/PlayerPage";
 import TranscribePage from "@/pages/TranscribePage";
 import TextPage from "@/pages/TextPage";
 import { DictionaryPage } from "@/pages/DictionaryPage";
