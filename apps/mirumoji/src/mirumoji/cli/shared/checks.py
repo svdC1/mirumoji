@@ -7,6 +7,7 @@ rather than raising, so that a front-end can present a full report
 
 import logging
 import platform
+import shutil
 from importlib.util import find_spec
 
 from . import process
@@ -31,15 +32,24 @@ def _probe(name: str, cmd: list[str], *, ok_detail: str = "") -> CheckResult:
     Returns:
         The mapped check result
     """
-    try:
-        result = process.run(cmd, check=False)
-    except FileNotFoundError:
+    # Resolve via the PATH with shutil so that Windows `.bat` / `.cmd`
+    # shims like `flutter.bat` are found, unlike bare CreateProcess lookups
+    exe = shutil.which(cmd[0])
+    if exe is None:
         return CheckResult(name, CheckStatus.MISSING, "Not Installed")
+    try:
+        # Try to get additional information
+        result = process.run([exe, *cmd[1:]], check=False)
+    except OSError:
+        # Found on PATH but not directly executable (e.g. a shell shim that
+        # needs a command processor). Presence is enough to report OK
+        return CheckResult(name, CheckStatus.OK, ok_detail or "Installed")
+
     lines = result.stdout.strip().splitlines()
     first = lines[0] if lines else ""
     if result.returncode != 0:
         return CheckResult(name, CheckStatus.MISSING, first or "Check Failed")
-    return CheckResult(name, CheckStatus.OK, ok_detail or first)
+    return CheckResult(name, CheckStatus.OK, ok_detail or first or "Installed")
 
 
 def docker() -> CheckResult:
@@ -94,12 +104,36 @@ def nvidia_gpu() -> CheckResult:
     )
 
 
+def _image_present(image: str) -> bool:
+    """
+    Checks whether a Docker image already exists locally
+
+    Args:
+        image (str): The image reference to look up
+
+    Returns:
+        `True` if `docker image inspect` finds the image
+    """
+    try:
+        result = process.run(
+            ["docker", "image", "inspect", image],
+            check=False,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
+
+
 def nvidia_toolkit() -> CheckResult:
     """
     Checks whether the NVIDIA Container Toolkit can expose a GPU to Docker
 
     Runs a short-lived CUDA container with `--gpus all`. Requires both a GPU
     and a running Docker Daemon
+
+    info: No Side Effects
+        The probe image is removed afterwards unless it was already present
+        locally before the check, so the check leaves Docker as it found it
 
     Returns:
         The NVIDIA Container Toolkit check result
@@ -116,7 +150,12 @@ def nvidia_toolkit() -> CheckResult:
             CheckStatus.MISSING,
             "Docker Not Running",
         )
-    return _probe(
+
+    # Remember whether the probe image existed so that the CLI only cleans up
+    # what the check itself pulled
+    keep_image = _image_present(_GPU_PROBE_IMAGE)
+
+    result = _probe(
         "NVIDIA Container Toolkit",
         [
             "docker",
@@ -131,6 +170,15 @@ def nvidia_toolkit() -> CheckResult:
         ],
         ok_detail="GPU Reachable From Docker",
     )
+
+    # Best-effort cleanup of the pulled image (ignore failures)
+    if not keep_image:
+        try:
+            process.run(["docker", "rmi", _GPU_PROBE_IMAGE], check=False)
+        except OSError:
+            LOGGER.debug(f"Could Not Remove Probe Image {_GPU_PROBE_IMAGE}")
+
+    return result
 
 
 def _module(name: str, label: str) -> CheckResult:
