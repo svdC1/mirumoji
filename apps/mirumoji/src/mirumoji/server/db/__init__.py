@@ -23,7 +23,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool.base import _ConnectionRecord
 
-from ..constants import DB_URL, HOST_DB_PATH
+from ...paths import HOST_DB_PATH
+from ..constants import DB_URL
 from .models import Base
 from .repos import (
     ClipRepository,

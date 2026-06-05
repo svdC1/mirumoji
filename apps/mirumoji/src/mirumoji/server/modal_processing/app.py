@@ -18,8 +18,8 @@ from dataclasses import dataclass
 
 import modal
 
+from ...paths import HOST_MEDIA_PATH
 from ..config import get_settings
-from ..constants import HOST_MEDIA_PATH
 from .conversion import video_conversion_job
 from .transcription import transcribe_job
 

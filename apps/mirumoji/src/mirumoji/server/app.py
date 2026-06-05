@@ -27,9 +27,9 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..exceptions import MirumojiServerError
+from ..paths import HOST_LOG_PATH
 from . import media
 from .config import setup_logging
-from .constants import HOST_LOG_PATH
 from .db import get_engine, init_db
 from .processing.processor import Processor
 from .routers.audio import audio_router
@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
     # Create Log Directory + Register Handlers
     setup_logging()
-    LOGGER.info(f"Storing Logs At `{HOST_LOG_PATH}`")
+    LOGGER.info(f"Storing Logs At `{HOST_LOG_PATH / 'backend.log'}`")
 
     # Create / Initialise Database
     await init_db()
@@ -226,25 +226,3 @@ def create_app() -> FastAPI:
     app.include_router(profile_router)
 
     return app
-
-
-app = create_app()
-
-
-def run() -> None:
-    """
-    Entry point for the `mirumoji-server` console script
-
-    Launches `Uvicorn` on `0.0.0.0:8000` with auto-reload enabled
-    (development mode)
-
-    For production deployments use the Docker image directly
-    """
-    import uvicorn
-
-    uvicorn.run(
-        "mirumoji.server.app:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-    )

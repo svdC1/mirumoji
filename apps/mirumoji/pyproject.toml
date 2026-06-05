@@ -7,7 +7,7 @@ name = "mirumoji"
 version = "3.0.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
-description = "Self-hostable Japanese language immersion tool"
+description = "Self-Hostable Japanese Language Immersion Tool"
 keywords = [
     "japanese",
     "video-player",
@@ -22,34 +22,38 @@ keywords = [
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: GPU :: NVIDIA CUDA :: 12",
+    "Environment :: Console",
+    "Framework :: FastAPI",
+    "Framework :: Pydantic :: 2",
+    "Framework :: AsyncIO",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Education"
 ]
 license = "MIT"
-license-files = ["LICEN[CS]E*"]
+license-files = ["LICENSE*", "LICENCE*"]
 
-# Base Install - CLI + Launcher Only (Lightweight, No Heavy ML Deps)
+# --- Dependencies ---
+
+# Base Install - CLI Only
 dependencies = [
-    "click",
-    "python-dotenv"
+    "typer",
+    "rich",
+    "python-dotenv",
+    "platformdirs",
+    "pyyaml"
 ]
 
 [project.optional-dependencies]
-# Core Server Stack - CPU
-# API Deps
-# Tokenizer
-# Dictionary
-# Media
-# DB 
-# Modal Offload
 
-# LLM Provider - OpenAI SDK - `base_url` Supports
-# Gemini (OpenAI-Compatible Endpoint)
-# Any Local OpenAI-Compatible LLM Server
-# Modal-Hosted OpenAI-Compatible LLM Server
-
-# LLM Provider - Native Anthropic SDK For Better Claude Support
-
+# Core Server Stack - CPU Only
 server = [
     "fastapi==0.115.12",
     "uvicorn==0.34.2",
@@ -64,15 +68,11 @@ server = [
     "modal==1.1.3",
     "genanki==0.13.1",
     "aiosqlite==0.20.0",
-    "platformdirs",
     "openai==1.76.2",
     "anthropic"
-
 ]
 
-# Local Whisper Transcription (Modal Offload Deployments Don't Need This)
-# huggingface_hub / sentencepiece / requests support model download + the
-# faster-whisper tokenizer
+# GPU Server Deployment (Local Transcription)
 whisper-local = [
     "faster-whisper==1.1.1",
     "huggingface_hub",
@@ -81,12 +81,9 @@ whisper-local = [
 ]
 
 
-# Desktop GUI Launcher
+# GUI Launcher Build
 gui = [
-    "fastapi==0.115.12",
-    "uvicorn==0.34.2",
-    "flaskwebgui",
-    "python-socketio"
+    "flet[all]"
 ]
 
 # Development Tools
@@ -100,9 +97,7 @@ dev = [
 ]
 
 [project.scripts]
-mirumoji = "mirumoji.cli.launcher:cli"
-mirumoji-gui = "mirumoji.cli.gui_launcher:main"
-mirumoji-server = "mirumoji.server.app:run"
+mirumoji = "mirumoji.cli.main:app"
 
 [project.urls]
 Repository = "https://github.com/svdC1/mirumoji"
@@ -116,10 +111,9 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# Ship the Dockerfiles as package data so the CLI/GUI can build images from an
-# installed wheel
+# --- Docker Data ---
 [tool.setuptools.package-data]
-mirumoji = ["docker/*"]
+mirumoji = ["docker/*", "docker/compose/*"]
 
 # --- Ruff ---
 [tool.ruff]
@@ -138,8 +132,6 @@ select = [
     "C4",  # flake8-comprehensions
     "RUF", # ruff-specific rules
 ]
-
-ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI routers instantiate services at module level (cleanup planned for 3.x)
@@ -163,3 +155,7 @@ warn_redundant_casts = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+# --- Flet (GUI) ---
+[tool.flet]
+desktop_flavor = "light"

@@ -1,10 +1,13 @@
-# Use the NVIDIA CUDA runtime image (recommended in FasterWhisper repo) as the base for GPU support
+# Published GPU Image
+# Installs The Released Wheel From PyPI
+# Built And Pushed by CI
+
 FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 
-# --- Set working directory ---
+# --- Working Directory ---
 WORKDIR /app
 
-# --- Set env ---
+# --- Environment ---
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}" \
@@ -12,12 +15,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
 
-# --- Install System Dependencies ---
+# --- Released Version (CI Overrides Via --build-arg) ---
+ARG MIRUMOJI_VERSION=3.0.0
+
+# --- System Dependencies + Python Shim ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     ffmpeg \
-    wget \ 
+    wget \
     xz-utils \
     mecab \
     libmecab-dev \
@@ -27,33 +33,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Ensure 'python' and 'python3' commands both point to python3.11 ---
+# --- Point 'python' + 'python3' At python3.11 ---
 RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # --- Upgrade PIP ---
 RUN python3.11 -m pip install --upgrade pip
 
-# --- Install PyTorch with CUDA Support, suitable for CUDA 12.3 base image. ---
-# Torch is a manual install, CUDA build is hardware-dependent and needs correct index
-# so it is intentionally not declared in pyproject
-RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+# --- Install PyTorch With CUDA Support ---
+RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cu124
 
-# --- Copy package files and install server + local-whisper dependencies ---
-COPY pyproject.toml README.md ./
-COPY src/ src/
-RUN python3.11 -m pip install ".[server,whisper-local]"
+# --- Install The Published Package + Local Whisper Extra ---
+RUN python3.11 -m pip install \
+    "mirumoji[server,whisper-local]==${MIRUMOJI_VERSION}"
 
-# --- Download UniDic Dictionary and Kotobase DB ---
+# --- Download UniDic Dictionary + Kotobase DB ---
 RUN python3.11 -m unidic download
 RUN kotobase pull-db
 
-# --- Pre-cache the Faster-Whisper model from huggingface ---
+# --- Pre-Cache The Faster-Whisper Model ---
 RUN python3.11 -c "from huggingface_hub import snapshot_download; \
     snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
 
-# --- Expose the uvicorn port ---
+# --- Expose The Uvicorn Port ---
 EXPOSE 8000
 
-# --- Start uvicorn with host mode ---
-CMD ["python3.11", "-m", "uvicorn", "mirumoji.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# --- Start Server ---
+CMD ["python3.11", "-m", "uvicorn", "mirumoji.server.app:create_app", \
+    "--factory", "--host", "0.0.0.0", "--port", "8000"]

@@ -22,10 +22,10 @@ from dotenv import load_dotenv
 from tqdm.auto import tqdm
 
 from ..exceptions import ModalError, WhisperUnavailableError
+from ..paths import HOST_LOG_PATH
 from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
     DEFAULT_SRT_SYS_MSG,
-    HOST_LOG_PATH,
 )
 
 # --- Environment Loading + Settings ---

@@ -1,6 +1,7 @@
-# Published CPU image (Modal-Offload Deployment)
-# Installs The Released Wheel From PyPI
-# Built and pushed by CI
+# Local-Build CPU Image
+# Installs From Local Repo
+# Used By `mirumoji build` / `mirumoji up --build`
+# Build Context Is The Package Root (apps/mirumoji)
 
 FROM python:3.11-slim-bookworm
 
@@ -11,9 +12,6 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}"
-
-# --- Released Version (CI Overrides Via --build-arg) ---
-ARG MIRUMOJI_VERSION=3.0.0
 
 # --- System Dependencies ---
 RUN apt-get update && \
@@ -30,9 +28,10 @@ RUN apt-get update && \
 RUN python3.11 -m ensurepip --upgrade && \
     python3.11 -m pip install --no-cache-dir --upgrade pip
 
-# --- Install The Published Package ---
-RUN python3.11 -m pip install --no-cache-dir \
-    "mirumoji[server]==${MIRUMOJI_VERSION}"
+# --- Install From The Working Tree ---
+COPY pyproject.toml README.md ./
+COPY src/ src/
+RUN python3.11 -m pip install --no-cache-dir ".[server]"
 
 # --- Download UniDic Dictionary + Kotobase DB ---
 RUN python3.11 -m unidic download

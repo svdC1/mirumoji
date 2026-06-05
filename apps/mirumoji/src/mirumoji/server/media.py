@@ -28,7 +28,7 @@ from fastapi import Request
 from tqdm.auto import tqdm
 
 from ..exceptions import InvalidMediaPathError, StorageError, UploadError
-from .constants import HOST_MEDIA_PATH
+from ..paths import HOST_MEDIA_PATH
 
 LOGGER = logging.getLogger(__name__)
 

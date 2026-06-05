@@ -2,58 +2,24 @@
 Defines deterministic constants and built-in default values for the server
 
 abstract: Configuration Split
-    - Path constants derive from `platformdirs` (appname + version) and are
-      deterministic, so they're safe to evaluate at import
-
-    - Environment-dependent configuration is resolved lazily by
-      `mirumoji.server.config.get_settings` so that a `.env` loaded at
-      startup is respected
-
-warning: Directory Creation
-    `HOST_DATA_DIRS` is created with `ensure_exists=False`, so none of the
-    `HOST_*` directories exist merely because this module was imported
+    Environment-dependent configuration is resolved lazily by
+    `mirumoji.server.config.get_settings` so that a `.env` loaded at
+    startup is respected
 
 Attributes:
-    HOST_DATA_DIRS (PlatformDirs): Platform-specific application directories
-        (`appname="mirumoji"`, versioned), with `ensure_exists=False`
-    HOST_MEDIA_PATH (Path): Media root, `user_data_path / "media_files"`
-        (not auto-created)
-    HOST_DB_PATH (Path): SQLite Database file, `user_data_path / "mirumoji.db"`
-        (parent not auto-created)
-    HOST_LOG_PATH (Path): Log directory, `user_log_dir` (not auto-created)
     DB_URL (str): Async SQLAlchemy database URL built from `HOST_DB_PATH`
     DEFAULT_SRT_SYS_MSG (str): Built-in default system message for SRT-fixing
     DEFAULT_BREAKDOWN_SYS_MSG (str): Built-in default system message for
         word-nuance breakdowns
 """
 
-from pathlib import Path
-
-from platformdirs import PlatformDirs
-
-from .. import __version__
-
-# --- File Management ---
-
-HOST_DATA_DIRS = PlatformDirs(
-    appname="mirumoji",
-    appauthor=False,
-    version=__version__,
-    ensure_exists=False,
-)
-
-HOST_MEDIA_PATH: Path = HOST_DATA_DIRS.user_data_path / "media_files"
-
-HOST_DB_PATH: Path = HOST_DATA_DIRS.user_data_path / "mirumoji.db"
-
-HOST_LOG_PATH: Path = HOST_DATA_DIRS.user_log_path
+from ..paths import HOST_DB_PATH
 
 # --- Database ---
 
 DB_URL = f"sqlite+aiosqlite:///{HOST_DB_PATH}"
 
-# --- Built-in default LLM system messages ---
-# Resolved (with env overrides) by config.get_settings
+# --- Built-In Default LLM System Messages ---
 
 DEFAULT_SRT_SYS_MSG = (
     "You are an expert subtitle editor for Japanese anime.\n"

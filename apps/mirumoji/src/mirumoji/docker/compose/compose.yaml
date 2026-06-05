@@ -1,0 +1,69 @@
+# Mirumoji Docker Compose template
+#
+# This template is transformed at runtime by the launcher (`mirumoji.cli.shared.compose`)
+#
+# Modifications Made By The Launcher
+#
+# - Replaces Image References For GPU / CPU Backend Builds
+# - Injects The NVIDIA GPU Reservation + Hugging Face Model-Cache Volume For GPU Backend Builds
+#
+# It's recommended to run `mirumoji up` rather than to edit this file directly
+#
+# `mirumoji compose render` emits a resolved copy for manual installs
+#
+# Every backend variable uses a `${VAR:-default}` form so that nothing is required
+# except what the chosen backend genuinely needs. The launcher collects those into the
+# `.env` it passes via `--env-file`
+
+services:
+  frontend:
+    image: svdc1/mirumoji:frontend-latest
+    ports:
+      - "80:80"    # HTTP (Redirects To HTTPS)
+      - "443:443"  # HTTPS (Self-Digned Cert Built For HOST_LAN_IP At Runtime)
+    environment:
+      - HOST_LAN_IP=${HOST_LAN_IP:-127.0.0.1}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    image: svdc1/mirumoji:backend-cpu-latest
+    ports:
+      - "8000:8000"
+    environment:
+      - MIRUMOJI_TRANSCRIBE_BACKEND=${MIRUMOJI_TRANSCRIBE_BACKEND:-auto}
+      - MIRUMOJI_LOGGING_LEVEL=${MIRUMOJI_LOGGING_LEVEL:-INFO}
+      # LLM Providers
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MIRUMOJI_LLM_API_KEY=${MIRUMOJI_LLM_API_KEY:-}
+      - MIRUMOJI_LLM_BASE_URL=${MIRUMOJI_LLM_BASE_URL:-}
+      # Modal
+      - MODAL_TOKEN_ID=${MODAL_TOKEN_ID:-}
+      - MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET:-}
+      - MIRUMOJI_MODAL_GPU=${MIRUMOJI_MODAL_GPU:-A10G}
+      - MIRUMOJI_MODAL_IMAGE=${MIRUMOJI_MODAL_IMAGE:-docker.io/svdc1/mirumoji-modal-gpu:latest}
+      - MODAL_FORCE_BUILD=${MODAL_FORCE_BUILD:-0}
+      # Default LLM System-Message Overrides
+      - MIRUMOJI_SRT_DEFAULT_SYS_MSG=${MIRUMOJI_SRT_DEFAULT_SYS_MSG:-}
+      - MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG=${MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG:-}
+    volumes:
+      # Mounted at the parent of the versioned platformdirs paths so that data and
+      # logs survive version bumps.
+      #
+      # The server resolves its storage via platformdirs (see mirumoji/paths.py)
+      - data:/root/.local/share/mirumoji
+      - logs:/root/.local/state/mirumoji
+    networks:
+      - app-network
+
+volumes:
+  data:
+  logs:
+
+networks:
+  app-network:
+    driver: bridge
