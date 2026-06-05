@@ -2,6 +2,8 @@
 Defines Pydantic response models for the API's endpoints
 """
 
+from typing import Any
+
 from pydantic import BaseModel
 
 from .jpdict import EnrichedJapaneseWord
@@ -155,7 +157,7 @@ class ClipResponse(BaseModel):
     clip_url: str
     start_time: float
     end_time: float
-    breakdown: dict
+    breakdown: dict[str, Any]
 
 
 class ProfileFileResponse(BaseModel):

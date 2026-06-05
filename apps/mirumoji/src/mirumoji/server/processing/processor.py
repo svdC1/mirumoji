@@ -17,7 +17,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import aiofiles
 
@@ -63,7 +63,7 @@ class Processor:
 
     def _get_model(
         self,
-        w_model_args: dict | None = None,
+        w_model_args: dict[str, Any] | None = None,
     ) -> WhisperModel:
         """
         Loads the local `WhisperModel` object on first use, returning the
@@ -124,8 +124,8 @@ class Processor:
         media_path: str | os.PathLike[str],
         output_format: Literal["srt", "joined"] = "srt",
         *,
-        w_model_args: dict | None = None,
-        w_transcribe_args: dict | None = None,
+        w_model_args: dict[str, Any] | None = None,
+        w_transcribe_args: dict[str, Any] | None = None,
     ) -> str:
         """
         Transcribes media using either a local `WhisperModel` or the `Modal`
@@ -181,12 +181,13 @@ class Processor:
             rel = str(media.get_relative_path(media_path))
             try:
                 async with runtime.app.run():
-                    return await runtime.transcribe.remote.aio(
+                    result = await runtime.transcribe.remote.aio(
                         rel_media_fp=rel,
                         output_format=output_format,
                         w_model_args=w_model_args,
                         w_transcribe_args=w_transcribe_args,
                     )
+                    return cast(str, result)
             except MirumojiServerError:
                 # Domain exceptions are preserved across the Modal boundary
                 raise
@@ -213,7 +214,7 @@ class Processor:
         self,
         input_path: str | os.PathLike[str],
         output_path: str | os.PathLike[str],
-        to_mp4_kwargs: dict | None = None,
+        to_mp4_kwargs: dict[str, Any] | None = None,
     ) -> Path:
         """
         Converts a video to MP4 using `FFMPEG`

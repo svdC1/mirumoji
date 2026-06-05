@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # --- Kotobase Data Models ---
@@ -205,7 +207,7 @@ class Token(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def clear_asterisks(cls, data: dict) -> dict:
+    def clear_asterisks(cls, data: dict[str, Any]) -> dict[str, Any]:
         """
         Cleans incoming dictionary fields by converting UniDic's "*" sentinel
         and any missing (`None`) feature to an empty string, since unknown /

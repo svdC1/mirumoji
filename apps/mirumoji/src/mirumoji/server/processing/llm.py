@@ -22,7 +22,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
-from typing import Protocol
+from typing import Any, Protocol
 
 from anthropic import Anthropic
 from anthropic.types import TextBlock
@@ -302,7 +302,7 @@ def provider_available(provider: LLMProvider) -> bool:
     )
 
 
-def provider_status() -> list[dict]:
+def provider_status() -> list[dict[str, Any]]:
     """
     Report availability of every known LLM provider
 

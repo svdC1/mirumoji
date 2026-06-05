@@ -223,7 +223,7 @@ def transcribe_backend() -> Literal["local", "modal", "none"]:
 # --- Logging ---
 
 
-class TqdmStreamHandler(logging.StreamHandler):
+class TqdmStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
     """
     Handler for displaying `tqdm` progress bars properly with python logging
     """

@@ -144,12 +144,12 @@ indent-style = "space"
 # --- MyPy ---
 [tool.mypy]
 python_version = "3.10"
-strict = false
-ignore_missing_imports = true
-check_untyped_defs = true
+strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
-# Tightening is planned for 3.x
+# Minimal Local Stubs For Untyped Third-Party Libs
+# Covers Only The Surface Used By Mirumoji
+mypy_path = "stubs"
 
 # --- PyTest ---
 [tool.pytest.ini_options]

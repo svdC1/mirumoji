@@ -8,6 +8,7 @@ Attributes:
 
 import asyncio
 import logging
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -33,7 +34,7 @@ llm_router = APIRouter(prefix="/llm")
 
 
 @llm_router.get("/providers")
-async def list_providers() -> dict:
+async def list_providers() -> dict[str, Any]:
     """
     Reports which LLM providers are usable in this deployment
 

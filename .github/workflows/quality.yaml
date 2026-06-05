@@ -9,7 +9,7 @@ on:
 jobs:
     # --- Python: Ruff + MyPy ---
     python-lint:
-        name: Python lint (ruff + mypy)
+        name: Python Lint (Ruff + MyPy)
         runs-on: ubuntu-latest
 
         steps:
@@ -20,26 +20,30 @@ jobs:
               with:
                   python-version: "3.11"
 
-            - name: Install all extras + dev dependencies
-              # Install every runtime extra so mypy type-checks against the real
-              # (typed) optional deps - e.g. the openai / anthropic SDKs (in the
-              # server core) ship py.typed - instead of treating them as Any.
+            - name: Install Dependencies
+              # Install every runtime extra + torch for mypy
               run: |
                   python -m pip install --upgrade pip
                   pip install -e "apps/mirumoji[server,whisper-local,dev]"
+                  pip install torch==2.6.0
 
-            - name: ruff check
+            - name: Ruff Check
               run: ruff check apps/mirumoji/src
 
-            - name: ruff format check
+            - name: Ruff Format Check
               run: ruff format --check apps/mirumoji/src
 
-            - name: mypy
-              run: mypy apps/mirumoji/src
+            - name: MyPy
+              # Run from the package dir so mypy loads its [tool.mypy] config
+              # (strict + the local stubs/ via mypy_path)
+              run: |
+                  cd apps/mirumoji
+                  mypy --install-types --non-interactive src
+                  mypy src
 
-    # --- Python: pytest ---
+    # --- Python: PyTest ---
     python-test:
-        name: Python tests (pytest)
+        name: Python Tests (PyTest)
         runs-on: ubuntu-latest
 
         steps:
@@ -50,12 +54,12 @@ jobs:
               with:
                   python-version: "3.11"
 
-            - name: Install server + dev dependencies
+            - name: Install Dependencies
               run: |
                   python -m pip install --upgrade pip
                   pip install -e "apps/mirumoji[server,dev]"
 
-            - name: Run pytest
+            - name: Run PyTest
               run: |
                   cd apps/mirumoji
                   pytest --tb=short -q
@@ -75,18 +79,18 @@ jobs:
                   cache: npm
                   cache-dependency-path: apps/frontend/package-lock.json
 
-            - name: Install dependencies
+            - name: Install Dependencies
               run: cd apps/frontend && npm ci
 
             - name: ESLint
               run: cd apps/frontend && npm run lint
 
-            - name: Prettier check
+            - name: Prettier Check
               run: cd apps/frontend && npm run format:check
 
     # --- Frontend: vitest ---
     frontend-test:
-        name: Frontend tests (Vitest)
+        name: Frontend Tests (Vitest)
         runs-on: ubuntu-latest
 
         steps:
@@ -99,7 +103,7 @@ jobs:
                   cache: npm
                   cache-dependency-path: apps/frontend/package-lock.json
 
-            - name: Install dependencies
+            - name: Install Dependencies
               run: cd apps/frontend && npm ci
 
             - name: Run Vitest

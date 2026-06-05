@@ -15,6 +15,7 @@ import logging
 import urllib.parse
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
@@ -119,7 +120,7 @@ async def upsert_template(
 @profile_router.delete("/template", status_code=status.HTTP_200_OK)
 async def delete_template(
     profile_id: str = Depends(ensure_profile_exists),
-) -> dict:
+) -> dict[str, Any]:
     """
     Deletes the active profile's LLM template
 
@@ -271,7 +272,7 @@ async def list_clips(
 async def delete_clip(
     clip_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
-) -> dict:
+) -> dict[str, Any]:
     """
     Deletes one of the active profile's saved clips and its file
 
@@ -340,7 +341,7 @@ async def list_files(
 async def delete_file(
     file_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
-) -> dict:
+) -> dict[str, Any]:
     """
     Deletes one of the active profile's files
 
@@ -496,7 +497,7 @@ async def list_transcripts(
 async def delete_transcript(
     transcript_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
-) -> dict:
+) -> dict[str, Any]:
     """
     Deletes one of the active profile's transcripts
 

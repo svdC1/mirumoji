@@ -200,13 +200,13 @@ def query_kotobase(
             )
 
         # Build JMNe Entries
-        for entry in jmne:
+        for ne_entry in jmne:
             jmnentries.append(
                 JMNEntry(
-                    kana=entry.kana or [],
-                    kanji=entry.kanji or [],
-                    translation_type=entry.translation_type or "",
-                    gloss=entry.gloss or [],
+                    kana=ne_entry.kana or [],
+                    kanji=ne_entry.kanji or [],
+                    translation_type=ne_entry.translation_type or "",
+                    gloss=ne_entry.gloss or [],
                 ),
             )
     # Build KanjiInfo

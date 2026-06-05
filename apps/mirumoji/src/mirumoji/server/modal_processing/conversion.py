@@ -5,11 +5,12 @@ Defines `Modal` GPU jobs for `NVENC` video conversion
 import os
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 
 def video_conversion_job(
     rel_video_fp: str | os.PathLike[str],
-    to_mp4_kwargs: dict | None = None,
+    to_mp4_kwargs: dict[str, Any] | None = None,
 ) -> Generator[bytes, None, None]:
     """
     Convert `video_fp` to MP4 using NVENC and stream the content as bytes

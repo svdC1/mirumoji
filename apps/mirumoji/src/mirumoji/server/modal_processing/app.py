@@ -13,8 +13,11 @@ warning: Media Paths
       container and the job will fail with a ValueError
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import modal
 
@@ -39,8 +42,8 @@ class ModalRuntime:
     """
 
     app: modal.App
-    transcribe: modal.Function
-    convert: modal.Function
+    transcribe: modal.Function[..., Any, Any]
+    convert: modal.Function[..., Any, Any]
 
 
 def setup_modal() -> ModalRuntime:

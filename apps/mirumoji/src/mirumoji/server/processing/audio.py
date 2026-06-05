@@ -51,7 +51,7 @@ def run_command(
     command: list[str],
     check: bool = True,
     cwd: str | os.PathLike[str] | None = None,
-) -> subprocess.CompletedProcess:
+) -> subprocess.CompletedProcess[str]:
     """
     Wraps `subprocess.run` in order to log errors and results
 

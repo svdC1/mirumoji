@@ -334,7 +334,7 @@ class Clip(Base):
         Float,
     )
 
-    llm_breakdown_response: Mapped[dict] = mapped_column(
+    llm_breakdown_response: Mapped[dict[str, Any]] = mapped_column(
         JSON,
     )
 
@@ -453,5 +453,5 @@ class ClipDTO(SafeORMModel):
     file: FileDTO | None
     start_time: float
     end_time: float
-    llm_breakdown_response: dict
+    llm_breakdown_response: dict[str, Any]
     created_at: datetime

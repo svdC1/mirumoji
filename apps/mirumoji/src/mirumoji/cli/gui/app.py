@@ -107,4 +107,4 @@ def main() -> None:
         )
         refresh()
 
-    ft.app(target=view)
+    ft.app(target=view)  # type: ignore[no-untyped-call]

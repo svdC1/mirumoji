@@ -7,7 +7,7 @@ payload. A single FastAPI exception handler reads those attributes and renders
 the nested error envelope, so transport concerns never leak into domain code
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 # --- Base Exceptions ---
 
@@ -31,7 +31,9 @@ class MirumojiServerError(MirumojiError):
     http_status: ClassVar[int] = 500
     code: ClassVar[str] = "ServerError"
 
-    def __init__(self, message: str, *, details: dict | None = None) -> None:
+    def __init__(
+        self, message: str, *, details: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(message)
         self.details = details
 

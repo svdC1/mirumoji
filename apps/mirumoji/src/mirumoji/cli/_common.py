@@ -14,7 +14,7 @@ import json
 import subprocess
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import typer
 from rich.live import Live
@@ -155,7 +155,7 @@ def stream_command(
                 try:
                     line = next(gen)
                 except StopIteration as stop:
-                    return stop.value
+                    return cast(_T, stop.value)
                 table.add_row(f"↪ {line}", style="muted")
 
     # Catch Launcher Exceptions
@@ -175,7 +175,7 @@ def stream_command(
 # --- Docker Helpers ---
 
 
-def _parse_compose_ps(output: str) -> list[dict]:
+def _parse_compose_ps(output: str) -> list[dict[str, Any]]:
     """
     Parses `docker compose ps` JSON, tolerating array or NDJSON forms
 
@@ -200,7 +200,7 @@ def _parse_compose_ps(output: str) -> list[dict]:
         return entries
 
 
-def _format_compose_ports(entry: dict) -> str:
+def _format_compose_ports(entry: dict[str, Any]) -> str:
     """
     Formats a `docker compose ps` service entry's published ports as
     `host->container`
@@ -265,7 +265,7 @@ def _prompt_env_var(var: EnvVar, current: str) -> str:
     default = current or var.default
     label = var.description or var.name
     while True:
-        entered = typer.prompt(
+        entered: str = typer.prompt(
             label,
             default=default,
             hide_input=var.secret,

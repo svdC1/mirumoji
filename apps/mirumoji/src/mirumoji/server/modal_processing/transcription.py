@@ -10,15 +10,15 @@ info: Transcription-Only
 """
 
 import os
-from typing import Literal
+from typing import Any, Literal
 
 
 def transcribe_job(
     rel_media_fp: str | os.PathLike[str],
     output_format: Literal["srt", "joined"] = "srt",
     *,
-    w_model_args: dict | None = None,
-    w_transcribe_args: dict | None = None,
+    w_model_args: dict[str, Any] | None = None,
+    w_transcribe_args: dict[str, Any] | None = None,
 ) -> str:
     """
     Transcribe media on a `Modal` GPU and return raw SRT content

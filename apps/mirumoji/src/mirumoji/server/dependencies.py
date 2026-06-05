@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
@@ -30,7 +30,7 @@ def get_processor(request: Request) -> Processor:
     Returns:
         The single `Processor` instance built during application startup
     """
-    return request.app.state.processor
+    return cast("Processor", request.app.state.processor)
 
 
 async def get_stream_file(

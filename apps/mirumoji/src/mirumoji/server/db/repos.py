@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -518,7 +519,7 @@ class ClipRepository:
         file_id: _Uuid,
         start_time: float,
         end_time: float,
-        llm_breakdown_response: dict,
+        llm_breakdown_response: dict[str, Any],
     ) -> ClipDTO:
         """
         Adds a clip record
