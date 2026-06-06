@@ -24,7 +24,7 @@ jobs:
               # Install every runtime extra + torch for mypy
               run: |
                   python -m pip install --upgrade pip
-                  pip install -e "apps/mirumoji[server,whisper-local,dev]"
+                  pip install -e "apps/mirumoji[server,whisper-local,dev,gui]"
                   pip install torch==2.6.0
 
             - name: Ruff Check
