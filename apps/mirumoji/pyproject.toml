@@ -54,30 +54,32 @@ dependencies = [
 [project.optional-dependencies]
 
 # Core Server Stack - CPU Only
+# Compatible ranges: floor at a known-good version, cap below the next
+# breaking bump (next major for >=1.0 libs, next minor for 0.x libs)
 server = [
-    "fastapi==0.115.12",
-    "uvicorn==0.34.2",
-    "fugashi[unidic]==1.4.0",
-    "kotobase==0.2.7",
-    "pydantic==2.11.4",
+    "fastapi>=0.136.3,<0.137",
+    "uvicorn>=0.49,<0.50",
+    "fugashi[unidic]>=1.5.2,<2",
+    "kotobase>=0.2.7,<0.3",
+    "pydantic>=2.13.4,<3",
     "pydantic[email]",
-    "srt==3.5.3",
-    "python-multipart==0.0.20",
-    "aiofiles==24.1.0",
-    "tqdm",
-    "modal==1.1.3",
-    "genanki==0.13.1",
-    "aiosqlite==0.20.0",
-    "openai==1.76.2",
-    "anthropic"
+    "srt>=3.5.3,<4",
+    "python-multipart>=0.0.32,<0.1",
+    "aiofiles>=25.1,<26",
+    "tqdm>=4.67,<5",
+    "modal>=1.4.3,<2",
+    "genanki>=0.13.1,<0.14",
+    "aiosqlite>=0.22.1,<0.23",
+    "openai>=2.41,<3",
+    "anthropic>=0.107,<1"
 ]
 
 # GPU Server Deployment (Local Transcription)
 whisper-local = [
-    "faster-whisper==1.1.1",
-    "huggingface_hub",
-    "sentencepiece",
-    "requests"
+    "faster-whisper>=1.2.1,<2",
+    "huggingface_hub>=1.0,<2",
+    "sentencepiece>=0.2,<0.3",
+    "requests>=2.32,<3"
 ]
 
 

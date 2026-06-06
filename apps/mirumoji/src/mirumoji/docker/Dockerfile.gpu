@@ -54,7 +54,7 @@ RUN kotobase pull-db
 
 # --- Pre-Cache The Faster-Whisper Model ---
 RUN python3.11 -c "from huggingface_hub import snapshot_download; \
-    snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
+    snapshot_download('Systran/faster-whisper-large-v3')"
 
 # --- Expose The Uvicorn Port ---
 EXPOSE 8000
