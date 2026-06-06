@@ -9,6 +9,9 @@ class Model:
 
 class Deck:
     notes: list[Any]
+    name: Any
+    description: Any
+    models: dict[Any, Any]
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
     def add_note(self, note: Any) -> None: ...
 

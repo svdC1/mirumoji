@@ -6,6 +6,8 @@ This is the scaffold for the desktop launcher: it adopts the frontend's
 uses. The full themed orchestration UI is built in the following commit
 """
 
+from __future__ import annotations
+
 from ..shared import checks
 from ..shared.models import CheckResult, CheckStatus
 
@@ -52,7 +54,7 @@ def main() -> None:
     """
     import flet as ft
 
-    def view(page: "ft.Page") -> None:
+    def view(page: ft.Page) -> None:
         page.title = "Mirumoji"
         page.bgcolor = _BG
         page.padding = 32

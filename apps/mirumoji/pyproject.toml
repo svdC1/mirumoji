@@ -83,7 +83,7 @@ whisper-local = [
 
 # GUI Launcher Build
 gui = [
-    "flet[all]"
+    "flet[all]==0.85.2"
 ]
 
 # Development Tools
@@ -93,7 +93,10 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "httpx",
-    "pip-tools"
+    "pip-tools",
+    "types-PyYAML",
+    "types-tqdm",
+    "types-aiofiles",
 ]
 
 [project.scripts]
@@ -113,7 +116,7 @@ where = ["src"]
 
 # --- Docker Data ---
 [tool.setuptools.package-data]
-mirumoji = ["docker/*", "docker/compose/*"]
+mirumoji = ["py.typed", "docker/*", "docker/compose/*"]
 
 # --- Ruff ---
 [tool.ruff]
@@ -133,9 +136,19 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
-[tool.ruff.lint.per-file-ignores]
-# FastAPI routers instantiate services at module level (cleanup planned for 3.x)
-"src/mirumoji/server/routers/*.py" = ["B008"]
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection helpers are factories designed to be called in
+# parameter defaults. Allow them so B008 still catches real accidental calls
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Header",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Cookie",
+]
 
 [tool.ruff.format]
 quote-style = "double"

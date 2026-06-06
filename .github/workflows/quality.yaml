@@ -34,11 +34,8 @@ jobs:
               run: ruff format --check apps/mirumoji/src
 
             - name: MyPy
-              # Run from the package dir so mypy loads its [tool.mypy] config
-              # (strict + the local stubs/ via mypy_path)
               run: |
                   cd apps/mirumoji
-                  mypy --install-types --non-interactive src
                   mypy src
 
     # --- Python: PyTest ---
