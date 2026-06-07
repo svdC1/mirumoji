@@ -77,13 +77,13 @@ class LookupResult(Serializable):
     ...
 
 __all__ = [
-    'JLPTGrammarDTO',
-    'JLPTKanjiDTO',
-    'JLPTVocabDTO',
-    'JMDictEntryDTO',
-    'JMNeDictEntryDTO',
-    'KanjiDTO',
-    'LookupResult',
-    'SentenceDTO',
-    'Serializable',
+    "JLPTGrammarDTO",
+    "JLPTKanjiDTO",
+    "JLPTVocabDTO",
+    "JMDictEntryDTO",
+    "JMNeDictEntryDTO",
+    "KanjiDTO",
+    "LookupResult",
+    "SentenceDTO",
+    "Serializable",
 ]

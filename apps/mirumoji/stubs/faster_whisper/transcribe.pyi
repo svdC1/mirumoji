@@ -1,6 +1,7 @@
 """
 Minimal stubs for `faster_whisper.transcribe` (only what the server uses)
 """
+
 from collections.abc import Iterable
 from typing import Any, BinaryIO
 
@@ -28,7 +29,6 @@ class Segment:
     words: list[Word] | None
     temperature: float | None
     ...
-
 
 class TranscriptionOptions:
     beam_size: int
@@ -59,7 +59,6 @@ class TranscriptionOptions:
     hotwords: str | None
     ...
 
-
 class TranscriptionInfo:
     language: str
     language_probability: float
@@ -83,7 +82,7 @@ class WhisperModel:
         local_files_only: bool = False,
         files: dict[Any, Any] | None = None,
         **model_kwargs: dict[str, Any],
-        ) -> None: ...
+    ) -> None: ...
     def transcribe(
         self,
         audio: str | BinaryIO | ndarray,
@@ -128,5 +127,4 @@ class WhisperModel:
         hotwords: str | None = None,
         language_detection_threshold: float | None = 0.5,
         language_detection_segments: int = 1,
-    ) -> tuple[Iterable[Segment], TranscriptionInfo]:
-        ...
+    ) -> tuple[Iterable[Segment], TranscriptionInfo]: ...

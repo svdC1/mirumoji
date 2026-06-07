@@ -17,5 +17,5 @@ __all__ = [
     "TranscriptionOptions",
     "VadOptions",
     "WhisperModel",
-    "Word"
-    ]
+    "Word",
+]

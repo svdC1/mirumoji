@@ -8,8 +8,8 @@ class Kotobase:
         wildcard: bool = False,
         include_names: bool = False,
         sentence_limit: int = 50,
-        entry_limit: int | None = None
-        ) -> LookupResult: ...
+        entry_limit: int | None = None,
+    ) -> LookupResult: ...
     @staticmethod
     def db_info() -> dict[str, str]: ...
     @staticmethod
@@ -25,7 +25,7 @@ class Kotobase:
         wildcard: bool = False,
         include_names: bool = False,
         sentence_limit: int = 50,
-        entry_limit: int | None = None
-        ) -> LookupResult: ...
+        entry_limit: int | None = None,
+    ) -> LookupResult: ...
 
-__all__ = ['Kotobase']
+__all__ = ["Kotobase"]

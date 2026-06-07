@@ -130,7 +130,7 @@ LLM_VARS: tuple[EnvVar, ...] = (
         description=(
             "Use A Custom OpenAI-Compatible Endpoint For LLM Features"
             " (Leave Empty If Not Applicable)"
-            ),
+        ),
     ),
     EnvVar(
         "MIRUMOJI_LLM_BASE_URL",
@@ -164,9 +164,10 @@ MODAL_VARS: tuple[EnvVar, ...] = (
     ),
     EnvVar(
         "MODAL_FORCE_BUILD",
-        description=("Set To 1 To Force Modal Containers To Update The Cached"
-                     "Mirumoji App Image"
-                     ),
+        description=(
+            "Set To 1 To Force Modal Containers To Update The Cached"
+            "Mirumoji App Image"
+        ),
         default="0",
     ),
 )
