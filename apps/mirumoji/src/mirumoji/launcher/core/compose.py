@@ -1,6 +1,6 @@
 """
 Defines helpers to modify the Docker Compose template at
-`docker/compose/compose.yaml` according to user input
+`mirumoji/docker/compose/compose.yaml` according to user input
 
 info: Additional Information
 
@@ -108,7 +108,7 @@ def _frontend_image(source: ImageSource) -> str:
 
 def load_template() -> dict[str, Any]:
     """
-    Loads the packaged compose template
+    Loads the packaged compose template using `PyYAML`
 
     Returns:
         The parsed template as a mutable dict
@@ -138,18 +138,18 @@ def transform(
           `backend=local`
 
     Args:
-        template (dict): The parsed compose template
+        template (dict[str, Any]): The parsed packaged compose template
         backend (Backend): The chosen transcription backend
         source (ImageSource): Pull vs local build
 
     Returns:
         The same template dict, now resolved
     """
-    services = template["services"]
+    services: dict[str, Any] = template["services"]
     # Set Frontend Image Reference
     services[FRONTEND_SERVICE]["image"] = _frontend_image(source)
 
-    backend_svc = services[BACKEND_SERVICE]
+    backend_svc: dict[str, Any] = services[BACKEND_SERVICE]
     # Set Backend Image Reference
     backend_svc["image"] = _backend_image(backend, source)
 
@@ -158,7 +158,7 @@ def transform(
         backend_svc["deploy"] = _GPU_DEPLOY
         # Get Inner `volumes` Key In Backend Service Or Create It If It
         # Doesn't Exist
-        backend_volumes = backend_svc.setdefault("volumes", [])
+        backend_volumes: list[str] = backend_svc.setdefault("volumes", [])
         # Attatch Hugging Face Cache Volume If It Doesn't Exist
         if _HF_CACHE_MOUNT not in backend_volumes:
             backend_volumes.append(_HF_CACHE_MOUNT)
@@ -175,7 +175,7 @@ def transform(
     return template
 
 
-def render(
+def write_compose(
     backend: Backend,
     source: ImageSource,
     *,
@@ -185,7 +185,7 @@ def render(
     Writes a resolved compose file for the chosen `backend` + `source`
 
     Args:
-        backend (Backend): The chosen transcription backend
+        backend (Backend): The chosen mirumoji transcription backend
         source (ImageSource): Pull vs local build
         out_path (Path): Where to write the resolved file
 
@@ -199,10 +199,11 @@ def render(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(
-            resolved,
-            fh,
+            data=resolved,
+            stream=fh,
+            indent=4,
             sort_keys=False,
             default_flow_style=False,
         )
-    LOGGER.debug(f"Rendered Compose File To {out_path}")
+    LOGGER.debug(f"Wrote Compose File To {out_path}")
     return out_path

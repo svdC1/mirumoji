@@ -1,9 +1,11 @@
 """
-Defines `.env` file handling for the launcher
+Defines functions to read, edit, and write a `.env` configuration file for an
+end-user
 
-Reads, merges, and writes the environment file that Docker Compose consumes.
-Prompting for values is the front-end's job. This module only does file IO and
-required-variable resolution
+The `.env` file is stored in the application's data directory in the user's
+machine and is used to start the `Mirumoji` Docker Compose application with the
+configuration that was selected by the user via the launcher. It is also
+used to perist that information for future run
 """
 
 import logging
@@ -39,11 +41,28 @@ def overlay_environ(
     names: Iterable[str],
 ) -> dict[str, str]:
     """
-    Merges `values` with the current proccess' environment variables
+    Merges the environment variables stored in `values` with the ones set in
+    the current proccess' context (accessed via os.environ) if they're listed
+    in `names`
 
     For each named variable not already set in `values`, adds a non-empty
-    value from `os.environ` if present. File values take precedence when a
-    named variable is present both in `values` and `os.environ`
+    value from `os.environ` if present. The values in `values` take precedence
+    when a named variable is present both in `values` and `os.environ`.
+    Empty string values are considered as not set
+
+    Example:
+        ```python
+
+        values = {"VAR_0": "0", "VAR_1": "V1A", "VAR_2": "V2"}
+        names = ["VAR_1", "VAR_2", "VAR_3"]
+
+        # os.environ = {"VAR_1": "V1B", "VAR_3": "V3"}
+
+        merged = overlay_environ(values, names)
+        print(merged)
+
+        # {"VAR_0": "0", "VAR_1": "V1A", "VAR_2": "V2", "VAR_3": "V3"}
+        ```
 
     Args:
         values (Mapping[str, str]): The values read from the `.env` file
@@ -66,7 +85,7 @@ def missing_required(
     """
     Returns the required environment variables that still have no value set
 
-    Checks the `EnvVar.required` attribute to check if if the environment
+    Checks the `EnvVar.required` attribute to check if the environment
     variable is required and appends it to a list if it doesn't contain a
     value in `values`
 
@@ -104,7 +123,7 @@ def write(path: Path, values: Mapping[str, str]) -> None:
     Writes resolved values to a `.env` file, skipping blanks
 
     Args:
-        path (Path): The `.env` file path to write
+        path (Path): The `.env` file path to write to
         values (Mapping[str, str]): The values to persist
     """
     path.parent.mkdir(parents=True, exist_ok=True)

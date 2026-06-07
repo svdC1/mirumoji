@@ -1,8 +1,13 @@
 """
-Defines environment validation checks for the launcher
+Defines functions that check whether or not mirumoji's required
+python / system dependencies are available in the end-user's machine
 
-Each `probe` inspects one external dependency and returns a `CheckResult`
-rather than raising, so that a front-end can present a full report
+Contains functions that check for the presence of executables with `shutil`
+and run system commands using `subprocess` to inspect external dependecies
+
+Each `probe` function inspects one external dependency and returns a
+`CheckResult` rather than raising so that a frontend (CLI / GUI) can present a
+full report
 """
 
 import logging
@@ -25,15 +30,18 @@ def _probe(name: str, cmd: list[str], *, ok_detail: str = "") -> CheckResult:
 
     Args:
         name (str): The capability being checked
-        cmd (list[str]): The probe command and its arguments
-        ok_detail (str): Detail to attach when the probe succeeds. The first
+        cmd (list[str]): Which command to run and its arguments
+        ok_detail (str): Detail to attach when the command succeeds. The first
             line of the command output is used when empty
 
     Returns:
         The mapped check result
     """
+
     # Resolve via the PATH with shutil so that Windows `.bat` / `.cmd`
-    # shims like `flutter.bat` are found, unlike bare CreateProcess lookups
+    # shims like `flutter.bat` are found. The Bare CreateProcess run by
+    # subprocess can't find those
+
     exe = shutil.which(cmd[0])
     if exe is None:
         return CheckResult(name, CheckStatus.MISSING, "Not Installed")
@@ -106,7 +114,7 @@ def nvidia_gpu() -> CheckResult:
 
 def _image_present(image: str) -> bool:
     """
-    Checks whether a Docker image already exists locally
+    Checks whether a Docker Image already exists locally
 
     Args:
         image (str): The image reference to look up
@@ -151,8 +159,8 @@ def nvidia_toolkit() -> CheckResult:
             "Docker Not Running",
         )
 
-    # Remember whether the probe image existed so that the CLI only cleans up
-    # what the check itself pulled
+    # Remember whether the probe image existed before the check
+    # If the check pulled it, delete it afterwards
     keep_image = _image_present(_GPU_PROBE_IMAGE)
 
     result = _probe(
@@ -213,7 +221,7 @@ def flet() -> CheckResult:
 
 def flutter() -> CheckResult:
     """
-    Checks whether the Flutter SDK is installed (needed to build executables)
+    Checks whether the Flutter SDK is installed (needed to build the GUI)
 
     Returns:
         The Flutter check result
@@ -238,19 +246,30 @@ def require_docker() -> None:
         )
 
 
-def validate(
+def validate_deploy(
     backend: Backend,
     source: ImageSource,
 ) -> list[CheckResult]:
     """
-    Runs the checks relevant to a specific deploy configuration
+    Runs all external dependency checks relevant to a specific deploy
+    configuration
 
-    info: Checks Performed
-        - Always Checks Docker + Compose
+    info: Required For All Deploys
+        - `Docker`
 
-        - Checks Git When Building Locally
+        - `Compose`
 
-        - Checks NVIDIA Stack When Local Transcription Backend Is Selected
+    info: Required When Building Images Locally
+        - `Docker`
+
+        - `Compose`
+
+        - `Git`
+
+    info: Required For The `LOCAL` Backend
+        - `NVIDIA GPU`
+
+        - `NVIDIA Container Toolkit`
 
     Args:
         backend (Backend): The chosen transcription backend

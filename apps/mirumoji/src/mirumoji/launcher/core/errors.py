@@ -1,10 +1,10 @@
 """
-Defines the launcher's typed exceptions
+Defines typed exception that the launcher may raise
 
 tip: Usage
-    The `shared` core raises these so the presentation layers (Rich CLI,
-    Flet GUI) can map them to friendly messages and exit codes without parsing
-    strings
+    This sub-package (`core`) raises these so that the presentation layers
+    (Rich CLI, Flet GUI) can map them to friendly messages and exit codes
+    without parsing strings
 """
 
 

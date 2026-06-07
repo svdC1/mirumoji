@@ -20,9 +20,10 @@ from .commands import (
 )
 
 app = typer.Typer(
+    name="mirumoji",
     no_args_is_help=True,
     add_completion=False,
-    help="Mirumoji — Self-Hostable Japanese Immersion Toolkit",
+    help="Mirumoji • Self-Hostable Japanese Immersion Toolkit",
 )
 
 app.command("up")(up)

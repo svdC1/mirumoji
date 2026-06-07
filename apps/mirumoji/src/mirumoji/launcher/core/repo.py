@@ -26,7 +26,7 @@ def ensure_repo(
     branch: str = DEFAULT_BRANCH,
 ) -> Generator[str, None, Path]:
     """
-    Clones or updates the managed source checkout, yielding progress lines
+    Clones or updates the mirumoji GitHub repo, yielding progress lines
 
     Clones `repo_url` into `repo_path` when absent, otherwise fetches and
     fast-forwards the tracked branch. Output is yielded line by line
@@ -53,12 +53,12 @@ def ensure_repo(
     try:
         if not (repo_path / ".git").is_dir():
             repo_path.parent.mkdir(parents=True, exist_ok=True)
-            yield f"Cloning {repo_url} Into {repo_path}"
+            yield f"Cloning '{repo_url}' Into '{repo_path}'"
             yield from process.stream(
                 ["git", "clone", "--branch", branch, repo_url, str(repo_path)],
             )
         else:
-            yield f"Updating Checkout At {repo_path}"
+            yield f"Updating Checkout At '{repo_path}'"
             yield from process.stream(
                 ["git", "-C", str(repo_path), "fetch", "--all", "--prune"],
             )
@@ -70,7 +70,7 @@ def ensure_repo(
             )
     except Exception as exc:
         raise BuildSourceError(
-            f"Could Not Prepare Source Checkout  ↦  {exc}",
+            f"Could Not Clone The Mirumoji GitHub Repo  ↦  {exc}",
         ) from exc
 
     return repo_path

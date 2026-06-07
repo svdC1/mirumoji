@@ -73,6 +73,11 @@ def up(
 
     Returns:
         The compose exit code
+
+    Raises:
+        DependnecyError: If Docker is not running
+        subprocess.CalledProcessError: If the command fails
+        FileNotFoundError: If the Docker executable is not found
     """
     checks.require_docker()
     cmd = [*_compose_base(project, compose_file, env_file), "up"]
@@ -88,7 +93,7 @@ def pull(
     project: str = PROJECT_NAME,
 ) -> Generator[str, None, int]:
     """
-    Pulls the application's images with `docker compose pull`
+    Pulls the application's pre-built images with `docker compose pull`
 
     Args:
         compose_file (Path): The resolved compose file
@@ -100,6 +105,11 @@ def pull(
 
     Returns:
         The compose exit code
+
+    Raises:
+        DependnecyError: If Docker is not running
+        subprocess.CalledProcessError: If the command fails
+        FileNotFoundError: If the Docker executable is not found
     """
     checks.require_docker()
     cmd = [*_compose_base(project, compose_file, env_file), "pull"]
@@ -125,6 +135,11 @@ def down(
 
     Returns:
         The compose exit code
+
+    Raises:
+        DependnecyError: If Docker is not running
+        subprocess.CalledProcessError: If the command fails
+        FileNotFoundError: If the Docker executable is not found
     """
     checks.require_docker()
     cmd = [*_compose_base(project, compose_file), "down"]
@@ -150,6 +165,8 @@ def ps(
 
     Raises:
         DependencyError: If Docker is not running
+        subprocess.CalledProcessError: If the command fails
+        FileNotFoundError: If the Docker executable is not found
     """
     checks.require_docker()
     cmd = _compose_base(project, compose_file)
@@ -180,6 +197,11 @@ def logs(
 
     Returns:
         The compose exit code
+
+    Raises:
+        DependencyError: If Docker is not running
+        subprocess.CalledProcessError: If the command fails
+        FileNotFoundError: If the Docker executable is not found
     """
     checks.require_docker()
     cmd = [*_compose_base(project, compose_file), "logs"]

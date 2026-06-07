@@ -102,13 +102,13 @@ dev = [
 ]
 
 [project.scripts]
-mirumoji = "mirumoji.cli.main:app"
+mirumoji = "mirumoji.launcher.cli.main:app"
 
 [project.urls]
 Repository = "https://github.com/svdC1/mirumoji"
 Issues = "https://github.com/svdC1/mirumoji/issues"
-Documentation = "svdc1.github.io/mirumoji/docs"
-Changelog = "svdc1.github.io/mirumoji/docs/changelog"
+Documentation = "https://svdc1.github.io/mirumoji/docs"
+Changelog = "https://svdc1.github.io/mirumoji/docs/changelog"
 
 [tool.setuptools]
 include-package-data = true

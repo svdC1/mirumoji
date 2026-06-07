@@ -1,0 +1,3 @@
+"""
+Defines the `Mirumoji` CLI
+"""

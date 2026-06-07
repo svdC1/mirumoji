@@ -8,8 +8,8 @@ uses. The full themed orchestration UI is built in the following commit
 
 from __future__ import annotations
 
-from ..shared import checks
-from ..shared.models import CheckResult, CheckStatus
+from ..core import checks
+from ..core.models import CheckResult, CheckStatus
 
 # Sumi & Shu palette (matches the frontend + CLI theme)
 _BG = "#15120F"

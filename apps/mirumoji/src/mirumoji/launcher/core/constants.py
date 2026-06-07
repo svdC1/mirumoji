@@ -1,5 +1,5 @@
 """
-Defines deterministic constants uses by the launcher
+Defines deterministic constants used by the launcher
 
 info: Deterministic Data
     - Source Repository URL
@@ -13,36 +13,98 @@ from .models import Backend, EnvVar
 # --- Source Repository ---
 
 REPO_URL = "https://github.com/svdC1/mirumoji.git"
+"""
+The `Mirumoji` GitHub repository URL
+"""
+
 DEFAULT_BRANCH = "main"
+"""
+Which branch of the `Mirumoji` GitHub repo to use to build images
+"""
+
 
 # --- Compose Identifiers ---
 
 PROJECT_NAME = "mirumoji"
+"""
+Name of the Docker Compose project
+"""
+
 FRONTEND_SERVICE = "frontend"
+"""
+Identifier for the frotend service in the `Mirumoji` Docker Compose application
+"""
+
 BACKEND_SERVICE = "backend"
+"""
+Identifier for the backend service in the `Mirumoji` Docker Compose application
+"""
 
 # --- Docker Image References ---
 
 FRONTEND_IMAGE = "svdc1/mirumoji:frontend-latest"
+"""
+Docker Hub Identifier of the latest `Mirumoji` frontend image
+"""
 BACKEND_CPU_IMAGE = "svdc1/mirumoji:backend-cpu-latest"
+"""
+Docker Hub Identifier of the latest `Mirumoji` backend image for the `modal`
+transcription backend
+"""
 BACKEND_GPU_IMAGE = "svdc1/mirumoji:backend-gpu-latest"
+"""
+Docker Hub Identifier of the latest `Mirumoji` backend image for the `local`
+transcription backend
+"""
 
 # Tags Assigned To Images Built Locally
 FRONTEND_LOCAL_IMAGE = "mirumoji_frontend_local:latest"
+"""
+Local Docker Image Identifier to attach to a locally built `Mirumoji` frontend
+image
+"""
 BACKEND_CPU_LOCAL_IMAGE = "mirumoji_backend_cpu_local:latest"
+"""
+Local Docker Image Identifier to attach to a locally built `Mirumoji` backend
+image for the `modal` transcription backend
+"""
 BACKEND_GPU_LOCAL_IMAGE = "mirumoji_backend_gpu_local:latest"
+"""
+Local Docker Image Identifier to attach to a locally built `Mirumoji` backend
+image for the `local` transcription backend
+"""
 
 # --- Local Build Inputs (Relative To The Managed Repo Checkout Root) ---
 
 FRONTEND_DOCKERFILE = "apps/frontend/Dockerfile"
+"""
+Path to the `fontend` Docker Image's `Dockerfile` relative to the `mirumoji`
+repo root
+"""
 FRONTEND_CONTEXT = "apps/frontend"
+"""
+Path determining the location relative to the `mirumoji` repo's root from
+which Docker should build the `frontend` Image
+"""
 BACKEND_CONTEXT = "apps/mirumoji"
+"""
+Path determining the location relative to the `mirumoji` repo's root from
+which Docker should build the `backend` Image
+"""
 BACKEND_CPU_DOCKERFILE = (
     "apps/mirumoji/src/mirumoji/docker/Dockerfile.local.cpu"
 )
+"""
+Path to the `backend` Docker Image's `Dockerfile` relative to the `mirumoji`
+repo root when using the `modal` transcription backend
+"""
 BACKEND_GPU_DOCKERFILE = (
     "apps/mirumoji/src/mirumoji/docker/Dockerfile.local.gpu"
 )
+"""
+Path to the `backend` Docker Image's `Dockerfile` relative to the `mirumoji`
+repo root when using the `local` transcription backend
+"""
 
 # --- Environment Variables ---
 
@@ -50,26 +112,29 @@ LLM_VARS: tuple[EnvVar, ...] = (
     EnvVar(
         "OPENAI_API_KEY",
         secret=True,
-        description="OpenAI API Key (GPT)",
+        description="Make GPT Available For LLM Features",
     ),
     EnvVar(
         "ANTHROPIC_API_KEY",
         secret=True,
-        description="Anthropic API Key (Claude)",
+        description="Make Claude Available For LLM Features",
     ),
     EnvVar(
         "GEMINI_API_KEY",
         secret=True,
-        description="Google API Key (Gemini)",
+        description="Make Gemini Available For LLM Features",
     ),
     EnvVar(
         "MIRUMOJI_LLM_API_KEY",
         secret=True,
-        description="API Key For A Custom OpenAI-Compatible Endpoint",
+        description=(
+            "Use A Custom OpenAI-Compatible Endpoint For LLM Features"
+            " (Leave Empty If Not Applicable)"
+            ),
     ),
     EnvVar(
         "MIRUMOJI_LLM_BASE_URL",
-        description="Base URL For A Custom OpenAI-Compatible Endpoint",
+        description="Use A Custom OpenAI-Compatible Endpoint For LLM Features",
     ),
 )
 """
@@ -94,16 +159,14 @@ MODAL_VARS: tuple[EnvVar, ...] = (
     ),
     EnvVar(
         "MIRUMOJI_MODAL_GPU",
-        description="Modal GPU Type",
+        description="Which GPU To Use In The Modal Containers",
         default="A10G",
     ),
     EnvVar(
         "MODAL_FORCE_BUILD",
-        description=(
-            "Whether To Force Modal To Pull The Latest `mirumoji-gpu`"
-            "Ephemeral App Image When Starting Up A Container Instead Of Using"
-            "An Account-Cached One"
-        ),
+        description=("Set To 1 To Force Modal Containers To Update The Cached"
+                     "Mirumoji App Image"
+                     ),
         default="0",
     ),
 )
@@ -120,14 +183,25 @@ PASSTHROUGH_VARS: tuple[str, ...] = (
     "MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG",
 )
 """
-Environment variables that are always passed through to the backend container
-when present, but never prompted for since sensible server defaults exist
+Additional environment variables accepted by the `mirumoji` backend that are
+not required, but may be used for advanced configuration. All of these have
+sensible defaults and don't require custom values in most cases
 """
 
 
 # Set Automatically By The Launcher (Not User-Supplied)
 HOST_LAN_IP_VAR = "HOST_LAN_IP"
+"""
+Stores the end-user's IPv4 LAN IP, discovered automatically with the `sockets`
+library
+"""
+
 TRANSCRIBE_BACKEND_VAR = "MIRUMOJI_TRANSCRIBE_BACKEND"
+"""
+Stores a `Backend` value to be passed to the `mirumoji` server on
+application startup
+"""
+
 
 # --- Internal ---
 
@@ -141,10 +215,11 @@ in order to have access to the GPU
 
 def prompted_vars(backend: Backend) -> tuple[EnvVar, ...]:
     """
-    Returns the env vars the launcher should prompt for, per backend
+    Returns the environment variables that the launcher should prompt for
+    based on which mirumoji transcription backend is being used
 
-    LLM keys are always offered (optional); Modal credentials are added only
-    when the Modal backend is selected
+    All LLM Provider API Keys are always offered, and are all optional.
+    Modal credentials are added only when the Modal backend is selected
 
     Args:
         backend (Backend): The chosen transcription backend

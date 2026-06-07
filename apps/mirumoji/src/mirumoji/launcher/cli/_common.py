@@ -20,15 +20,15 @@ import typer
 from rich.live import Live
 from rich.table import Table
 
-from .shared import checks, envfile
-from .shared.constants import (
+from ..core import checks, envfile
+from ..core.constants import (
     LLM_VARS,
     MODAL_VARS,
     PASSTHROUGH_VARS,
     prompted_vars,
 )
-from .shared.errors import LauncherError
-from .shared.models import Backend, CheckStatus, EnvVar, ImageSource
+from ..core.errors import LauncherError
+from ..core.models import Backend, CheckStatus, EnvVar, ImageSource
 from .theme import console, err_console
 
 _T = TypeVar("_T")
@@ -38,8 +38,8 @@ _ALL_ENV_VARS = [
     *PASSTHROUGH_VARS,
 ]
 """
-Every environment variable name that the launcher may carry from the
-environment into the `.env` file
+Every environment variable names that the launcher may write to the
+user's configuration `.env` file
 """
 
 
@@ -96,8 +96,6 @@ def subprocess_error_table(
 def fail(
     message: str = "Operation Aborted",
     code: int = 1,
-    *,
-    print_calls: tuple[dict[str, Any]] | None = None,
 ) -> typer.Exit:
     """
     Console helper that prints errors with  `rich` and returns a `typer.Exit`
@@ -120,7 +118,7 @@ def stream_command(
     title: str,
 ) -> _T:
     """
-    Consumes the streaming generator returned by `shared.process.stream`,
+    Consumes the streaming generator returned by `core.process.stream`,
     pretty-printing each line (external command output) inside a `rich` table
     , and returning the process' return code at the end. In addition, maps
     launcher errors to clean `Typer` command exits
@@ -144,9 +142,10 @@ def stream_command(
     )
     table.add_column()
 
-    # The `Live` is transient so the progress table clears when the block
-    # exits (success or error). Exceptions are handled OUTSIDE the block so the
-    # mapped error message prints cleanly instead of being swallowed by it
+    # The `Live` is transient so that the progress table clears when the block
+    # exits (success or error). Exceptions are handled OUTSIDE the block so
+    # that the mapped error message prints cleanly instead of being swallowed
+    # by it
     try:
         with Live(
             table, refresh_per_second=10, console=console, transient=True
@@ -225,7 +224,7 @@ def _format_compose_ports(entry: dict[str, Any]) -> str:
 
 def _validate_dependencies(backend: Backend, source: ImageSource) -> None:
     """
-    Runs environment checks for all Mirumoji Docker Compose apploication
+    Runs environment checks for all Mirumoji Docker Compose application
     dependencies and aborts if any of them is missing
 
     Args:
@@ -238,7 +237,7 @@ def _validate_dependencies(backend: Backend, source: ImageSource) -> None:
     """
     missing = [
         result
-        for result in checks.validate(backend, source)
+        for result in checks.validate_deploy(backend, source)
         if result.status is CheckStatus.MISSING
     ]
     if missing:

@@ -14,7 +14,15 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from ..paths import DEFAULT_ENV_PATH
+from ...paths import DEFAULT_ENV_PATH
+from ..core import checks, host, lifecycle, repo
+from ..core.compose import RESOLVED_COMPOSE_PATH, write_compose
+from ..core.constants import (
+    HOST_LAN_IP_VAR,
+    TRANSCRIBE_BACKEND_VAR,
+)
+from ..core.errors import LauncherError
+from ..core.models import Backend, CheckResult, CheckStatus, ImageSource
 from ._common import (
     _collect_env,
     _format_compose_ports,
@@ -23,15 +31,6 @@ from ._common import (
     fail,
     stream_command,
 )
-from .shared import checks, host, lifecycle, repo
-from .shared.compose import RESOLVED_COMPOSE_PATH
-from .shared.compose import render as shared_render
-from .shared.constants import (
-    HOST_LAN_IP_VAR,
-    TRANSCRIBE_BACKEND_VAR,
-)
-from .shared.errors import LauncherError
-from .shared.models import Backend, CheckResult, CheckStatus, ImageSource
 from .theme import console
 
 # Maps Environment Dependency Status To Console Symbols
@@ -48,7 +47,7 @@ def build(
         typer.Option(
             "--transcribe",
             "-t",
-            prompt="Choose a Transcription Backend (Press Enter For `modal`)",
+            prompt="Choose a Transcription Backend",
             help="Which Transcription Backend To Use",
         ),
     ] = Backend.MODAL,
@@ -226,7 +225,7 @@ def pull(
         typer.Option(
             "--transcribe",
             "-t",
-            prompt="Choose a Transcription Backend (Press Enter For `modal`)",
+            prompt="Choose a Transcription Backend",
             help="Which Transcription Backend To Use",
         ),
     ] = Backend.MODAL,
@@ -237,7 +236,7 @@ def pull(
     Pulls the pre-built `Mirumoji` Docker Images from Docker Hub for the
     chosen backend
     """
-    compose_file = shared_render(transcribe, ImageSource.PULL)
+    compose_file = write_compose(transcribe, ImageSource.PULL)
     stream_command(
         gen=lifecycle.pull(compose_file),
         identifier="Docker",
@@ -259,7 +258,7 @@ def gui() -> None:
             "Flet Is Not Installed - Run `pip install mirumoji[gui]` Or Use "
             "The Standalone Executable",
         )
-    from .gui.app import main
+    from ..gui.app import main
 
     main()
 
@@ -270,7 +269,7 @@ def render(
         typer.Option(
             "--transcribe",
             "-t",
-            prompt="Choose a Transcription Backend (Press Enter For `modal`)",
+            prompt="Choose a Transcription Backend",
             help="Which Transcription Backend To Use",
         ),
     ] = Backend.MODAL,
@@ -299,7 +298,7 @@ def render(
     """
     source = ImageSource.BUILD if build else ImageSource.PULL
     try:
-        written = shared_render(transcribe, source, out_path=output)
+        written = write_compose(transcribe, source, out_path=output)
     except FileNotFoundError as exc:
         raise fail(f"Compose Template Not Found  ↦  {exc}") from exc
     console.print(
@@ -354,7 +353,7 @@ def up(
         typer.Option(
             "--transcribe",
             "-t",
-            prompt="Choose a Transcription Backend (Press Enter For `modal`)",
+            prompt="Choose a Transcription Backend",
             help="Which Transcription Backend To Use",
         ),
     ] = Backend.MODAL,
@@ -433,7 +432,7 @@ def up(
 
         console.print("✓ Images Built", style="success")
 
-    compose_file = shared_render(transcribe, source)
+    compose_file = write_compose(transcribe, source)
 
     if source is ImageSource.PULL:
         stream_command(
