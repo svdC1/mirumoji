@@ -174,3 +174,13 @@ testpaths = ["tests"]
 # --- Flet (GUI) ---
 [tool.flet]
 desktop_flavor = "light"
+org = "io.github.svdc1"
+product = "Mirumoji"
+company = "svdC1"
+copyright = "Copyright (C) 2026 by svdC1"
+
+# The build entry (`main.py`) and app assets are added to this directory by
+# `scripts/build_gui.py`, which then runs `flet build` from here
+[tool.flet.app]
+path = "."
+module = "main"

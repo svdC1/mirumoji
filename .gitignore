@@ -55,5 +55,9 @@ coverage/
 apps/backend/media_files/
 apps/backend/data/
 
+# --- Flet GUI Build (scripts/build_gui.py) ---
+apps/mirumoji/main.py
+apps/mirumoji/assets/
+
 # --- AI ---
 .claude

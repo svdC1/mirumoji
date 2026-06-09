@@ -1,7 +1,7 @@
 {
     "short_name": "Mirumoji",
     "name": "Mirumoji",
-    "description": "Interactive Japanese language video player",
+    "description": "Japanese Immersion Toolkit",
     "icons": [
         {
             "src": "/icons/icon-192.png",
@@ -24,7 +24,7 @@
     "screenshots": [
         {
             "src": "/screenshots/desktop_screenshot.png",
-            "sizes": "2862x1872",
+            "sizes": "2869x1435",
             "type": "image/png",
             "form_factor": "wide"
         },
