@@ -21,25 +21,17 @@ from rich.live import Live
 from rich.table import Table
 
 from ..core import checks, envfile
-from ..core.constants import (
-    LLM_VARS,
-    MODAL_VARS,
-    PASSTHROUGH_VARS,
-    prompted_vars,
-)
+from ..core.constants import CONFIG_ENV_VARS, backend_vars
 from ..core.errors import LauncherError
-from ..core.models import Backend, CheckStatus, EnvVar, ImageSource
+from ..core.models import Backend, CheckStatus, ImageSource
 from .theme import console, err_console
 
 _T = TypeVar("_T")
 
-_ALL_ENV_VARS = [
-    *(v.name for v in (*LLM_VARS, *MODAL_VARS)),
-    *PASSTHROUGH_VARS,
-]
+_ALL_ENV_VARS = [v.name for v in CONFIG_ENV_VARS]
 """
-Every environment variable names that the launcher may write to the
-user's configuration `.env` file
+Every environment variable name that the launcher recognises in the user's
+configuration `.env` file
 """
 
 
@@ -249,84 +241,85 @@ def _validate_dependencies(backend: Backend, source: ImageSource) -> None:
         raise fail("Environment Checks Failed  ↦  Run `mirumoji doctor`")
 
 
-def _prompt_env_var(var: EnvVar, current: str) -> str:
+def resolve_backend(flag: Backend | None, env_path: Path) -> Backend:
     """
-    Prompts for a single environment variable, looping until a required one is
-    given
+    Resolves which transcription backend should be used when running
+    a CLI command
+
+    info: Order of Precedence
+        The values are considered in the following order
+
+        - Direct Flag Passed To Command (--transcribe)
+
+        - Value Stored In The Managed Config File
+
+        - Default (`MODAL`)
 
     Args:
-        var (EnvVar): The variable to prompt for
-        current (str): The currently resolved value, if any
+        flag (Backend | None): The `--transcribe` value, if provided
+        env_path (Path): The managed config file to fall back to
 
     Returns:
-        The entered (or retained) value
+        The backend to use for this run
     """
-    default = current or var.default
-    label = var.description or var.name
-    while True:
-        entered: str = typer.prompt(
-            label,
-            default=default,
-            hide_input=var.secret,
-            show_default=not var.secret,
-        ).strip()
-        if entered or not var.required:
-            return entered
-        console.print(f"{var.name} Is Required", style="warning")
+    if flag is not None:
+        return flag
+    backend, _ = envfile.read_deployment(envfile.read(env_path))
+    return backend or Backend.MODAL
 
 
-def _collect_env(
-    backend: Backend,
-    env_path: Path,
-    *,
-    interactive: bool,
-) -> dict[str, str]:
+def resolve_source(flag: bool | None, env_path: Path) -> ImageSource:
     """
-    Resolves the environment, prompting for missing values when `interactive`
-    is `True`
+    Resolves which image source should be used when running a CLI command
 
-    info: Steps
-        - Reads the existing `.env` file at `env_path`
+    info: Order of Precedence
+        The values are considered in the following order
 
-        - Appends the process' environment variables (see
-          `shared.envfile.overlay_environ`)
+        - Direct Flag Passed To Command (--build/--pull)
 
-        - If `interactive=False` validates that all required variables are set
+        - Value Stored In The Managed Config File
 
-        - If `interactive=True` prompts for missing values
+        - Default (`PULL`)
 
-        - Writes all collected variables to the `.env` file at `env_path`
+    Args:
+        flag (bool | None): `True` for `--build`, `False` for `--pull`, `None`
+            when neither was passed
+        env_path (Path): The managed config file to fall back to
+
+    Returns:
+        The image source to use for this run
+    """
+    if flag is not None:
+        return ImageSource.BUILD if flag else ImageSource.PULL
+    _, source = envfile.read_deployment(envfile.read(env_path))
+    return source or ImageSource.PULL
+
+
+def require_env(backend: Backend, env_path: Path) -> None:
+    """
+    Validates that every environment variable required by the chosen backend
+    is configured
+
+    info: Read-Only
+        - The managed config is the source of truth
+
+        - The process' environment is used as a fallback (Compose applies the
+          same precedence at runtime) so that a value supplied purely via the
+          shell does not trigger a false "missing"
 
     Args:
         backend (Backend): The chosen transcription backend
-        env_path (Path): The `.env` file to read and update
-        interactive (bool): Whether to prompt for values
-
-    Returns:
-        The resolved environment values
+        env_path (Path): The managed config file to read
 
     Raises:
-        typer.Exit: If a required var is missing and prompting is disabled
+        typer.Exit: If a required variable is set neither in the config nor in
+            the process' environment
     """
-    values = envfile.overlay_environ(
-        envfile.read(env_path),
-        _ALL_ENV_VARS,
-    )
-
-    vars = prompted_vars(backend)
-
-    if not interactive:
-        missing = envfile.missing_required(vars, values)
-        if missing:
-            names = ", ".join(var.name for var in missing)
-            raise fail(f"Missing Required Variables  ↦  [{names}]")
-        return values
-
-    for var in vars:
-        entered = _prompt_env_var(var, values.get(var.name, ""))
-        if entered:
-            values[var.name] = entered
-
-    envfile.write(env_path, values)
-    console.print(f"Saved Configuration To {env_path}", style="muted")
-    return values
+    values = envfile.overlay_environ(envfile.read(env_path), _ALL_ENV_VARS)
+    missing = envfile.missing_required(backend_vars(backend), values)
+    if missing:
+        names = ", ".join(var.name for var in missing)
+        raise fail(
+            f"Missing Required Variables  ↦  [{names}]. "
+            "Set Them With `mirumoji config set <KEY> <VALUE>`"
+        )

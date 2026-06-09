@@ -115,10 +115,10 @@ Directory in which the launcher stores the rendered Docker Compose files
 generated from the template before running `docker compose -f`
 """
 
-DEFAULT_ENV_PATH: Path = Path.cwd() / ".env"
+HOST_CONFIG_FILE: Path = HOST_STORAGE.user_config_path / "mirumoji.env"
 """
-The default path in which the launcher looks for a user-provided `.env` file
-to be used with `python-dotenv` or Docker Compose Files
+File in which the launcher persists user configuration data as environment
+variables for the server to consume
 """
 
 # --- Packaged Resources (Shipped In The Wheel) ---

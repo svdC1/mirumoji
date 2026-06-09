@@ -8,6 +8,12 @@ import typer
 
 from .commands import (
     build,
+    config_clear,
+    config_delete,
+    config_import,
+    config_path,
+    config_set,
+    config_show,
     doctor,
     down,
     gui,
@@ -36,6 +42,19 @@ app.command("doctor")(doctor)
 app.command("server")(server)
 app.command("gui")(gui)
 app.command("render")(render)
+
+# Config Management Subcommands (`mirumoji config ...`)
+config_app = typer.Typer(
+    no_args_is_help=True,
+    help="Manage The Launcher's Configuration (.env)",
+)
+config_app.command("set")(config_set)
+config_app.command("delete")(config_delete)
+config_app.command("import")(config_import)
+config_app.command("show")(config_show)
+config_app.command("path")(config_path)
+config_app.command("clear")(config_clear)
+app.add_typer(config_app, name="config")
 
 
 if __name__ == "__main__":

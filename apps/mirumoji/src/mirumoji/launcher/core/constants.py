@@ -8,7 +8,7 @@ info: Deterministic Data
     - Environment Variables Used By The Server
 """
 
-from .models import Backend, EnvVar
+from .models import Backend, EnvVar, ImageSource
 
 # --- Source Repository ---
 
@@ -165,8 +165,7 @@ MODAL_VARS: tuple[EnvVar, ...] = (
     EnvVar(
         "MODAL_FORCE_BUILD",
         description=(
-            "Set To 1 To Force Modal Containers To Update The Cached"
-            "Mirumoji App Image"
+            "Forces Modal Containers To Update The Cached Mirumoji App Image"
         ),
         default="0",
     ),
@@ -177,11 +176,29 @@ Modal Transcription Backend)
 """
 
 
-PASSTHROUGH_VARS: tuple[str, ...] = (
-    "MIRUMOJI_LOGGING_LEVEL",
-    "MIRUMOJI_MODAL_IMAGE",
-    "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
-    "MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG",
+ADVANCED_VARS: tuple[EnvVar, ...] = (
+    EnvVar(
+        "MIRUMOJI_LOGGING_LEVEL",
+        description="The Python Logging Level For The Mirumoji Backend Server",
+    ),
+    EnvVar(
+        "MIRUMOJI_MODAL_IMAGE",
+        description="Docker Hub Image That Modal Containers Will Run",
+    ),
+    EnvVar(
+        "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
+        description=(
+            "The Default LLM System Message Used For SRT Fixing When A "
+            "Profile Doesn't Have An LLM Template Configured"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG",
+        description=(
+            "The Default LLM System Message Used For Word Breakdowns When A "
+            "Profile Doesn't Have An LLM Template Configured"
+        ),
+    ),
 )
 """
 Additional environment variables accepted by the `mirumoji` backend that are
@@ -193,7 +210,7 @@ sensible defaults and don't require custom values in most cases
 # Set Automatically By The Launcher (Not User-Supplied)
 HOST_LAN_IP_VAR = "HOST_LAN_IP"
 """
-Stores the end-user's IPv4 LAN IP, discovered automatically with the `sockets`
+Stores the end-user's IPv4 LAN IP, discovered automatically with the `socket`
 library
 """
 
@@ -202,6 +219,68 @@ TRANSCRIBE_BACKEND_VAR = "MIRUMOJI_TRANSCRIBE_BACKEND"
 Stores a `Backend` value to be passed to the `mirumoji` server on
 application startup
 """
+
+IMAGE_SOURCE_VAR = "MIRUMOJI_IMAGE_SOURCE"
+"""
+Persists the launcher's image-source choice (pull pre-built vs build locally)
+in the managed config file so that it's remembered across runs
+
+Launcher-Only. The compose template never references it, and the server
+ignores it
+"""
+
+
+# --- Managed Config Surface ---
+
+CONFIG_ENV_VARS: tuple[EnvVar, ...] = (*LLM_VARS, *MODAL_VARS, *ADVANCED_VARS)
+"""
+Every user-facing environment variable that the launcher manages in the config
+file (LLM Providers + Modal + Advanced Overrides)
+"""
+
+# Deployment keys are also env vars and are managed by the launcher,
+# but they're validated against their respective enums rather than treated as
+# free-form strings
+_DEPLOYMENT_CHOICES: dict[str, tuple[str, ...]] = {
+    TRANSCRIBE_BACKEND_VAR: tuple(b.value for b in Backend),
+    IMAGE_SOURCE_VAR: tuple(s.value for s in ImageSource),
+}
+
+CONFIG_KEYS: frozenset[str] = frozenset(
+    [v.name for v in CONFIG_ENV_VARS] + list(_DEPLOYMENT_CHOICES)
+)
+"""
+Every environment variable key that the launcher accepts in the managed config
+file. Used to reject unknown keys in `mirumoji config set/delete`
+"""
+
+
+def is_config_key(key: str) -> bool:
+    """
+    Reports whether `key` is a recognised managed-config key
+
+    Args:
+        key (str): The candidate environment-variable name
+
+    Returns:
+        `True` when the key is managed by the launcher
+    """
+    return key in CONFIG_KEYS
+
+
+def deployment_choices(key: str) -> tuple[str, ...] | None:
+    """
+    Returns the allowed values for a deployment key, or `None` for free-form
+    keys
+
+    Args:
+        key (str): The environment variable key
+
+    Returns:
+        The permitted enum values for `MIRUMOJI_TRANSCRIBE_BACKEND` /
+        `MIRUMOJI_IMAGE_SOURCE`, else `None`
+    """
+    return _DEPLOYMENT_CHOICES.get(key)
 
 
 # --- Internal ---
@@ -214,20 +293,27 @@ in order to have access to the GPU
 """
 
 
-def prompted_vars(backend: Backend) -> tuple[EnvVar, ...]:
+def backend_vars(backend: Backend) -> tuple[EnvVar, ...]:
     """
-    Returns the environment variables that the launcher should prompt for
-    based on which mirumoji transcription backend is being used
+    Returns all relevant environment variables for a given transcription
+    `backend`
 
-    All LLM Provider API Keys are always offered, and are all optional.
-    Modal credentials are added only when the Modal backend is selected
+    info: `MODAL` Backend
+        - All Modal-Related Variables
+        - All LLM Provider API Keys
+        - All Advanced Variables
+
+    info: `LOCAL` Backend
+        - All LLM Provider API Keys
+        - All Advanced Variables
 
     Args:
         backend (Backend): The chosen transcription backend
 
     Returns:
-        The ordered env vars to prompt for
+        The ordered env vars that may be passed when the transcription backend
+        choice is `backend`
     """
     if backend is Backend.MODAL:
-        return (*LLM_VARS, *MODAL_VARS)
-    return LLM_VARS
+        return (*LLM_VARS, *MODAL_VARS, *ADVANCED_VARS)
+    return (*LLM_VARS, *ADVANCED_VARS)

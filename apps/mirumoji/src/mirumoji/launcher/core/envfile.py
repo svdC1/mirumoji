@@ -5,7 +5,7 @@ end-user
 The `.env` file is stored in the application's data directory in the user's
 machine and is used to start the `Mirumoji` Docker Compose application with the
 configuration that was selected by the user via the launcher. It is also
-used to perist that information for future run
+used to perist that information for future runs
 """
 
 import logging
@@ -15,9 +15,14 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from .models import EnvVar
+from .constants import IMAGE_SOURCE_VAR, TRANSCRIBE_BACKEND_VAR
+from .errors import EnvConfigError
+from .models import Backend, EnvVar, ImageSource
 
 LOGGER = logging.getLogger(__name__)
+
+_BACKEND_VALUES = {b.value for b in Backend}
+_SOURCE_VALUES = {s.value for s in ImageSource}
 
 
 def read(path: Path) -> dict[str, str]:
@@ -132,3 +137,94 @@ def write(path: Path, values: Mapping[str, str]) -> None:
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     LOGGER.debug(f"Wrote {len(lines)} Variables To {path}")
+
+
+def import_file(source: Path, target: Path) -> dict[str, str]:
+    """
+    Merges an external `.env` file into the managed config file
+
+    Reads the managed `target`, overrides its values with the values present
+    in `source` (keys absent from `source` are kept),
+    and writes the merged result back to `target`
+
+    Args:
+        source (Path): The external `.env` file to import
+        target (Path): The managed config file to overwrite
+
+    Returns:
+        The merged values now persisted in `target`
+
+    Raises:
+        EnvConfigError: If `source` does not exist or cannot be read
+    """
+    if not source.is_file():
+        raise EnvConfigError(f"Couldn't Find {source}")
+    try:
+        incoming = read(source)
+    except OSError as exc:
+        raise EnvConfigError(f"Could Not Read {source}  ↦  {exc}") from exc
+    merged = {**read(target), **incoming}
+    write(target, merged)
+    LOGGER.debug(
+        f"Imported {len(incoming)} Variables From {source} Into {target}"
+    )
+    return merged
+
+
+def set_value(path: Path, key: str, value: str) -> None:
+    """
+    Upserts a single key into the `.env` file, preserving the others
+
+    Args:
+        path (Path): The `.env` file to update
+        key (str): The variable name to set
+        value (str): The value to write
+    """
+    values = read(path)
+    values[key] = value
+    write(path, values)
+    LOGGER.debug(f"Set {key} In {path}")
+
+
+def delete_value(path: Path, key: str) -> bool:
+    """
+    Removes a single key from the `.env` file, preserving the others
+
+    Args:
+        path (Path): The `.env` file to update
+        key (str): The variable name to remove
+
+    Returns:
+        `True` when the key was present and removed, `False` otherwise
+    """
+    values = read(path)
+    if key not in values:
+        return False
+    del values[key]
+    write(path, values)
+    LOGGER.debug(f"Deleted {key} From {path}")
+    return True
+
+
+def read_deployment(
+    env: Mapping[str, str],
+) -> tuple[Backend | None, ImageSource | None]:
+    """
+    Parses the persisted deployment choice from the resolved values
+    of a managed config file
+
+
+    Missing or unrecognised values return `None` so that callers can
+    fall back to a flag or a built-in default
+
+    Args:
+        env (Mapping[str, str]): The resolved environment values
+
+    Returns:
+        The persisted `(backend, source)`, each `None` when absent/invalid
+    """
+    raw_backend = env.get(TRANSCRIBE_BACKEND_VAR)
+    raw_source = env.get(IMAGE_SOURCE_VAR)
+    backend = Backend(raw_backend) if raw_backend in _BACKEND_VALUES else None
+    source = ImageSource(raw_source) if raw_source in _SOURCE_VALUES else None
+    return backend, source

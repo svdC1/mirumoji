@@ -18,6 +18,11 @@ from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 
+# On Windows, a GUI app spawning a console program pops up a transient `cmd`
+# window for each call. `CREATE_NO_WINDOW` suppresses it. The flag is
+# Windows-only, so it resolves to `0` on other platforms
+_NO_WINDOW: int = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def _popen(cmd: list[str], cwd: Path | None) -> subprocess.Popen[str]:
     """
@@ -37,6 +42,7 @@ def _popen(cmd: list[str], cwd: Path | None) -> subprocess.Popen[str]:
     return subprocess.Popen(
         cmd,
         cwd=cwd,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -44,6 +50,7 @@ def _popen(cmd: list[str], cwd: Path | None) -> subprocess.Popen[str]:
         encoding="utf-8",
         errors="replace",
         env=env,
+        creationflags=_NO_WINDOW,
     )
 
 
@@ -77,10 +84,12 @@ def run(
     result = subprocess.run(
         cmd,
         cwd=cwd,
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
+        creationflags=_NO_WINDOW,
     )
     if check and result.returncode != 0:
         LOGGER.error(
