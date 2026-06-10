@@ -99,6 +99,13 @@ dev = [
     "types-PyYAML",
     "types-tqdm",
     "types-aiofiles",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-autorefs",
+    "mkdocs-awesome-nav",
+    "black"
 ]
 
 [project.scripts]

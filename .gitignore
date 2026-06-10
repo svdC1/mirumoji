@@ -59,5 +59,7 @@ apps/backend/data/
 apps/mirumoji/main.py
 apps/mirumoji/assets/
 
+# --- Dynamically Generated Frontend Docs ---
+docs/site/docs_md/frontend_api
 # --- AI ---
 .claude

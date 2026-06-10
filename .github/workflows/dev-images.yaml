@@ -1,0 +1,65 @@
+name: Build And Push Dev Images
+
+# Builds The CPU/GPU Dev Container Images Used By .devcontainer And Pushes Them
+# To Docker Hub (mirumoji_dev:cpu-latest / gpu-latest). Manual, Plus On Changes
+# To The Dev Container Definitions
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - ".devcontainer/**"
+
+jobs:
+    build:
+        name: Build ${{ matrix.variant }} Dev Image
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - variant: cpu
+                      file: ./.devcontainer/dockerfiles/Dockerfile.cpu
+                      tag: cpu-latest
+                    - variant: gpu
+                      file: ./.devcontainer/dockerfiles/Dockerfile.gpu
+                      tag: gpu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            - name: Set Up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Log In To Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_TOKEN }}
+
+            - name: Extract Docker Metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: docker.io/${{ secrets.DOCKER_USERNAME }}/mirumoji_dev
+                  tags: |
+                      type=raw,value=${{ matrix.tag }}
+
+            - name: Free Up Disk Space
+              run: |
+                  docker system prune -af || true
+                  sudo rm -rf /usr/share/dotnet || true
+                  sudo rm -rf /usr/local/lib/android || true
+                  sudo rm -rf /opt/ghc || true
+                  sudo rm -rf /tmp/* || true
+                  sudo apt-get clean
+
+            - name: Build And Push ${{ matrix.variant }} Dev Image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ${{ matrix.file }}
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}

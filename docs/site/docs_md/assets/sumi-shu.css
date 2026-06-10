@@ -1,0 +1,261 @@
+/*
+ * "Sumi & Shu" (墨と朱)
+ * Re-skins the Material `slate` scheme to match the Mirumoji frontend.
+ * Palette mirrors apps/frontend/src/shared/theme/tokens.css.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Serif+JP:wght@400;600&display=swap");
+
+/* --- Palette tokens --- */
+:root {
+    --sumi-bg: #151210;
+    --sumi-surface: #201b16;
+    --sumi-surface-2: #2a241d;
+    --sumi-ink: #f4eee3;
+    --sumi-ink-muted: #b7ad9c;
+    --sumi-ink-faint: #7e7567;
+    --sumi-shu: #e2533b;
+    --sumi-shu-soft: #f08a6e;
+    --sumi-ai: #5e83a4;
+    --sumi-matcha: #8aa06a;
+    --sumi-danger: #c8503d;
+}
+
+/* --- Map the tokens onto Material's slate scheme --- */
+[data-md-color-scheme="slate"] {
+    /* Backgrounds (warm ink) */
+    --md-default-bg-color: var(--sumi-bg);
+    --md-default-bg-color--light: #1b1714;
+    --md-default-bg-color--lighter: var(--sumi-surface);
+    --md-default-bg-color--lightest: var(--sumi-surface-2);
+
+    /* Foreground text (washi off-white) */
+    --md-default-fg-color: var(--sumi-ink);
+    --md-default-fg-color--light: var(--sumi-ink-muted);
+    --md-default-fg-color--lighter: var(--sumi-ink-faint);
+    --md-default-fg-color--lightest: #3a332b;
+
+    /* Header / sidebar = dark surface so vermilion stays an accent */
+    --md-primary-fg-color: var(--sumi-surface);
+    --md-primary-fg-color--light: var(--sumi-surface-2);
+    --md-primary-fg-color--dark: var(--sumi-bg);
+    --md-primary-bg-color: var(--sumi-ink);
+    --md-primary-bg-color--light: var(--sumi-ink-muted);
+
+    /* Accent (hover / interactive) */
+    --md-accent-fg-color: var(--sumi-shu-soft);
+    --md-accent-fg-color--transparent: rgba(226, 83, 59, 0.1);
+    --md-accent-bg-color: var(--sumi-ink);
+
+    /* Links */
+    --md-typeset-a-color: var(--sumi-shu);
+
+    /* Code (block surface sits a step above the page so it reads as a panel) */
+    --md-code-bg-color: #2f2820;
+    --md-code-fg-color: var(--sumi-ink);
+    --md-code-hl-comment-color: var(--sumi-ink-faint);
+    --md-code-hl-keyword-color: var(--sumi-shu);
+    --md-code-hl-string-color: var(--sumi-matcha);
+    --md-code-hl-function-color: var(--sumi-ai);
+    --md-code-hl-number-color: var(--sumi-shu-soft);
+    --md-code-hl-name-color: var(--sumi-ink);
+    --md-code-hl-operator-color: var(--sumi-ink-muted);
+
+    /* Admonitions / details: warm surface body + ink text. Per-type accent
+       colors (note/tip/warning/danger/...) are left to Material so each block
+       keeps its own identity */
+    --md-admonition-bg-color: var(--sumi-surface);
+    --md-admonition-fg-color: var(--sumi-ink);
+
+    /* Footer */
+    --md-footer-bg-color: var(--sumi-surface);
+    --md-footer-bg-color--dark: var(--sumi-bg);
+}
+
+/* Material's primary palette sets --md-typeset-a-color / --md-accent-fg-color
+   via [data-md-color-scheme="slate"][data-md-color-primary=...] (a two-attribute
+   selector), which out-specifies the single-attribute block above and forces
+   links back to Material's indigo. Match that specificity so our colours win */
+[data-md-color-scheme="slate"][data-md-color-primary] {
+    --md-typeset-a-color: var(--sumi-shu);
+}
+
+[data-md-color-scheme="slate"][data-md-color-accent] {
+    --md-accent-fg-color: var(--sumi-shu-soft);
+}
+
+/* --- Typography --- */
+/* Body uses Hanken Grotesk (theme.font.text). Headings go serif. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-header__title,
+.md-nav__title {
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.md-typeset h1 {
+    color: var(--sumi-ink);
+    font-weight: 600;
+}
+
+/* Vermilion hairline under the page title */
+.md-typeset h1 {
+    border-bottom: 1px solid rgba(226, 83, 59, 0.25);
+    padding-bottom: 0.3em;
+}
+
+/* Japanese glyphs render in Mincho, matching the app */
+:lang(ja),
+.md-typeset :lang(ja) {
+    font-family: "Noto Serif JP", "Hiragino Mincho ProN", serif;
+}
+
+/* --- Shape & accents --- */
+.md-typeset pre > code,
+.md-typeset .highlight,
+.md-typeset .admonition,
+.md-typeset details {
+    border-radius: 8px;
+}
+
+/* Active nav links and the section tabs pick up vermilion */
+.md-nav__link--active,
+.md-nav__link:focus,
+.md-nav__link:hover {
+    color: var(--sumi-shu);
+}
+
+.md-tabs__link--active {
+    color: var(--sumi-ink);
+}
+
+/* Inline code chip: lift it off the ink background with a warmer surface and a
+   hairline so it reads as a chip. Code blocks keep --md-code-bg-color and are
+   excluded via :not(pre) */
+.md-typeset :not(pre) > code:not(.doc-symbol) {
+    background-color: var(--sumi-surface-2);
+    border: 1px solid rgba(244, 238, 227, 0.08);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+}
+
+/* Non-badge <code> in a heading stays plain — otherwise the signature gets a
+   boxed outline that reads like a stray square shadow */
+.md-typeset :is(h1, h2, h3, h4, h5, h6) > code:not(.doc-symbol),
+.md-typeset .doc-heading code:not(.doc-symbol) {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+}
+
+/* mkdocstrings symbol badges ({mod}, {func}, {attr}, ...): a discrete pill that
+   keeps each kind's colour (currentColor) as a faint tint. color-mix gives the
+   tint on modern browsers; the warm surface is the fallback */
+.md-typeset .doc-symbol {
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    font-size: 0.62em;
+    font-weight: 700;
+    vertical-align: middle;
+    background-color: var(--sumi-surface-2);
+    background-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+/* Copy button (Material's newer `.md-code__button` and the older
+   `.md-clipboard`). The default icon leans cool blue-grey; warm it to the ink
+   palette and let it pick up vermilion on hover */
+.md-typeset .md-code__button,
+.md-typeset .md-clipboard {
+    color: var(--sumi-ink-faint);
+}
+
+/* The code nav backdrop ships as a cool blue-grey; drop it so the copy button
+   sits cleanly on the warm code surface */
+.md-typeset .md-code__nav {
+    background-color: transparent;
+}
+
+.md-typeset .md-code__button:hover,
+.md-typeset .md-code__button:focus,
+.md-typeset .md-clipboard:hover,
+.md-typeset .md-clipboard:focus {
+    color: var(--sumi-shu);
+}
+
+/* Tables: soft ink borders */
+.md-typeset table:not([class]) th {
+    background-color: var(--sumi-surface);
+    color: var(--sumi-ink);
+}
+
+/* Don't override admonition border/title colors here.
+   Material's per-type accents (note=ai, warning=amber, danger=shu, ...) are
+   kept so each callout stays distinguishable */
+
+/* --- Atmosphere --- */
+/* A faint warm vignette behind the content, like the frontend backdrop */
+.md-main {
+    background:
+        radial-gradient(
+            120% 80% at 50% 0%,
+            rgba(42, 36, 29, 0.45) 0%,
+            rgba(21, 18, 15, 0) 60%
+        ),
+        var(--sumi-bg);
+}
+
+/* Selection in vermilion */
+::selection {
+    background: rgba(226, 83, 59, 0.3);
+    color: var(--sumi-ink);
+}
+
+/* --- Feature carousel (home page) --- */
+/* A swipe/scroll carousel via CSS scroll-snap (no JS). Each .feature-slide is a
+   figure with a screenshot + caption */
+.md-typeset .feature-carousel {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 0.75rem;
+    scrollbar-width: thin;
+}
+
+.md-typeset .feature-carousel .feature-slide {
+    flex: 0 0 86%;
+    scroll-snap-align: center;
+    margin: 0;
+    background-color: var(--sumi-surface);
+    border: 1px solid rgba(244, 238, 227, 0.06);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.md-typeset .feature-carousel .feature-slide img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0;
+}
+
+.md-typeset .feature-carousel figcaption {
+    padding: 0.7rem 1rem 1rem;
+    color: var(--sumi-ink-muted);
+    font-size: 0.82em;
+    line-height: 1.5;
+}
+
+.md-typeset .feature-carousel .feature-slide strong {
+    color: var(--sumi-ink);
+}
+
+@media (min-width: 60em) {
+    .md-typeset .feature-carousel .feature-slide {
+        flex-basis: 48%;
+    }
+}

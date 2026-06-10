@@ -20,6 +20,16 @@ repos:
           - id: ruff-format
             files: ^apps/mirumoji/src/
 
+    # --- Sync .github/ meta files to the per-app copies ---
+    - repo: local
+      hooks:
+          - id: sync-meta
+            name: Sync README + LICENSE From .github
+            language: system
+            entry: python scripts/sync_meta.py
+            files: ^\.github/(README\.md|LICENSE)$
+            pass_filenames: false
+
     # --- Frontend: eslint + prettier ---
     - repo: local
       hooks:

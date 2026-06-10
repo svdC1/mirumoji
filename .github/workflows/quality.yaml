@@ -21,7 +21,10 @@ jobs:
                   python-version: "3.11"
 
             - name: Install Dependencies
-              # Install every runtime extra + torch for mypy
+              # Install every runtime extra so mypy can resolve all imports.
+              # torch is not a declared dependency (it ships in the GPU image /
+              # is user-installed), but whisper-local code imports it, so mypy
+              # needs it present.
               run: |
                   python -m pip install --upgrade pip
                   pip install -e "apps/mirumoji[server,whisper-local,dev,gui]"

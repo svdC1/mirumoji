@@ -1,29 +1,47 @@
 ## Description
 
-> **Summary of the changes**
+<!-- Summary of the changes and the motivation behind them -->
 
-## Issue
+## Related Issue
 
-> **Related Issue** &rarr;
+<!-- e.g. Closes #123 -->
+
+## Surface
+
+<!-- Tick all that apply -->
+
+- [ ] Server (FastAPI backend)
+- [ ] Frontend (web UI)
+- [ ] CLI (`mirumoji`)
+- [ ] GUI launcher (`mirumoji gui`)
+- [ ] Docker / Compose
+- [ ] Documentation
+- [ ] CI / tooling
 
 ## Type of Change
 
-> -   [ ] **Bug Fix**
-
-> -   [ ] **Optimization**
-
-> -   [ ] **New feature**
-
-> -   [ ] **Documentation Update**
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Improvement / refactor
+- [ ] Documentation
+- [ ] Breaking change
 
 ## Checklist
 
-> -   [ ] **I have performed a self-review of my code**
+- [ ] I have read the [Contributing Guide](https://svdc1.github.io/mirumoji/docs/Contributing)
+- [ ] My changes don't break existing functionality
+- [ ] I added or updated tests where it makes sense
 
-> -   [ ] **I have commented my code**
+### Quality Gates
 
-> -   [ ] **My changes don't break existing functionality**
+<!-- Run the gates relevant to the surfaces you touched -->
+
+- [ ] Python &rarr; `ruff check apps/mirumoji/src` and `ruff format --check apps/mirumoji/src`
+- [ ] Python &rarr; `cd apps/mirumoji && mypy src`
+- [ ] Python &rarr; `cd apps/mirumoji && pytest`
+- [ ] Frontend &rarr; `cd apps/frontend && npm run lint` and `npx prettier --check src`
+- [ ] Frontend &rarr; `cd apps/frontend && npm test`
 
 ## Additional Context
 
-> **Additional information**
+<!-- Screenshots, notes, or anything else reviewers should know -->

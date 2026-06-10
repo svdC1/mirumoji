@@ -1,0 +1,86 @@
+name: Bug Report
+description: Report a bug in Mirumoji to help us improve
+title: "[Bug]: "
+labels: ["bug"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for taking the time to file a bug report. Please search
+              [existing issues](https://github.com/svdC1/mirumoji/issues) first
+              to avoid duplicates.
+
+    - type: dropdown
+      id: surface
+      attributes:
+          label: Surface
+          description: Which part of Mirumoji does the bug occur in?
+          options:
+              - Server (FastAPI backend)
+              - Frontend (web UI)
+              - CLI (mirumoji)
+              - GUI launcher (mirumoji gui)
+              - Docker / Compose
+              - Documentation
+              - Other / not sure
+      validations:
+          required: true
+
+    - type: input
+      id: version
+      attributes:
+          label: Mirumoji Version
+          description: Output of `mirumoji --version`, the Docker image tag, or the release version.
+          placeholder: "3.0.0"
+      validations:
+          required: true
+
+    - type: textarea
+      id: description
+      attributes:
+          label: Description
+          description: A clear and concise description of what the bug is.
+      validations:
+          required: true
+
+    - type: textarea
+      id: reproduction
+      attributes:
+          label: Steps to Reproduce
+          description: Steps to reproduce the behaviour.
+          placeholder: |
+              1. Go to '...'
+              2. Click on '...'
+              3. See error
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected
+      attributes:
+          label: Expected Behaviour
+          description: What did you expect to happen?
+      validations:
+          required: true
+
+    - type: textarea
+      id: environment
+      attributes:
+          label: Environment
+          description: The environment in which the bug occurs.
+          value: |
+              - OS:
+              - Deployment (pip / Docker CPU / Docker GPU / Modal):
+              - Browser (if frontend):
+              - Python version (if running from source):
+      validations:
+          required: false
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: Logs / Additional Context
+          description: Relevant log output, screenshots, or any other context.
+          render: shell
+      validations:
+          required: false

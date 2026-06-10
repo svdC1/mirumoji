@@ -29,21 +29,22 @@ paths
 
 
 tip: Storage Paths
-    ==="Windows"
-        ```bin
+    === "Windows"
+        ```text
         user_data_path = %LOCALAPPDATA%\mirumoji\{version}\
         user_cache_path = %LOCALAPPDATA%\mirumoji\{version}\Cache\
         user_logs_path = %LOCALAPPDATA%\mirumoji\{version}\Logs\
         ```
-    ==="MacOS"
-        ```bin
+
+    === "MacOS"
+        ```text
         user_data_path = ~/Library/Application Support/mirumoji/{version}/
         user_cache_path = ~/Library/Caches/mirumoji/{version}/
         user_logs_path = ~/Library/Logs/mirumoji/{version}/
         ```
 
-    ==="Linux / Unix"
-        ```bin
+    === "Linux / Unix"
+        ```text
         # WARNING
         # platformdirs adheres to the $XDG_DATA_HOME env variables for these
         # The following are the defaults when they are not set

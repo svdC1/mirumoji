@@ -1,0 +1,41 @@
+name: Resolve Version
+
+# Reusable Workflow that Reads the version from apps/mirumoji/pyproject.toml
+# and asserts that the release tag matches it. Other release workflows consume
+# the `version` output
+
+on:
+    workflow_call:
+        outputs:
+            version:
+                description: "Package Version From pyproject.toml"
+                value: ${{ jobs.resolve.outputs.version }}
+
+jobs:
+    resolve:
+        name: Resolve And Verify Version
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.read.outputs.version }}
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            - name: Read Version From pyproject.toml
+              id: read
+              run: |
+                  version=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('apps/mirumoji/pyproject.toml').read_text())['project']['version'])")
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  echo "Resolved Version: $version"
+
+            - name: Assert Tag Matches Version
+              # Only Enforced For Tag-Triggered Runs (manual dispatch skips it)
+              if: startsWith(github.ref, 'refs/tags/')
+              run: |
+                  tag="${GITHUB_REF_NAME#v}"
+                  pkg="${{ steps.read.outputs.version }}"
+                  if [ "$tag" != "$pkg" ]; then
+                      echo "::error::Tag ($GITHUB_REF_NAME -> $tag) does not match pyproject.toml version ($pkg)"
+                      exit 1
+                  fi
+                  echo "Tag $GITHUB_REF_NAME matches version $pkg"

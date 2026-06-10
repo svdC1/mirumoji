@@ -1,0 +1,19 @@
+# Navigation is owned by mkdocs-awesome-nav
+nav:
+  - Home: index.md
+  - Setup:
+      - Overview: setup/index.md
+      - CLI Setup: setup/cli.md
+      - GUI Setup: setup/gui.md
+      - Manual Setup: setup/manual.md
+  - CLI Reference: cli.md
+  - Guides:
+      - Using a GPU: guides/gpu.md
+      - Sharing Outside Your Network: guides/sharing.md
+  - Project:
+      - Contributing: project/contributing.md
+      - Changelog: project/changelog.md
+      - Versioning Policy: project/versioning.md
+      - Third-Party Notices: notices.md
+  - Mirumoji Package: python_api
+  - Frontend API: frontend_api

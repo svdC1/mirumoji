@@ -68,11 +68,12 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
     && node --version \
     && npm --version
 
-# --- Backend Dependencies ---
-COPY ../apps/backend/requirements.txt /tmp/backend_requirements.txt
-RUN python3.11 -m pip install -r /tmp/backend_requirements.txt
-
-# --- Install UniDic + KotobaseDB ---
+# --- Japanese Dictionary Data ---
+# The full app deps are installed editable at container-create time (see the
+# .devcontainer postCreateCommand). Only the packages needed to fetch the
+# dictionary data are installed here, so the data is baked into the image and
+# the first container open stays fast
+RUN python3.11 -m pip install "fugashi[unidic]" kotobase
 RUN python3.11 -m unidic download && \
     kotobase pull-db
 
