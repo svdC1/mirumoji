@@ -1,113 +1,133 @@
-![GitHub Release](https://img.shields.io/github/v/release/svdC1/mirumoji?display_name=release&style=for-the-badge&logoSize=auto&label=Version)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/svdC1/mirumoji/total?style=for-the-badge&logoSize=auto&label=GitHub%20Downloads&link=https%3A%2F%2Fgithub.com%2FsvdC1%2Fmirumoji%2Freleases)
-![Docker Pulls](https://img.shields.io/docker/pulls/svdc1/mirumoji?style=for-the-badge&logoSize=auto&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2F)
+# Mirumoji
 
----
+An open-source, self-hosted `Japanese Immersion Toolkit`
 
-# Overview
+Drop in a video, an anime episode, a drama, or an audio clip and Mirumoji gives
+you clickable tokenized subtitles with instant dictionary lookups whisper-powered
+subtitle generation, clip saving, and Anki export. All running locally in Docker,
+with optional cloud GPU and LLM features
 
-Mirumoji is an open-source, self-hosted Japanese immersion toolkit. Drop in any video, anime episode, drama or audio clip and it gives you: clickable tokenized subtitles with dictionary pop-ups, Whisper-powered transcription, instant SRT/clip extraction, and one-click Anki deck export — all in Docker, all running on your own machine.
-
-??? tip "Optional Integrations"
-
-    -   [`OpenAI`](https://platform.openai.com/docs/overview) Integration: Customizable GPT Breakdowns of Subtitles
-    -   [`Modal`](https://modal.com) Integration: Install a CPU only version and run all GPU tasks on the cloud
-
----
-
-??? info "Preview"
-
-    > View a [`Preview`](https://svdc1.github.io/mirumoji) of the frontend _(No backend running)_
-
-??? Documentation
-
-    > Access full [`Documentantion`](https://svdc1.github.io/mirumoji/docs)
-
-# Features
-
-=== "**Interactive Video Player**"
-
-    <figure markdown="span">
-    ![player](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/player.png?raw=true)
-    <figcaption>Upload your local anime/J-Drama espisodes or any Japanese video and `.SRT` subtitles.</figcaption>
-    </figure>
-
-
-=== "**Clickable Japanese Subtitles**"
-
-    <figure markdown="span">
-    ![word_dialog](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/word_dialog.png?raw=true)
-    <figcaption>Subtitles are tokenized ([`kuromoji.js`](https://github.com/takuyaa/kuromoji.js)), allowing you to click individual words for information</figcaption>
-    </figure>
-
-=== "**Dictionary**"
-
-    <figure markdown="span">
-    ![dictionary](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/dictionary.png?raw=true)
-    <figcaption>Dictionary ([`kotobase`](https://github.com/svdC1/kotobase)) page allowing wildcard searches.</figcaption>
-    </figure>
-
-=== "**Text Analyzer**"
-
-    <figure markdown="span">
-    ![text_analyzer](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/text_analyzer.png?raw=true)
-    <figcaption>Copy and paste text for tokenized output with furigana and clickable words.</figcaption>
-    </figure>
-
-=== "**OpenAI Integration**"
-
-    <figure markdown="span">
-    ![gpt_template](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/gpt_template.png?raw=true)
-    <figcaption>Modify System Message and User Prompt with `{sentence}` and `{word}` variables.</figcaption>
-    </figure>
-
-=== "**Local Media Processing**"
-
-    ???+ info "**Video Conversion**"
-        Upload videos in various formats; they can be converted to MP4 for optimal playback.
-
-    ???+ info "**SRT Generation**"
-        Generate subtitles for your videos. Runs [`FasterWhisper`](https://github.com/SYSTRAN/faster-whisper) with modified parameters to increase accuracy for longer media such as Anime/ J-Drama episodes.
-
-=== "**Audio Transcription**"
-
-    <figure markdown="span">
-    ![transcription](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/transcription.png?raw=true)
-    <figcaption>Transcribe Japanese audio from recordings or uploaded files.</figcaption>
-    </figure>
-
-=== "**Profile-Based Data Management**"
-
-    ??? info "**Persistent Storage**"
-
-        <figure markdown="span">
-        ![profile](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/profile.png?raw=true)
-        <figcaption>Profile configurations and all other profile-related data is stored and managed via SQLite database by the backend.</figcaption>
-        </figure>
-
-    ??? info "**Clip Saving**"
-
-        <figure markdown="span">
-        ![clips](https://github.com/svdC1/mirumoji/blob/main/.github/example_imgs/clips.png?raw=true)
-        <figcaption>Save important video segments with their associated word breakdowns and export as an Anki Deck</figcaption>
-        </figure>
----
-
-# Setup
-
-???+ info "Docker Images"
-    Both the [`frontend`](https://github.com/svdC1/mirumoji/tree/main/apps/frontend) and [`backend`](https://github.com/svdC1/mirumoji/tree/main/apps/backend) have pre-built [`Docker`](https://hub.docker.com/repository/docker/svdc1/mirumoji/general) images and are set up to work with Docker Compose.
-
-???+ tip 
-    The easiest setup is to run the [`GUI Launcher`](Launcher-GUI-Guide.md) for your platform.
-    **For detailed instructions please refer to the [`Setup Guide`](Setup-Guide.md)**
+[Get Started](setup/index.md){ .md-button .md-button--primary }
+[Try the Live Preview](https://svdc1.github.io/mirumoji){ .md-button .md-button--primary }
 
 
 ---
 
-# Image Sizes
+## Features
 
-???+ info "Compressed Image Sizes"
-    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-gpu-latest?style=for-the-badge&&logoSize=auto&label=GPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-gpu-latest%2F)
-    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/backend-cpu-latest?style=for-the-badge&logoSize=auto&label=CPU%20Backend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Fbackend-cpu-latest%2F)
-    ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/svdc1/mirumoji/frontend-latest?style=for-the-badge&logoSize=auto&label=Frontend%20Image&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fsvdc1%2Fmirumoji%2Ftags%2Ffrontend-latest%2F)
+<div class="feature-carousel" markdown>
+
+<figure class="feature-slide" markdown>
+![Interactive video player with clickable subtitles](assets/images/player.png)
+<figcaption><strong>Interactive Video Player</strong> &rarr; Load any local video and
+<code>.srt</code> subtitles, with synced, clickable Japanese lines</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Word lookup dialog](assets/images/word-dialog.png)
+<figcaption><strong>Clickable Subtitles</strong> &rarr; Subtitles are tokenized in the
+server (UniDic). Click any word for readings, meanings, and contexts</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Kanji breakdown in the word lookup](assets/images/kanji.png)
+<figcaption><strong>Kanji Breakdown</strong> &rarr; Every lookup breaks down its kanji
+with stroke counts, readings, and meaning (KANJIDIC2)</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Dictionary search page](assets/images/dictionary.png)
+<figcaption><strong>Dictionary</strong> &rarr; Wildcard search powered by
+<a href="https://github.com/svdC1/kotobase">kotobase</a> (JMdict / JMnedict)</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Dictionary example sentences with furigana](assets/images/dictionary-examples.png)
+<figcaption><strong>Example Sentences</strong> &rarr; Entries (Tatoeba) come with
+furigana-annotated example sentences to see words in use</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Profile dashboard with files, transcripts, and clips](assets/images/profile.png)
+<figcaption><strong>Profiles &amp; Data</strong> &rarr; Your files, transcripts, clips,
+and LLM templates stay organized per profile on the server</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Audio transcription page](assets/images/transcribe.png)
+<figcaption><strong>Transcription</strong> &rarr; Transcribe audio or generate
+subtitles with faster-whisper, locally or offloaded to a cloud GPU</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![LLM word breakdown](assets/images/llm-breakdown.png)
+<figcaption><strong>LLM Breakdowns</strong>. Optionally use Gemini / Claude / GPT API Keys (or your own local LLM server) to generate sentence breakdowns</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Customizable LLM breakdown template](assets/images/llm-template.png)
+<figcaption><strong>Custom LLM Prompts</strong> &rarr; Pick your provider and tailor the
+breakdown prompt and system message per profile.</figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Saved clips and Anki export](assets/images/clips.png)
+<figcaption><strong>Clips &amp; Anki</strong> &rarr; Save video segments with their word
+breakdowns and export them as an Anki deck </figcaption>
+</figure>
+
+<figure class="feature-slide" markdown>
+![Desktop launcher dashboard](assets/images/gui-dashboard.png)
+<figcaption><strong>Desktop Launcher</strong> &rarr; The GUI starts and
+manages the docker compose application for you</figcaption>
+</figure>
+
+</div>
+
+---
+
+## How It Works
+
+???+ abstract "Services"
+    Mirumoji Is A [`Docker Compose Application`](https://docs.docker.com/compose/) With Two Services
+
+    - `Frontend` &rarr; A React app served over HTTPS that you open in any browser on your network
+
+    - `Server` &rarr; A FastAPI backend that tokenizes Japanese, runs transcription, manages your profiles,
+      and talks to optional cloud services
+
+???+ info "Optional Features"
+    Two capabilities are `optional` and entirely under your control. Everything else (your media, profiles, clips, and database) stays in your machine
+
+    - `Transcription Backend` &rarr; Run [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) on your  local NVIDIA GPU or offload it to [`Modal`](https://modal.com) Cloud GPUs (CPU-Only Setup). See [`Using a GPU`](guides/gpu.md)
+    
+    - `LLM`  &rarr; Provide an `OpenAI`, `Anthropic`, `Gemini`, or `Custom
+      OpenAI-Compatible` key to unlock AI sentence breakdowns + subtitle refinement. Without a key, those
+      features are hidden
+
+---
+
+## Get Started
+
+<div class="grid cards" markdown>
+
+- :material-monitor: **[GUI Setup](setup/gui.md)**
+
+    Downlaod Desktop Launcher For Your Platform To Start, Stop, and
+    Configure Mirumoji *(Easiest)*
+
+- :material-console: **[CLI Setup](setup/cli.md)**
+
+    Install With `pip` And Run The Docker Compose Applicatin With `mirumoji up`
+    *(For Those Who Prefer The Terminal)*
+
+- :material-docker: **[Manual Setup](setup/manual.md)**
+
+    Run The Docker Compose Commands Yourself, No Launcher
+    *(More Configuration)*
+
+- :material-book-open-variant: **[CLI Reference](cli.md)**
+
+    Every `mirumoji` Command Explained
+
+</div>
