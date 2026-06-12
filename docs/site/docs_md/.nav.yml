@@ -15,5 +15,5 @@ nav:
       - Changelog: project/changelog.md
       - Versioning Policy: project/versioning.md
       - Third-Party Notices: notices.md
-  - Mirumoji Package: python_api
-  - Frontend API: frontend_api
+  - Python Reference: python_api
+  - Frontend Reference: frontend_api
