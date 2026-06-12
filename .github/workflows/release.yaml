@@ -49,3 +49,4 @@ jobs:
         uses: ./.github/workflows/_desktop.yaml
         with:
             version: ${{ needs.version.outputs.version }}
+            is_prerelease: ${{ needs.version.outputs.is_prerelease == 'true' }}

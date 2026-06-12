@@ -316,6 +316,9 @@ class TerminalSurface(ft.Container):
         - Shows a monospace log list inside a bordered card with a status
           header
 
+        - A header button clears the log list, leaving the status and any
+          running operation untouched
+
         - A header toggle hides the log list (preserving its contents) and
           shrinks the card to its header bar.Toggling again restores it
 
@@ -327,6 +330,7 @@ class TerminalSurface(ft.Container):
     Attributes:
         list_view (ft.ListView): The scrolling, monospace log list
         status_text (ft.Text): The colour-coded header status label
+        clear_button (ft.IconButton): Clears the log list
         logs_toggle (ft.IconButton): Hides / shows the log list
     """
 
@@ -351,6 +355,13 @@ class TerminalSurface(ft.Container):
             weight=ft.FontWeight.W_600,
             color=INK_FAINT,
         )
+        self.clear_button = ft.IconButton(
+            icon=ft.Icons.CLEAR_ALL,
+            tooltip="Clear Output",
+            icon_size=18,
+            icon_color=INK_FAINT,
+            on_click=self._clear_logs,
+        )
         self.logs_toggle = ft.IconButton(
             icon=ft.Icons.VISIBILITY_OFF,
             tooltip="Hide Logs",
@@ -365,6 +376,7 @@ class TerminalSurface(ft.Container):
                     self._output_label,
                     ft.Container(expand=True),  # Spacer
                     self.status_text,
+                    self.clear_button,
                     self.logs_toggle,
                 ],
             ),
@@ -410,6 +422,16 @@ class TerminalSurface(ft.Container):
             e (ft.Event[ft.IconButton]): The toggle click event
         """
         self._set_collapsed(self.list_view.visible)
+
+    def _clear_logs(self, e: ft.Event[ft.IconButton]) -> None:
+        """
+        Clears the log list from the header button, keeping the status
+
+        Args:
+            e (ft.Event[ft.IconButton]): The clear click event
+        """
+        self.clear()
+        self.update()
 
     def set_status(self, text: str, kind: str = "muted") -> None:
         """

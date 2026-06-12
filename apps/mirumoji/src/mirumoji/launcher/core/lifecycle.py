@@ -181,6 +181,7 @@ def logs(
     tail: int | None = None,
     compose_file: Path | None = None,
     project: str = PROJECT_NAME,
+    handle: process.StreamHandle | None = None,
 ) -> Generator[str, None, int]:
     """
     Streams container logs with `docker compose logs`
@@ -191,6 +192,9 @@ def logs(
         tail (int | None): Limit to the last N lines when given
         compose_file (Path | None): The resolved compose file, if available
         project (str): The compose project name
+        handle (process.StreamHandle | None): An optional cancellation token to
+            stop a followed stream on demand (e.g. a GUI "Stop" button). A run
+            stopped through it ends cleanly rather than raising
 
     Yields:
         Each log line
@@ -211,7 +215,7 @@ def logs(
         cmd += ["--tail", str(tail)]
     if service is not None:
         cmd.append(service)
-    return (yield from process.stream(cmd))
+    return (yield from process.stream(cmd, handle=handle))
 
 
 def _build(image: str, dockerfile: Path, context: Path) -> list[str]:

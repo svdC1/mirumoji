@@ -28,9 +28,8 @@ from ..core.constants import (
 )
 from ..core.errors import EnvConfigError, LauncherError
 from ..core.models import Backend, CheckResult, CheckStatus, ImageSource
+from ..core.status import parse_status
 from ._common import (
-    _format_compose_ports,
-    _parse_compose_ps,
     _validate_dependencies,
     fail,
     require_env,
@@ -171,11 +170,11 @@ def status() -> None:
     table
     """
     try:
-        entries = _parse_compose_ps(lifecycle.ps())
+        services = parse_status(lifecycle.ps())
     except LauncherError as exc:
         raise fail(str(exc)) from exc
 
-    if not entries:
+    if not services:
         console.print("No Running Services Found", style="muted")
         return
 
@@ -188,14 +187,13 @@ def status() -> None:
     table.add_column("Status", style="muted")
     table.add_column("Ports", style="muted")
 
-    for entry in entries:
-        state = entry.get("State", "")
-        style = "success" if state == "running" else "warning"
+    for service in services:
+        style = "success" if service.running else "warning"
         table.add_row(
-            entry.get("Service", entry.get("Name", "")),
-            f"[{style}]{state}[/{style}]",
-            entry.get("Status", ""),
-            _format_compose_ports(entry),
+            service.service,
+            f"[{style}]{service.state}[/{style}]",
+            service.status,
+            service.ports,
         )
 
     console.print(table)

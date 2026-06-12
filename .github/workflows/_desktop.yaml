@@ -13,6 +13,11 @@ on:
                 description: "Version Used In The Asset File Name"
                 required: true
                 type: string
+            is_prerelease:
+                description: "Mark The GitHub Release As A Pre-Release"
+                required: false
+                default: false
+                type: boolean
 
 permissions:
     # Required To Create The Release And Upload Assets
@@ -68,4 +73,5 @@ jobs:
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ github.ref_name }}
+                  prerelease: ${{ inputs.is_prerelease }}
                   files: mirumoji-${{ inputs.version }}-${{ matrix.os_name }}.zip

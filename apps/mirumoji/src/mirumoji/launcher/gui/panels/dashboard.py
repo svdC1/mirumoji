@@ -22,7 +22,8 @@ from ...core.constants import (
     backend_vars,
 )
 from ...core.host import get_host_lan_ip
-from ...core.models import ImageSource
+from ...core.models import ImageSource, ServiceStatus
+from ...core.status import parse_status
 from .. import theme
 from ..runner import run_blocking, run_stream
 from ..state import AppState
@@ -41,6 +42,31 @@ List containing the names of all environment variables managed by the launcher
 """
 
 # --- Helpers ---
+
+
+def _status_lines(services: list[ServiceStatus]) -> list[str]:
+    """
+    Renders parsed service statuses as aligned monospace table rows
+
+    Args:
+        services (list[ServiceStatus]): The parsed compose service statuses
+
+    Returns:
+        A header row followed by one row per service, padded into columns for
+        the terminal surface
+    """
+    headers = ("SERVICE", "STATE", "STATUS", "PORTS")
+    rows = [(s.service, s.state, s.status, s.ports or "-") for s in services]
+    widths = [
+        max(len(headers[col]), *(len(row[col]) for row in rows))
+        for col in range(len(headers))
+    ]
+
+    def render(cells: tuple[str, ...]) -> str:
+        padded = (cell.ljust(widths[col]) for col, cell in enumerate(cells))
+        return "  ".join(padded).rstrip()
+
+    return [render(headers), *(render(row) for row in rows)]
 
 
 def _missing_required(state: AppState) -> list[str]:
@@ -199,10 +225,13 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         begin("Querying Status", status_btn)
 
         def render(out: str) -> None:
-            stripped = out.strip()
-            if stripped:
-                terminal.append_log(stripped)
-            done("Status Updated" if stripped else "No Running Services")
+            services = parse_status(out)
+            if not services:
+                done("No Running Services")
+                return
+            for line in _status_lines(services):
+                terminal.append_log(line)
+            done("Status Updated")
 
         run_blocking(
             page,

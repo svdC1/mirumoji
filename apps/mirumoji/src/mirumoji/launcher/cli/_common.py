@@ -10,7 +10,6 @@ info: Scope
       `Typer.Exit` non-zero exits
 """
 
-import json
 import subprocess
 from collections.abc import Generator
 from pathlib import Path
@@ -161,54 +160,6 @@ def stream_command(
     # Catch Executable Not Found Exceptions
     except FileNotFoundError as exc:
         raise fail(f"Command `{exc.filename}` Couldn't Be Found") from exc
-
-
-# --- Docker Helpers ---
-
-
-def _parse_compose_ps(output: str) -> list[dict[str, Any]]:
-    """
-    Parses `docker compose ps` JSON, tolerating array or NDJSON forms
-
-    Args:
-        output (str): The raw compose `ps --format json` output
-
-    Returns:
-        The parsed service entries
-    """
-    text = output.strip()
-    if not text:
-        return []
-    try:
-        data = json.loads(text)
-        return data if isinstance(data, list) else [data]
-    except json.JSONDecodeError:
-        entries = []
-        for line in text.splitlines():
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
-        return entries
-
-
-def _format_compose_ports(entry: dict[str, Any]) -> str:
-    """
-    Formats a `docker compose ps` service entry's published ports as
-    `host->container`
-
-    Args:
-        entry (dict): A compose `ps` service entry
-
-    Returns:
-        A comma-separated published-ports summary
-    """
-    pubs = entry.get("Publishers") or []
-    parts = [
-        f"{p.get('PublishedPort')}->{p.get('TargetPort')}"
-        for p in pubs
-        if p.get("PublishedPort")
-    ]
-    return ", ".join(parts)
 
 
 # -- Up Validation ---

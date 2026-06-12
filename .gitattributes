@@ -1,1 +1,6 @@
 apps/frontend/public/** linguist-vendored
+
+# Shell scripts must keep LF endings so they stay executable inside the Linux
+# Docker images. A CRLF entrypoint makes the kernel look for `/bin/sh\r` and
+# fail with "no such file or directory", which looks like a missing file.
+*.sh text eol=lf

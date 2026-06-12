@@ -197,3 +197,32 @@ class ComposeSpec:
     source: ImageSource
     env: dict[str, str] = field(default_factory=dict)
     project_name: str = "mirumoji"
+
+
+@dataclass(frozen=True)
+class ServiceStatus:
+    """
+    Represents one service of the running mirumoji Docker Compose application
+    as reported by `docker compose ps`
+
+    Attributes:
+        service (str): The compose service name (e.g. `frontend`)
+        state (str): The container lifecycle state (e.g. `running`)
+        status (str): The human-readable status detail (e.g. `Up 3 minutes`)
+        ports (str): The published-ports summary (e.g. `80->80, 443->443`)
+    """
+
+    service: str
+    state: str
+    status: str
+    ports: str
+
+    @property
+    def running(self) -> bool:
+        """
+        Whether the service container is currently running
+
+        Returns:
+            `True` when the state is `running`
+        """
+        return self.state == "running"

@@ -10,6 +10,9 @@ on:
             version:
                 description: "Package Version From pyproject.toml"
                 value: ${{ jobs.resolve.outputs.version }}
+            is_prerelease:
+                description: "True When The Version Is A Pre-Release (rc/a/b/dev)"
+                value: ${{ jobs.resolve.outputs.is_prerelease }}
 
 jobs:
     resolve:
@@ -17,6 +20,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.read.outputs.version }}
+            is_prerelease: ${{ steps.read.outputs.is_prerelease }}
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v4
@@ -27,6 +31,15 @@ jobs:
                   version=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('apps/mirumoji/pyproject.toml').read_text())['project']['version'])")
                   echo "version=$version" >> "$GITHUB_OUTPUT"
                   echo "Resolved Version: $version"
+                  # A final release is exactly MAJOR.MINOR.PATCH. Anything else
+                  # (rc/a/b/dev/post suffixes) is a pre-release.
+                  if echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+                      echo "Pre-Release: false"
+                  else
+                      echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+                      echo "Pre-Release: true"
+                  fi
 
             - name: Assert Tag Matches Version
               # Only Enforced For Tag-Triggered Runs (manual dispatch skips it)
