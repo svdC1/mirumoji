@@ -1,12 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* UI / body — Hanken Grotesk */
+@import "@fontsource/hanken-grotesk/400.css";
+@import "@fontsource/hanken-grotesk/500.css";
+@import "@fontsource/hanken-grotesk/600.css";
+@import "@fontsource/hanken-grotesk/700.css";
 
-/* slick scrollbars */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-thumb {
-    background: #4b5563;
-    border-radius: 4px;
-}
+/* Display / headings — Newsreader */
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "@fontsource/newsreader/600.css";
+
+/* Japanese content — Noto Serif JP (Mincho), Japanese subset only.
+   Each weight is a large CJK file (~1.4 MB), so we ship just regular + bold. */
+@import "@fontsource/noto-serif-jp/japanese-400.css";
+@import "@fontsource/noto-serif-jp/japanese-700.css";
+
+/* Design tokens + base layer (must precede Tailwind layers) */
+@import "../shared/theme/tokens.css";
+
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";

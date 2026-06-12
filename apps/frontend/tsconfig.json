@@ -5,23 +5,22 @@
         "lib": ["DOM", "DOM.Iterable", "ESNext"],
         "allowJs": false,
         "skipLibCheck": true,
-        "esModuleInterop": false,
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
-        "moduleResolution": "Node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx",
-        "types": ["node", "vite/client"],
-        "baseUrl": ".",
+        "types": ["node", "vite/client", "vitest/globals"],
         "paths": {
-            "vfile": ["node_modules/vfile"],
-            "vfile/*": ["node_modules/vfile/*"],
-            "vfile-message": ["node_modules/vfile-message"],
-            "vfile-message/*": ["node_modules/vfile-message/*"]
+            "@/*": ["./src/*"],
+            "vfile": ["./node_modules/vfile"],
+            "vfile/*": ["./node_modules/vfile/*"],
+            "vfile-message": ["./node_modules/vfile-message"],
+            "vfile-message/*": ["./node_modules/vfile-message/*"]
         }
     },
     "include": ["src", "vite-env.d.ts", "media.d.ts", "vite.config.ts"]

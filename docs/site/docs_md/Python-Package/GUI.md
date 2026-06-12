@@ -1,1 +1,0 @@
-:::mirumoji.gui

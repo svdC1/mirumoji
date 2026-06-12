@@ -1,0 +1,52 @@
+name: Release
+
+# Central Release Orchestrator. Triggered By Pushing A Version Tag (e.g.
+# v3.0.0). Resolves + Verifies The Version, Then Fans Out To The Reusable
+# Workflows That Publish Images, The PyPI Package, The Docs/Frontend Site, And
+# The Desktop Bundles. Manual `workflow_dispatch` Runs Skip The Tag Assertion
+
+on:
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+
+# Ceiling For The Reusable Workflows: each narrows from here (Desktop needs
+# contents:write to upload assets, Pages + PyPI need id-token/pages)
+permissions:
+    contents: write
+    pages: write
+    id-token: write
+
+jobs:
+    version:
+        name: Resolve Version
+        uses: ./.github/workflows/_version.yaml
+
+    images:
+        name: Images
+        needs: version
+        uses: ./.github/workflows/_images.yaml
+        with:
+            version: ${{ needs.version.outputs.version }}
+        secrets:
+            DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+
+    pypi:
+        name: PyPI
+        needs: version
+        uses: ./.github/workflows/_pypi.yaml
+
+    pages:
+        name: Pages
+        needs: version
+        uses: ./.github/workflows/_pages.yaml
+
+    desktop:
+        name: Desktop
+        needs: version
+        uses: ./.github/workflows/_desktop.yaml
+        with:
+            version: ${{ needs.version.outputs.version }}
+            is_prerelease: ${{ needs.version.outputs.is_prerelease == 'true' }}

@@ -1,0 +1,110 @@
+name: Quality Gates
+
+on:
+    push:
+        branches: [main, v3-refactor]
+    pull_request:
+        branches: [main, v3-refactor]
+
+jobs:
+    # --- Python: Ruff + MyPy ---
+    python-lint:
+        name: Python Lint (Ruff + MyPy)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Dependencies
+              # Install every runtime extra so mypy can resolve all imports.
+              # torch is not a declared dependency (it ships in the GPU image /
+              # is user-installed), but whisper-local code imports it, so mypy
+              # needs it present.
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -e "apps/mirumoji[server,whisper-local,dev,gui]"
+                  pip install torch==2.6.0
+
+            - name: Ruff Check
+              run: ruff check apps/mirumoji/src
+
+            - name: Ruff Format Check
+              run: ruff format --check apps/mirumoji/src
+
+            - name: MyPy
+              run: |
+                  cd apps/mirumoji
+                  mypy src
+
+    # --- Python: PyTest ---
+    python-test:
+        name: Python Tests (PyTest)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -e "apps/mirumoji[server,dev]"
+
+            - name: Run PyTest
+              run: |
+                  cd apps/mirumoji
+                  pytest --tb=short -q
+
+    # --- Frontend: eslint + prettier ---
+    frontend-lint:
+        name: Frontend lint (ESLint + Prettier)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: npm
+                  cache-dependency-path: apps/frontend/package-lock.json
+
+            - name: Install Dependencies
+              run: cd apps/frontend && npm ci
+
+            - name: ESLint
+              run: cd apps/frontend && npm run lint
+
+            - name: Prettier Check
+              run: cd apps/frontend && npm run format:check
+
+    # --- Frontend: vitest ---
+    frontend-test:
+        name: Frontend Tests (Vitest)
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: npm
+                  cache-dependency-path: apps/frontend/package-lock.json
+
+            - name: Install Dependencies
+              run: cd apps/frontend && npm ci
+
+            - name: Run Vitest
+              run: cd apps/frontend && npm test -- --run

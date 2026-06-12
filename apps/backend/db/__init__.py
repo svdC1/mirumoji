@@ -1,3 +1,0 @@
-"""
-Mirumoji Database functionality.
-"""

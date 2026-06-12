@@ -1,0 +1,61 @@
+name: Feature Request
+description: Request a feature or improvement for Mirumoji
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for suggesting an improvement. Please search
+              [existing issues](https://github.com/svdC1/mirumoji/issues) first
+              to avoid duplicates.
+
+    - type: dropdown
+      id: surface
+      attributes:
+          label: Surface
+          description: Which part of Mirumoji would this affect?
+          multiple: true
+          options:
+              - Server (FastAPI backend)
+              - Frontend (web UI)
+              - CLI (mirumoji)
+              - GUI launcher (mirumoji gui)
+              - Docker / Compose
+              - Documentation
+      validations:
+          required: true
+
+    - type: dropdown
+      id: type
+      attributes:
+          label: Type
+          options:
+              - New feature
+              - Improvement to an existing feature
+      validations:
+          required: true
+
+    - type: textarea
+      id: description
+      attributes:
+          label: Description
+          description: A clear and concise description of the feature and the behaviour you want.
+      validations:
+          required: true
+
+    - type: textarea
+      id: motivation
+      attributes:
+          label: Motivation
+          description: Why would this be a good addition? What problem does it solve?
+      validations:
+          required: true
+
+    - type: textarea
+      id: alternatives
+      attributes:
+          label: Alternatives / Additional Context
+          description: Any alternatives you considered, or other context.
+      validations:
+          required: false

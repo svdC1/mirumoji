@@ -2,7 +2,7 @@
     "$schema": "https://typedoc.org/schema.json",
     "entryPoints": ["./src/"],
     "entryPointStrategy": "expand",
-    "out": "../../docs/site/docs_md/Frontend-UI",
+    "out": "../../docs/site/docs_md/frontend_api",
     "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-mdn-links", "typedoc-plugin-rename-defaults", "typedoc-plugin-extras", "typedoc-plugin-no-inherit"],
     "readme": "none",
     "theme": "markdown",

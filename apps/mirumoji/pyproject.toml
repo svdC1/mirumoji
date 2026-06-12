@@ -1,0 +1,193 @@
+[build-system]
+requires = ["setuptools>=80.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirumoji"
+version = "3.0.0rc1"
+authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
+maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
+description = "Self-Hostable Japanese Language Immersion Tool"
+keywords = [
+    "japanese",
+    "video-player",
+    "language",
+    "cli",
+    "gui",
+    "language-learning",
+    "immersion",
+    "anki",
+    "whisper",
+]
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: GPU :: NVIDIA CUDA :: 12",
+    "Environment :: Console",
+    "Framework :: FastAPI",
+    "Framework :: Pydantic :: 2",
+    "Framework :: AsyncIO",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Education"
+]
+license = "MIT"
+license-files = ["LICENSE*", "LICENCE*"]
+
+# --- Dependencies ---
+
+# Base Install - CLI Only
+dependencies = [
+    "typer",
+    "rich",
+    "python-dotenv",
+    "platformdirs",
+    "pyyaml"
+]
+
+[project.optional-dependencies]
+
+# Core Server Stack - CPU Only
+# Compatible ranges: floor at a known-good version, cap below the next
+# breaking bump (next major for >=1.0 libs, next minor for 0.x libs)
+server = [
+    "fastapi>=0.136.3,<0.137",
+    "uvicorn>=0.49,<0.50",
+    "fugashi[unidic]>=1.5.2,<2",
+    "kotobase>=0.2.7,<0.3",
+    "pydantic>=2.13.4,<3",
+    "pydantic[email]",
+    "srt>=3.5.3,<4",
+    "python-multipart>=0.0.32,<0.1",
+    "aiofiles>=25.1,<26",
+    "tqdm>=4.67,<5",
+    "modal>=1.4.3,<2",
+    "genanki>=0.13.1,<0.14",
+    "aiosqlite>=0.22.1,<0.23",
+    "openai>=2.41,<3",
+    "anthropic>=0.107,<1"
+]
+
+# GPU Server Deployment (Local Transcription)
+whisper-local = [
+    "faster-whisper>=1.2.1,<2",
+    "huggingface_hub>=1.0,<2",
+    "sentencepiece>=0.2,<0.3",
+    "requests>=2.32,<3"
+]
+
+
+# GUI Launcher Build
+gui = [
+    "flet[all]==0.85.2"
+]
+
+# Development Tools
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "pip-tools",
+    "types-PyYAML",
+    "types-tqdm",
+    "types-aiofiles",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-autorefs",
+    "mkdocs-awesome-nav",
+    "black"
+]
+
+[project.scripts]
+mirumoji = "mirumoji.launcher.cli.main:app"
+
+[project.urls]
+Repository = "https://github.com/svdC1/mirumoji"
+Issues = "https://github.com/svdC1/mirumoji/issues"
+Documentation = "https://svdc1.github.io/mirumoji/docs"
+Changelog = "https://svdc1.github.io/mirumoji/docs/changelog"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# --- Docker Data ---
+[tool.setuptools.package-data]
+mirumoji = ["py.typed", "docker/*", "docker/compose/*"]
+
+# --- Ruff ---
+[tool.ruff]
+target-version = "py310"
+line-length = 79
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection helpers are factories designed to be called in
+# parameter defaults. Allow them so B008 still catches real accidental calls
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Header",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Cookie",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# --- MyPy ---
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Minimal Local Stubs For Untyped Third-Party Libs
+# Covers Only The Surface Used By Mirumoji
+mypy_path = "stubs"
+
+# --- PyTest ---
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+# --- Flet (GUI) ---
+[tool.flet]
+desktop_flavor = "light"
+org = "io.github.svdc1"
+product = "Mirumoji"
+company = "svdC1"
+copyright = "Copyright (C) 2026 by svdC1"
+
+# The build entry (`main.py`) and app assets are added to this directory by
+# `scripts/build_gui.py`, which then runs `flet build` from here
+[tool.flet.app]
+path = "."
+module = "main"

@@ -4,77 +4,12 @@ site_dir: site_html
 repo_url: https://github.com/svdC1/mirumoji
 repo_name: svdC1/mirumoji
 docs_dir: docs_md
-nav:
-  - Home:
-      - index.md
-      - Contributing: Contributing.md
-      - Licenses: Licenses.md
-  - Setup:
-      - Setup Guide: Setup-Guide.md
-      - Manual Setup: Manual-Setup.md
-      - Launcher GUI Guide: Launcher-GUI-Guide.md
-      - Launcher Documentation: Launcher-CLI-Docs.md
-  - Additional Information:
-      - Sharing on the Internet: Sharing-Outside-Local-Network.md
-      - Source Code: Source-Code.md
-      - Using a GPU: Using-a-GPU.md
-  - Backend API:
-      - Database: Backend-API/db.md
-      - Main: Backend-API/main.md
-      - Modal Processing: Backend-API/modal_processing.md
-      - Models: Backend-API/models.md
-      - Processing: Backend-API/processing.md
-      - Profile Manager: Backend-API/profile_manager.md
-      - Routers: Backend-API/router.md
-      - Utils: Backend-API/utils.md
-  - Python Package:
-      - GUI: Python-Package/GUI.md
-      - GUI Launcher: Python-Package/GUI-Launcher.md
-      - CLI: Python-Package/CLI.md
-  - Frontend UI:
-      - Index: Frontend-UI/README.md
-      - App: Frontend-UI/App.md
-      - Main: Frontend-UI/main.md
-      - Components:
-          - ChatBubble: Frontend-UI/components/ChatBubble.md
-          - DictDisplays: Frontend-UI/components/DictDisplays.md
-          - NavigationMenu: Frontend-UI/components/NavigationMenu.md
-          - SettingsDrawer: Frontend-UI/components/SettingsDrawer.md
-          - SubtitlePlayer: Frontend-UI/components/SubtitlePlayer.md
-          - WordDialog: Frontend-UI/components/WordDialog.md
-      - Constants:
-          - User Page: Frontend-UI/constants/user-page.md
-      - Contexts:
-          - PlayerContext: Frontend-UI/contexts/PlayerContext.md
-          - ProfileContext: Frontend-UI/contexts/ProfileContext.md
-          - SubtitleSettingsContext: Frontend-UI/contexts/SubtitleSettingsContext.md
-      - Pages:
-          - DictionaryPage: Frontend-UI/pages/DictionaryPage.md
-          - HomePage: Frontend-UI/pages/HomePage.md
-          - Icons: Frontend-UI/pages/Icons.md
-          - NotFoundPage: Frontend-UI/pages/NotFoundPage.md
-          - PlayerPage: Frontend-UI/pages/PlayerPage.md
-          - SavedPage: Frontend-UI/pages/SavedPage.md
-          - TextPage: Frontend-UI/pages/TextPage.md
-          - TranscribePage: Frontend-UI/pages/TranscribePage.md
-          - UserPage: Frontend-UI/pages/UserPage.md
-      - Services:
-          - api: Frontend-UI/services/api.md
-          - dictApi: Frontend-UI/services/dictApi.md
-          - tokenizer: Frontend-UI/services/tokenizer.md
-      - Types:
-          - types: Frontend-UI/types/types.md
-      - Utils:
-          - apiErrorToaster: Frontend-UI/utils/apiErrorToaster.md
-          - clipCreator: Frontend-UI/utils/clipCreator.md
-          - fileUtils: Frontend-UI/utils/fileUtils.md
-          - formatters: Frontend-UI/utils/formatters.md
-          - languageUtils: Frontend-UI/utils/languageUtils.md
-          - mediaRecorder: Frontend-UI/utils/mediaRecorder.md
+copyright: Copyright &copy; 2026 svdC1
 theme:
   name: material
   font:
-    code: Roboto Mono
+    text: Hanken Grotesk
+    code: JetBrains Mono
   logo: assets/icon-192.png
   favicon: assets/favicon.ico
   features:
@@ -82,18 +17,23 @@ theme:
     - navigation.footer
     - content.tooltips
     - content.code.copy
+    - content.code.annotate
     - search.suggest
     - search.highlight
     - navigation.tracking
     - navigation.tabs
+    - navigation.indexes
   icon:
     repo: fontawesome/brands/github
   palette:
     - scheme: slate
-      primary: black
-      accent: deep purple
+
+extra_css:
+  - assets/sumi-shu.css
 
 plugins:
+  - search
+  - awesome-nav
   - mkdocstrings:
       handlers:
         python:
@@ -102,7 +42,8 @@ plugins:
             - https://docs.sqlalchemy.org/objects.inv
             - https://fastapi.tiangolo.com/objects.inv
             - https://docs.pydantic.dev/latest/objects.inv
-
+          paths:
+            ["../../apps/mirumoji/src"]
           options:
             show_root_heading: true
             show_root_toc_entry: true
@@ -117,9 +58,6 @@ plugins:
             show_root_members_full_path: false
             show_source: false
             show_submodules: true
-          paths:
-            ["../../apps/", "../../apps/backend", "../../apps/cli/mirumoji/src"]
-  - search
   - autorefs:
       resolve_closest: true
       link_titles: true
@@ -152,3 +90,6 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.magiclink
   - pymdownx.blocks.caption
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

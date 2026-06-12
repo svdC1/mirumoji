@@ -7,6 +7,8 @@ import React, {
     useContext,
     useState,
     useEffect,
+    useCallback,
+    useMemo,
     ReactNode,
 } from "react";
 
@@ -29,9 +31,7 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
  * @param {{ children: ReactNode }} props The props for the component.
  * @returns {JSX.Element} The ProfileProvider component.
  */
-export const ProfileProvider: React.FC<{ children: ReactNode }> = ({
-    children,
-}) => {
+export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [profileId, setProfileIdState] = useState<string | null>(() => {
         return localStorage.getItem("currentProfileId");
     });
@@ -44,15 +44,13 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({
         }
     }, [profileId]);
 
-    const setProfileId = (id: string | null) => {
+    const setProfileId = useCallback((id: string | null) => {
         setProfileIdState(id);
-    };
+    }, []);
 
-    return (
-        <ProfileContext.Provider value={{ profileId, setProfileId }}>
-            {children}
-        </ProfileContext.Provider>
-    );
+    const value = useMemo(() => ({ profileId, setProfileId }), [profileId, setProfileId]);
+
+    return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };
 
 /**

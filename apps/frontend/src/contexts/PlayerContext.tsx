@@ -5,7 +5,7 @@
  * between pages.
  */
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 
 /**
  * @interface PlayerContextState
@@ -20,6 +20,8 @@ export interface PlayerContextState {
     setSrt: (file: File | null) => void;
     srtFileName: string | null;
     setSrtFileName: (name: string | null) => void;
+    srtFileId: string | null;
+    setSrtFileId: (id: string | null) => void;
     videoUrl: string | null;
     setVideoUrl: (url: string | null) => void;
     drawerOpen: boolean;
@@ -52,6 +54,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [videoFileName, setVideoFileName] = useState<string | null>(null);
     const [srt, setSrt] = useState<File | null>(null);
     const [srtFileName, setSrtFileName] = useState<string | null>(null);
+    const [srtFileId, setSrtFileId] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(true);
     const [showFurigana, setShowFurigana] = useState<boolean>(true);
@@ -60,42 +63,57 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     /**
      * Resets all player-related state to their initial default values.
      */
-    const clearPlayerState = () => {
+    const clearPlayerState = useCallback(() => {
         setVideo(null);
         setVideoFileName(null);
         setSrt(null);
         setSrtFileName(null);
+        setSrtFileId(null);
         setVideoUrl(null);
         setDrawerOpen(true);
         setShowFurigana(true);
         setTimestamp(null);
-    };
+    }, []);
 
-    const value = {
-        video,
-        setVideo,
-        videoFileName,
-        setVideoFileName,
-        srt,
-        setSrt,
-        srtFileName,
-        setSrtFileName,
-        videoUrl,
-        setVideoUrl,
-        drawerOpen,
-        setDrawerOpen,
-        showFurigana,
-        setShowFurigana,
-        clearPlayerState,
-        timestamp,
-        setTimestamp,
-    };
-
-    return (
-        <PlayerContext.Provider value={value}>
-            {children}
-        </PlayerContext.Provider>
+    // Memoize the context value so consumers don't re-render on every provider
+    // render
+    const value = useMemo<PlayerContextState>(
+        () => ({
+            video,
+            setVideo,
+            videoFileName,
+            setVideoFileName,
+            srt,
+            setSrt,
+            srtFileName,
+            setSrtFileName,
+            srtFileId,
+            setSrtFileId,
+            videoUrl,
+            setVideoUrl,
+            drawerOpen,
+            setDrawerOpen,
+            showFurigana,
+            setShowFurigana,
+            clearPlayerState,
+            timestamp,
+            setTimestamp,
+        }),
+        [
+            video,
+            videoFileName,
+            srt,
+            srtFileName,
+            srtFileId,
+            videoUrl,
+            drawerOpen,
+            showFurigana,
+            timestamp,
+            clearPlayerState,
+        ]
     );
+
+    return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 };
 
 /**

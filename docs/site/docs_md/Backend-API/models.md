@@ -1,3 +1,0 @@
-# Pydantic Models
-
-::: models

@@ -9,12 +9,13 @@
                 "ms-python.vscode-pylance",
                 "ms-python.debugpy",
                 "KevinRose.vsc-python-indent",
+                "charliermarsh.ruff",
                 "bradlc.vscode-tailwindcss",
                 "esbenp.prettier-vscode",
-                "christian-kohler.path-intellisense",
-                "ms-python.flake8"
+                "christian-kohler.path-intellisense"
             ]
         }
     },
-    "forwardPorts": [8000, 5173]
+    "forwardPorts": [8000, 5173],
+    "postCreateCommand": "pip install -e './apps/mirumoji[server,dev,gui,whisper-local]' && (cd apps/frontend && npm install) && pip install pre-commit && pre-commit install"
 }

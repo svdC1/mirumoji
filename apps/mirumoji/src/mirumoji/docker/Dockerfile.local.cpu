@@ -1,0 +1,45 @@
+# Local-Build CPU Image
+# Installs From Local Repo
+# Used By `mirumoji build` / `mirumoji up --build`
+# Build Context Is The Package Root (apps/mirumoji)
+
+FROM python:3.11-slim-bookworm
+
+# --- Working Directory ---
+WORKDIR /app
+
+# --- Environment ---
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/local/bin:${PATH}"
+
+# --- System Dependencies ---
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget \
+    xz-utils \
+    git \
+    mecab \
+    libmecab-dev \
+    ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- Upgrade PIP ---
+RUN python3.11 -m ensurepip --upgrade && \
+    python3.11 -m pip install --no-cache-dir --upgrade pip
+
+# --- Install From The Working Tree ---
+COPY pyproject.toml README.md ./
+COPY src/ src/
+RUN python3.11 -m pip install --no-cache-dir ".[server]"
+
+# --- Download UniDic Dictionary + Kotobase DB ---
+RUN python3.11 -m unidic download
+RUN kotobase pull-db
+
+# --- Expose The Uvicorn Port ---
+EXPOSE 8000
+
+# --- Start Server ---
+CMD ["python3.11", "-m", "uvicorn", "mirumoji.server.app:create_app", \
+    "--factory", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,64 @@
+# Published GPU Image
+# Installs The Released Wheel From PyPI
+# Built And Pushed by CI
+
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
+
+# --- Working Directory ---
+WORKDIR /app
+
+# --- Environment ---
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/local/bin:${PATH}" \
+    PIP_NO_CACHE_DIR=1 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+
+# --- Released Version (CI Overrides Via --build-arg) ---
+ARG MIRUMOJI_VERSION=3.0.0
+
+# --- System Dependencies + Python Shim ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    ffmpeg \
+    wget \
+    xz-utils \
+    mecab \
+    libmecab-dev \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Point 'python' + 'python3' At python3.11 ---
+RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# --- Upgrade PIP ---
+RUN python3.11 -m pip install --upgrade pip
+
+# --- Install PyTorch With CUDA Support ---
+RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# --- Install The Published Package + Local Whisper Extra ---
+RUN python3.11 -m pip install \
+    "mirumoji[server,whisper-local]==${MIRUMOJI_VERSION}"
+
+# --- Download UniDic Dictionary + Kotobase DB ---
+RUN python3.11 -m unidic download
+RUN kotobase pull-db
+
+# --- Pre-Cache The Faster-Whisper Model ---
+RUN python3.11 -c "from huggingface_hub import snapshot_download; \
+    snapshot_download('Systran/faster-whisper-large-v3')"
+
+# --- Expose The Uvicorn Port ---
+EXPOSE 8000
+
+# --- Start Server ---
+CMD ["python3.11", "-m", "uvicorn", "mirumoji.server.app:create_app", \
+    "--factory", "--host", "0.0.0.0", "--port", "8000"]
