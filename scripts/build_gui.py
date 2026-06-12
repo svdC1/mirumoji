@@ -18,6 +18,17 @@ from pathlib import Path
 from rich.console import Console
 from rich.theme import Theme
 
+# `flet build` prints Unicode status glyphs such as ● (U+25CF)
+#
+# On Windows the std streams default to cp1252, which can't encode
+# them and crashes the build with a UnicodeEncodeError
+#
+# Force UTF-8 on the streams before any output is written.
+for _stream in (sys.stdout, sys.stderr):
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if _reconfigure is not None:
+        _reconfigure(encoding="utf-8", errors="replace")
+
 MIRUMOJI_THEME = Theme(
     {
         "accent": "#E2533B",

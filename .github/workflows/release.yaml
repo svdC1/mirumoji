@@ -11,8 +11,10 @@ on:
             - "v*"
     workflow_dispatch:
 
-# Ceiling For The Reusable Workflows: each narrows from here (Desktop needs
-# contents:write to upload assets, Pages + PyPI need id-token/pages)
+# Ceiling For The Reusable Workflows
+# Each narrows from here
+# Desktop needs contents:write to upload assets
+# Pages + PyPI need id-token/pages
 permissions:
     contents: write
     pages: write
@@ -25,7 +27,9 @@ jobs:
 
     images:
         name: Images
-        needs: version
+        # The backend images install the published wheel from PyPI, so they
+        # must build only after pypi_publish has uploaded this version
+        needs: [version, pypi_publish]
         uses: ./.github/workflows/_images.yaml
         with:
             version: ${{ needs.version.outputs.version }}
@@ -33,10 +37,57 @@ jobs:
             DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
 
-    pypi:
-        name: PyPI
+    # PyPI publishing is inlined here (not a reusable workflow)
+    # PyPI Trusted Publishing does not support reusable workflows,
+    # so the OIDC claim must point at this top-level workflow
+    pypi_build:
+        name: PyPI - Build Distribution
         needs: version
-        uses: ./.github/workflows/_pypi.yaml
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            - name: Set Up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Build Tooling
+              run: pip install build
+
+            - name: Build sdist + wheel
+              run: cd apps/mirumoji && python -m build
+
+            - name: Upload Distribution Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dist
+                  path: apps/mirumoji/dist/
+
+    pypi_publish:
+        name: PyPI - Upload
+        needs: pypi_build
+        runs-on: ubuntu-latest
+        environment: pypi
+        permissions:
+            # Required For Trusted Publishing (OIDC)
+            id-token: write
+        steps:
+            - name: Download Distribution Artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: dist
+                  path: dist
+
+            - name: Publish To PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  packages-dir: dist
+                  # Make re-runs idempotent
+                  # If this version is already on PyPI
+                  # skip instead of failing so the rest of the release can proceed
+                  skip-existing: true
 
     pages:
         name: Pages

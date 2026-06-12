@@ -64,6 +64,10 @@ jobs:
               run: pip install -e "apps/mirumoji[gui]"
 
             - name: Build Desktop Bundle
+              # UTF-8 mode so flet's Unicode build output is encodable on the
+              # Windows runner (cp1252 by default). Harmless on macOS/Linux.
+              env:
+                  PYTHONUTF8: "1"
               run: python scripts/build_gui.py ${{ matrix.platform }}
 
             - name: Zip Bundle
