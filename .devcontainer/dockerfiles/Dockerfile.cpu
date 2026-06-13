@@ -7,7 +7,7 @@ WORKDIR /workspace
 ENV PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}" \
     PIP_NO_CACHE_DIR=1\
-    NODE_VERSION=22.0.0
+    NODE_VERSION=24.16.0
 
 # --- System Packages ---
 

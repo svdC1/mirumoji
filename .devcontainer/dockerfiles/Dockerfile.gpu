@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1\
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,video \
-    NODE_VERSION=22.0.0
+    NODE_VERSION=24.16.0
 
 
 # --- System Packages ---

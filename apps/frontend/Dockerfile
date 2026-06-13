@@ -1,6 +1,6 @@
 # ---- Build Stage ----
-# Noje.js Alpine
-FROM node:22-alpine AS builder
+# Node.js Alpine
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
