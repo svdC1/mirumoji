@@ -23,7 +23,7 @@ jobs:
             is_prerelease: ${{ steps.read.outputs.is_prerelease }}
         steps:
             - name: Checkout Repository
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Read Version From pyproject.toml
               id: read
