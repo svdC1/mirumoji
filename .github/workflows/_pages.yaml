@@ -6,6 +6,9 @@ name: Deploy Pages
 
 on:
     workflow_call:
+    # Allow a standalone redeploy of the frontend + docs site from a branch,
+    # without re-running the PyPI / image / desktop release jobs
+    workflow_dispatch:
 
 permissions:
     contents: read
