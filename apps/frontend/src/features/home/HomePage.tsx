@@ -53,7 +53,7 @@ export default function HomePage() {
     );
 
     return (
-        <div className="mx-auto min-h-screen w-full max-w-5xl px-4 py-10">
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-5xl px-4 py-10">
             <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <span
@@ -99,14 +99,16 @@ export default function HomePage() {
                 >
                     <User size={18} />
                 </span>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
+                    <div className="text-2xs uppercase tracking-wide text-ink-faint">
+                        Active Profile
+                    </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-2xs uppercase tracking-wide text-ink-faint">
-                            Active Profile
+                        <span className="min-w-0 truncate font-display text-lg text-ink">
+                            {profileId ?? "None Set"}
                         </span>
                         {profileId && <Badge tone="success">Active</Badge>}
                     </div>
-                    <div className="font-display text-lg text-ink">{profileId ?? "None Set"}</div>
                 </div>
                 <Link
                     to="/dashboard"

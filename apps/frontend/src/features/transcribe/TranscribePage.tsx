@@ -205,7 +205,7 @@ export default function TranscribePage() {
         );
 
     return (
-        <div className="flex h-screen flex-col bg-bg text-ink">
+        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink md:h-dvh">
             <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
                     {messages.length === 0 ? (
@@ -245,16 +245,16 @@ export default function TranscribePage() {
                             onClick={() => setCleanAudio((v) => !v)}
                             className={toggleClass(cleanAudio)}
                         >
-                            Clean Audio
+                            Clean
                         </button>
                         <button
                             onClick={() => setLlmExplain((v) => !v)}
                             className={toggleClass(llmExplain)}
                         >
-                            LLM Explain
+                            LLM
                         </button>
                         <Button variant="ghost" className="flex-1" onClick={clearChat}>
-                            Clear Chat
+                            Clear
                         </Button>
                     </div>
 
@@ -269,7 +269,7 @@ export default function TranscribePage() {
                                 <Trash2 size={16} /> Delete
                             </Button>
                             <Button className="flex-1" onClick={sendAudio} loading={sending}>
-                                <Send size={16} /> Send Audio
+                                <Send size={16} /> Send
                             </Button>
                         </div>
                     ) : (
@@ -281,7 +281,7 @@ export default function TranscribePage() {
                                 disabled={sending}
                             >
                                 {recording ? <Square size={16} /> : <Mic size={16} />}
-                                {recording ? "Stop Recording" : "Start Recording"}
+                                {recording ? "Stop" : "Start"}
                             </Button>
                             <label
                                 htmlFor="file-upload"
@@ -294,7 +294,7 @@ export default function TranscribePage() {
                                     )
                                 )}
                             >
-                                <Upload size={16} /> Upload Audio
+                                <Upload size={16} /> Upload
                             </label>
                             <input
                                 id="file-upload"

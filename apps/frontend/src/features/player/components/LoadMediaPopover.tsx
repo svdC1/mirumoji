@@ -130,7 +130,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
             <IconButton label="Load media" active={open} onClick={() => setOpen((v) => !v)}>
                 <FolderOpen size={18} />
             </IconButton>
-            <Popover open={open} onClose={() => setOpen(false)} className="w-72 p-4">
+            <Popover open={open} onClose={() => setOpen(false)} className="w-60 p-4 sm:w-72">
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <h4 className="text-2xs uppercase tracking-wide text-ink-faint">

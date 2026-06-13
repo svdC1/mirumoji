@@ -8,6 +8,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { SWRConfig } from "swr";
 import App from "./app/App";
 import "./assets/index.css";
 import { Toaster } from "react-hot-toast";
@@ -41,13 +42,17 @@ import { SubtitleSettingsProvider } from "./contexts/SubtitleSettingsContext";
  */
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-        <ProfileProvider>
-            <SubtitleSettingsProvider>
-                <BrowserRouter basename={import.meta.env.BASE_URL}>
-                    <App />
-                </BrowserRouter>
-            </SubtitleSettingsProvider>
-        </ProfileProvider>
+        {/* Cap error retries so a dead backend (e.g. the live demo with no
+            server) doesn't storm requests; toasts are deduped by id regardless. */}
+        <SWRConfig value={{ errorRetryCount: 2 }}>
+            <ProfileProvider>
+                <SubtitleSettingsProvider>
+                    <BrowserRouter basename={import.meta.env.BASE_URL}>
+                        <App />
+                    </BrowserRouter>
+                </SubtitleSettingsProvider>
+            </ProfileProvider>
+        </SWRConfig>
         <Toaster
             position="top-center"
             toastOptions={{

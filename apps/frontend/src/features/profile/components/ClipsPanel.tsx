@@ -77,8 +77,11 @@ export function ClipsPanel() {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-end">
-                <Button size="sm" onClick={onExport} loading={exporting}>
+            <div className="flex items-center justify-between gap-3 border-b border-ink/10 pb-3">
+                <span className="text-sm text-ink-muted">
+                    {data.length} {data.length === 1 ? "Clip" : "Clips"}
+                </span>
+                <Button size="sm" onClick={onExport} loading={exporting} className="shrink-0">
                     <Download size={15} /> Export All To Anki
                 </Button>
             </div>

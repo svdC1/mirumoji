@@ -60,20 +60,22 @@ export default function DictionaryPage() {
     };
 
     return (
-        <div className="mx-auto min-h-screen w-full max-w-3xl px-4 py-8">
-            <h1 className="mb-6 text-center font-display text-3xl text-ink">Dictionary</h1>
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-3xl px-4 py-8">
+            <div className="mx-auto mb-6 max-w-xl">
+                <h1 className="mb-6 text-center font-display text-3xl text-ink">Dictionary</h1>
 
-            <div className="mx-auto mb-6 flex max-w-xl gap-2">
-                <Input
-                    lang="ja"
-                    value={pattern}
-                    onChange={(e) => setPattern(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Word Or Wildcard Pattern (e.g. *字*)"
-                />
-                <Button onClick={handleSearch} loading={loading} className="shrink-0">
-                    <Search size={18} />
-                </Button>
+                <div className="flex gap-2">
+                    <Input
+                        lang="ja"
+                        value={pattern}
+                        onChange={(e) => setPattern(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                        placeholder="Word Or Wildcard Pattern (e.g. *字*)"
+                    />
+                    <Button onClick={handleSearch} loading={loading} className="shrink-0">
+                        <Search size={18} />
+                    </Button>
+                </div>
             </div>
 
             {error && <EmptyState title="Nothing Found" description={error} />}

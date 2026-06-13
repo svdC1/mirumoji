@@ -1,7 +1,7 @@
 /**
  * @packageDocumentation Custom, on-theme video controls (the native ones can't
  * be themed cross-browser). Renders over the bottom of the video: scrub bar,
- * play/pause, volume, time, and playback speed. No fullscreen — native
+ * play/pause, volume, time, and playback speed. No fullscreen -> native
  * fullscreen would drop the overlay subtitles. Reads/writes the <video> element
  * directly and mirrors its events into local state.
  */
@@ -78,7 +78,7 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
     return (
         <div
             // Absorb clicks when visible (so clicking the bar doesn't toggle the
-            // video); pass them through to the video when hidden.
+            // video). Pass them through to the video when hidden.
             onClick={(e) => e.stopPropagation()}
             className={cn(
                 "absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-2.5 pt-8 transition-opacity duration-200",

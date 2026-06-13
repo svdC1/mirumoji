@@ -70,7 +70,7 @@ const STEPS: Step[] = [
  */
 export default function GuidePage() {
     return (
-        <div className="mx-auto min-h-screen w-full max-w-3xl px-4 py-10">
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-3xl px-4 py-10">
             <h1 className="mb-2 font-display text-3xl text-ink">Guide</h1>
             <p className="mb-8 text-ink-muted">How To Use Mirumoji</p>
 

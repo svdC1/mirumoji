@@ -5,8 +5,15 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PanelRightClose, PanelRightOpen, Search } from "lucide-react";
+import {
+    PanelRightClose,
+    PanelRightOpen,
+    PanelBottomOpen,
+    PanelBottomClose,
+    Search,
+} from "lucide-react";
 import { Input, IconButton, EmptyState, cn } from "@/shared/ui";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { formatClock } from "@/shared/format/time";
 import type { Cue } from "../types";
 
@@ -34,6 +41,12 @@ export function SubtitlePanel({
     const [query, setQuery] = useState("");
     const activeRef = useRef<HTMLButtonElement | null>(null);
 
+    // The panel docks to the right on desktop and the bottom on mobile, so the
+    // collapse/expand affordances point the matching direction.
+    const isMobile = useIsMobile();
+    const ExpandIcon = isMobile ? PanelBottomOpen : PanelRightOpen;
+    const CollapseIcon = isMobile ? PanelBottomClose : PanelRightClose;
+
     // Keep original indices so the active highlight + seek survive filtering.
     const rows = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -49,25 +62,27 @@ export function SubtitlePanel({
     }, [activeIdx, collapsed]);
 
     if (collapsed) {
+        // Mobile: a slim full-width bar below the video. Desktop: a vertical rail.
         return (
-            <div className="flex h-full w-11 shrink-0 flex-col items-center border-l border-ink/10 bg-surface py-3">
-                <IconButton label="Show subtitles" onClick={onToggle}>
-                    <PanelRightOpen size={18} />
+            <div className="flex w-full shrink-0 items-center gap-2 border-t border-ink/10 bg-surface px-3 py-2 md:h-full md:w-11 md:flex-col md:border-l md:border-t-0 md:px-0 md:py-3">
+                <IconButton label="Show Subtitles" onClick={onToggle}>
+                    <ExpandIcon size={18} />
                 </IconButton>
-                <span className="mt-3 text-2xs uppercase tracking-widest text-ink-faint [writing-mode:vertical-rl]">
+                <span className="text-2xs uppercase tracking-widest text-ink-faint md:mt-3 md:[writing-mode:vertical-rl]">
                     Subtitles
                 </span>
             </div>
         );
     }
 
+    // Mobile: full-width, fills the space below the video. Desktop: a fixed rail.
     return (
-        <aside className="flex h-full w-80 shrink-0 flex-col border-l border-ink/10 bg-surface lg:w-96">
+        <aside className="flex min-h-0 w-full flex-1 flex-col border-t border-ink/10 bg-surface md:h-full md:w-80 md:flex-none md:border-l md:border-t-0 lg:w-96">
             <div className="flex items-center gap-2 border-b border-ink/10 px-3 py-2.5">
                 <h2 className="flex-1 font-display text-sm text-ink">Subtitles</h2>
                 <span className="text-2xs text-ink-faint">{cues.length} Cues</span>
-                <IconButton label="Hide subtitles" size="sm" onClick={onToggle}>
-                    <PanelRightClose size={16} />
+                <IconButton label="Hide Subtitles" size="sm" onClick={onToggle}>
+                    <CollapseIcon size={16} />
                 </IconButton>
             </div>
 

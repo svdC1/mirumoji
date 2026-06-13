@@ -11,7 +11,7 @@ import { hexToRgba } from "@/shared/format/color";
 import { useSubtitleSettings } from "@/contexts/SubtitleSettingsContext";
 import { cn } from "@/shared/ui";
 import { useVideoBox } from "../hooks/useVideoBox";
-import { VideoControls } from "./VideoControls";
+import { VideoControls } from "@/shared/components/VideoControls";
 import type { Cue } from "../types";
 
 export interface VideoStageProps {

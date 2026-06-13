@@ -12,24 +12,33 @@ export const API_BASE = "/api";
 /**
  * Parses a server error body into a message + optional machine code/details,
  * understanding the nested `{ error: { code, message, details } }` envelope.
+ * A body that isn't that envelope (a static host's 404 HTML, a dev-proxy error
+ * page, ...) yields a generic message flagged `displayMessage: false` so callers
+ * never surface raw markup to the user.
  */
 function parseApiError(
     body: string,
-    fallback: string
-): { message: string; code?: string; details?: unknown } {
+    status: number
+): { message: string; code?: string; details?: unknown; displayMessage: boolean } {
     try {
         const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === "object" && parsed.error) {
+        if (
+            parsed &&
+            typeof parsed === "object" &&
+            parsed.error &&
+            typeof parsed.error.message === "string"
+        ) {
             return {
-                message: parsed.error.message ?? fallback,
+                message: parsed.error.message,
                 code: parsed.error.code,
                 details: parsed.error.details,
+                displayMessage: true,
             };
         }
     } catch {
-        // body wasn't JSON; fall through to the raw text
+        // body wasn't the JSON envelope (HTML page, proxy error, ...)
     }
-    return { message: body || fallback };
+    return { message: `Request Failed (${status})`, displayMessage: false };
 }
 
 /**
@@ -55,12 +64,18 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
         headers.set("X-Profile-ID", profileId);
     }
 
-    const res = await fetch(fullUrl, { ...opts, headers });
+    let res: Response;
+    try {
+        res = await fetch(fullUrl, { ...opts, headers });
+    } catch {
+        // Network failure / server down / DNS / CORS — the backend is unreachable.
+        throw new ApiError(0, "Could not reach the server", "BackendUnreachable", undefined, false);
+    }
 
     if (!res.ok) {
         const body = await res.text();
-        const { message, code, details } = parseApiError(body, res.statusText);
-        throw new ApiError(res.status, message, code, details);
+        const { message, code, details, displayMessage } = parseApiError(body, res.status);
+        throw new ApiError(res.status, message, code, details, displayMessage);
     }
 
     const ct = res.headers.get("content-type") ?? "";
@@ -96,7 +111,7 @@ export async function uploadFile<T = unknown>(
         const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
         const profileId = localStorage.getItem("currentProfileId");
         if (!profileId) {
-            return reject(new ApiError(400, "No profile ID found. Please select a profile."));
+            return reject(new ApiError(400, "No Profile ID Dound. Select A Profile"));
         }
 
         const uploadId = `${file.name}-${Date.now()}`;
@@ -130,15 +145,24 @@ export async function uploadFile<T = unknown>(
                     reject(new ApiError(500, "Failed to parse server response."));
                 }
             } else {
-                const { message, code, details } = parseApiError(
+                const { message, code, details, displayMessage } = parseApiError(
                     xhr.responseText,
-                    `Request failed with status ${xhr.status}`
+                    xhr.status
                 );
-                reject(new ApiError(xhr.status, message, code, details));
+                reject(new ApiError(xhr.status, message, code, details, displayMessage));
             }
         };
 
-        xhr.onerror = () => reject(new ApiError(500, "Network Error"));
+        xhr.onerror = () =>
+            reject(
+                new ApiError(
+                    0,
+                    "Could not reach the server",
+                    "BackendUnreachable",
+                    undefined,
+                    false
+                )
+            );
         xhr.send(file);
     });
 }

@@ -78,7 +78,12 @@ export function SubtitleStylePopover({ className }: { className?: string }) {
             <IconButton label="Subtitle style" active={open} onClick={() => setOpen((v) => !v)}>
                 <SlidersHorizontal size={18} />
             </IconButton>
-            <Popover open={open} onClose={() => setOpen(false)} align="left" className="w-72 p-4">
+            <Popover
+                open={open}
+                onClose={() => setOpen(false)}
+                align="left"
+                className="w-60 p-4 sm:w-72"
+            >
                 <div className="space-y-4">
                     <Range
                         label={`Font Size · ${subtitleStyle.fontSize}px`}

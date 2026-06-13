@@ -9,6 +9,7 @@ import remarkBreaks from "remark-breaks";
 import { toHiragana } from "@/shared/japanese/kana";
 import { staticUrl } from "@/shared/format/files";
 import { Card, Button } from "@/shared/ui";
+import { VideoPlayer } from "@/shared/components/VideoPlayer";
 import type { Clip } from "@/shared/clips/types";
 
 /**
@@ -21,12 +22,7 @@ export function ClipDetail({ clip, onClose }: { clip: Clip; onClose: () => void 
     const { focus, sentence, explanation } = clip.breakdown;
     return (
         <Card elevated className="overflow-hidden">
-            <video
-                key={staticUrl(clip.clip_url)}
-                controls
-                src={staticUrl(clip.clip_url)}
-                className="aspect-video w-full bg-black"
-            />
+            <VideoPlayer key={staticUrl(clip.clip_url)} src={staticUrl(clip.clip_url)} />
             <div className="space-y-4 p-5">
                 {focus && (
                     <div>

@@ -116,18 +116,43 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
     const [hovered, setHovered] = useState(false);
     const [open, setOpen] = useState(false);
 
-    if (immersive) {
-        return (
-            <>
-                {!open && (
-                    <IconButton
-                        label="Open menu"
-                        onClick={() => setOpen(true)}
-                        className="fixed left-3 top-3 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
-                    >
+    return (
+        <>
+            {/* Drawer menu — every route on mobile, and the immersive Player on
+                desktop. Hidden on desktop for regular pages (they use the hover
+                rail below), so it never reserves content width on mobile. */}
+            {/* Mobile top bar — non-immersive routes. Holds the menu button (and
+                brand) so it fills the top strip instead of floating over content. */}
+            {!immersive && (
+                <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-ink/10 bg-surface/80 px-3 backdrop-blur md:hidden">
+                    <IconButton label="Open menu" onClick={() => setOpen(true)}>
                         <Menu size={20} />
                     </IconButton>
-                )}
+                    <Link to="/" className="flex items-center gap-2">
+                        <span
+                            lang="ja"
+                            className="grid h-8 w-8 place-items-center rounded-lg bg-shu/15 font-jp text-shu"
+                        >
+                            見
+                        </span>
+                        <span className="font-display text-ink">Mirumoji</span>
+                    </Link>
+                </header>
+            )}
+
+            {/* Floating menu button — immersive Player (all sizes). */}
+            {immersive && !open && (
+                <IconButton
+                    label="Open menu"
+                    onClick={() => setOpen(true)}
+                    className="fixed left-3 top-3 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
+                >
+                    <Menu size={20} />
+                </IconButton>
+            )}
+
+            {/* Drawer overlay + panel — mobile (all routes) + immersive desktop. */}
+            <div className={immersive ? "" : "md:hidden"}>
                 {open && (
                     <div
                         className="fixed inset-0 z-40 bg-black/50"
@@ -136,7 +161,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                 )}
                 <aside
                     className={cn(
-                        "fixed left-0 top-0 z-50 h-screen w-60 border-r border-ink/10 bg-surface transition-transform duration-200",
+                        "fixed left-0 top-0 z-50 h-dvh w-60 border-r border-ink/10 bg-surface transition-transform duration-200",
                         open ? "translate-x-0 shadow-lift" : "-translate-x-full"
                     )}
                 >
@@ -155,20 +180,25 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                         </div>
                     </div>
                 </aside>
-            </>
-        );
-    }
+            </div>
 
-    return (
-        <aside
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            className={cn(
-                "fixed left-0 top-0 z-40 h-screen overflow-hidden border-r border-ink/10 bg-surface transition-[width] duration-200",
-                hovered ? "w-60 shadow-lift" : "w-16"
+            {/* Hover rail — desktop, regular pages only. */}
+            {!immersive && (
+                <aside
+                    onMouseEnter={() => setHovered(true)}
+                    onMouseLeave={() => setHovered(false)}
+                    className={cn(
+                        "fixed left-0 top-0 z-40 hidden h-dvh overflow-hidden border-r border-ink/10 bg-surface transition-[width] duration-200 md:block",
+                        hovered ? "w-60 shadow-lift" : "w-16"
+                    )}
+                >
+                    <RailBody
+                        expanded={hovered}
+                        pathname={pathname}
+                        onNavigate={() => setHovered(false)}
+                    />
+                </aside>
             )}
-        >
-            <RailBody expanded={hovered} pathname={pathname} onNavigate={() => undefined} />
-        </aside>
+        </>
     );
 }

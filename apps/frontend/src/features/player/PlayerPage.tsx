@@ -90,15 +90,12 @@ export default function PlayerPage() {
     };
 
     return (
-        <div className="flex h-screen flex-col bg-bg text-ink">
-            <PlayerToolbar
-                panelCollapsed={panelCollapsed}
-                onTogglePanel={() => setPanelCollapsed((v) => !v)}
-            />
+        <div className="flex h-dvh flex-col bg-bg text-ink">
+            <PlayerToolbar />
 
-            <div className="flex min-h-0 flex-1">
+            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                 {hasMedia ? (
-                    <div className="min-w-0 flex-1">
+                    <div className="min-h-0 min-w-0 flex-1">
                         <VideoStage
                             onVideoEl={setVideoEl}
                             blobUrl={blobUrl}

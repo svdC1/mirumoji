@@ -177,9 +177,7 @@ export function LlmTemplatePanel() {
 
             {subTab === "breakdown" ? (
                 <>
-                    <p className="text-sm text-ink-muted">
-                        Used When You Click A Word To Explain It
-                    </p>
+                    <p className="text-sm text-ink-muted">Used When You Click A Word</p>
                     <ProviderModelPicker
                         provider={provider}
                         modelName={modelName}
@@ -240,7 +238,7 @@ export function LlmTemplatePanel() {
                 </>
             ) : (
                 <>
-                    <p className="text-sm text-ink-muted">Used By Fix SRT In The Player</p>
+                    <p className="text-sm text-ink-muted">Used To Fix Subtitles</p>
                     <ProviderModelPicker
                         provider={srtProvider}
                         modelName={srtModelName}
@@ -259,12 +257,13 @@ export function LlmTemplatePanel() {
                 </>
             )}
 
-            <div className="flex flex-wrap gap-2 border-t border-ink/10 pt-4">
+            <div className="flex gap-2 border-t border-ink/10 pt-4">
                 <Button onClick={onSave} loading={saving} disabled={deleting}>
-                    {template ? "Update Template" : "Create Template"}
+                    {template ? "Update" : "Create"}
+                    <span className="hidden sm:inline">{" Template"}</span>
                 </Button>
                 <Button variant="secondary" onClick={onRevert} disabled={saving || deleting}>
-                    Revert To Default
+                    Revert<span className="hidden sm:inline">{" To Default"}</span>
                 </Button>
                 {template && (
                     <Button

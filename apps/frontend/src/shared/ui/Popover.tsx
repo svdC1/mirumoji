@@ -44,7 +44,9 @@ export function Popover({ open, onClose, children, className, align = "left" }: 
                     exit={{ opacity: 0, y: -4, scale: 0.98 }}
                     transition={{ duration: 0.12 }}
                     className={cn(
-                        "absolute z-50 mt-2 rounded-card border border-ink/10 bg-surface shadow-lift",
+                        // `max-w` keeps the panel within the viewport on small
+                        // screens so it can never push the page horizontally.
+                        "absolute z-50 mt-2 max-w-[calc(100vw-1rem)] rounded-card border border-ink/10 bg-surface shadow-lift",
                         align === "right" ? "right-0" : "left-0",
                         className
                     )}
