@@ -1,36 +1,36 @@
 # mirumoji
 
 [![PyPI](https://img.shields.io/pypi/v/mirumoji?style=flat&logo=pypi&logoColor=white)](https://pypi.org/project/mirumoji/)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](https://github.com/svdC1/mirumoji/blob/main/.github/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](https://github.com/svdC1/mirumoji/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-lightgrey?style=flat&logo=materialformkdocs&logoColor=black&logoSize=auto)](https://svdc1.github.io/mirumoji/docs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/svdc1/mirumoji?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/svdc1/mirumoji)
-[![Quality](https://img.shields.io/github/actions/workflow/status/svdC1/mirumoji/release.yaml?branch=main&style=flat&logo=githubactions&logoColor=white&label=quality)](https://github.com/svdC1/mirumoji/actions/workflows/release.yaml)
+[![Release Action](https://img.shields.io/github/actions/workflow/status/svdC1/mirumoji/release.yaml?style=flat&logo=githubactions&logoColor=white&label=release)](https://github.com/svdC1/mirumoji/actions/workflows/release.yaml)
+[![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/svdc1/mirumoji/total?style=flat&logo=github&label=GitHub%20Downloads)]()
 
-An open-source, self-hosted **Japanese immersion toolkit**. Drop in a video, an
-anime episode, a drama, or an audio clip and Mirumoji gives you clickable
-tokenized subtitles with instant dictionary lookups, Whisper-powered
-transcription, SRT generation, clip saving, and one-click Anki export. All
-running locally in Docker, with optional cloud GPU and LLM features
+
+An open-source, self-hosted `Japanese Immersion Toolkit`
+
+Drop in a video, an anime episode, a drama, or an audio clip and Mirumoji gives
+you clickable tokenized subtitles with instant dictionary lookups whisper-powered
+subtitle generation, clip saving, and Anki export. All running locally in Docker,
+with optional cloud GPU and LLM features
 
 <p align="center">
-  <img src="https://github.com/svdC1/mirumoji/blob/main/.github/assets/player_example.gif?raw=true" alt="Mirumoji demo" width="100%">
+  <img src="https://github.com/svdC1/mirumoji/blob/main/.github/assets/player_example.gif?raw=true" alt="Mirumoji Demo" width="100%"/>
 </p>
 
 ---
 
 ## Quickstart
 
-Mirumoji runs as a local `Docker Compose Application`. The quickest way to start is to download the
-`Desktop Launcher` for your platform
+Mirumoji runs as a local [`Docker Compose Application`](https://docs.docker.com/compose/)
 
-### Detailed Walkthroughs
+The quickest way to start is to download the `Desktop Launcher` for your platform and follow
+the [`Setup Walkthrough`](https://svdc1.github.io/mirumoji/docs/setup/gui/)
 
+### Alternatives
 
-- Full Walkthrough &rarr; [`GUI Setup`](https://svdc1.github.io/mirumoji/docs/setup/gui/)
-
-- CLI Setup Walkthrough &rarr; [`CLI Setup`](https://svdc1.github.io/mirumoji/docs/setup/cli/)
-
-- Manual Setup Walkthrough &rarr; [`Manual Setup`](https://svdc1.github.io/mirumoji/docs/setup/manual/)
+You can also setup Mirumoji [`Manually`](https://svdc1.github.io/mirumoji/docs/setup/manual/), or through its [`CLI`](https://svdc1.github.io/mirumoji/docs/setup/cli/)
 
 ---
 
@@ -39,31 +39,31 @@ Mirumoji runs as a local `Docker Compose Application`. The quickest way to start
 <table>
   <tr>
     <td><b>Interactive Player</b></td>
-    <td>Load any video and <code>.srt</code> subtitles for clickable, tokenized Japanese lines with instant dictionary pop-ups</td>
+    <td>Load Videos + Subtitles For Clickable, Tokenized Japanese Lines With Dictionary Pop-Ups</td>
   </tr>
   <tr>
-    <td><b>Transcription &amp; SRT</b></td>
-    <td>Generate subtitles and transcribe audio with <a href="https://github.com/SYSTRAN/faster-whisper"><code>faster-whisper</code></a>, on a <a href="https://svdc1.github.io/mirumoji/docs/guides/gpu/"><code>local or cloud GPU</code></a></td>
+    <td><b>Transcription</b></td>
+    <td>Generate Subtitles + Transcribe Audio with <a href="https://github.com/SYSTRAN/faster-whisper"><code>faster-whisper</code></a>, on a <a href="https://svdc1.github.io/mirumoji/docs/guides/gpu/"><code>Local / Cloud GPU</code></a></td>
   </tr>
   <tr>
-    <td><b>Dictionary &amp; Analyzer</b></td>
+    <td><b>Dictionary</b></td>
     <td>Wildcard dictionary search (<a href="https://github.com/svdC1/kotobase"><code>kotobase</code></a>) + a paste-in text analyzer with furigana</td>
   </tr>
   <tr>
-    <td><b>LLM Breakdowns</b></td>
-    <td>Optional GPT / Claude / Gemini word &amp; sentence breakdowns with fully customizable prompts</td>
+    <td><b>LLM</b></td>
+    <td>Optionally Use Gemini / Claude / GPT API Keys (Or Your Own Local LLM Server) To Generate Sentence Breakdowns With Fully Customizable Prompts</td>
   </tr>
   <tr>
-    <td><b>Clips &amp; Anki</b></td>
-    <td>Save video segments with their word breakdowns and export them as an Anki deck</td>
+    <td><b>Clips + Anki</b></td>
+    <td>Save Video Segments With Their Word Breakdowns And Export Them As An Anki Deck</td>
   </tr>
   <tr>
     <td><b>Profiles</b></td>
-    <td>Keep files, transcripts, clips, and LLM templates organized per profile on the server</td>
+    <td>Keep Generated Files, Transcripts, Clips, and LLM Templates Organized Per Profile On The Server</td>
   </tr>
   <tr>
-    <td><b>CLI &amp; Desktop GUI</b></td>
-    <td>Run the docker compose application with <a href="https://svdc1.github.io/mirumoji/docs/cli/"><code>mirumoji up</code></a> or the <a href="https://svdc1.github.io/mirumoji/docs/setup/gui/"><code>desktop launcher</code></a></td>
+    <td><b>Launcher</b></td>
+    <td>Easily Run The Docker Compose Application Via The <a href="https://svdc1.github.io/mirumoji/docs/cli/"><code>CLI</code></a> Or The <a href="https://svdc1.github.io/mirumoji/docs/setup/gui/"><code>Desktop Launcher</code></a></td>
   </tr>
 </table>
 
@@ -74,23 +74,23 @@ Mirumoji runs as a local `Docker Compose Application`. The quickest way to start
 <table>
   <tr>
     <td><b><a href="https://svdc1.github.io/mirumoji/docs">Documentation</a></b></td>
-    <td>Guides, Full Python API Reference, Full Frontend API Reference</td>
+    <td>Guides + Full Backend / Frontend API Reference</td>
   </tr>
   <tr>
     <td><b><a href="https://svdc1.github.io/mirumoji/docs/setup/">Setup Guide</a></b></td>
-    <td>CLI, GUI, and Manual setup</td>
+    <td>CLI + GUI + Manual setup</td>
   </tr>
   <tr>
     <td><b><a href="https://svdc1.github.io/mirumoji/docs/guides/gpu/">Using a GPU</a></b></td>
-    <td>Local GPU vs. Modal Cloud GPU</td>
+    <td>Local GPU x Modal Cloud GPU</td>
   </tr>
   <tr>
     <td><b><a href="https://svdc1.github.io/mirumoji/docs/project/changelog/">Changelog</a></b></td>
-    <td>Changed Between Versions</td>
+    <td>What Changed Between Versions</td>
   </tr>
   <tr>
     <td><b><a href="https://svdc1.github.io/mirumoji/">Live Preview</a></b></td>
-    <td>View a live preview of the frontend (not backend running)</td>
+    <td>Test The Frontend (No Backend Running)</td>
   </tr>
 </table>
 

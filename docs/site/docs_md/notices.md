@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Mirumoji is licensed under the [`MIT License`](https://github.com/svdC1/mirumoji/blob/main/.github/LICENSE)
+Mirumoji is licensed under the [`MIT License`](https://github.com/svdC1/mirumoji/blob/main/LICENSE)
 
 This page acknowledges the third-party software and data Mirumoji depends on
 and redistributes

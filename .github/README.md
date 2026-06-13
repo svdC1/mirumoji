@@ -1,10 +1,10 @@
 # mirumoji
 
 [![PyPI](https://img.shields.io/pypi/v/mirumoji?style=flat&logo=pypi&logoColor=white)](https://pypi.org/project/mirumoji/)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](https://github.com/svdC1/mirumoji/blob/main/.github/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat)](https://github.com/svdC1/mirumoji/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-lightgrey?style=flat&logo=materialformkdocs&logoColor=black&logoSize=auto)](https://svdc1.github.io/mirumoji/docs)
 [![Docker Pulls](https://img.shields.io/docker/pulls/svdc1/mirumoji?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/r/svdc1/mirumoji)
-[![Release Action](https://img.shields.io/github/actions/workflow/status/svdC1/mirumoji/release.yaml?branch=main&style=flat&logo=githubactions&logoColor=white&label=release)](https://github.com/svdC1/mirumoji/actions/workflows/release.yaml)
+[![Release Action](https://img.shields.io/github/actions/workflow/status/svdC1/mirumoji/release.yaml?style=flat&logo=githubactions&logoColor=white&label=release)](https://github.com/svdC1/mirumoji/actions/workflows/release.yaml)
 [![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/svdc1/mirumoji/total?style=flat&logo=github&label=GitHub%20Downloads)]()
 
 

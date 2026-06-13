@@ -1,6 +1,7 @@
 """
-Keeps the community-health files in `.github/` in sync with the
-per-app copies that need to live beside the code they ship with
+Keeps the shared community-health files (the `.github/` README and the root
+LICENSE) in sync with the per-app copies that live beside the code they ship
+with
 
 Rather than hand-maintain three READMEs, edit `.github/README.md` and let this
 script propagate it
@@ -22,7 +23,8 @@ GITHUB = REPO_ROOT / ".github"
 SYNC_MAP: list[tuple[Path, Path]] = [
     (GITHUB / "README.md", REPO_ROOT / "apps" / "mirumoji" / "README.md"),
     (GITHUB / "README.md", REPO_ROOT / "apps" / "frontend" / "README.md"),
-    (GITHUB / "LICENSE", REPO_ROOT / "apps" / "mirumoji" / "LICENSE"),
+    # The root LICENSE is the copy GitHub detects, so it is the source of truth
+    (REPO_ROOT / "LICENSE", REPO_ROOT / "apps" / "mirumoji" / "LICENSE"),
 ]
 
 
@@ -41,7 +43,7 @@ def _rel(path: Path) -> str:
 
 def sync(check: bool) -> int:
     """
-    Copies each `.github/` file onto its destinations, or verifies they match
+    Copies each source file onto its destinations, or verifies they match
 
     Args:
         check (bool): When True, report drift without writing and return 1 if
@@ -66,7 +68,7 @@ def sync(check: bool) -> int:
             shutil.copyfile(source, dest)
 
     if check and drifted:
-        print("Out Of Sync With .github/ (run scripts/sync_meta.py):")
+        print("Out Of Sync (run scripts/sync_meta.py):")
         for path in drifted:
             print(f"  - {path}")
         return 1
