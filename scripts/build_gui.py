@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -104,6 +105,26 @@ def bundle_deps_block(platform: str) -> str:
 # --- In-Process Flet Build ---
 
 
+def build_version() -> str:
+    """
+    Returns the package version reduced to its `X.Y.Z` core
+
+    `flet build` maps `[project].version` to `--build-version`, which must be a
+    plain `x.y.z` string. A PEP 440 pre-release suffix (e.g. `3.0.0rc1`) leaves
+    the Windows executable's VERSIONINFO resource blank or invalid, a common
+    heuristic AV / SmartScreen flag for unsigned binaries, so it is trimmed and
+    passed explicitly
+
+    Returns:
+        The `X.Y.Z` core of `[project].version`, or `0.0.0` if unreadable
+    """
+    text = PYPROJECT.read_text(encoding="utf-8")
+    match = re.search(r'(?m)^\s*version\s*=\s*["\']([^"\']+)["\']', text)
+    version = match.group(1) if match else "0.0.0"
+    core = re.match(r"\d+\.\d+\.\d+", version)
+    return core.group(0) if core else version
+
+
 def run_flet_build(platform: str) -> None:
     """
     Runs `flet build` in-process from the app directory
@@ -119,8 +140,18 @@ def run_flet_build(platform: str) -> None:
     """
     from flet_cli.cli import main as flet_main
 
+    # An explicit `x.y.z` build version keeps the VERSIONINFO resource valid;
+    # the rest of the metadata (product / company / copyright / description) is
+    # already resolved from pyproject.toml
     argv, cwd = sys.argv, os.getcwd()
-    sys.argv = ["flet", "build", platform, "--yes"]
+    sys.argv = [
+        "flet",
+        "build",
+        platform,
+        "--yes",
+        "--build-version",
+        build_version(),
+    ]
     os.chdir(APP_DIR)
     try:
         flet_main()
