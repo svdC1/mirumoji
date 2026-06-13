@@ -92,12 +92,12 @@ export default defineConfig({
         },
     },
     build: {
-        rollupOptions: {
+        // Rolldown-native chunking (Vite 8). Keeps React in its own vendor
+        // chunk, the same split the old rollup `manualChunks` produced.
+        rolldownOptions: {
             output: {
-                manualChunks(id) {
-                    if (/\/react(?:-dom)?/.test(id)) {
-                        return "vendor";
-                    }
+                codeSplitting: {
+                    groups: [{ name: "vendor", test: /\/react(?:-dom)?/ }],
                 },
             },
         },
