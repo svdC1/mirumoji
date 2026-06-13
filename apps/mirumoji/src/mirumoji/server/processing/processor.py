@@ -27,7 +27,7 @@ from ...exceptions import (
     WhisperUnavailableError,
 )
 from .. import media
-from ..config import transcribe_backend
+from ..config import gpu_available, transcribe_backend
 from . import audio, whisper
 
 if TYPE_CHECKING:
@@ -235,7 +235,7 @@ class Processor:
             output_path (str | os.PathLike[str]): Absolute destination path for
                 the MP4
             to_mp4_kwargs (dict | None): Argument overrides for `audio.to_mp4`
-                (resolution, target_bitrate, use_nvenc)
+                (resolution, target_bitrate, use_gpu)
 
         Returns:
             The path to the converted MP4
@@ -278,8 +278,13 @@ class Processor:
                 ) from e
             return out
 
-        # Local Backend
-        kwargs = {"use_nvenc": True, **(to_mp4_kwargs or {})}
+        # Local Backend. Only attempt the GPU path when a CUDA device is
+        # actually present, so CPU-only deployments don't waste a doomed NVENC
+        # attempt before falling back
+        kwargs = {
+            "use_gpu": bool(gpu_available()["available"]),
+            **(to_mp4_kwargs or {}),
+        }
         await asyncio.to_thread(
             audio.to_mp4,
             ffmpeg_path=audio.get_ffmpeg_path()["ffmpeg"],

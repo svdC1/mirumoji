@@ -327,11 +327,15 @@ def to_mp4(
     output_path: str | os.PathLike[str] | None = None,
     resolution: str = "1280x720",
     target_bitrate: str = "2500k",
-    use_nvenc: bool = False,
+    use_gpu: bool = False,
 ) -> Path:
     """
     Converts any video supported by `FFMPEG` to an MP4 file using H.264 + AAC
     encoding
+
+    info: Hardware Acceleration
+        When `use_gpu` is `True`, this function attempts to decode the source
+        using `NVDEC`, and re-encode using `NVENC` (`h264_nvenc`)
 
     Args:
         ffmpeg_path (str): Path to the system's FFMPEG executable
@@ -343,8 +347,8 @@ def to_mp4(
         resolution (str): Target canvas `WxH`. Aspect is preserved.
             Defaults to `1280x720`
         target_bitrate (str):  Target video bitrate. Default to `2500k`
-        use_nvenc (bool): When `True`, attempts to use `NVIDIA NVENC` for
-            faster encoding, falling back `libx264 CPU` in case of failures
+        use_gpu (bool): When `True`, attempts NVIDIA hardware acceleration
+            falling back to CPU `libx264` if the GPU path fails for any reason
 
     Raises:
         FFmpegError: If any of the FFMPEG commands have returned a non-zero
@@ -397,8 +401,6 @@ def to_mp4(
         "libx264",
         "-profile:v",
         "high",
-        "-b:v",
-        target_bitrate,
         "-preset",
         "veryfast",
         "-crf",
@@ -425,7 +427,7 @@ def to_mp4(
         output.as_posix(),
     ]
 
-    # --- NVENC Parameters ---
+    # --- GPU Parameters (NVDEC decode + NVENC encode) ---
 
     nvidia_enc = [
         "-c:v",
@@ -440,9 +442,14 @@ def to_mp4(
         "yuv420p",
     ]
 
+    # `-hwaccel cuda` decodes with NVDEC. Without `-hwaccel_output_format cuda`
+    # the frames are downloaded to system memory, so the CPU scale/pad filters
+    # run normally and NVENC re-uploads them for encoding
     nvidia_cmd = [
         ffmpeg_path,
         "-y",
+        "-hwaccel",
+        "cuda",
         *input_args,
         "-i",
         input.as_posix(),
@@ -460,23 +467,24 @@ def to_mp4(
 
     # --- Determine Encoder ---
 
-    cmd = nvidia_cmd if use_nvenc else cpu_cmd
+    cmd = nvidia_cmd if use_gpu else cpu_cmd
 
     LOGGER.info(
-        f"Audio Processing - Converting {input.as_posix()} to MP4 with"
-        f"use_nvenc='{use_nvenc}'"
+        f"Audio Processing - Converting {input.as_posix()} to MP4 with "
+        f"use_gpu='{use_gpu}'"
     )
 
     result = run_command(cmd, check=False)
 
-    if result.returncode != 0 and use_nvenc:
+    if result.returncode != 0 and use_gpu:
         LOGGER.warning(
-            f"Audio Processing - NVENC MP4 Conversion Failed For "
-            f"{input.as_posix()} - Retrying with libx264"
+            f"Audio Processing - GPU MP4 Conversion Failed For "
+            f"{input.as_posix()} - Retrying with CPU libx264"
         )
 
-        # Retry with `libx264` in case of NVENC error
-        result = run_command(cpu_cmd)
+        # Retry on CPU. `check=False` so a failure flows into the
+        # `check_returncode()` below and is wrapped as `FFmpegError`
+        result = run_command(cpu_cmd, check=False)
 
     try:
         result.check_returncode()
@@ -499,11 +507,19 @@ def to_webm(
     output_path: str | os.PathLike[str] | None = None,
     resolution: str = "1280x720",
     target_bitrate: str = "2500k",
-    use_nvenc: bool = False,
+    use_gpu: bool = False,
 ) -> Path:
     """
     Converts any video supported by `FFMPEG` to an WebM file using VP9 + Opus
     encoding
+
+    info: Hardware Acceleration
+        - When `use_gpu` is `True`, this function attempts to decode the source
+          with NVIDIA `NVDEC` hardware acceleration, falling back to normal
+          decoding when it fails for any reason
+
+        - VP9 encoding is always CPU `libvpx-vp9`, since `NVENC` has
+          no VP9 encoder
 
     Args:
         ffmpeg_path (str): Path to the system's FFMPEG executable
@@ -515,8 +531,8 @@ def to_webm(
         resolution (str): Target canvas `WxH`. Aspect is preserved.
             Defaults to `1280x720`
         target_bitrate (str):  Target video bitrate. Default to `2500k`
-        use_nvenc (bool): When `True`, attempts to use `NVIDIA NVENC` for
-            faster encoding, falling back `libvpx-vp9 CPU` in case of failures
+        use_gpu (bool): When `True`, tries to decode with NVIDIA `NVDEC`
+            hardware acceleration
 
     Raises:
         FFmpegError: If any of the FFMPEG commands have returned a non-zero
@@ -562,7 +578,12 @@ def to_webm(
         "50M",  # 50 Megabytes
     ]
 
-    # --- CPU Parameters ---
+    # --- CPU Encode (VP9 has no NVENC encoder, so always `libvpx-vp9`) ---
+
+    # without `-row-mt`, `-tile-columns` and `-threads` libvpx-vp9 encodes
+    # almost single-threaded and is extremely slow
+    # `-cpu-used 2` trades a little quality for a large speed gain
+    threads = str(os.cpu_count() or 4)
     cpu_enc = [
         "-c:v",
         "libvpx-vp9",
@@ -570,6 +591,14 @@ def to_webm(
         target_bitrate,
         "-deadline",
         "good",
+        "-cpu-used",
+        "2",
+        "-row-mt",
+        "1",
+        "-tile-columns",
+        "2",
+        "-threads",
+        threads,
     ]
 
     cpu_cmd = [
@@ -588,26 +617,22 @@ def to_webm(
         output.as_posix(),
     ]
 
-    # --- NVENC Parameters ---
+    # --- GPU decode (NVDEC) + the same CPU VP9 encode ---
 
-    nvidia_enc = [
-        "-c:v",
-        "vp9_nvenc",
-        "-rc:v",
-        "vbr",
-        "-b:v",
-        target_bitrate,
-    ]
-
-    nvidia_cmd = [
+    # `-hwaccel cuda` decodes with NVDEC. Without `-hwaccel_output_format cuda`
+    # the frames are downloaded to system memory, so the CPU scale/pad filters
+    # and the libvpx-vp9 encoder run normally
+    gpu_cmd = [
         ffmpeg_path,
         "-y",
+        "-hwaccel",
+        "cuda",
         *input_args,
         "-i",
         input.as_posix(),
         "-vf",
         vf,
-        *nvidia_enc,
+        *cpu_enc,
         "-c:a",
         "libopus",
         "-b:a",
@@ -615,25 +640,26 @@ def to_webm(
         output.as_posix(),
     ]
 
-    # --- Determine Encoder ---
+    # --- Determine Decoder ---
 
-    cmd = nvidia_cmd if use_nvenc else cpu_cmd
+    cmd = gpu_cmd if use_gpu else cpu_cmd
 
     LOGGER.info(
-        f"Audio Processing - Converting {input.as_posix()} to WebM with"
-        f"use_nvenc='{use_nvenc}'"
+        f"Audio Processing - Converting {input.as_posix()} to WebM with "
+        f"use_gpu='{use_gpu}'"
     )
 
     result = run_command(cmd, check=False)
 
-    if result.returncode != 0 and use_nvenc:
+    if result.returncode != 0 and use_gpu:
         LOGGER.warning(
-            f"Audio Processing - NVENC WebM Conversion Failed For "
-            f"{input.as_posix()} - Retrying with libvpx-vp9"
+            f"Audio Processing - GPU-accelerated WebM Conversion Failed For "
+            f"{input.as_posix()} - Retrying with CPU-only libvpx-vp9"
         )
 
-        # Retry with `libvpx-vp9` in case of NVENC error
-        result = run_command(cpu_cmd)
+        # Retry fully on CPU. `check=False` so a failure flows into the
+        # `check_returncode()` below and is wrapped as `FFmpegError`
+        result = run_command(cpu_cmd, check=False)
 
     try:
         result.check_returncode()

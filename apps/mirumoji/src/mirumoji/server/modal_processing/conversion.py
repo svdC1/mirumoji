@@ -71,7 +71,7 @@ def video_conversion_job(
         ffmpeg_path=ffmpeg_path["ffmpeg"],
         input_path=input_local,
         output_path=output_local,
-        use_nvenc=True,
+        use_gpu=True,
     )
     result_p = to_mp4(**to_mp4_kwargs)
 

@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from ...exceptions import RecordNotFoundError
 from .. import media
+from ..config import gpu_available
 from ..db import UnitOfWork
 from ..dependencies import ensure_profile_exists, get_stream_file
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
@@ -194,14 +195,15 @@ async def save_clip(
     rel_path = media.get_relative_path(webm_loc)
 
     try:
-        # Convert to WebM for Anki Compatibility (NVENC w/ CPU fallback)
+        # Convert to WebM for Anki Compatibility (NVDEC decode w/ CPU fallback,
+        # VP9 encode is always CPU)
         ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
         await asyncio.to_thread(
             audio.to_webm,
             ffmpeg_path=ffmpeg,
             input_path=str(clip_file),
             output_path=str(webm_loc),
-            use_nvenc=True,
+            use_gpu=bool(gpu_available()["available"]),
         )
 
         async with UnitOfWork() as uow:
