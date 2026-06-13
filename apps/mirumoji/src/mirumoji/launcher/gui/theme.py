@@ -330,6 +330,8 @@ class TerminalSurface(ft.Container):
     Attributes:
         list_view (ft.ListView): The scrolling, monospace log list
         status_text (ft.Text): The colour-coded header status label
+        copy_button (ft.IconButton): Copies the buffered output to the
+            clipboard
         clear_button (ft.IconButton): Clears the log list
         logs_toggle (ft.IconButton): Hides / shows the log list
     """
@@ -342,6 +344,9 @@ class TerminalSurface(ft.Container):
             auto_scroll=True,
             padding=20,
         )
+        # Raw text of each shown line, kept parallel to `list_view.controls`
+        # so the whole buffer can be copied to the clipboard
+        self._lines: list[str] = []
 
         self.status_text = ft.Text(
             "Ready",
@@ -354,6 +359,13 @@ class TerminalSurface(ft.Container):
             size=11,
             weight=ft.FontWeight.W_600,
             color=INK_FAINT,
+        )
+        self.copy_button = ft.IconButton(
+            icon=ft.Icons.CONTENT_COPY,
+            tooltip="Copy Output",
+            icon_size=18,
+            icon_color=INK_FAINT,
+            on_click=self._copy_logs,
         )
         self.clear_button = ft.IconButton(
             icon=ft.Icons.CLEAR_ALL,
@@ -376,6 +388,7 @@ class TerminalSurface(ft.Container):
                     self._output_label,
                     ft.Container(expand=True),  # Spacer
                     self.status_text,
+                    self.copy_button,
                     self.clear_button,
                     self.logs_toggle,
                 ],
@@ -395,6 +408,16 @@ class TerminalSurface(ft.Container):
             **kwargs,
         )
 
+    def _repaint(self) -> None:
+        """
+        Repaints the surface, but only while it is mounted
+
+        Updating a control detached from the page (e.g. after navigating to
+        another panel mid-stream) raises, so guard on `self.page`
+        """
+        if self.page is not None:
+            self.update()
+
     def _set_collapsed(self, collapsed: bool) -> None:
         """
         Hides or shows the log list, preserving its contents
@@ -412,7 +435,7 @@ class TerminalSurface(ft.Container):
             ft.Icons.VISIBILITY if collapsed else ft.Icons.VISIBILITY_OFF
         )
         self.logs_toggle.tooltip = "Show Logs" if collapsed else "Hide Logs"
-        self.update()
+        self._repaint()
 
     def _toggle_logs(self, e: ft.Event[ft.IconButton]) -> None:
         """
@@ -431,7 +454,19 @@ class TerminalSurface(ft.Container):
             e (ft.Event[ft.IconButton]): The clear click event
         """
         self.clear()
-        self.update()
+        self._repaint()
+
+    async def _copy_logs(self, e: ft.Event[ft.IconButton]) -> None:
+        """
+        Copies the full buffered output to the system clipboard
+
+        Args:
+            e (ft.Event[ft.IconButton]): The copy click event
+        """
+        text = "\n".join(self._lines)
+        if not text:
+            return
+        await ft.Clipboard().set(text)
 
     def set_status(self, text: str, kind: str = "muted") -> None:
         """
@@ -444,7 +479,7 @@ class TerminalSurface(ft.Container):
         """
         self.status_text.value = text.upper()
         self.status_text.color = _STATUS_COLORS.get(kind, INK_FAINT)
-        self.update()
+        self._repaint()
 
     def append_log(self, text: str) -> None:
         """
@@ -464,18 +499,21 @@ class TerminalSurface(ft.Container):
         self.list_view.controls.append(
             ft.Text(spans=spans, size=13, font_family=MONO, selectable=True)
         )
+        self._lines.append(text)
         # Batch-Removal -> Dropping the oldest line on every append is O(n) per
         # line. Instead, let the buffer overshoot, then trim a block
         # at once so that the expensive shift happens once per
         # `_CULL_BATCH` lines
         if len(self.list_view.controls) >= _MAX_LOG_LINES + _CULL_BATCH:
             del self.list_view.controls[:_CULL_BATCH]
+            del self._lines[:_CULL_BATCH]
 
     def clear(self) -> None:
         """
         Clears all current log lines
         """
         self.list_view.controls.clear()
+        self._lines.clear()
 
 
 class NotificationBar(ft.SnackBar):

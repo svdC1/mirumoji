@@ -8,8 +8,10 @@ are run via `page.run_thread` to keep the Flet UI responsive. Results are
 delivered back through callbacks that update controls
 """
 
+import asyncio
 import logging
 import subprocess
+import threading
 from collections.abc import Callable, Generator
 from typing import Any, TypeVar
 
@@ -22,6 +24,10 @@ LOGGER = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
+# Coalesce a burst of streamed lines into one repaint at most this often, so a
+# chatty subprocess doesn't flood the event loop with per-line updates
+_FLUSH_INTERVAL_S = 0.1
+
 
 def run_blocking(
     page: ft.Page,
@@ -32,6 +38,11 @@ def run_blocking(
     """
     Runs a blocking function in a background thread
 
+    The `on_done` / `on_error` callbacks mutate UI controls, so they are
+    marshalled back onto the page's event loop with `page.run_task` instead of
+    running on the worker thread. Touching Flet controls off the event loop
+    races the loop's own diffing and corrupts the control tree
+
     Args:
         page (ft.Page): The page used to schedule the worker thread
         fn (Callable[[], _T]): The blocking function to run
@@ -39,20 +50,31 @@ def run_blocking(
         on_error (Callable[[Exception], None] | None): Called on failures
     """
 
+    async def deliver_done(result: _T) -> None:
+        """
+        Runs the success callback on the event loop
+        """
+        on_done(result)
+
+    async def deliver_error(exc: Exception) -> None:
+        """
+        Runs the error callback on the event loop
+        """
+        if on_error is not None:
+            on_error(exc)
+
     def worker() -> None:
         """
-        Runs the blocking `fn` function and calls
-        `on_done` and `on_error` with the result / exception
-        as their arguments
+        Runs the blocking `fn` function and delivers the result / exception
+        back to the event loop
         """
         try:
             result = fn()
         except Exception as exc:
             LOGGER.exception("GUI Background Task Failed")
-            if on_error is not None:
-                on_error(exc)
+            page.run_task(deliver_error, exc)
             return
-        on_done(result)
+        page.run_task(deliver_done, result)
 
     page.run_thread(worker)
 
@@ -66,16 +88,23 @@ def run_stream(
     on_error: Callable[[str], None] | None = None,
 ) -> None:
     """
-    Runs a `launcher.core` generator function on a background thread and
-    streams its yielded output output into a `TerminalSurface` (`ft.Container`)
+    Runs a `launcher.core` generator on a background thread and streams its
+    yielded output into a `TerminalSurface`
 
     info: Behaviour
-        - Each yielded line is appended to `terminal` and triggers a page
-          reload.
+        - Yielded lines are buffered and flushed to `terminal` in batches on
+          the page's event loop, at most once per `_FLUSH_INTERVAL_S`, so a
+          busy stream doesn't repaint the page per line
+
+        - All UI work (appending lines, the `on_done` / `on_error` callbacks)
+          runs on the event loop via `page.run_task`
+
+        - The worker thread never touches Flet controls directly, which would
+          race the loop's diff and corrupt the control tree
 
         - The generator's return value is delivered to `on_done`
 
-        - Any launcher / process error is mapped to a message for `on_error`
+        - launcher / process errors are mapped to a message for `on_error`
 
     Args:
         page (ft.Page): The page used to schedule the worker thread
@@ -85,43 +114,76 @@ def run_stream(
         on_error (Callable[[str], None] | None): Called with an error message
     """
 
-    def emit(line: str) -> None:
-        """
-        Appends an output line to `terminal` and updates the page
+    buffer: list[str] = []
+    lock = threading.Lock()
+    # Single-slot flag so overlapping emits coalesce into one scheduled flush
+    flush_pending = False
 
-        Args:
-            line (str): The line to append to `terminal`
-        """
-        terminal.append_log(line)
+    def drain() -> list[str]:
+        """Atomically takes and clears the buffered lines"""
+        with lock:
+            lines = buffer.copy()
+            buffer.clear()
+            return lines
+
+    def render(lines: list[str]) -> None:
+        """Appends `lines` to the terminal and repaints once (event loop)"""
+        if not lines:
+            return
+        for line in lines:
+            terminal.append_log(line)
         page.update()
+
+    async def flush() -> None:
+        """Coalesces a burst of lines into a single batched repaint"""
+        nonlocal flush_pending
+        await asyncio.sleep(_FLUSH_INTERVAL_S)
+        with lock:
+            flush_pending = False
+        render(drain())
+
+    async def finish(value: Any) -> None:
+        """Flushes any tail lines, then delivers the return value"""
+        render(drain())
+        if on_done is not None:
+            on_done(value)
+
+    async def fail(message: str) -> None:
+        """Delivers an error message on the event loop"""
+        if on_error is not None:
+            on_error(message)
+
+    def emit(line: str) -> None:
+        """Buffers a line and schedules a flush (worker thread)"""
+        nonlocal flush_pending
+        with lock:
+            buffer.append(line)
+            if flush_pending:
+                return
+            flush_pending = True
+        page.run_task(flush)
 
     def worker() -> None:
         """
-        Runs the `launcher.core` generator function, mapping
-        launcher / proccess exceptions to user-friendly messages
-
+        Runs the generator, buffering output and mapping launcher / process
+        exceptions to user-friendly messages
         """
         try:
             while True:
                 try:
                     line = next(gen)
                 except StopIteration as stop:
-                    if on_done is not None:
-                        on_done(stop.value)
+                    page.run_task(finish, stop.value)
                     return
                 emit(line)
         except LauncherError as exc:
-            if on_error is not None:
-                on_error(str(exc))
+            page.run_task(fail, str(exc))
         except subprocess.CalledProcessError as exc:
-            if on_error is not None:
-                on_error(f"Command Failed ({exc.returncode})")
+            page.run_task(fail, f"Command Failed ({exc.returncode})")
         except FileNotFoundError as exc:
-            if on_error is not None:
-                on_error(f"Command Not Found: {exc.filename}")
+            page.run_task(fail, f"Command Not Found: {exc.filename}")
         except Exception as exc:
             LOGGER.exception("GUI Stream Failed")
-            if on_error is not None:
-                on_error(str(exc))
+            page.run_task(fail, str(exc))
 
     page.run_thread(worker)
