@@ -8,12 +8,17 @@
         // Get the full path that the user tried to access.
         const path = window.location.pathname;
 
-        // Store it in sessionStorage.
-        sessionStorage.setItem('redirectPath', path);
-
-        // Redirect to the base URL of the GitHub Pages application.
-        // The script in the main app will handle the rest.
-        window.location.href = "/mirumoji/"
+        if (path.indexOf('/docs/') !== -1) {
+            // The mkdocs site lives under /docs/. If one of its pages 404s,
+            // send the user to the docs home rather than bouncing the path into
+            // the SPA, which has no /docs route.
+            window.location.href = "/mirumoji/docs/";
+        } else {
+            // Store the intended path so the app can restore it after the
+            // redirect to the base URL.
+            sessionStorage.setItem('redirectPath', path);
+            window.location.href = "/mirumoji/";
+        }
     </script>
 </head>
 

@@ -56,9 +56,10 @@ export default defineConfig({
                 ],
             },
             workbox: {
-                // API calls always need the live backend -> never serve them from
-                // cache, and never let the SPA navigation fallback swallow them
-                navigateFallbackDenylist: [/^\/api\//],
+                // Keep the SPA navigation fallback from swallowing API calls or
+                // the mkdocs site served under /docs/ on the Pages build, and
+                // never cache /api responses
+                navigateFallbackDenylist: [/^\/api\//, /\/docs\//],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
