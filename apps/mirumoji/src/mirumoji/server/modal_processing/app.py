@@ -21,7 +21,7 @@ from typing import Any
 
 import modal
 
-from ...paths import HOST_MEDIA_PATH
+from ...paths import CONTAINER_MEDIA_DIR, HOST_MEDIA_PATH
 from ..config import get_settings
 from .conversion import video_conversion_job
 from .transcription import transcribe_job
@@ -75,7 +75,7 @@ def setup_modal() -> ModalRuntime:
     HOST_MEDIA_PATH.mkdir(parents=True, exist_ok=True)
     LOGGER.info(
         f"Modal Setup - Configiguring Image + Mounting '{HOST_MEDIA_PATH}' at "
-        f"/root/media_files",
+        f"'{CONTAINER_MEDIA_DIR}'",
     )
 
     # Build media_files on modal container startup
@@ -83,7 +83,7 @@ def setup_modal() -> ModalRuntime:
         settings.modal_image,
     ).add_local_dir(
         HOST_MEDIA_PATH,
-        remote_path="/root/media_files",
+        remote_path=CONTAINER_MEDIA_DIR,
     )
 
     app = modal.App("mirumoji-gpu", image=mirumoji_image)

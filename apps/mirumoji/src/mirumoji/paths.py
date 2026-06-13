@@ -68,13 +68,23 @@ The server's media root (`user_data_path / media_files`)
 Directory in which the server stores all media that was generated or uploaded
 by users at runtime. Contains sub-directories for every mirumoji `profile`
 under which the media was uploaded or generated
+"""
+
+CONTAINER_MEDIA_DIR = "/root/media_files"
+"""
+Where `HOST_MEDIA_PATH` is mounted inside every `Modal` Job Container
 
 info: Modal Container Mount
-    When using the server's `modal` transcribe backend, this directory is
-    mounted at startup onto every `Modal` container running the `mirumoji-gpu`
-    ephemeral app so that the container has access to the files for processing.
-    The directory is mounted at `/root/media_files` inside the `Modal`
-    container
+    - When using the server's `modal` transcribe backend, `HOST_MEDIA_PATH` is
+      mounted at startup onto every `Modal` container running the
+      `mirumoji-gpu` ephemeral app so that the container has access to the
+      files for processing
+
+    - Jobs receive media paths relative to `HOST_MEDIA_PATH`, so they resolve
+      them against this mount to reach the file inside the container
+
+    - The directory is mounted at `/root/media_files` inside the `Modal`
+      container
 """
 
 

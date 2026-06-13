@@ -35,6 +35,7 @@ def video_conversion_job(
     """
     import logging
 
+    from mirumoji.paths import CONTAINER_MEDIA_DIR
     from mirumoji.server.processing.audio import get_ffmpeg_path, to_mp4
 
     # Configure Container Logging
@@ -51,7 +52,9 @@ def video_conversion_job(
     tmp_p.mkdir(parents=True, exist_ok=True)
     logger.info(f"Using Temporary Directory For Video Conversion: '{tmp_p}'")
 
-    input_local = Path(rel_video_fp)
+    # The path arrives relative to the mounted host media dir
+    # (CONTAINER_MEDIA_DIR), so resolve against it to reach the file
+    input_local = Path(CONTAINER_MEDIA_DIR) / rel_video_fp
     output_local = tmp_p / f"{input_local.stem}_converted.mp4"
 
     logger.info(

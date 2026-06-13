@@ -54,6 +54,7 @@ def transcribe_job(
     import logging
     from pathlib import Path
 
+    from mirumoji.paths import CONTAINER_MEDIA_DIR
     from mirumoji.server.processing import whisper
 
     # Configure Container Logging
@@ -69,7 +70,9 @@ def transcribe_job(
     )
 
     model = whisper.load_model(w_model_args)
-    input = Path(rel_media_fp)
+    # The path arrives relative to the mounted host media dir
+    # (CONTAINER_MEDIA_DIR), so resolve against it to reach the file
+    input = Path(CONTAINER_MEDIA_DIR) / rel_media_fp
 
     logger.info(
         f"'model_opts' : {w_model_args} | "
