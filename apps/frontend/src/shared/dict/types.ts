@@ -3,6 +3,13 @@
  * matching the server's serialized shapes.
  */
 
+/**
+ * Token bundling granularity, mirroring the server `BundleMode`. `words` merges
+ * into whole dictionary words, `grammar` (default) splits into learning blocks,
+ * `morphemes` is one word per raw UniDic unit.
+ */
+export type BundleMode = "words" | "grammar" | "morphemes";
+
 /** A single sense within a JMdict entry. */
 export interface WordSense {
     order: number;

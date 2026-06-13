@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import SrtParser2 from "srt-parser-2";
 import { apiTokenizeBatch } from "@/shared/dict/api";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { toSec } from "@/shared/format/time";
 import type { Cue } from "../types";
 
@@ -23,6 +24,7 @@ export interface UseCuesResult {
 export function useCues(srt: File | null): UseCuesResult {
     const [cues, setCues] = useState<Cue[]>([]);
     const [preparing, setPreparing] = useState(false);
+    const { mode } = useBundleSettings();
 
     useEffect(() => {
         let cancelled = false;
@@ -50,7 +52,10 @@ export function useCues(srt: File | null): UseCuesResult {
 
             setPreparing(true);
             try {
-                const wordsList = await apiTokenizeBatch(parsed.map((c) => c.raw));
+                const wordsList = await apiTokenizeBatch(
+                    parsed.map((c) => c.raw),
+                    mode
+                );
                 if (cancelled) return;
                 setCues(parsed.map((cue, i) => ({ ...cue, words: wordsList[i] })));
             } catch (err) {
@@ -63,7 +68,7 @@ export function useCues(srt: File | null): UseCuesResult {
         return () => {
             cancelled = true;
         };
-    }, [srt]);
+    }, [srt, mode]);
 
     return { cues, preparing };
 }

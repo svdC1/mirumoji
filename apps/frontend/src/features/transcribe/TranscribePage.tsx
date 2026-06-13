@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
 import { uploadFile } from "@/shared/api/client";
 import { apiTokenize } from "@/shared/dict/api";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { apiExplainSentence, apiGetTemplate } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import WordDialog from "@/shared/components/WordDialog";
@@ -30,6 +31,7 @@ export default function TranscribePage() {
     const [previewUrl, setPreviewUrl] = useState("");
     const [sending, setSending] = useState(false);
     const [dialog, setDialog] = useState<{ sentence: string; word: string } | null>(null);
+    const { mode } = useBundleSettings();
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -152,7 +154,7 @@ export default function TranscribePage() {
             if (result.transcript) {
                 let words;
                 try {
-                    words = await apiTokenize(result.transcript);
+                    words = await apiTokenize(result.transcript, mode);
                 } catch (e) {
                     console.error("Failed to tokenize transcript:", e);
                 }

@@ -28,7 +28,7 @@
 
 ## Checklist
 
-- [ ] I have read the [Contributing Guide](https://svdc1.github.io/mirumoji/docs/Contributing)
+- [ ] I have read the [`Contributing Guide`](https://svdc1.github.io/mirumoji/docs/Contributing)
 - [ ] My changes don't break existing functionality
 - [ ] I added or updated tests where it makes sense
 

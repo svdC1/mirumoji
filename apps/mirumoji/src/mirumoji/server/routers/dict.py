@@ -12,6 +12,7 @@ import logging
 from fastapi import APIRouter, Query
 
 from ..models.jpdict import (
+    BundleMode,
     EnrichedJapaneseWord,
     JapaneseWord,
     KotobaseData,
@@ -50,7 +51,10 @@ async def query(
 
 
 @dict_router.get("/tokenize", response_model=list[JapaneseWord])
-async def tokenize(sentence: str = Query(...)) -> list[JapaneseWord]:
+async def tokenize(
+    sentence: str = Query(...),
+    mode: BundleMode = Query(BundleMode.grammar),
+) -> list[JapaneseWord]:
     """
     Tokenizes a sentence into useful, stitched words (no dictionary lookups)
 
@@ -59,6 +63,7 @@ async def tokenize(sentence: str = Query(...)) -> list[JapaneseWord]:
 
     Args:
         sentence (str): The Japanese sentence to tokenize
+        mode (BundleMode): How aggressively to group tokens into words
 
     Returns:
         A list of `JapaneseWord` models, one per stitched word
@@ -66,7 +71,7 @@ async def tokenize(sentence: str = Query(...)) -> list[JapaneseWord]:
     Raises:
         FugashiError: If tokenization fails
     """
-    return await asyncio.to_thread(text.segment, sentence)
+    return await asyncio.to_thread(text.segment, sentence, mode)
 
 
 @dict_router.post("/tokenize", response_model=list[list[JapaneseWord]])
@@ -88,12 +93,13 @@ async def tokenize_batch(
     Raises:
         FugashiError: If tokenization fails
     """
-    return await asyncio.to_thread(text.segment_batch, req.sentences)
+    return await asyncio.to_thread(text.segment_batch, req.sentences, req.mode)
 
 
 @dict_router.get("/analyze", response_model=list[EnrichedJapaneseWord])
 async def analyze(
     sentence: str = Query(...),
+    mode: BundleMode = Query(BundleMode.grammar),
 ) -> list[EnrichedJapaneseWord]:
     """
     Tokenizes a sentence and enriches every stitched word with dictionary data
@@ -103,6 +109,7 @@ async def analyze(
 
     Args:
         sentence (str): The Japanese sentence to analyze
+        mode (BundleMode): How aggressively to group tokens into words
 
     Returns:
         A list of `EnrichedJapaneseWord` models, one per stitched word
@@ -111,4 +118,4 @@ async def analyze(
         FugashiError: If tokenization fails
         KotobaseError: If a dictionary lookup fails
     """
-    return await asyncio.to_thread(text.enrich, sentence)
+    return await asyncio.to_thread(text.enrich, sentence, mode)

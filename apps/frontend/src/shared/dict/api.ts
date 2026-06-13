@@ -3,17 +3,22 @@
  */
 
 import { apiFetch } from "@/shared/api/client";
-import type { JapaneseWord, KotobaseData } from "./types";
+import type { BundleMode, JapaneseWord, KotobaseData } from "./types";
 
 /**
  * Tokenizes a sentence on the server, returning one stitched `JapaneseWord` per
  * word (no dictionary data).
  *
  * @param {string} sentence The Japanese sentence.
+ * @param {BundleMode} [mode="grammar"] How aggressively to group tokens.
  * @returns {Promise<JapaneseWord[]>} The stitched words.
  */
-export async function apiTokenize(sentence: string): Promise<JapaneseWord[]> {
-    return apiFetch<JapaneseWord[]>(`dict/tokenize?sentence=${encodeURIComponent(sentence)}`, {
+export async function apiTokenize(
+    sentence: string,
+    mode: BundleMode = "grammar"
+): Promise<JapaneseWord[]> {
+    const params = new URLSearchParams({ sentence, mode });
+    return apiFetch<JapaneseWord[]>(`dict/tokenize?${params.toString()}`, {
         method: "GET",
     });
 }
@@ -23,12 +28,16 @@ export async function apiTokenize(sentence: string): Promise<JapaneseWord[]> {
  * subtitle file).
  *
  * @param {string[]} sentences The sentences, in order.
+ * @param {BundleMode} [mode="grammar"] How aggressively to group tokens.
  * @returns {Promise<JapaneseWord[][]>} One word list per input sentence.
  */
-export async function apiTokenizeBatch(sentences: string[]): Promise<JapaneseWord[][]> {
+export async function apiTokenizeBatch(
+    sentences: string[],
+    mode: BundleMode = "grammar"
+): Promise<JapaneseWord[][]> {
     return apiFetch<JapaneseWord[][]>("dict/tokenize", {
         method: "POST",
-        body: JSON.stringify({ sentences }),
+        body: JSON.stringify({ sentences, mode }),
     });
 }
 

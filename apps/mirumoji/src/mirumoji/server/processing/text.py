@@ -11,6 +11,7 @@ from kotobase.core.datatypes import JMDictEntryDTO, JMNeDictEntryDTO
 
 from ...exceptions import FugashiError, KotobaseError
 from ..models.jpdict import (
+    BundleMode,
     EnrichedJapaneseWord,
     JapaneseWord,
     JMEntry,
@@ -273,39 +274,65 @@ These open a (possibly compound) noun bundle
 """
 
 
-def _attaches_to_predicate(tok: Token) -> bool:
+_ADVERBIAL_NOUN = "副詞可能"
+"""
+`pos3` marking a noun that can also act adverbially
+(今日, 毎日, 去年, 全部, ...)
+
+These stand on their own far more often than they head a compound, so they are
+kept out of noun bundles to avoid over-merges like 毎日 + 日本語
+"""
+
+
+_POLITE_AUX = {"です", "ます"}
+"""
+`orth_base` of the politeness auxiliaries
+
+In `grammar` mode these are split off from the word they politen
+(読み | ました, 何 | です) rather than glued onto the stem, since that boundary
+is an obvious one for a learner
+"""
+
+
+def _attaches_to_predicate(tok: Token, mode: BundleMode) -> bool:
     """
     Whether a token glues onto an open predicate (verb/adjective) bundle
 
-    Deliberately does NOT attach case/topic particles (`格助詞` を/が/で,
-    `係助詞` は), since those mark how words relate and should stay separate so
-    that the sentence structure stays visible
+    Never attaches case/topic particles (`格助詞` を/が/で, `係助詞` は), which
+    mark how words relate, so keeping them apart keeps the sentence readable
 
+    abstract: words
+        Pulls a predicate's whole tail back onto the stem
 
-    abstract: Open Predicates
-        A predicate's meaning is spread across its stem + a tail of
-        grammatical pieces. This merges that tail back on by returning `True`
-        for the following parts of speech
+        - Form-changing endings: auxiliaries (`助動詞`) for tense,
+          politeness and negation (`まし` + `た` in `読み + まし + た` ->
+          `読みました`), and suffixes (`接尾辞`) like the `さ` in `高さ`
 
-        - Auxiliaries (`助動詞`) &rarr; carry tense/politeness/negation (e.g.
-          the `まし` and `た` in `読み + まし + た` -> `読みました`)
+        - Helper verbs (`動詞`/`非自立可能`): `みる`/`いる` that add nuance
+          (the `み` in `食べて + み + た` -> `食べてみた`)
 
-        - Suffixes (`接尾辞`) &rarr; e.g. `さ` turning an adjective into a noun
+        - The connecting `て`/`で` (`助詞`/`接続助詞`) that links them
 
-        - Bound auxiliary verbs (`動詞`/`非自立可能`) &rarr; verbs like `いる`,
-          `みる`, `くる` that follow another verb to add aspect/nuance (e.g.
-          the `み` from `みる` in `食べて` + `み` + `た` -> `食べてみた`)
-
-        - The connecting particle て/で (`助詞`/`接続助詞`) that links the
-          above (e.g. the `て` in `食べ` + `て` + `みた`)
+    abstract: grammar
+        Keeps only the form-changing endings (`助動詞`, `接尾辞`), but splits
+        off the parts a learner reads on their own: the polite `ます`/`です`,
+        the connecting `て`, and the helper verbs (`食べてみた` ->
+        `食べ | て | みた`, and `読みました` -> `読み | ました`)
 
     Args:
         tok (Token): The candidate following token
+        mode (BundleMode): The active bundling mode
 
     Returns:
         `True` if the token should merge into the current predicate
     """
-    if tok.pos in {"助動詞", "接尾辞"}:
+    if tok.pos == "接尾辞":
+        return True
+    if mode is BundleMode.grammar:
+        # Form-changing endings stay on, but the polite stem breaks off alone
+        return tok.pos == "助動詞" and tok.orth_base not in _POLITE_AUX
+    # words: glue the whole tail (auxiliaries, helper verbs, connecting て)
+    if tok.pos == "助動詞":
         return True
     if tok.pos == "動詞" and tok.pos2 == "非自立可能":
         return True
@@ -317,16 +344,18 @@ def _attaches_to_noun(tok: Token) -> bool:
     Whether a token extends an open noun compound
 
     Japanese builds compound nouns by stacking nouns (and noun-like suffixes)
-    with no space between them. This merges those pieces into one word
+    with no space between them, so this merges those pieces into one word
 
-    info: Additional Information
-        Returns `True` for the following parts of speech
+    abstract: Merges
+        - Another noun/pronoun (`名詞`/`代名詞`): `東京` + `大学` -> `東京大学`
 
-        - Another noun/pronoun (`名詞`/`代名詞`) &rarr; (e.g. `東京` / Tokyo +
-          `大学` / University -> `東京大学` / Tokyo University)
+        - A noun-like suffix (`接尾辞`/`名詞的`): the `館` in `図書` + `館` ->
+          `図書館`
 
-        - A noun-like suffix (`接尾辞`/`名詞的`) &rarr; (e.g. the `館` /
-          building in `図書` + `館` -> `図書館` / library)
+    abstract: Keeps apart
+        - Adverbial nouns (`副詞可能`: 今日, 毎日, ...), which stand alone
+          far more often than they head a compound, so merging them would
+          wrongly fuse `毎日` + `日本語` into one word
 
     Args:
         tok (Token): The candidate following token
@@ -335,29 +364,33 @@ def _attaches_to_noun(tok: Token) -> bool:
         `True` if the token should merge into the current noun compound
     """
     if tok.pos in _NOUN_POS:
-        return True
+        return tok.pos3 != _ADVERBIAL_NOUN
     return tok.pos == "接尾辞" and tok.pos2 == "名詞的"
 
 
-def _bundle_kind(tok: Token) -> str:
+def _bundle_kind(tok: Token, mode: BundleMode) -> str:
     """
     Classifies the kind of bundle a token opens (what it can grow into)
 
-    abstract: Bundle Types
-        - `prefix` &rarr; A prefix (`接頭辞`) like `お`/`ご`/`不` that attaches
-          to the *following* word (e.g. the `お` in `お` + `名前` -> `お名前`)
+    abstract: Kinds
+        - `prefix`: A prefix (`接頭辞`) like `お`/`ご`/`不` attaching to the
+          *following* word (the `お` in `お` + `名前` -> `お名前`)
 
-        - `predicate` &rarr; A verb/adjective head that can absorb an
-          inflectional tail (see `_attaches_to_predicate`)
+        - `predicate`: A verb/adjective head that absorbs an inflectional tail
+          (see `_attaches_to_predicate`). In `grammar` mode a politeness stem
+          (`ます`/`です`) also opens one, so it carries its own tense
+          (`まし` + `た` -> `ました`) apart from the verb
 
-        - `noun` &rarr; A noun/pronoun head that can absorb a compound (see
-          `_attaches_to_noun`)
+        - `noun`: A noun/pronoun head that absorbs a compound (see
+          `_attaches_to_noun`), unless it is an adverbial noun (`副詞可能`),
+          which stays on its own
 
-        - `other` &rarr; Anything else (particles like は/を, punctuation,
-          adverbs, ...) which stays a standalone one-token word
+        - `other`: Anything else (particles like は/を, punctuation, adverbs,
+          ...) which stays a standalone one-token word
 
     Args:
         tok (Token): The bundle's head (first) token
+        mode (BundleMode): The active bundling mode
 
     Returns:
         One of the documented bundle types
@@ -366,7 +399,18 @@ def _bundle_kind(tok: Token) -> str:
         return "prefix"
     if tok.pos in _PREDICATE_POS:
         return "predicate"
+    # In grammar mode a politeness stem heads its own block so it carries its
+    # own tense tail (`まし` + `た` -> `ました`), apart from the verb
+    if (
+        mode is BundleMode.grammar
+        and tok.pos == "助動詞"
+        and tok.orth_base in _POLITE_AUX
+    ):
+        return "predicate"
     if tok.pos in _NOUN_POS:
+        # Adverbial nouns stay standalone instead of opening a compound
+        if tok.pos3 == _ADVERBIAL_NOUN:
+            return "other"
         return "noun"
     return "other"
 
@@ -414,45 +458,51 @@ def _bundle_to_word(toks: list[Token], kind: str) -> JapaneseWord:
     )
 
 
-def stitch(tokens: list[Token]) -> list[JapaneseWord]:
+def stitch(
+    tokens: list[Token],
+    mode: BundleMode = BundleMode.grammar,
+) -> list[JapaneseWord]:
     """
     Stitches UniDic short-unit tokens into useful, learner-facing words
 
-    example: Tokenisation Example
-        ```txt
-        私は図書館で本を読みました (I read a book at the library)
+    The grouping is controlled by `mode` (see `BundleMode`)
 
+    example: 私は図書館で本を読みました (grammar mode)
+        ```txt
         UniDic short units (10):
             私 | は | 図書 | 館 | で | 本 | を | 読み | まし | た
 
-        Stitched words (7):
-            私 | は | 図書館 | で | 本 | を | 読みました
+        Stitched words (8):
+            私 | は | 図書館 | で | 本 | を | 読み | ました
 
-        Changes:
-
-            図書 + 館 -> 図書館 (Library)
-            読み + まし + た -> 読みました (Read - Polite Form)
-            Particles は/で/を Stay On Their Own
+        図書 + 館 -> 図書館 (library)
+        読み stays on its own, the polite まし + た splits off -> 読み | ました
+        Particles は/で/を stay on their own
         ```
 
     warning: Reliability
+        - Splitting verbs, auxiliaries and particles follows directly from
+          UniDic's grammatical labels, so it is essentially deterministic
 
-        - Predicate gluing (verb/adjective + its auxiliaries, bound verbs,
-          and connecting て/で) follows directly from UniDic's grammatical
-          labels, so it is essentially deterministic
-
-        - Noun compounding is a **heuristic**. UniDic hands back a run of
-          nouns, but does not say whether they form one compound or several
-          words (that lives in its separate "long unit word" layer, which the
-          short-unit output doesn't expose), so consecutive nouns are merged
-          by rule and may occasionally over- or under-merge
+        - Noun compounding is a **heuristic**. UniDic returns a run of nouns,
+          not whether they form one word or several (that lives in its
+          separate "long unit word" layer, which the short-unit output does
+          not expose), so consecutive nouns are merged by rule and may over-
+          or under-merge
 
     Args:
         tokens (list[Token]): Short-unit tokens, in order
+        mode (BundleMode): How aggressively to group the tokens
 
     Returns:
         The stitched `JapaneseWord` bundles, in order
     """
+    if mode is BundleMode.morphemes:
+        # No stitching, so one word per UniDic short unit
+        return [
+            _bundle_to_word([tok], _bundle_kind(tok, mode)) for tok in tokens
+        ]
+
     bundles: list[list[Token]] = []
     kinds: list[str] = []
 
@@ -460,7 +510,7 @@ def stitch(tokens: list[Token]) -> list[JapaneseWord]:
         if bundles:
             kind = kinds[-1]
 
-            if kind == "predicate" and _attaches_to_predicate(tok):
+            if kind == "predicate" and _attaches_to_predicate(tok, mode):
                 bundles[-1].append(tok)
                 continue
 
@@ -469,9 +519,9 @@ def stitch(tokens: list[Token]) -> list[JapaneseWord]:
                 continue
 
             if kind == "prefix":
-                # A prefix glues onto the following content head, then takes
-                # that head's kind; otherwise it stands on its own
-                new_kind = _bundle_kind(tok)
+                # A prefix glues onto the following content head and takes that
+                # head's kind, otherwise it stands on its own
+                new_kind = _bundle_kind(tok, mode)
                 if new_kind in {"predicate", "noun", "prefix"}:
                     bundles[-1].append(tok)
                     kinds[-1] = new_kind
@@ -479,7 +529,7 @@ def stitch(tokens: list[Token]) -> list[JapaneseWord]:
                 kinds[-1] = "other"
 
         bundles.append([tok])
-        kinds.append(_bundle_kind(tok))
+        kinds.append(_bundle_kind(tok, mode))
 
     return [
         _bundle_to_word(toks, kind)
@@ -487,7 +537,10 @@ def stitch(tokens: list[Token]) -> list[JapaneseWord]:
     ]
 
 
-def segment(sentence: str) -> list[JapaneseWord]:
+def segment(
+    sentence: str,
+    mode: BundleMode = BundleMode.grammar,
+) -> list[JapaneseWord]:
     """
     Tokenizes and stitches a sentence into useful words (no dictionary lookups)
 
@@ -501,6 +554,7 @@ def segment(sentence: str) -> list[JapaneseWord]:
 
     Args:
         sentence (str): The Japanese sentence to segment
+        mode (BundleMode): How aggressively to group the tokens
 
     Returns:
         The stitched `JapaneseWord` bundles
@@ -508,10 +562,13 @@ def segment(sentence: str) -> list[JapaneseWord]:
     Raises:
         FugashiError: If tokenisation fails
     """
-    return stitch(tokenize(sentence))
+    return stitch(tokenize(sentence), mode)
 
 
-def segment_batch(sentences: list[str]) -> list[list[JapaneseWord]]:
+def segment_batch(
+    sentences: list[str],
+    mode: BundleMode = BundleMode.grammar,
+) -> list[list[JapaneseWord]]:
     """
     Segments many sentences in one call (see `segment`)
 
@@ -520,6 +577,7 @@ def segment_batch(sentences: list[str]) -> list[list[JapaneseWord]]:
 
     Args:
         sentences (list[str]): The sentences to segment, in order
+        mode (BundleMode): How aggressively to group the tokens
 
     Returns:
         One stitched-word list per input sentence, in the same order
@@ -527,10 +585,13 @@ def segment_batch(sentences: list[str]) -> list[list[JapaneseWord]]:
     Raises:
         FugashiError: If tokenisation fails
     """
-    return [segment(sentence) for sentence in sentences]
+    return [segment(sentence, mode) for sentence in sentences]
 
 
-def enrich(sentence: str) -> list[EnrichedJapaneseWord]:
+def enrich(
+    sentence: str,
+    mode: BundleMode = BundleMode.grammar,
+) -> list[EnrichedJapaneseWord]:
     """
     Segments a sentence and enriches each stitched word with dictionary data
 
@@ -541,6 +602,7 @@ def enrich(sentence: str) -> list[EnrichedJapaneseWord]:
 
     Args:
         sentence (str): The Japanese sentence to process
+        mode (BundleMode): How aggressively to group the tokens
 
     Returns:
         A list of `EnrichedJapaneseWord` (stitched word + dictionary data)
@@ -554,5 +616,5 @@ def enrich(sentence: str) -> list[EnrichedJapaneseWord]:
             word=word,
             kotobase_data=query_kotobase(query=word.lemma),
         )
-        for word in segment(sentence)
+        for word in segment(sentence, mode)
     ]

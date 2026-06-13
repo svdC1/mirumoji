@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { apiTokenizeBatch } from "@/shared/dict/api";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { Badge, cn } from "@/shared/ui";
 import TokenizedText from "./TokenizedText";
 import type { JMEntry, JMNEntry, JapaneseWord, KanjiInfo, KotobaseData } from "@/shared/dict/types";
@@ -146,18 +147,19 @@ export const TokenizedExamples = ({
 }) => {
     const [wordsList, setWordsList] = useState<JapaneseWord[][] | null>(null);
     const joined = examples.join(" ");
+    const { mode } = useBundleSettings();
 
     useEffect(() => {
         let cancelled = false;
         setWordsList(null);
-        apiTokenizeBatch(examples)
+        apiTokenizeBatch(examples, mode)
             .then((r) => !cancelled && setWordsList(r))
             .catch(() => !cancelled && setWordsList(null));
         return () => {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [joined]);
+    }, [joined, mode]);
 
     return (
         <ul className="space-y-2">

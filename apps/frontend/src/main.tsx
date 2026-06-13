@@ -14,6 +14,7 @@ import "./assets/index.css";
 import { Toaster } from "react-hot-toast";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { SubtitleSettingsProvider } from "./contexts/SubtitleSettingsContext";
+import { BundleSettingsProvider } from "./contexts/BundleSettingsContext";
 
 /**
  * Fix for GitHub Pages and other static hosts.
@@ -47,9 +48,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <SWRConfig value={{ errorRetryCount: 2 }}>
             <ProfileProvider>
                 <SubtitleSettingsProvider>
-                    <BrowserRouter basename={import.meta.env.BASE_URL}>
-                        <App />
-                    </BrowserRouter>
+                    <BundleSettingsProvider>
+                        <BrowserRouter basename={import.meta.env.BASE_URL}>
+                            <App />
+                        </BrowserRouter>
+                    </BundleSettingsProvider>
                 </SubtitleSettingsProvider>
             </ProfileProvider>
         </SWRConfig>

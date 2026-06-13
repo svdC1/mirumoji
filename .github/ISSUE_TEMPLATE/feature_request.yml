@@ -7,7 +7,7 @@ body:
       attributes:
           value: |
               Thanks for suggesting an improvement. Please search
-              [existing issues](https://github.com/svdC1/mirumoji/issues) first
+              [`existing issues`](https://github.com/svdC1/mirumoji/issues) first
               to avoid duplicates.
 
     - type: dropdown

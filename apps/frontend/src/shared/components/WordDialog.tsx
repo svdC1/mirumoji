@@ -227,11 +227,13 @@ export default function WordDialog({
     }, [tab, dictWord]);
 
     // Tokenize the current dict word for its grammar breakdown (no LLM needed).
+    // Force "words" so the whole word stays one bundle and exposes all of its
+    // underlying tokens, independent of the user's reading preference.
     useEffect(() => {
         if (tab !== "dict") return;
         let cancelled = false;
         setDictTokens([]);
-        apiTokenize(dictWord)
+        apiTokenize(dictWord, "words")
             .then((ws) => !cancelled && setDictTokens(ws[0]?.tokens ?? []))
             .catch(() => !cancelled && setDictTokens([]));
         return () => {

@@ -7,6 +7,7 @@
 import React, { useState } from "react";
 import { ArrowLeft, ClipboardPaste } from "lucide-react";
 import { apiTokenize } from "@/shared/dict/api";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { toastApiError } from "@/shared/api/errors";
 import WordDialog from "@/shared/components/WordDialog";
 import TokenizedText from "@/shared/components/TokenizedText";
@@ -25,12 +26,13 @@ export default function TextPage() {
     const [loading, setLoading] = useState(false);
     const [showFurigana, setShowFurigana] = useState(true);
     const [reading, setReading] = useState(false);
+    const { mode } = useBundleSettings();
 
     const handleRead = async () => {
         if (text.trim() === "" || loading) return;
         setLoading(true);
         try {
-            setWords(await apiTokenize(text));
+            setWords(await apiTokenize(text, mode));
             setReading(true);
         } catch (e) {
             toastApiError(e);

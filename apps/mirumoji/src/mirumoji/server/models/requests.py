@@ -14,6 +14,8 @@ tip: LLM Request Defaults
 
 from pydantic import BaseModel
 
+from .jpdict import BundleMode
+
 # --- Dictionary Requests ---
 
 
@@ -23,9 +25,11 @@ class TokenizeBatchRequest(BaseModel):
 
     Args:
         sentences (list[str]): The sentences to tokenize, in order
+        mode (BundleMode): How aggressively to group tokens into words
     """
 
     sentences: list[str]
+    mode: BundleMode = BundleMode.grammar
 
 
 # --- LLM requests ---

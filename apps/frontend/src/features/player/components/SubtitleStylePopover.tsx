@@ -7,6 +7,8 @@ import { useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { IconButton, Popover, Button, cn } from "@/shared/ui";
 import { useSubtitleSettings } from "@/contexts/SubtitleSettingsContext";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
+import { BundleModeSelect } from "@/shared/components/BundleModeSelect";
 
 function Range({
     label,
@@ -72,6 +74,7 @@ function ColorField({
 export function SubtitleStylePopover({ className }: { className?: string }) {
     const [open, setOpen] = useState(false);
     const { subtitleStyle, setSubtitleStyle, resetSubtitleStyle } = useSubtitleSettings();
+    const { resetMode } = useBundleSettings();
 
     return (
         <div className={cn("relative", className)}>
@@ -125,11 +128,17 @@ export function SubtitleStylePopover({ className }: { className?: string }) {
                             }
                         />
                     </div>
+                    <div className="border-t border-ink/10 pt-3">
+                        <BundleModeSelect />
+                    </div>
                     <Button
                         variant="secondary"
                         size="sm"
                         className="w-full"
-                        onClick={resetSubtitleStyle}
+                        onClick={() => {
+                            resetSubtitleStyle();
+                            resetMode();
+                        }}
                     >
                         Reset
                     </Button>

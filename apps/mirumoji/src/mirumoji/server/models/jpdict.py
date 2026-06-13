@@ -1,6 +1,48 @@
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# --- Bundling Mode ---
+
+
+class BundleMode(str, Enum):
+    """
+    How aggressively the `stitch` function groups UniDic short-unit tokens into
+    words
+
+    The modes trade granularity for a learner's needs, from whole dictionary
+    words down to raw morphemes
+
+    abstract: words
+        - The coarsest grouping
+
+        - Merges compound nouns and the whole inflected tail of a predicate,
+          including the connecting て, bound auxiliary verbs, and politeness,
+          into single dictionary words (e.g. `図書館`, `食べてみたかった`)
+
+        - Best for looking words up
+
+    abstract: grammar (default)
+        - The `learning` view
+
+        - Keeps compound nouns and a predicate's inflectional auxiliaries
+          together, but breaks off the pieces a learner parses separately,
+          like the connecting て, bound auxiliary verbs (みる/いる/出す), and
+          the politeness stems (ます/です) (e.g. `食べ | て | みたかった`,
+          `読み | ました`)
+
+    abstract: morphemes
+        - The finest grouping
+
+        - No stitching at all, one word per UniDic short unit
+          (e.g. `図書 | 館`, `読み | まし | た`)
+    """
+
+    words = "words"
+    grammar = "grammar"
+    morphemes = "morphemes"
+
 
 # --- Kotobase Data Models ---
 
