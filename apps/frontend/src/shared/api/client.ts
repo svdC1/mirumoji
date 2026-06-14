@@ -111,7 +111,7 @@ export async function uploadFile<T = unknown>(
         const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
         const profileId = localStorage.getItem("currentProfileId");
         if (!profileId) {
-            return reject(new ApiError(400, "No Profile ID Dound. Select A Profile"));
+            return reject(new ApiError(400, "No Profile ID Found. Select A Profile"));
         }
 
         const uploadId = `${file.name}-${Date.now()}`;

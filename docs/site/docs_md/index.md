@@ -113,12 +113,12 @@ manages the docker compose application for you</figcaption>
 
 - :material-monitor: **[GUI Setup](setup/gui.md)**
 
-    Downlaod Desktop Launcher For Your Platform To Start, Stop, and
+    Download Desktop Launcher For Your Platform To Start, Stop, and
     Configure Mirumoji *(Easiest)*
 
 - :material-console: **[CLI Setup](setup/cli.md)**
 
-    Install With `pip` And Run The Docker Compose Applicatin With `mirumoji up`
+    Install With `pip` And Run The Docker Compose Application With `mirumoji up`
     *(For Those Who Prefer The Terminal)*
 
 - :material-docker: **[Manual Setup](setup/manual.md)**

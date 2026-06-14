@@ -8,12 +8,12 @@ Pick The One That Fits You
 
 - :material-monitor: **[GUI Setup](gui.md)**
 
-    Downlaod Desktop Launcher For Your Platform To Start, Stop, and
+    Download Desktop Launcher For Your Platform To Start, Stop, and
     Configure Mirumoji &rarr; `Easiest`
 
 - :material-console: **[CLI Setup](cli.md)**
 
-    Install With `pip` And Run The Docker Compose Applicatin With `mirumoji up`
+    Install With `pip` And Run The Docker Compose Application With `mirumoji up`
     &rarr; `For Those Who Prefer The Terminal`
 
 - :material-docker: **[Manual Setup](manual.md)**
@@ -29,7 +29,7 @@ Pick The One That Fits You
 | **Docker** + **Compose V2** | All Setups | Download The Cross-Platform [`Docker Desktop`](https://docs.docker.com/desktop/) *(Or [`Docker Engine`](https://docs.docker.com/engine/install/) + [`Compose Plugin`](https://docs.docker.com/compose/install/linux/) On Linux)* |
 | **Python 3.10+** | CLI Setup | Only To Install The [`mirumoji`](https://pypi.org/project/mirumoji/#description) Launcher From PyPI. |
 | **NVIDIA GPU + [`Container Toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)** | `Local` Transcription Backend | Lets The Backend Run [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) on your GPU. |
-| **A [`Modal`](https://modal.com) Account** | `Modal` Transcription Backend | To Offload Ttranscription To Cloud GPUs For CPU-Only Setups |
+| **A [`Modal`](https://modal.com) Account** | `Modal` Transcription Backend | To Offload Transcription To Cloud GPUs For CPU-Only Setups |
 
 !!! tip "Check Your Machine"
     With the `CLI` installed, run `mirumoji doctor` to see which dependencies
@@ -95,7 +95,7 @@ mirumoji config set MIRUMOJI_LLM_API_KEY ...
 
 ## Opening Mirumoji
 
-Once the Docker Compose Applicatin is running, the frontend is served over HTTPS
+Once the Docker Compose Application is running, the frontend is served over HTTPS
 
 ???+ Access Links
     - Host Machine &rarr; [`https://localhost`](https://localhost)

@@ -40,7 +40,7 @@ It's `free` for personal use and runs on every platform
 
 ### On The Machine Running Mirumoji
 
-- [`Download Tailscale`](https://tailscale.com/downlaod) And Sign In To Create Your `Tailnet`
+- [`Download Tailscale`](https://tailscale.com/download) And Sign In To Create Your `Tailnet`
 
 - Find Your Machine's Tailscale Address
 
@@ -53,7 +53,7 @@ It's `free` for personal use and runs on every platform
 
 ### On The Device You Want To Access
 
--  [`Download Tailscale`](https://tailscale.com/downlaod) And Sign In With The `Same Account` As Above
+-  [`Download Tailscale`](https://tailscale.com/download) And Sign In With The `Same Account` As Above
 
 - Open Your Tailscale Address (e.g `https://100.101.102.103`)
 

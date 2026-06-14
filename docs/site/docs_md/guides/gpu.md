@@ -57,7 +57,7 @@ This is the `default` backend because it works on any computer
 
 The `free` tier includes a generous amount of monthly compute credits, which is plenty for personal use
 
-???+ abstract "Hot It Works"
+???+ abstract "How It Works"
     - With the `modal` backend, Mirumoji runs its lightweight CPU image on your machine and
       `delegates` only the heavy transcription / conversion of media to short-lived `Modal`
       GPU containers
@@ -65,7 +65,7 @@ The `free` tier includes a generous amount of monthly compute credits, which is 
     !!! info "Step By Step Request Workflow"
         - You request a transcription / conversion on the frontend
 
-        - The backend asks `Modal` to sping up an ephemeral `GPU` container running a fully-configured Mirumoj GPU Docker Image
+        - The backend asks `Modal` to spin up an ephemeral `GPU` container running a fully-configured Mirumoji GPU Docker Image
 
         - The backend mounts the media that needs processing onto the container on startup
 
