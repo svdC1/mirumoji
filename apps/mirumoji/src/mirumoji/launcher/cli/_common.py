@@ -11,6 +11,7 @@ info: Scope
 """
 
 import subprocess
+import threading
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -19,7 +20,7 @@ import typer
 from rich.live import Live
 from rich.table import Table
 
-from ..core import checks, envfile
+from ..core import checks, envfile, process
 from ..core.constants import CONFIG_ENV_VARS, backend_vars
 from ..core.errors import LauncherError
 from ..core.models import Backend, CheckStatus, ImageSource
@@ -103,43 +104,35 @@ def fail(
     return typer.Exit(code=code)
 
 
-def stream_command(
+def _consume_stream(
     gen: Generator[str, None, _T],
+    table: Table,
     identifier: str,
-    title: str,
 ) -> _T:
     """
-    Consumes the streaming generator returned by `core.process.stream`,
-    pretty-printing each line (external command output) inside a `rich` table
-    , and returning the process' return code at the end. In addition, maps
-    launcher errors to clean `Typer` command exits
+    Consumes a `core.process.stream` generator, pretty-printing each line to a
+    live `rich` table. In addition, maps launcher / subprocess errors to clean
+    `Typer` command exits
 
     Args:
         gen (Generator[str, None, T]): A generator yielding output lines
-        identifier (str): An identifier for the command being executed
-            (e.g `Docker`)
-        title (str): The title of the `rich` table in which command output
-            will be displayed
+        table (Table): The `rich` table to append each output line to
+        identifier (str): An identifier for the command (e.g `Docker`), used in
+            error messages
 
     Returns:
         The generator's return value
     """
-    # Create Dynamic Table
-    table = Table(
-        title=title,
-        title_style="heading",
-        border_style="info",
-        show_header=False,
-    )
-    table.add_column()
-
     # The `Live` is transient so that the progress table clears when the block
     # exits (success or error). Exceptions are handled OUTSIDE the block so
     # that the mapped error message prints cleanly instead of being swallowed
     # by it
     try:
         with Live(
-            table, refresh_per_second=10, console=console, transient=True
+            table,
+            refresh_per_second=10,
+            console=console,
+            transient=True,
         ):
             while True:
                 try:
@@ -160,6 +153,84 @@ def stream_command(
     # Catch Executable Not Found Exceptions
     except FileNotFoundError as exc:
         raise fail(f"Command `{exc.filename}` Couldn't Be Found") from exc
+
+
+def stream_command(
+    gen: Generator[str, None, _T],
+    identifier: str,
+    title: str,
+    *,
+    handle: process.StreamHandle | None = None,
+) -> _T:
+    """
+    Consumes the streaming generator returned by `core.process.stream`,
+    pretty-printing each line inside a `rich` table and returning the process'
+    return value. Maps launcher errors to clean `Typer` command exits
+
+    info: Cancellation
+        - When a `StreamHandle` is given (the same one passed to the streaming
+          generator), output is consumed on a worker thread so that `CTRL+C`
+          on the main thread can stop a stream that's blocked waiting for its
+          next line (e.g. `docker compose logs -f`)
+
+        - The interrupt cancels the handle, killing the followed process, and
+          exits cleanly
+
+        - Without a handle the generator is consumed in the same thread that's
+          running this function
+
+    Args:
+        gen (Generator[str, None, T]): A generator yielding output lines
+        identifier (str): An identifier for the command being executed
+            (e.g `Docker`)
+        title (str): The title of the `rich` table in which command output
+            will be displayed
+        handle (process.StreamHandle | None): The cancellation token bound to
+            `gen`, enabling `CTRL+C` to stop a followed stream
+
+    Returns:
+        The generator's return value
+    """
+    table = Table(
+        title=title,
+        title_style="heading",
+        border_style="info",
+        show_header=False,
+    )
+    table.add_column()
+
+    # Without a handle there is nothing to cancel, so consume in place
+    if handle is None:
+        return _consume_stream(gen, table, identifier)
+
+    # With a handle, consume on a worker thread and keep the main thread free
+    # to catch CTRL+C. A blocked `readline` (a CREATE_NO_WINDOW child gets no
+    # console signal on Windows) would otherwise defer the interrupt
+    # indefinitely. The short poll keeps the main thread responsive to it
+    outcome: dict[str, Any] = {}
+
+    def _worker() -> None:
+        try:
+            outcome["value"] = _consume_stream(gen, table, identifier)
+        except BaseException as exc:
+            # Re-raised on the main thread so Typer handles the exit / error
+            outcome["error"] = exc
+
+    worker = threading.Thread(target=_worker, daemon=True)
+    worker.start()
+    try:
+        while worker.is_alive():
+            worker.join(timeout=0.2)
+    except KeyboardInterrupt:
+        handle.cancel()
+        worker.join()
+        console.print("Stopped", style="muted")
+        raise typer.Exit(code=130) from None
+
+    error = outcome.get("error")
+    if error is not None:
+        raise error
+    return cast(_T, outcome.get("value"))
 
 
 # -- Up Validation ---

@@ -15,7 +15,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from ...paths import HOST_CONFIG_FILE
-from ..core import checks, envfile, host, lifecycle, repo
+from ..core import checks, envfile, host, lifecycle, process, repo
 from ..core.compose import RESOLVED_COMPOSE_PATH, write_compose
 from ..core.constants import (
     CONFIG_KEYS,
@@ -222,15 +222,20 @@ def logs(
     compose_file = (
         RESOLVED_COMPOSE_PATH if RESOLVED_COMPOSE_PATH.is_file() else None
     )
+    # A handle lets CTRL+C stop a followed tail (otherwise the read blocks
+    # forever waiting for the next line)
+    handle = process.StreamHandle()
     stream_command(
         gen=lifecycle.logs(
             service,
             follow=follow,
             tail=tail,
             compose_file=compose_file,
+            handle=handle,
         ),
         identifier="Docker",
         title="Mirumoji Docker Compose Logs",
+        handle=handle,
     )
 
 
