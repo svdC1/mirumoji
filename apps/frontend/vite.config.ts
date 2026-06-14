@@ -57,9 +57,10 @@ export default defineConfig({
             },
             workbox: {
                 // Keep the SPA navigation fallback from swallowing API calls or
-                // the mkdocs site served under /docs/ on the Pages build, and
-                // never cache /api responses
-                navigateFallbackDenylist: [/^\/api\//, /\/docs\//],
+                // the mkdocs site served under /docs on the Pages build, and
+                // never cache /api responses. The /docs match allows a missing
+                // trailing slash (/docs as well as /docs/...)
+                navigateFallbackDenylist: [/^\/api\//, /\/docs(?:\/|$)/],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith("/api/"),

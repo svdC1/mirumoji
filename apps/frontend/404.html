@@ -8,10 +8,11 @@
         // Get the full path that the user tried to access.
         const path = window.location.pathname;
 
-        if (path.indexOf('/docs/') !== -1) {
-            // The mkdocs site lives under /docs/. If one of its pages 404s,
-            // send the user to the docs home rather than bouncing the path into
-            // the SPA, which has no /docs route.
+        if (/\/docs(?:\/|$)/.test(path)) {
+            // The mkdocs site lives under /docs. If /docs (or one of its pages)
+            // 404s, send the user to the docs home rather than bouncing the path
+            // into the SPA, which has no /docs route. The match allows a missing
+            // trailing slash so /mirumoji/docs is handled too.
             window.location.href = "/mirumoji/docs/";
         } else {
             // Store the intended path so the app can restore it after the
