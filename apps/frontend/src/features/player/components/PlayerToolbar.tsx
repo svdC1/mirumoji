@@ -25,14 +25,13 @@ import { generateSrt, convertToMp4, saveSubtitles } from "../api";
 export function PlayerToolbar() {
     const {
         video,
+        videoUrl,
         srt,
         srtFileId,
         setSrt,
         setSrtFileName,
         setSrtFileId,
-        setVideo,
         setVideoUrl,
-        setVideoFileName,
         showFurigana,
         setShowFurigana,
         clearPlayerState,
@@ -61,7 +60,7 @@ export function PlayerToolbar() {
             const result = await generateSrt(
                 video,
                 (p) => setGenStatus(`Uploading ${p.toFixed(0)}%`),
-                () => setGenStatus("Generating …")
+                () => setGenStatus("Generating")
             );
             const file = new File([result.srt_content], `${video.name}.srt`, {
                 type: "application/x-subrip",
@@ -88,11 +87,13 @@ export function PlayerToolbar() {
             const result = await convertToMp4(
                 video,
                 (p) => setConvStatus(`Uploading ${p.toFixed(0)}%`),
-                () => setConvStatus("Converting …")
+                () => setConvStatus("Converting")
             );
-            setVideo(null);
+            // Keep the source file loaded so the toolbar still recognises a
+            // video and Generate SRT can use it (the source audio + timing
+            // match the converted result, so no re-download is needed). Point
+            // playback at the converted MP4 served from the profile.
             setVideoUrl(staticUrl(result.converted_video_url));
-            setVideoFileName(result.converted_video_url);
             toast.success("Conversion Complete");
         } catch (err) {
             toastApiError(err);
@@ -103,7 +104,7 @@ export function PlayerToolbar() {
 
     const handleFixSrt = async () => {
         if (!srt) return;
-        setFixStatus("Fixing …");
+        setFixStatus("Fixing");
         try {
             const template = await apiGetTemplate();
             if (!template) {
@@ -190,7 +191,7 @@ export function PlayerToolbar() {
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleConvert}
                 loading={converting}
-                disabled={!video || busy}
+                disabled={!video || !!videoUrl || busy}
                 title="Convert Video To MP4 Using FFMPEG"
             >
                 {converting ? (

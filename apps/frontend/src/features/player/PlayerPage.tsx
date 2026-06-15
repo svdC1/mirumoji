@@ -74,6 +74,31 @@ export default function PlayerPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [videoEl, blobUrl]);
 
+    // Arrow keys skip the player by 5s (ignored while typing in a field).
+    useEffect(() => {
+        if (!videoEl) return;
+        const SKIP_SECONDS = 5;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+            const active = document.activeElement as HTMLElement | null;
+            if (
+                active &&
+                (active.tagName === "INPUT" ||
+                    active.tagName === "TEXTAREA" ||
+                    active.tagName === "SELECT" ||
+                    active.isContentEditable)
+            ) {
+                return;
+            }
+            e.preventDefault();
+            const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : Infinity;
+            const delta = e.key === "ArrowRight" ? SKIP_SECONDS : -SKIP_SECONDS;
+            videoEl.currentTime = Math.min(Math.max(videoEl.currentTime + delta, 0), duration);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [videoEl]);
+
     const seek = (seconds: number) => {
         if (!videoEl) return;
         videoEl.currentTime = seconds;
