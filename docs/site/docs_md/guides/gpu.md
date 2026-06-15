@@ -67,11 +67,11 @@ The `free` tier includes a generous amount of monthly compute credits, which is 
 
         - The backend asks `Modal` to spin up an ephemeral `GPU` container running a fully-configured Mirumoji GPU Docker Image
 
-        - The backend mounts the media that needs processing onto the container on startup
+        - The backend uploads the media into a short-lived `Modal` volume that the container reads from
 
-        - The container runs the transcription / conversion work and returns the result to the backend
+        - The container runs the transcription / conversion work and returns the result (writing any converted file back to the same volume for the backend to retrieve)
 
-        - The container shuts down
+        - The container shuts down and the temporary volume is discarded
 
 
 ### Get Your API Token Pair

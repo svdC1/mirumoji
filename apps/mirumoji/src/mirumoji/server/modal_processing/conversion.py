@@ -2,40 +2,60 @@
 Defines `Modal` GPU jobs for `NVENC` video conversion
 """
 
-import os
-from collections.abc import Generator
-from pathlib import Path
 from typing import Any
 
 
 def video_conversion_job(
-    rel_video_fp: str | os.PathLike[str],
+    vol_fp: str,
+    vol_id: str,
     to_mp4_kwargs: dict[str, Any] | None = None,
-) -> Generator[bytes, None, None]:
+) -> str:
     """
-    Convert `video_fp` to MP4 using NVENC and stream the content as bytes
+    Convert a video to MP4 on a `Modal` GPU using `NVENC`
+
+    info: File Transfer
+        - The input video is read out of the per-job ephemeral volume into a
+          container-local temp directory
+
+        - The container converts the video and the resulting MP4 is
+          written back into the same volume
+
+        - The job returns the output key so that the local runtime can stream
+          the result out and save it
+
+        - The temp directory is removed once the job finishes
 
     Args:
-        rel_video_fp (str | Path): Path to the video relative to
-            `HOST_MEDIA_PATH`
+        vol_fp (str): Path of the input video inside the per-job ephemeral
+            volume
+        vol_id (str): ID of the per-job ephemeral volume
         to_mp4_kwargs (dict | None): Additional arguments for
-            `mirumoji.server.audio.to_mp4`
+            `mirumoji.server.processing.audio.to_mp4`
 
-    Yields:
-        The converted video chunks
+    Returns:
+        The Path of the converted MP4 inside the per-job ephemeral volume
 
     Raises:
-        FFmpegError: If any of the FFMPEG commands have returned a non-zero
-            exit code
-        ValueError: If input_path doesn't exist or is not a file, or if an
-            invalid resolution is provided
+        ModalVolumeError: If the input or output can't be transferred through
+            the volume
+        FFmpegError: If any of the FFMPEG commands return a non-zero exit code
+        ValueError: If the input doesn't exist or an invalid resolution is
+            provided
         MissingFFmpegError: If the FFMPEG executable couldn't be located
-        MissingFFprobeError: If the FFROBE executable couldn't be located
+        MissingFFprobeError: If the FFPROBE executable couldn't be located
         RuntimeError: If conversion produces no output
     """
     import logging
+    import shutil
+    import tempfile
+    from pathlib import Path, PurePosixPath
 
-    from mirumoji.paths import CONTAINER_MEDIA_DIR
+    import modal
+
+    from mirumoji.server.modal_processing.volume_io import (
+        download_from_volume,
+        upload_to_volume,
+    )
     from mirumoji.server.processing.audio import get_ffmpeg_path, to_mp4
 
     # Configure Container Logging
@@ -45,47 +65,43 @@ def video_conversion_job(
         format="{levelname}-{name}-{message}",
     )
     logger = logging.getLogger(__name__)
-    logger.info(f"'video_conversion_job' Started For Video: '{rel_video_fp}'")
 
-    # Create Temp For Storage
-    tmp_p = Path.cwd() / "tmp"
-    tmp_p.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Using Temporary Directory For Video Conversion: '{tmp_p}'")
+    vol = modal.Volume.from_id(vol_id)
+    workdir = Path(tempfile.mkdtemp(prefix="mirumoji_convert_"))
 
-    # The path arrives relative to the mounted host media dir
-    # (CONTAINER_MEDIA_DIR), so resolve against it to reach the file
-    input_local = Path(CONTAINER_MEDIA_DIR) / rel_video_fp
-    output_local = tmp_p / f"{input_local.stem}_converted.mp4"
+    try:
+        # Stream The Input Out Of The Volume Into Container-Local Storage
+        local_in = workdir / Path(vol_fp).name
+        download_from_volume(vol, vol_fp, local_in)
 
-    logger.info(
-        f"Converting '{input_local}' to '{output_local}' using `NVENC`"
-        f"with `to_mp4_kwargs` : {to_mp4_kwargs}"
-    )
-
-    # Get Container FFMPEG Path
-    ffmpeg_path = get_ffmpeg_path()
-
-    to_mp4_kwargs = to_mp4_kwargs or {}
-
-    to_mp4_kwargs.update(
-        ffmpeg_path=ffmpeg_path["ffmpeg"],
-        input_path=input_local,
-        output_path=output_local,
-        use_gpu=True,
-    )
-    result_p = to_mp4(**to_mp4_kwargs)
-
-    if result_p and result_p.exists() and result_p.stat().st_size > 0:
-        logger.info(f"Successfully Converted Video To: '{result_p}'")
-        with open(result_p, "rb") as f:
-            while True:
-                chunk = f.read(8192)
-                if not chunk:
-                    break
-                yield chunk
-        logger.info(f"Finished Streaming Video Bytes For: '{result_p}'")
-    else:
-        raise RuntimeError(
-            f"Video Conversion Failed Or Produced An Empty File "
-            f"For: '{input_local}'",
+        local_out = workdir / f"{local_in.stem}_converted.mp4"
+        logger.info(
+            f"'video_conversion_job' Converting '{local_in}' -> "
+            f"'{local_out}' Using NVENC (kwargs: {to_mp4_kwargs})"
         )
+
+        kwargs = dict(to_mp4_kwargs or {})
+        kwargs.update(
+            ffmpeg_path=get_ffmpeg_path()["ffmpeg"],
+            input_path=local_in,
+            output_path=local_out,
+            use_gpu=True,
+        )
+        result_p = to_mp4(**kwargs)
+
+        if not (
+            result_p and result_p.exists() and result_p.stat().st_size > 0
+        ):
+            raise RuntimeError(
+                f"Video Conversion Failed Or Produced An Empty File "
+                f"For '{local_in}'",
+            )
+
+        # Write The Result Back Into The Volume Next To The Input Path
+        out_vol_fp = str(PurePosixPath(vol_fp).with_name(local_out.name))
+        upload_to_volume(vol, result_p, out_vol_fp)
+        logger.info(f"Converted Video Written To Volume Path '{out_vol_fp}'")
+        return out_vol_fp
+
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)

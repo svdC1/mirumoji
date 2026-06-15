@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-import aiofiles
+import modal
 
 from ...exceptions import (
     MirumojiServerError,
@@ -28,6 +28,7 @@ from ...exceptions import (
 )
 from .. import media
 from ..config import gpu_available, transcribe_backend
+from ..modal_processing import volume_io
 from . import audio, whisper
 
 if TYPE_CHECKING:
@@ -176,18 +177,32 @@ class Processor:
         """
         self._require_transcription()
         if self.backend == "modal":
-            # Modal Backend
+            # Stream the input into a per-job ephemeral volume
+            # (the only surface shared with the container), keyed by its
+            # media-relative path
             runtime = self._get_runtime()
-            rel = str(media.get_relative_path(media_path))
+            src = Path(media_path)
+            vol_fp = media.get_relative_path(media_path).as_posix()
             try:
-                async with runtime.app.run():
-                    result = await runtime.transcribe.remote.aio(
-                        rel_media_fp=rel,
-                        output_format=output_format,
-                        w_model_args=w_model_args,
-                        w_transcribe_args=w_transcribe_args,
+                # Create Ephemeral Volume
+                async with modal.Volume.ephemeral() as vol:
+                    # Upload File
+                    await asyncio.to_thread(
+                        volume_io.upload_to_volume,
+                        vol,
+                        src,
+                        vol_fp,
                     )
-                    return cast(str, result)
+                    # Run Transcription
+                    async with runtime.app.run():
+                        result = await runtime.transcribe.remote.aio(
+                            vol_fp=vol_fp,
+                            vol_id=vol.object_id,
+                            output_format=output_format,
+                            w_model_args=w_model_args,
+                            w_transcribe_args=w_transcribe_args,
+                        )
+                return cast(str, result)
             except MirumojiServerError:
                 # Domain exceptions are preserved across the Modal boundary
                 raise
@@ -256,19 +271,36 @@ class Processor:
         out.parent.mkdir(parents=True, exist_ok=True)
 
         if self.backend == "modal":
-            # Modal Backend
+            # Stream the source into a per-job ephemeral volume,
+            # convert on the GPU container which writes the MP4 back into the
+            # same volume, then stream the result back out into `out`
             runtime = self._get_runtime()
-            rel = str(media.get_relative_path(input_path))
+            src = Path(input_path)
+            vol_fp = media.get_relative_path(input_path).as_posix()
             try:
-                async with (
-                    runtime.app.run(),
-                    aiofiles.open(out, "wb") as f,
-                ):
-                    async for chunk in runtime.convert.remote_gen.aio(
-                        rel_video_fp=rel,
-                        to_mp4_kwargs=to_mp4_kwargs,
-                    ):
-                        await f.write(chunk)
+                # Create Volume
+                async with modal.Volume.ephemeral() as vol:
+                    # Upload File
+                    await asyncio.to_thread(
+                        volume_io.upload_to_volume,
+                        vol,
+                        src,
+                        vol_fp,
+                    )
+                    # Run Conversion
+                    async with runtime.app.run():
+                        out_vol_fp = await runtime.convert.remote.aio(
+                            vol_fp=vol_fp,
+                            vol_id=vol.object_id,
+                            to_mp4_kwargs=to_mp4_kwargs,
+                        )
+                    # Save Converted File Back To Local Storage
+                    await asyncio.to_thread(
+                        volume_io.download_from_volume,
+                        vol,
+                        cast(str, out_vol_fp),
+                        out,
+                    )
             except MirumojiServerError:
                 # Domain Exceptions are preserved across the Modal boundary
                 raise

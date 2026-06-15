@@ -11,10 +11,19 @@ abstract: Paths
     - Operations take destinations **relative** to `BASE_PATH`, and
       `get_relative_path` converts an absolute path back to that format
 
-warning: Modal Paths
-    - `Modal` jobs only accept paths **relative** to `HOST_MEDIA_PATH` (see
-      `modal_processing.app`), so `get_relative_path` is what should be handed
-      to a job, never an absolute path
+info: Modal Paths
+    - When using the `modal` transcription backend, the server uploads input
+      files to (and downloads processed files from) an ephemeral per-job
+      volume shared between it and the `Modal` container running the job
+      (See `modal_processing.app`)
+
+    - Both the server and the container pass the in-volume paths in which
+      they've stored files so that the server's media handling
+      doesn't depend on the container sharing its file system layout
+
+    - The media-relative path from `get_relative_path` is only used as the
+      path in which the server stores files inside the modal volume to maintain
+      consistency
 """
 
 import asyncio
@@ -136,8 +145,14 @@ def get_relative_path(full_path: str | os.PathLike[str]) -> Path:
     """
     Converts an absolute path into one relative to the media directory
 
-    This relative form is what `Modal` jobs expect, since `HOST_MEDIA_PATH` is
-    mounted into the container
+    abstract: Modal File Transfer
+        - This relative form is used as the file's path within the per-job
+          ephemeral `Modal` volume when the server uploads it
+
+        - This is done so that the in-volume layout of `media_files` mirrors
+          the `HOST_MEDIA_PATH` directory
+
+        - See `modal_processing.app` for more information on this
 
     Args:
         full_path (str | os.PathLike[str]): Absolute path inside the media

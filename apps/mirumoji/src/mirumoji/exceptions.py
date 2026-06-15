@@ -210,6 +210,19 @@ class ModalError(MirumojiServerError):
     code: ClassVar[str] = "Modal"
 
 
+class ModalVolumeError(ModalError):
+    """
+    Raised when streaming a file in or out of a `Modal Volume` fails
+
+    Indicates that an error happened while uploading or downloading a file
+    from the per-job ephemeral modal volume, either locally or inside a
+    `Modal Container`
+    """
+
+    http_status: ClassVar[int] = 502
+    code: ClassVar[str] = "ModalVolume"
+
+
 # --- Media Exceptions ---
 
 
