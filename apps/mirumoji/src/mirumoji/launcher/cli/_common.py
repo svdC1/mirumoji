@@ -11,10 +11,11 @@ info: Scope
 """
 
 import subprocess
+import sys
 import threading
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, overload
 
 import typer
 from rich.live import Live
@@ -104,11 +105,30 @@ def fail(
     return typer.Exit(code=code)
 
 
+@overload
 def _consume_stream(
     gen: Generator[str, None, _T],
     table: Table,
     identifier: str,
-) -> _T:
+    handle: None = None,
+) -> _T: ...
+
+
+@overload
+def _consume_stream(
+    gen: Generator[str, None, _T],
+    table: Table,
+    identifier: str,
+    handle: process.StreamHandle,
+) -> _T | None: ...
+
+
+def _consume_stream(
+    gen: Generator[str, None, _T],
+    table: Table,
+    identifier: str,
+    handle: process.StreamHandle | None = None,
+) -> _T | None:
     """
     Consumes a `core.process.stream` generator, pretty-printing each line to a
     live `rich` table. In addition, maps launcher / subprocess errors to clean
@@ -119,9 +139,12 @@ def _consume_stream(
         table (Table): The `rich` table to append each output line to
         identifier (str): An identifier for the command (e.g `Docker`), used in
             error messages
+        handle (process.StreamHandle | None): When given, consumption stops as
+            soon as the handle is cancelled, so a `CTRL+C` tears the display
+            down promptly instead of draining the backlog
 
     Returns:
-        The generator's return value
+        The generator's return value or None when the operation was cancelled
     """
     # The `Live` is transient so that the progress table clears when the block
     # exits (success or error). Exceptions are handled OUTSIDE the block so
@@ -135,6 +158,14 @@ def _consume_stream(
             transient=True,
         ):
             while True:
+                # On cancel (CTRL+C) the process is killed, but lines it
+                # already wrote stay buffered in the pipe and `readline` keeps
+                # returning them. Stop consuming at once instead of rendering
+                # each into the growing table, so the `Live` tears down before
+                # the interpreter shuts down on a daemon thread still writing
+                # to stdout
+                if handle is not None and handle.cancelled:
+                    return None
                 try:
                     line = next(gen)
                 except StopIteration as stop:
@@ -211,7 +242,7 @@ def stream_command(
 
     def _worker() -> None:
         try:
-            outcome["value"] = _consume_stream(gen, table, identifier)
+            outcome["value"] = _consume_stream(gen, table, identifier, handle)
         except BaseException as exc:
             # Re-raised on the main thread so Typer handles the exit / error
             outcome["error"] = exc
@@ -222,8 +253,14 @@ def stream_command(
         while worker.is_alive():
             worker.join(timeout=0.2)
     except KeyboardInterrupt:
+        # Marks the handle on CTRL + C (the consumer stops on its next check)
+        # and kills the followed process so a blocked `readline` returns.
+        # Bound the join so a stuck worker can't hang the exit, then flush
+        # stdout so the interpreter never shuts down mid-write on the daemon
+        # worker thread
         handle.cancel()
-        worker.join()
+        worker.join(timeout=2.0)
+        sys.stdout.flush()
         console.print("Stopped", style="muted")
         raise typer.Exit(code=130) from None
 
