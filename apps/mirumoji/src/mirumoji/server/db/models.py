@@ -17,6 +17,7 @@ from sqlalchemy import (
     JSON,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     Uuid,
@@ -341,6 +342,106 @@ class Clip(Base):
     created_at: Mapped[datetime] = mapped_column(default=get_now_utc)
 
 
+class Job(Base):
+    """
+    SQLAlchemy model representing a long-running processing job
+
+    abstract: Mirumoji Server Jobs
+        - A job runs one operation (transcription, SRT generation, conversion,
+          or LLM SRT-fixing) server-side using an existing profile file, so
+          that the client can submit it and track it across navigation
+
+        - A batch is a parent job with one child job per file (`parent_id`),
+          and the parent aggregates `total` / `completed`
+
+    Attributes:
+        id (uuid.UUID): Job identifier (primary key)
+        profile_id (str): Owning profile id (foreign key, cascade delete)
+        profile (Profile): The owning profile relationship
+        parent_id (uuid.UUID | None): Parent batch job id, when this is a child
+        type (str): Operation type (e.g. `transcribe`, `generate_srt`,
+            `convert`, `fix_srt`, or a `batch_*` variant)
+        status (str): `queued`, `running`, `succeeded`, `failed`, or `canceled`
+        progress (float): Progress fraction in `[0, 1]`
+        total (int): Number of work items (1 for a single job, N for a batch)
+        completed (int): Number of finished work items
+        params (dict): Submitted parameters (file references, options)
+        result (dict | None): Produced references (file / transcript / SRT ids)
+            or `None` until finished
+        error (str | None): Failure message when `status` is `failed`
+        created_at (datetime): UTC creation timestamp
+        updated_at (datetime): UTC last-update timestamp
+    """
+
+    __tablename__ = "jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        index=True,
+        default=uuid.uuid4,
+    )
+
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"),
+    )
+
+    profile: Mapped[Profile] = relationship(passive_deletes="all")
+
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    type: Mapped[str] = mapped_column(
+        String(50),
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="queued",
+        index=True,
+    )
+
+    progress: Mapped[float] = mapped_column(
+        Float,
+        default=0.0,
+    )
+
+    total: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+    )
+
+    completed: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+
+    params: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        default=dict,
+    )
+
+    result: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
+    error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(default=get_now_utc)
+
+    updated_at: Mapped[datetime] = mapped_column(
+        default=get_now_utc,
+        onupdate=get_now_utc,
+    )
+
+
 # --- DTOs ---
 
 
@@ -455,3 +556,40 @@ class ClipDTO(SafeORMModel):
     end_time: float
     llm_breakdown_response: dict[str, Any]
     created_at: datetime
+
+
+class JobDTO(SafeORMModel):
+    """
+    Represents a single processing job stored in the mirumoji database
+
+    Attributes:
+        id (uuid.UUID): Job identifier
+        profile_id (str): Owning profile id
+        profile (ProfileDTO | None): Owning profile, when loaded
+        parent_id (uuid.UUID | None): Parent batch job id, when this is a child
+        type (str): Operation type
+        status (str): `queued`, `running`, `succeeded`, `failed`, or `canceled`
+        progress (float): Progress fraction in `[0, 1]`
+        total (int): Number of work items
+        completed (int): Number of finished work items
+        params (dict): Submitted parameters
+        result (dict | None): Produced references, or `None` until finished
+        error (str | None): Failure message when `status` is `failed`
+        created_at (datetime): UTC creation timestamp
+        updated_at (datetime): UTC last-update timestamp
+    """
+
+    id: uuid.UUID
+    profile_id: str
+    profile: ProfileDTO | None
+    parent_id: uuid.UUID | None
+    type: str
+    status: str
+    progress: float
+    total: int
+    completed: int
+    params: dict[str, Any]
+    result: dict[str, Any] | None
+    error: str | None
+    created_at: datetime
+    updated_at: datetime

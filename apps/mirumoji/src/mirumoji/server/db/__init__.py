@@ -29,6 +29,7 @@ from .models import Base
 from .repos import (
     ClipRepository,
     FileRepository,
+    JobRepository,
     LlmTemplateRepository,
     ProfileRepository,
     TranscriptRepository,
@@ -104,7 +105,7 @@ class UnitOfWork:
     tip: Usage
         - Enter the async context to open a session and access the mirumoji
           database repositories (`profiles`, `files`, `transcripts`,
-          `templates`, `clips`)
+          `templates`, `clips`, `jobs`)
 
         - Call `commit` to persist any changes
 
@@ -125,6 +126,7 @@ class UnitOfWork:
         transcripts (TranscriptRepository): Transcript data access
         templates (LlmTemplateRepository): LLM-template data access
         clips (ClipRepository): Clip data access
+        jobs (JobRepository): Job data access
     """
 
     def __init__(
@@ -149,6 +151,7 @@ class UnitOfWork:
         self.transcripts = TranscriptRepository(self.session)
         self.templates = LlmTemplateRepository(self.session)
         self.clips = ClipRepository(self.session)
+        self.jobs = JobRepository(self.session)
         return self
 
     async def __aexit__(

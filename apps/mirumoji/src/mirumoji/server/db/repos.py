@@ -30,6 +30,8 @@ from .models import (
     ClipDTO,
     File,
     FileDTO,
+    Job,
+    JobDTO,
     LlmTemplate,
     LlmTemplateDTO,
     Profile,
@@ -37,6 +39,8 @@ from .models import (
     Transcript,
     TranscriptDTO,
 )
+
+_ACTIVE_STATUSES = ("queued", "running")
 
 LOGGER = logging.getLogger("mirumoji")
 
@@ -628,3 +632,227 @@ class ClipRepository:
             await self.session.delete(clip)
         except Exception as e:
             raise DatabaseError(f"Failed To Delete Clip : {e}") from e
+
+
+class JobRepository:
+    """
+    Data access for `Job` records
+
+    Attributes:
+        session (AsyncSession): The active asynchronous database session
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(
+        self,
+        profile_id: str,
+        type: str,
+        params: dict[str, Any],
+        parent_id: _Uuid | None = None,
+        total: int = 1,
+    ) -> JobDTO:
+        """
+        Adds a queued job record
+
+        Args:
+            profile_id (str): Owning profile id
+            type (str): Operation type
+            params (dict): Submitted parameters (file references, options)
+            parent_id (uuid.UUID | str | None): Parent batch job id, if any
+            total (int): Number of work items (1 for a single job)
+
+        Returns:
+            The created `JobDTO`
+
+        Raises:
+            DatabaseError: If the insert fails
+        """
+        try:
+            job = Job(
+                profile_id=profile_id,
+                type=type,
+                params=params,
+                parent_id=parent_id,
+                total=total,
+            )
+            self.session.add(job)
+            await self.session.flush()
+            return JobDTO.model_validate(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Add Job : {e}") from e
+
+    async def get(self, job_id: _Uuid) -> JobDTO:
+        """
+        Fetches a job by id
+
+        Args:
+            job_id (uuid.UUID | str): The job id
+
+        Returns:
+            The matching `JobDTO`
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the lookup fails
+        """
+        try:
+            job = await self.session.get(Job, job_id)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Fetch Job : {e}") from e
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        return JobDTO.model_validate(job)
+
+    async def list_for_profile(
+        self,
+        profile_id: str,
+        active_only: bool = False,
+    ) -> list[JobDTO]:
+        """
+        Lists a profile's top-level jobs (batch children are excluded)
+
+        Args:
+            profile_id (str): Owning profile id
+            active_only (bool): Restrict to `queued` / `running` jobs
+
+        Returns:
+            A list of top-level `JobDTO`, newest first
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = (
+                select(Job)
+                .where(Job.profile_id == profile_id)
+                .where(Job.parent_id.is_(None))
+                .order_by(Job.created_at.desc())
+            )
+            if active_only:
+                stmt = stmt.where(Job.status.in_(_ACTIVE_STATUSES))
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Jobs : {e}") from e
+
+    async def list_children(self, parent_id: _Uuid) -> list[JobDTO]:
+        """
+        Lists the child jobs of a batch parent
+
+        Args:
+            parent_id (uuid.UUID | str): The parent job id
+
+        Returns:
+            A list of child `JobDTO`, oldest first
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = (
+                select(Job)
+                .where(Job.parent_id == parent_id)
+                .order_by(Job.created_at.asc())
+            )
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Job Children : {e}") from e
+
+    async def list_unfinished(self) -> list[JobDTO]:
+        """
+        Lists every `queued` / `running` job across all profiles
+
+        Used on startup to reconcile jobs left over from a previous run (the
+        in-process queue does not survive a restart)
+
+        Returns:
+            A list of unfinished `JobDTO`
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = select(Job).where(Job.status.in_(_ACTIVE_STATUSES))
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Unfinished Jobs : {e}") from e
+
+    async def update(
+        self,
+        job_id: _Uuid,
+        *,
+        status: str | None = None,
+        progress: float | None = None,
+        completed: int | None = None,
+        result: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> JobDTO:
+        """
+        Applies a partial update to a job (a `None` argument leaves the field
+        unchanged)
+
+        Args:
+            job_id (uuid.UUID | str): The job id
+            status (str | None): New status
+            progress (float | None): New progress fraction
+            completed (int | None): New completed-item count
+            result (dict | None): Produced references
+            error (str | None): Failure message
+
+        Returns:
+            The updated `JobDTO`
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the update fails
+        """
+        job = await self.session.get(Job, job_id)
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        try:
+            if status is not None:
+                job.status = status
+            if progress is not None:
+                job.progress = progress
+            if completed is not None:
+                job.completed = completed
+            if result is not None:
+                job.result = result
+            if error is not None:
+                job.error = error
+            await self.session.flush()
+            return JobDTO.model_validate(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Update Job : {e}") from e
+
+    async def delete(self, job_id: _Uuid) -> None:
+        """
+        Deletes a job (cascading to its children)
+
+        Args:
+            job_id (uuid.UUID | str): The job id
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the deletion fails
+        """
+        job = await self.session.get(Job, job_id)
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        try:
+            await self.session.delete(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Delete Job : {e}") from e
