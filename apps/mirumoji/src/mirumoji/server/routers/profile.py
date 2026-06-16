@@ -12,18 +12,25 @@ Attributes:
 import asyncio
 import json
 import logging
-import urllib.parse
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 
 from ...exceptions import RecordNotFoundError
 from .. import media
 from ..config import gpu_available
 from ..db import UnitOfWork
-from ..dependencies import ensure_profile_exists, get_stream_file
+from ..dependencies import ensure_profile_exists
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
@@ -150,58 +157,61 @@ async def delete_template(
     status_code=status.HTTP_201_CREATED,
 )
 async def save_clip(
-    clip_file: Path = Depends(get_stream_file),
+    clip_file: UploadFile = File(...),
+    start_time: float = Form(...),
+    end_time: float = Form(...),
+    breakdown: str = Form(...),
     profile_id: str = Depends(ensure_profile_exists),
-    start_time: str = Header(..., alias="X-Clip-Start-Time"),
-    end_time: str = Header(..., alias="X-Clip-End-Time"),
-    breakdown: str = Header(..., alias="X-Breakdown"),
 ) -> SaveClipResponse:
     """
-    Saves a streamed video clip for the active profile
+    Saves an uploaded video clip for the active profile
 
-    Streams the upload, converts it to WebM for Anki compatibility, stores it
-    under the profile, and persists a file + clip record. Clip metadata is
-    carried via headers, since the request body is the streamed file
+    Receives the clip and its metadata as a single `multipart/form-data`
+    request (the clip is the file part, the rest are form fields), converts it
+    to WebM for Anki compatibility, stores it under the profile, and persists a
+    file + clip record
 
     Args:
-        clip_file (Path): Path to the streamed upload
+        clip_file (UploadFile): The recorded clip (multipart file part)
+        start_time (float): Clip start time in seconds
+        end_time (float): Clip end time in seconds
+        breakdown (str): JSON-encoded breakdown payload
         profile_id (str): Validated profile id
-        start_time (str): Clip start time in seconds (`X-Clip-Start-Time`)
-        end_time (str): Clip end time in seconds (`X-Clip-End-Time`)
-        breakdown (str): URL-encoded JSON breakdown payload (`X-Breakdown`)
 
     Returns:
         The saved clip's id, its file id, and its media URL
 
     Raises:
-        HTTPException: If the clip metadata headers are malformed
+        HTTPException: If the breakdown payload is not valid JSON
         FFmpegError: If the WebM conversion fails
         StorageError: If storing the clip fails
         DatabaseError: If persistence fails
     """
     try:
-        s_time = float(start_time)
-        e_time = float(end_time)
-        breakdown_data = json.loads(urllib.parse.unquote(breakdown))
-    except (ValueError, json.JSONDecodeError) as e:
+        breakdown_data = json.loads(breakdown)
+    except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid clip metadata headers: {e}",
+            detail=f"Invalid breakdown payload: {e}",
         ) from e
 
     op_id = uuid.uuid4().hex
+    temp_dir = media.get_temp_dir(op_id)
+    src = temp_dir / (clip_file.filename or f"{op_id}.bin")
     clips_dir = media.get_profile_dir(profile_id, "clips")
-    webm_loc = clips_dir / f"{op_id}_{Path(clip_file.name).stem}.webm"
+    webm_loc = clips_dir / f"{op_id}_{Path(src.name).stem}.webm"
     rel_path = media.get_relative_path(webm_loc)
 
     try:
+        await media.save_upload_object(clip_file, src)
+
         # Convert to WebM for Anki Compatibility (NVDEC decode w/ CPU fallback,
         # VP9 encode is always CPU)
         ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
         await asyncio.to_thread(
             audio.to_webm,
             ffmpeg_path=ffmpeg,
-            input_path=str(clip_file),
+            input_path=str(src),
             output_path=str(webm_loc),
             use_gpu=bool(gpu_available()["available"]),
         )
@@ -216,8 +226,8 @@ async def save_clip(
             clip_rec = await uow.clips.add(
                 profile_id=profile_id,
                 file_id=file_rec.id,
-                start_time=s_time,
-                end_time=e_time,
+                start_time=start_time,
+                end_time=end_time,
                 llm_breakdown_response=breakdown_data,
             )
             await uow.commit()
@@ -229,10 +239,10 @@ async def save_clip(
         )
     finally:
         try:
-            await media.delete_dir(media.get_relative_path(clip_file.parent))
+            await media.delete_dir(media.get_relative_path(temp_dir))
         except Exception:
             LOGGER.warning(
-                f"Failed to clean temp dir '{clip_file.parent}'",
+                f"Failed to clean temp dir '{temp_dir}'",
                 exc_info=True,
             )
 

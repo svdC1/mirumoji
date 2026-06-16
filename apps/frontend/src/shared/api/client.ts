@@ -89,6 +89,51 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
 }
 
 /**
+ * Wires the shared progress + completion handling for an upload `XMLHttpRequest`
+ * (progress events, the 2xx/JSON-parse success path, the structured-error path,
+ * and the unreachable-server path), so the upload helpers only differ in how
+ * they build and send the request.
+ */
+function settleUpload<T>(
+    xhr: XMLHttpRequest,
+    resolve: (value: T) => void,
+    reject: (reason: ApiError) => void,
+    onProgress: (percent: number) => void,
+    onUploadComplete: () => void
+): void {
+    xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            onProgress(percentComplete);
+            if (percentComplete === 100) {
+                onUploadComplete();
+            }
+        }
+    };
+
+    xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                resolve(JSON.parse(xhr.responseText) as T);
+            } catch {
+                reject(new ApiError(500, "Failed to parse server response."));
+            }
+        } else {
+            const { message, code, details, displayMessage } = parseApiError(
+                xhr.responseText,
+                xhr.status
+            );
+            reject(new ApiError(xhr.status, message, code, details, displayMessage));
+        }
+    };
+
+    xhr.onerror = () =>
+        reject(
+            new ApiError(0, "Could not reach the server", "BackendUnreachable", undefined, false)
+        );
+}
+
+/**
  * Uploads a file via a streaming `XMLHttpRequest` with progress, mirroring
  * `apiFetch` (profile header, {@link ApiError}, JSON response).
  *
@@ -127,42 +172,43 @@ export async function uploadFile<T = unknown>(
             xhr.setRequestHeader(key, headers[key]);
         }
 
-        xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const percentComplete = (event.loaded / event.total) * 100;
-                onProgress(percentComplete);
-                if (percentComplete === 100) {
-                    onUploadComplete();
-                }
-            }
-        };
-
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    resolve(JSON.parse(xhr.responseText) as T);
-                } catch {
-                    reject(new ApiError(500, "Failed to parse server response."));
-                }
-            } else {
-                const { message, code, details, displayMessage } = parseApiError(
-                    xhr.responseText,
-                    xhr.status
-                );
-                reject(new ApiError(xhr.status, message, code, details, displayMessage));
-            }
-        };
-
-        xhr.onerror = () =>
-            reject(
-                new ApiError(
-                    0,
-                    "Could not reach the server",
-                    "BackendUnreachable",
-                    undefined,
-                    false
-                )
-            );
+        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete);
         xhr.send(file);
+    });
+}
+
+/**
+ * Uploads `multipart/form-data` via a progress-tracked `XMLHttpRequest`,
+ * mirroring {@link uploadFile} (profile header, {@link ApiError}, JSON
+ * response). The file rides in the form body, so large structured metadata is
+ * a form field rather than a size-limited header. The browser sets the
+ * multipart `Content-Type` (with boundary), so it is deliberately not set here.
+ *
+ * @template T The expected JSON response type.
+ * @param {string} url The API endpoint.
+ * @param {FormData} formData The multipart payload (file part + fields).
+ * @param {(percent: number) => void} onProgress Upload progress callback.
+ * @param {() => void} onUploadComplete Called when the upload hits 100%.
+ * @returns {Promise<T>} The parsed JSON response.
+ */
+export async function uploadFormData<T = unknown>(
+    url: string,
+    formData: FormData,
+    onProgress: (percent: number) => void,
+    onUploadComplete: () => void
+): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
+        const profileId = localStorage.getItem("currentProfileId");
+        if (!profileId) {
+            return reject(new ApiError(400, "No Profile ID Found. Select A Profile"));
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", fullUrl, true);
+        xhr.setRequestHeader("X-Profile-ID", profileId);
+
+        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete);
+        xhr.send(formData);
     });
 }

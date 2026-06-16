@@ -33,7 +33,7 @@ import shutil
 from pathlib import Path
 
 import aiofiles
-from fastapi import Request
+from fastapi import Request, UploadFile
 from tqdm.auto import tqdm
 
 from ..exceptions import InvalidMediaPathError, StorageError, UploadError
@@ -95,6 +95,49 @@ async def save_upload_file(
             f"Failed to save uploaded content to {output} : {e}"
         ) from e
 
+    return output
+
+
+async def save_upload_object(
+    upload: UploadFile,
+    output_path: str | os.PathLike[str],
+) -> Path:
+    """
+    Saves a `FastAPI.UploadFile` (a multipart file part) to the file system by
+    streaming it to `output_path` in chunks
+
+    info: Difference From `save_upload_file`
+        `save_upload_file` is used for large raw-body streamed uploads while
+        `save_upload_object` is used for multipart uploads (`File(...)`) where
+        the file travels alongside form metadata
+
+    Args:
+        upload (UploadFile): The multipart file part to save
+        output_path (str | os.PathLike[str]): File path in which to save it
+
+    Returns:
+        `output_path`, if the file was written successfully
+
+    Raises:
+        UploadError: If the upload fails for any reason
+    """
+    output = Path(output_path).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    chunk_size = 1024 * 1024
+
+    try:
+        async with aiofiles.open(output, "wb") as f:
+            while chunk := await upload.read(chunk_size):
+                await f.write(chunk)
+
+    except Exception as e:
+        # Clean Up Partially Created File
+        output.unlink(missing_ok=True)
+        raise UploadError(
+            f"Failed to save uploaded object to {output} : {e}"
+        ) from e
+
+    LOGGER.info(f"Saved Upload Object To {output}")
     return output
 
 
