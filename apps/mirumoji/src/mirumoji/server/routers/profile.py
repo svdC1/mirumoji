@@ -196,10 +196,14 @@ async def save_clip(
         ) from e
 
     op_id = uuid.uuid4().hex
+    # The uploaded filename is client-controlled, so never build a server path
+    # from it. Use the op id for both the scratch file and the stored clip,
+    # keeping only the (separator-free) suffix as a format hint for ffmpeg
+    suffix = Path(clip_file.filename or "").suffix
     temp_dir = media.get_temp_dir(op_id)
-    src = temp_dir / (clip_file.filename or f"{op_id}.bin")
+    src = temp_dir / f"{op_id}{suffix}"
     clips_dir = media.get_profile_dir(profile_id, "clips")
-    webm_loc = clips_dir / f"{op_id}_{Path(src.name).stem}.webm"
+    webm_loc = clips_dir / f"{op_id}.webm"
     rel_path = media.get_relative_path(webm_loc)
 
     try:
