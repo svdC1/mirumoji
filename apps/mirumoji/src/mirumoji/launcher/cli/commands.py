@@ -440,7 +440,9 @@ def up(
         - Builds the correct compose file based on the backend / image source
           choice
 
-        - Builds or pulls images
+        - Builds images locally for a build source. For a pull source it does
+          not pull explicitly, letting `docker compose up` fetch only the
+          missing images (use `mirumoji pull` to refresh on demand)
 
         - Runs Docker Compose Up using the managed config as the `--env-file`
     """
@@ -473,14 +475,9 @@ def up(
 
     compose_file = write_compose(backend, source)
 
-    if source is ImageSource.PULL:
-        stream_command(
-            gen=lifecycle.pull(compose_file),
-            identifier="Docker",
-            title="Pulling Images",
-        )
-        console.print("✓ Images Pulled", style="success")
-
+    # No explicit pull here. `docker compose up` already pulls any missing
+    # image and reuses cached ones, so a normal `up` doesn't need to hit
+    # Docker Hub. Run `mirumoji pull` to refresh images on demand
     stream_command(
         gen=lifecycle.up(
             compose_file, env_file=HOST_CONFIG_FILE, detach=detach
