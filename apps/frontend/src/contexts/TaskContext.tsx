@@ -16,6 +16,7 @@ import React, {
     useState,
     ReactNode,
 } from "react";
+import { toast } from "react-hot-toast";
 import { useProfile } from "./ProfileContext";
 import { cancelJob, getJob, listJobs, submitJob, uploadProfileFile } from "@/shared/jobs/api";
 import type { Job, JobStatus, JobType, SubmitJobRequest, UploadedFile } from "@/shared/jobs/types";
@@ -117,6 +118,12 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             (j) => isActive(j.status) && !activeIds.has(j.id)
         );
         const finished = await Promise.all(justFinished.map((j) => getJob(j.id).catch(() => null)));
+
+        // Surface failures the way the old synchronous toastApiError did; the
+        // tray keeps them around with the same (now domain-coded) message.
+        for (const j of finished) {
+            if (j?.status === "failed") toast.error(j.error ?? "A Task Failed");
+        }
 
         setJobs((prev) => {
             const byId = new Map(prev.map((j) => [j.id, j]));

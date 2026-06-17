@@ -26,8 +26,9 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
+from ..exceptions import MirumojiServerError
 from . import media
 from .config import get_settings
 from .db import UnitOfWork
@@ -151,6 +152,8 @@ class JobQueueManager:
         *,
         result: JobResult | None = None,
         error: str | None = None,
+        error_code: str | None = None,
+        error_details: dict[str, Any] | None = None,
     ) -> None:
         """
         Persists a job's terminal state to the database
@@ -159,10 +162,18 @@ class JobQueueManager:
             job_id (uuid.UUID): The id of the job to terminate
             result (JobResult | None): The job's successful result
             error (str | None): The message returned by the job on failure
+            error_code (str | None): The stable error code on failure
+            error_details (dict | None): Structured error context on failure
         """
         async with UnitOfWork() as uow:
             if error is not None:
-                await uow.jobs.update(job_id, status="failed", error=error)
+                await uow.jobs.update(
+                    job_id,
+                    status="failed",
+                    error=error,
+                    error_code=error_code,
+                    error_details=error_details,
+                )
             else:
                 await uow.jobs.update(
                     job_id,
@@ -218,10 +229,24 @@ class JobQueueManager:
 
         try:
             result = await handler(job, self.processor)
-        except Exception as exc:
-            # Job Failed
+        except MirumojiServerError as exc:
+            # Domain Failure - > Surface the stable code + user-facing message
+            LOGGER.warning(f"Job '{job_id}' ({job.type}) Failed: {exc.code}")
+            await self._terminate_job(
+                job_id,
+                error=str(exc),
+                error_code=exc.code,
+                error_details=exc.details,
+            )
+            return
+        except Exception:
+            # Unexpected Failure ->Log it, but don't leak the raw message
             LOGGER.exception(f"Job '{job_id}' ({job.type}) Failed")
-            await self._terminate_job(job_id, error=str(exc))
+            await self._terminate_job(
+                job_id,
+                error="An Unexpected Error Occurred",
+                error_code="ServerError",
+            )
             return
         # Job Succeeded
         await self._terminate_job(job_id, result=result)

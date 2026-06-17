@@ -136,6 +136,9 @@ class JobResponse(BaseModel):
         result (dict[str, Any] | None): Produced references, or `None` until
             finished
         error (str | None): Failure message when `status` is `failed`
+        error_code (str | None): Stable error code on failure (the domain
+            exception's code, or `ServerError` for an unexpected failure)
+        error_details (dict[str, Any] | None): Structured error context
         created_at (str): ISO-8601 creation timestamp
         updated_at (str): ISO-8601 last-update timestamp
     """
@@ -149,6 +152,8 @@ class JobResponse(BaseModel):
     parent_id: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
+    error_code: str | None = None
+    error_details: dict[str, Any] | None = None
     created_at: str
     updated_at: str
 

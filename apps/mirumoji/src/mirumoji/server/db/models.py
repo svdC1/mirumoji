@@ -370,6 +370,9 @@ class Job(Base):
         result (dict | None): Produced references (file / transcript / SRT ids)
             or `None` until finished
         error (str | None): Failure message when `status` is `failed`
+        error_code (str | None): Stable error code on failure (the domain
+            exception's `code`, or `ServerError` for an unexpected failure)
+        error_details (dict | None): Optional structured error context
         created_at (datetime): UTC creation timestamp
         updated_at (datetime): UTC last-update timestamp
     """
@@ -432,6 +435,16 @@ class Job(Base):
 
     error: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True,
+    )
+
+    error_code: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    error_details: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
         nullable=True,
     )
 
@@ -577,6 +590,8 @@ class JobDTO(SafeORMModel):
         params (dict): Submitted parameters
         result (dict | None): Produced references, or `None` until finished
         error (str | None): Failure message when `status` is `failed`
+        error_code (str | None): Stable error code on failure
+        error_details (dict | None): Optional structured error context
         created_at (datetime): UTC creation timestamp
         updated_at (datetime): UTC last-update timestamp
     """
@@ -593,5 +608,7 @@ class JobDTO(SafeORMModel):
     params: dict[str, Any]
     result: dict[str, Any] | None
     error: str | None
+    error_code: str | None
+    error_details: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime

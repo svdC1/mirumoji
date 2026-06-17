@@ -791,6 +791,8 @@ class JobRepository:
         completed: int | None = None,
         result: dict[str, Any] | None = None,
         error: str | None = None,
+        error_code: str | None = None,
+        error_details: dict[str, Any] | None = None,
     ) -> JobDTO:
         """
         Applies a partial update to a job (a `None` argument leaves the field
@@ -803,6 +805,8 @@ class JobRepository:
             completed (int | None): New completed-item count
             result (dict | None): Produced references
             error (str | None): Failure message
+            error_code (str | None): Stable error code
+            error_details (dict | None): Structured error context
 
         Returns:
             The updated `JobDTO`
@@ -828,6 +832,10 @@ class JobRepository:
                 job.result = result
             if error is not None:
                 job.error = error
+            if error_code is not None:
+                job.error_code = error_code
+            if error_details is not None:
+                job.error_details = error_details
             await self.session.flush()
             return JobDTO.model_validate(job)
         except Exception as e:

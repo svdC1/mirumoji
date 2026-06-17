@@ -21,6 +21,8 @@ export interface Job {
     parent_id: string | null;
     result: Record<string, unknown> | null;
     error: string | null;
+    error_code: string | null;
+    error_details: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
 }

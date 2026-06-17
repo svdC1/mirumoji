@@ -45,6 +45,8 @@ def _to_response(job: JobDTO) -> JobResponse:
         parent_id=str(job.parent_id) if job.parent_id else None,
         result=job.result,
         error=job.error,
+        error_code=job.error_code,
+        error_details=job.error_details,
         created_at=job.created_at.isoformat(),
         updated_at=job.updated_at.isoformat(),
     )
