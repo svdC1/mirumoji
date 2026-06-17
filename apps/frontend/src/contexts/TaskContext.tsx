@@ -97,6 +97,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const jobsRef = useRef<Job[]>([]);
     jobsRef.current = jobs;
 
+    // Re-upload elimination: remembers the profile file id for each File
+    // uploaded this session, so a second job on the same File skips the upload.
+    const uploadedRef = useRef(new Map<File, string>());
+
     const refresh = useCallback(async () => {
         if (!profileId) return;
         let active: Job[];
@@ -126,6 +130,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         setJobs([]);
         setUploads([]);
+        uploadedRef.current.clear();
         if (!profileId) return;
         let cancelled = false;
         listJobs(true)
@@ -154,6 +159,17 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const uploadAndSubmit = useCallback(
         async (file: File, options: SubmitOptions): Promise<Job | null> => {
+            // Reuse the file id when this exact File was already uploaded.
+            const cachedId = uploadedRef.current.get(file);
+            if (cachedId) {
+                return submit({
+                    type: options.jobType,
+                    file_id: cachedId,
+                    opts: options.opts,
+                    model: options.model,
+                    sys_msg: options.sysMsg,
+                });
+            }
             const uploadId = `upload-${file.name}-${Date.now()}`;
             setUploads((prev) => [
                 ...prev,
@@ -177,6 +193,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     (percent) => patch({ progress: percent }),
                     () => patch({ progress: 100 })
                 );
+                uploadedRef.current.set(file, uploaded.id);
                 const job = await submit({
                     type: options.jobType,
                     file_id: uploaded.id,

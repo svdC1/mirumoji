@@ -42,3 +42,22 @@ export interface UploadedFile {
     type: string | null;
     created_at: string | null;
 }
+
+/** Result of a `generate_srt` or `fix_srt` job (the server's `SrtResult`). */
+export interface SrtResult {
+    srt_file_id: string;
+    srt_url: string;
+    srt_content: string;
+}
+
+/** Result of a `transcribe` job (the server's `TranscribeResult`). */
+export interface TranscribeResult {
+    transcript_id: string;
+    transcript: string;
+}
+
+/** Result of a `convert` job (the server's `ConvertResult`). */
+export interface ConvertResult {
+    file_id: string;
+    video_url: string;
+}

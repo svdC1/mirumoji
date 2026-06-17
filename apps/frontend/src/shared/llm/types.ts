@@ -35,8 +35,3 @@ export interface BreakdownResponse {
 export interface ExplanationResponse {
     explanation: string;
 }
-
-/** Response from `/llm/fix_srt`: the cleaned-up SRT content. */
-export interface FixSrtResponse {
-    srt: string;
-}

@@ -7,7 +7,9 @@
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+    ArrowRight,
     Ban,
     CheckCircle2,
     ChevronDown,
@@ -17,9 +19,18 @@ import {
     X,
     XCircle,
 } from "lucide-react";
+import { usePlayer } from "@/contexts/PlayerContext";
 import { useTasks, type UploadTask } from "@/contexts/TaskContext";
-import type { Job, JobStatus } from "@/shared/jobs/types";
+import { staticUrl } from "@/shared/format/files";
+import type { ConvertResult, Job, JobStatus, SrtResult } from "@/shared/jobs/types";
 import { cn, IconButton, Spinner } from "@/shared/ui";
+
+const RESULT_LABELS: Record<string, string> = {
+    generate_srt: "Load Subtitles",
+    fix_srt: "Load Subtitles",
+    convert: "Open Video",
+    transcribe: "View Transcript",
+};
 
 const TYPE_LABELS: Record<string, string> = {
     generate_srt: "Generate Subtitles",
@@ -113,12 +124,15 @@ function JobRow({
     job,
     onCancel,
     onDismiss,
+    onResult,
 }: {
     job: Job;
     onCancel: () => void;
     onDismiss: () => void;
+    onResult?: () => void;
 }) {
     const active = isActive(job.status);
+    const resultLabel = job.status === "succeeded" ? RESULT_LABELS[job.type] : undefined;
     return (
         <li className="px-3 py-2.5">
             <div className="flex items-start gap-2.5">
@@ -138,6 +152,16 @@ function JobRow({
                     </p>
                     {job.status === "running" && job.total > 1 && (
                         <ProgressBar percent={(job.completed / job.total) * 100} />
+                    )}
+                    {resultLabel && onResult && (
+                        <button
+                            type="button"
+                            onClick={onResult}
+                            className="mt-2 inline-flex items-center gap-1 rounded-control bg-shu/10 px-2 py-1 text-2xs font-medium text-shu transition-colors hover:bg-shu/20"
+                        >
+                            {resultLabel}
+                            <ArrowRight size={12} />
+                        </button>
                     )}
                 </div>
                 <IconButton
@@ -159,7 +183,32 @@ function JobRow({
  */
 export function TaskTray() {
     const { jobs, uploads, busy, cancel, dismiss } = useTasks();
+    const player = usePlayer();
+    const navigate = useNavigate();
     const [open, setOpen] = useState(false);
+
+    /** Applies a finished job's result (load it into the player / open it). */
+    const runResult = (job: Job) => {
+        const result = job.result;
+        if (!result) return;
+        if (job.type === "generate_srt" || job.type === "fix_srt") {
+            const srt = result as unknown as SrtResult;
+            const file = new File([srt.srt_content], "subtitles.srt", {
+                type: "application/x-subrip",
+            });
+            player.setSrt(file);
+            player.setSrtFileName(file.name);
+            player.setSrtFileId(srt.srt_file_id);
+            navigate("/player");
+        } else if (job.type === "convert") {
+            const conv = result as unknown as ConvertResult;
+            player.setVideoUrl(staticUrl(conv.video_url));
+            navigate("/player");
+        } else if (job.type === "transcribe") {
+            navigate("/dashboard");
+        }
+        setOpen(false);
+    };
 
     if (jobs.length + uploads.length === 0) return null;
 
@@ -194,6 +243,7 @@ export function TaskTray() {
                                 job={j}
                                 onCancel={() => cancel(j.id)}
                                 onDismiss={() => dismiss(j.id)}
+                                onResult={() => runResult(j)}
                             />
                         ))}
                     </ul>

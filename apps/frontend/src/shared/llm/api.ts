@@ -4,13 +4,7 @@
 
 import { apiFetch } from "@/shared/api/client";
 import { ApiError } from "@/shared/api/errors";
-import type {
-    BreakdownResponse,
-    ExplanationResponse,
-    FixSrtResponse,
-    LlmTemplate,
-    ProviderStatus,
-} from "./types";
+import type { BreakdownResponse, ExplanationResponse, LlmTemplate, ProviderStatus } from "./types";
 
 /**
  * Lists which LLM providers are usable in this deployment (`/llm/providers`).
@@ -108,26 +102,6 @@ export async function apiExplainSentence(req: {
     prompt?: string;
 }): Promise<ExplanationResponse> {
     return apiFetch<ExplanationResponse>("llm/explain_sentence", {
-        method: "POST",
-        body: JSON.stringify(req),
-    });
-}
-
-/**
- * Cleans up raw SRT content with an LLM (`/llm/fix_srt`).
- *
- * @param {object} req The SRT-fix request.
- * @param {string} req.srt The raw SRT content.
- * @param {string} req.model The `provider:model` selector.
- * @param {string} [req.sys_msg] Optional custom system message.
- * @returns {Promise<FixSrtResponse>} The cleaned-up SRT content.
- */
-export async function apiFixSrt(req: {
-    srt: string;
-    model: string;
-    sys_msg?: string;
-}): Promise<FixSrtResponse> {
-    return apiFetch<FixSrtResponse>("llm/fix_srt", {
         method: "POST",
         body: JSON.stringify(req),
     });
