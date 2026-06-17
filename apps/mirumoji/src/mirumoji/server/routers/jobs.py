@@ -11,7 +11,6 @@ Attributes:
 
 import logging
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -88,14 +87,6 @@ async def submit_job(
             detail=f"Invalid File Id '{req.file_id}'",
         ) from e
 
-    params: dict[str, Any] = {"file_id": req.file_id}
-    if req.opts is not None:
-        params["opts"] = req.opts
-    if req.model is not None:
-        params["model"] = req.model
-    if req.sys_msg is not None:
-        params["sys_msg"] = req.sys_msg
-
     async with UnitOfWork() as uow:
         file_rec = await uow.files.get(file_uuid)
         if file_rec.profile_id != profile_id:
@@ -106,7 +97,7 @@ async def submit_job(
         job = await uow.jobs.add(
             profile_id=profile_id,
             type=req.type,
-            params=params,
+            params=req.to_params(),
         )
         await uow.commit()
 

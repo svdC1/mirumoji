@@ -31,6 +31,11 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from . import media
 from .config import get_settings
 from .db import UnitOfWork
+from .models.requests import (
+    ConvertVideoRequest,
+    GenerateSrtRequest,
+    TranscribeAudioRequest,
+)
 from .processing import audio, llm
 from .processing.subtitles import sanitize_srt
 
@@ -400,7 +405,7 @@ async def generate_srt_handler(
         The new SRT file's id, media URL, and content
     """
     src = await _file_path(uuid.UUID(job.params["file_id"]))
-    opts = dict(job.params.get("opts") or {})
+    opts = GenerateSrtRequest.model_validate(job.params.get("opts") or {})
     op_id = uuid.uuid4().hex
     tmp = media.get_temp_dir(op_id)
     try:
@@ -414,7 +419,7 @@ async def generate_srt_handler(
         srt_content = await processor.transcribe(
             extracted,
             output_format="srt",
-            w_transcribe_args=opts,
+            w_transcribe_args=opts.model_dump(exclude_none=True),
         )
         srt_loc = media.get_profile_dir(job.profile_id, "subtitles") / (
             f"{op_id}.srt"
@@ -462,13 +467,16 @@ async def transcribe_handler(
     """
     file_id = uuid.UUID(job.params["file_id"])
     src = await _file_path(file_id)
-    opts = dict(job.params.get("opts") or {})
-    clean_audio = bool(opts.pop("clean_audio", False))
+    opts = TranscribeAudioRequest.model_validate(job.params.get("opts") or {})
+    w_transcribe_args = opts.model_dump(
+        exclude_none=True,
+        exclude={"clean_audio"},
+    )
     op_id = uuid.uuid4().hex
     tmp = media.get_temp_dir(op_id)
     try:
         source = src
-        if clean_audio:
+        if opts.clean_audio:
             ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
             cleaned = tmp / f"cleaned_{op_id}.wav"
             await asyncio.to_thread(
@@ -481,7 +489,7 @@ async def transcribe_handler(
         text = await processor.transcribe(
             source,
             output_format="joined",
-            w_transcribe_args=opts,
+            w_transcribe_args=w_transcribe_args,
         )
         async with UnitOfWork() as uow:
             rec = await uow.transcripts.add(
@@ -519,13 +527,17 @@ async def convert_handler(
         The new MP4 file's id and media URL
     """
     src = await _file_path(uuid.UUID(job.params["file_id"]))
-    opts = dict(job.params.get("opts") or {})
+    opts = ConvertVideoRequest.model_validate(job.params.get("opts") or {})
     op_id = uuid.uuid4().hex
     out_loc = media.get_profile_dir(job.profile_id, "converted") / (
         f"{src.stem}_{op_id}_converted.mp4"
     )
     rel_out = media.get_relative_path(out_loc)
-    await processor.convert_to_mp4(src, out_loc, to_mp4_kwargs=opts)
+    await processor.convert_to_mp4(
+        src,
+        out_loc,
+        to_mp4_kwargs=opts.model_dump(exclude_none=True),
+    )
     async with UnitOfWork() as uow:
         rec = await uow.files.add(
             profile_id=job.profile_id,

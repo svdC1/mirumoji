@@ -12,38 +12,11 @@ tip: LLM Request Defaults
       prompt
 """
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .jpdict import BundleMode
-
-# --- Job Requests ---
-
-
-class SubmitJobRequest(BaseModel):
-    """
-    Request body for `POST /jobs`
-
-    Submits a long-running operation that runs using an existing profile file
-    and is tracked through the `jobs` table
-
-    Args:
-        type (Literal): The operation to run
-        file_id (str): The profile file the job operates on
-        opts (dict[str, Any] | None): Operation options (transcription /
-            conversion args)
-        model (str | None): LLM model selector in `provider:model` form
-            (`fix_srt` only)
-        sys_msg (str | None): Optional LLM system message (`fix_srt` only)
-    """
-
-    type: Literal["generate_srt", "transcribe", "convert", "fix_srt"]
-    file_id: str
-    opts: dict[str, Any] | None = None
-    model: str | None = None
-    sys_msg: str | None = None
-
 
 # --- Dictionary Requests ---
 
@@ -257,3 +230,138 @@ class ConvertVideoRequest(BaseModel):
 
     resolution: str = "1280x720"
     target_bitrate: str = "2500k"
+
+
+# --- Job Submission Requests ---
+
+
+class SubmitJobBase(BaseModel):
+    """
+    Shared fields for every job submission request
+
+    Args:
+        file_id (str): The profile file that the job operates on
+    """
+
+    file_id: str
+
+
+class GenerateSrtJobRequest(SubmitJobBase):
+    """
+    Submission for a `generate_srt` job
+
+    Args:
+        type (Literal['generate_srt']): The operation discriminator
+        opts (GenerateSrtRequest): Curated transcription options
+    """
+
+    type: Literal["generate_srt"]
+    opts: GenerateSrtRequest = Field(default_factory=GenerateSrtRequest)
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted job's `params` attribute
+
+        Returns:
+            The file reference and normalised transcription options
+        """
+        return {
+            "file_id": self.file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class TranscribeJobRequest(SubmitJobBase):
+    """
+    Submission for a `transcribe` job
+
+    Args:
+        type (Literal['transcribe']): The operation discriminator
+        opts (TranscribeAudioRequest): `clean_audio` + curated transcription
+            options
+    """
+
+    type: Literal["transcribe"]
+    opts: TranscribeAudioRequest = Field(
+        default_factory=TranscribeAudioRequest,
+    )
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted job's `params` attribute
+
+        Returns:
+            The file reference and normalised transcription options
+        """
+        return {
+            "file_id": self.file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class ConvertJobRequest(SubmitJobBase):
+    """
+    Submission for a `convert` job
+
+    Args:
+        type (Literal['convert']): The operation discriminator
+        opts (ConvertVideoRequest): Conversion options
+    """
+
+    type: Literal["convert"]
+    opts: ConvertVideoRequest = Field(default_factory=ConvertVideoRequest)
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted job's stored `params`
+
+        Returns:
+            The file reference and normalised conversion options
+        """
+        return {
+            "file_id": self.file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class FixSrtJobRequest(SubmitJobBase):
+    """
+    Submission for a `fix_srt` job
+
+    Args:
+        type (Literal): The operation discriminator
+        model (str): LLM model selector in `provider:model` form
+        sys_msg (str | None): Optional LLM system message
+    """
+
+    type: Literal["fix_srt"]
+    model: str
+    sys_msg: str | None = None
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted job's `params` attribute
+
+        Returns:
+            The file reference, model selector, and optional system message
+        """
+        return {
+            "file_id": self.file_id,
+            "model": self.model,
+            "sys_msg": self.sys_msg,
+        }
+
+
+SubmitJobRequest: TypeAlias = Annotated[
+    GenerateSrtJobRequest
+    | TranscribeJobRequest
+    | ConvertJobRequest
+    | FixSrtJobRequest,
+    Field(discriminator="type"),
+]
+"""
+The body of a `POST /jobs` request
+
+A discriminated union keyed by a persisted job's `type` attribute, so that
+each operation's `opts` are validated against their own model
+"""
