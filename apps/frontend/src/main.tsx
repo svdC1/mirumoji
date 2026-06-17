@@ -82,6 +82,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     iconTheme: { primary: "rgb(var(--danger))", secondary: "rgb(var(--surface))" },
                 },
                 loading: {
+                    // Persist until replaced by success/error; the global 4s
+                    // default otherwise dismisses long recordings / uploads early.
+                    duration: Infinity,
                     iconTheme: { primary: "rgb(var(--shu))", secondary: "rgb(var(--surface))" },
                 },
             }}

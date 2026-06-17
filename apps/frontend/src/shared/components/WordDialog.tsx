@@ -1,11 +1,11 @@
 /**
- * @packageDocumentation A draggable word lookup: an LLM nuance explanation
- * (typewriter reveal) + dictionary definitions, with an optional "save clip"
+ * @packageDocumentation A draggable word lookup: a streamed LLM nuance
+ * explanation + dictionary definitions, with an optional "save clip"
  * action when opened from a video. Shared by the player, text analyzer, and
  * transcribe pages.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,12 +13,13 @@ import remarkBreaks from "remark-breaks";
 import { Copy, Check, Bookmark, Sparkles, BookOpen, ArrowLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiDictQuery, apiTokenize, isEmptyDict } from "@/shared/dict/api";
-import { apiBreakdown, apiGetTemplate } from "@/shared/llm/api";
+import { apiGetTemplate } from "@/shared/llm/api";
+import { streamBreakdown } from "@/shared/llm/stream";
 import { toastApiError } from "@/shared/api/errors";
 import { toHiragana } from "@/shared/japanese/kana";
 import { createAndSaveClip } from "@/shared/clips/create";
 import { cn } from "@/shared/ui";
-import type { KotobaseData, Token } from "@/shared/dict/types";
+import type { EnrichedJapaneseWord, KotobaseData, Token } from "@/shared/dict/types";
 import type { BreakdownResponse } from "@/shared/llm/types";
 import type { ClipBreakdown } from "@/shared/clips/types";
 import {
@@ -113,7 +114,13 @@ export default function WordDialog({
     videoUrl,
 }: WordDialogProps) {
     const key = `${sentence}__${word}`;
-    const [data, setData] = useState<BreakdownResponse | null>(breakdownCache.get(key) ?? null);
+    const cached = breakdownCache.get(key);
+    const [focus, setFocus] = useState<EnrichedJapaneseWord | null>(cached?.focus ?? null);
+    const [explanation, setExplanation] = useState<string>(cached?.explanation ?? "");
+    // The streamed buffer (`explanation`) is revealed by a typewriter into
+    // `displayed`, so the answer types out smoothly as the stream arrives.
+    const [displayed, setDisplayed] = useState<string>(cached?.explanation ?? "");
+    const [streaming, setStreaming] = useState(false);
     const [tab, setTab] = useState<MainTab>("dict");
     const [noModel, setNoModel] = useState(false);
     const [dictTab, setDictTab] = useState<DictTab>("jmdict");
@@ -127,10 +134,47 @@ export default function WordDialog({
     // the grammar breakdown is available on the always-visible dictionary tab.
     const [dictTokens, setDictTokens] = useState<Token[]>([]);
 
+    // Reset the LLM breakdown when the dialog moves to a new word/sentence (the
+    // dialog instance is reused across clicks), so it never shows a stale answer.
+    const [prevKey, setPrevKey] = useState(key);
+    if (key !== prevKey) {
+        setPrevKey(key);
+        const c = breakdownCache.get(key);
+        setFocus(c?.focus ?? null);
+        setExplanation(c?.explanation ?? "");
+        setDisplayed(c?.explanation ?? "");
+        setStreaming(false);
+        setNoModel(false);
+    }
+
     const [screenWidth, setScreenWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 0
     );
     const dragControls = useDragControls();
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Typewriter: reveal `displayed` toward the streamed `explanation` buffer,
+    // taking bigger steps when further behind so it keeps up with a fast stream
+    // without ever jumping a whole chunk in at once.
+    useEffect(() => {
+        if (displayed.length >= explanation.length) return;
+        const remaining = explanation.length - displayed.length;
+        const step = Math.max(2, Math.ceil(remaining / 12));
+        const id = window.setTimeout(() => {
+            setDisplayed(explanation.slice(0, displayed.length + step));
+        }, 16);
+        return () => window.clearTimeout(id);
+    }, [displayed, explanation]);
+
+    // Follow the text as it types, but only when the reader is already near the
+    // bottom, so scrolling up to re-read isn't fought.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el || displayed.length >= explanation.length) return;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [displayed, explanation]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -143,68 +187,87 @@ export default function WordDialog({
     const isMobile = screenWidth < 1380;
     const canSaveClip = !!(videoFile || videoUrl);
 
-    const fetchBreakdown = async (): Promise<BreakdownResponse | null> => {
-        const cached = breakdownCache.get(key);
-        if (cached) {
-            setData(cached);
-            return cached;
+    // Streams the breakdown: the focus word, then the explanation token by token
+    // (no typewriter — the stream itself is the reveal). The final result is
+    // cached so re-opening the same word is instant.
+    const runBreakdown = async (signal?: AbortSignal): Promise<BreakdownResponse | null> => {
+        const cachedNow = breakdownCache.get(key);
+        if (cachedNow) {
+            setFocus(cachedNow.focus);
+            setExplanation(cachedNow.explanation);
+            setDisplayed(cachedNow.explanation);
+            return cachedNow;
         }
+        let template;
         try {
             // Model (+ optional sys_msg/prompt) comes from the profile template;
             // without one, the LLM features stay disabled.
-            const template = await apiGetTemplate();
-            if (!template) {
-                setNoModel(true);
-                return null;
-            }
-            setNoModel(false);
-
-            const useCustomPrompt =
-                template.prompt.includes("{sentence}") && template.prompt.includes("{focus}");
-
-            const json = await apiBreakdown({
-                sentence,
-                focus: word,
-                model: template.model,
-                sys_msg: template.sys_msg || undefined,
-                prompt: useCustomPrompt ? toApiPrompt(template.prompt) : undefined,
-            });
-            breakdownCache.set(key, json);
-            setData(json);
-            return json;
+            template = await apiGetTemplate();
         } catch (e) {
             toastApiError(e);
             onClose();
-            throw e;
+            return null;
         }
+        if (!template) {
+            setNoModel(true);
+            return null;
+        }
+        setNoModel(false);
+
+        const useCustomPrompt =
+            template.prompt.includes("{sentence}") && template.prompt.includes("{focus}");
+        let focusWord: EnrichedJapaneseWord | null = null;
+        let text = "";
+        setStreaming(true);
+        try {
+            await streamBreakdown(
+                {
+                    sentence,
+                    focus: word,
+                    model: template.model,
+                    sys_msg: template.sys_msg || undefined,
+                    prompt: useCustomPrompt ? toApiPrompt(template.prompt) : undefined,
+                },
+                {
+                    onFocus: (f) => {
+                        focusWord = f;
+                        setFocus(f);
+                    },
+                    onToken: (t) => {
+                        text += t;
+                        setExplanation(text);
+                    },
+                },
+                signal
+            );
+        } catch (e) {
+            if (signal?.aborted) return null;
+            toastApiError(e);
+            onClose();
+            return null;
+        } finally {
+            setStreaming(false);
+        }
+        const result: BreakdownResponse = { focus: focusWord, explanation: text };
+        breakdownCache.set(key, result);
+        return result;
     };
 
     useEffect(() => {
-        if (data || tab !== "llm") return;
-        fetchBreakdown().catch(() => {});
+        if (tab !== "llm") return;
+        if (breakdownCache.get(key) || explanation || streaming) return;
+        const controller = new AbortController();
+        runBreakdown(controller.signal).catch(() => {});
+        return () => controller.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key, data, tab]);
-
-    // Typewriter reveal of the explanation.
-    const [typed, setTyped] = useState("");
-    useEffect(() => {
-        const full = data?.explanation ?? "";
-        setTyped("");
-        if (!full) return;
-        let i = 0;
-        const id = window.setInterval(() => {
-            i += 2;
-            setTyped(full.slice(0, i));
-            if (i >= full.length) window.clearInterval(id);
-        }, 12);
-        return () => window.clearInterval(id);
-    }, [data]);
+    }, [key, tab]);
 
     // Reset the dictionary drill-in target whenever the dialog's word changes.
     useEffect(() => setDictWord(word), [word]);
 
+    // Loaded regardless of the active tab so the LLM heading can show the
+    // dictionary reading rather than the streamed focus event.
     useEffect(() => {
-        if (tab !== "dict") return;
         setDictData(undefined);
         apiDictQuery(dictWord)
             .then((entry) => {
@@ -213,18 +276,19 @@ export default function WordDialog({
                     return;
                 }
                 setDictData(entry);
-                if (entry.jmentries.length === 0) {
-                    if (entry.jmnentries.length > 0) setDictTab("jmnedict");
-                    else if (entry.kanji.length > 0) setDictTab("kanji");
-                    else if (entry.examples.length > 0) setDictTab("examples");
-                }
+                // Reset to a valid sub-tab for this entry; the previous word's
+                // sub-tab may not exist here, which would render blank.
+                if (entry.jmentries.length > 0) setDictTab("jmdict");
+                else if (entry.jmnentries.length > 0) setDictTab("jmnedict");
+                else if (entry.kanji.length > 0) setDictTab("kanji");
+                else if (entry.examples.length > 0) setDictTab("examples");
             })
             .catch((e) => {
                 console.error("apiDictQuery error", e);
                 setDictData(null);
                 toastApiError(e);
             });
-    }, [tab, dictWord]);
+    }, [dictWord]);
 
     // Tokenize the current dict word for its grammar breakdown (no LLM needed).
     // Force "words" so the whole word stays one bundle and exposes all of its
@@ -243,14 +307,13 @@ export default function WordDialog({
 
     const handleCopy = () => {
         let textToCopy = "";
-        if (tab === "llm" && data) {
-            const focus = data.focus;
+        if (tab === "llm" && (focus || explanation)) {
             textToCopy = [
                 ...(focus ? [focus.word.surface] : []),
                 ...(focus?.word.reading ? [toHiragana(focus.word.reading)] : []),
                 ...(focus?.kotobase_data.meanings ?? []),
                 "",
-                data.explanation,
+                explanation,
             ].join("\n");
         } else if (tab === "dict" && dictData) {
             textToCopy = JSON.stringify(dictData);
@@ -271,10 +334,10 @@ export default function WordDialog({
         }
         setSaving(true);
         try {
-            let breakdown = data;
+            let breakdown = breakdownCache.get(key) ?? null;
             if (!breakdown) {
                 toast.loading("Fetching explanation...", { id: clipToastId });
-                breakdown = await fetchBreakdown();
+                breakdown = await runBreakdown();
             }
             if (!breakdown) {
                 toast.error("Configure An LLM Model In Your Profile To Save Clips.", {
@@ -315,6 +378,7 @@ export default function WordDialog({
     return (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
+                ref={scrollRef}
                 drag
                 dragListener={!isMobile}
                 dragControls={dragControls}
@@ -371,10 +435,18 @@ export default function WordDialog({
                         )}
                     >
                         <button
-                            className={tabClasses(tab === "llm")}
+                            className={cn(
+                                tabClasses(tab === "llm"),
+                                dictWord !== word && "cursor-not-allowed opacity-40"
+                            )}
                             onClick={() => setTab("llm")}
+                            disabled={dictWord !== word}
                             aria-label="LLM Explanation"
-                            title="LLM Explanation"
+                            title={
+                                dictWord !== word
+                                    ? "Explanation Is For The Original Word"
+                                    : "LLM Explanation"
+                            }
                         >
                             <Sparkles size={18} className="mx-auto" />
                         </button>
@@ -394,7 +466,7 @@ export default function WordDialog({
                                 Configure an LLM model in your Profile (Dashboard &rarr; LLM
                                 Template) to enable explanations.
                             </div>
-                        ) : !data ? (
+                        ) : !explanation ? (
                             <div className="w-full space-y-4">
                                 <div className="h-6 w-1/3 animate-pulse rounded bg-ink/10" />
                                 {Array.from({ length: 4 }).map((_, i) => (
@@ -405,34 +477,30 @@ export default function WordDialog({
                                 ))}
                             </div>
                         ) : (
-                            <>
-                                <div className="mb-3 border-b border-ink/10 pb-3">
-                                    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                                        <h2 lang="ja" className="font-display text-2xl font-bold">
-                                            {data.focus?.word.surface ?? word}
-                                        </h2>
-                                        {data.focus?.word.reading && (
-                                            <span
-                                                lang="ja"
-                                                className="text-base italic text-ink-muted"
-                                            >
-                                                {toHiragana(data.focus.word.reading)}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {data.focus && data.focus.kotobase_data.meanings.length > 0 && (
-                                        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                                            {data.focus.kotobase_data.meanings.join("；")}
-                                        </p>
+                            <motion.div
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
+                            >
+                                <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-ink/10 pb-3">
+                                    <h2 lang="ja" className="font-display text-2xl font-bold">
+                                        {word}
+                                    </h2>
+                                    {(dictData?.jmentries[0]?.kana[0] ||
+                                        dictData?.jmnentries[0]?.kana[0]) && (
+                                        <span lang="ja" className="text-base italic text-ink-muted">
+                                            {dictData?.jmentries[0]?.kana[0] ||
+                                                dictData?.jmnentries[0]?.kana[0]}
+                                        </span>
                                     )}
                                 </div>
                                 <ReactMarkdown
                                     className="prose prose-invert max-w-none whitespace-pre-wrap"
                                     remarkPlugins={[remarkGfm, remarkBreaks]}
                                 >
-                                    {typed}
+                                    {displayed}
                                 </ReactMarkdown>
-                            </>
+                            </motion.div>
                         )
                     ) : dictData === undefined ? (
                         <p className="text-center italic text-ink-muted">Loading dictionary…</p>
