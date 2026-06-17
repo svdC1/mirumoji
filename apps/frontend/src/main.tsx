@@ -15,6 +15,7 @@ import { Toaster } from "react-hot-toast";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { SubtitleSettingsProvider } from "./contexts/SubtitleSettingsContext";
 import { BundleSettingsProvider } from "./contexts/BundleSettingsContext";
+import { TaskProvider } from "./contexts/TaskContext";
 
 /**
  * Fix for GitHub Pages and other static hosts.
@@ -50,7 +51,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <SubtitleSettingsProvider>
                     <BundleSettingsProvider>
                         <BrowserRouter basename={import.meta.env.BASE_URL}>
-                            <App />
+                            <TaskProvider>
+                                <App />
+                            </TaskProvider>
                         </BrowserRouter>
                     </BundleSettingsProvider>
                 </SubtitleSettingsProvider>

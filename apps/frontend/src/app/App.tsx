@@ -6,6 +6,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppSidebar } from "./shell/AppSidebar";
+import { TaskTray } from "./shell/TaskTray";
 import HomePage from "@/features/home/HomePage";
 import PlayerPage from "@/features/player/PlayerPage";
 import TranscribePage from "@/features/transcribe/TranscribePage";
@@ -44,6 +45,7 @@ export default function App() {
                     <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </div>
+            <TaskTray />
         </PlayerProvider>
     );
 }
