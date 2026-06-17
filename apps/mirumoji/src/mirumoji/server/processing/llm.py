@@ -33,6 +33,7 @@ from ...exceptions import (
     InvalidModelStringError,
     LLMProviderUnavailableError,
     LLMRequestError,
+    MirumojiServerError,
 )
 from ..config import env_present, get_settings
 
@@ -458,11 +459,28 @@ def sse_format(chunks: Iterable[str]) -> Iterator[str]:
         chunks (Iterable[str]): Text chunks to emit
 
     Yields:
-        SSE-formatted strings (`data: <json>\\n\\n`), then a terminal
-            `event: done` frame
+        SSE `data: <json>` frames, an `event: error` frame if a domain error
+            interrupts the stream, then a terminal `event: done` frame
     """
-    for chunk in chunks:
-        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+    try:
+        for chunk in chunks:
+            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+    except MirumojiServerError as exc:
+        # Domain Failure Mid-Stream -> route its code + message as an error
+        # frame (the response already started, so an envelope is too late)
+        payload = json.dumps(
+            {"code": exc.code, "message": str(exc)},
+            ensure_ascii=False,
+        )
+        yield f"event: error\ndata: {payload}\n\n"
+    except Exception:
+        # Unexpected Failure Mid-Stream -> log it, route a generic error frame
+        LOGGER.exception("SSE stream failed")
+        payload = json.dumps(
+            {"code": "ServerError", "message": "An unexpected error occurred"},
+            ensure_ascii=False,
+        )
+        yield f"event: error\ndata: {payload}\n\n"
     yield "event: done\ndata:\n\n"
 
 
@@ -471,7 +489,7 @@ def sse_breakdown(
     chunks: Iterable[str],
 ) -> Iterator[str]:
     """
-    Stream a word breakdown: the structured focus first, then the explanation
+    Stream a word breakdown. The structured focus first, then the explanation
 
     The focus word (its stitched token + dictionary data) is emitted once as a
     `focus` event, after which the LLM explanation streams as normal `data:`

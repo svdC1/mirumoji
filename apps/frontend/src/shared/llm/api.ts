@@ -4,7 +4,9 @@
 
 import { apiFetch } from "@/shared/api/client";
 import { ApiError } from "@/shared/api/errors";
-import type { BreakdownResponse, ExplanationResponse, LlmTemplate, ProviderStatus } from "./types";
+import { streamSSE } from "@/shared/api/sse";
+import type { EnrichedJapaneseWord } from "@/shared/dict/types";
+import type { LlmTemplate, ProviderStatus } from "./types";
 
 /**
  * Lists which LLM providers are usable in this deployment (`/llm/providers`).
@@ -62,49 +64,55 @@ export async function apiDeleteTemplate(): Promise<void> {
 }
 
 /**
- * Explains the nuance of a focus word within a sentence (`/llm/breakdown`).
+ * Streams a word breakdown (`/llm/breakdown`): the structured focus word first,
+ * then the explanation token by token.
  *
  * @param {object} req The breakdown request.
- * @param {string} req.sentence The sentence containing the focus word.
- * @param {string} req.focus The word to explain in context.
- * @param {string} req.model The `provider:model` selector.
- * @param {string} [req.sys_msg] Optional custom system message.
- * @param {string} [req.prompt] Optional custom prompt (`{0}`=sentence, `{1}`=focus).
- * @returns {Promise<BreakdownResponse>} The focus word + explanation.
+ * @param {object} handlers `onFocus` (once) + `onToken` (per chunk).
+ * @param {AbortSignal} [signal] Aborts the stream.
+ * @returns {Promise<void>} Resolves when the explanation finishes.
  */
-export async function apiBreakdown(req: {
-    sentence: string;
-    focus: string;
-    model: string;
-    sys_msg?: string;
-    prompt?: string;
-}): Promise<BreakdownResponse> {
-    return apiFetch<BreakdownResponse>("llm/breakdown", {
-        method: "POST",
-        body: JSON.stringify(req),
-    });
+export async function streamBreakdown(
+    req: { sentence: string; focus: string; model: string; sys_msg?: string; prompt?: string },
+    handlers: {
+        onFocus: (focus: EnrichedJapaneseWord | null) => void;
+        onToken: (token: string) => void;
+    },
+    signal?: AbortSignal
+): Promise<void> {
+    await streamSSE(
+        "llm/breakdown",
+        req,
+        {
+            onToken: handlers.onToken,
+            onEvent: (event, data) => {
+                if (event !== "focus") return;
+                try {
+                    handlers.onFocus(JSON.parse(data) as EnrichedJapaneseWord);
+                } catch {
+                    handlers.onFocus(null);
+                }
+            },
+        },
+        signal
+    );
 }
 
 /**
- * Explains a whole sentence, without a focus word (`/llm/explain_sentence`).
+ * Streams an explanation of a whole sentence (`/llm/explain_sentence`), token
+ * by token.
  *
  * @param {object} req The explanation request.
- * @param {string} req.sentence The sentence to explain.
- * @param {string} req.model The `provider:model` selector.
- * @param {string} [req.sys_msg] Optional custom system message.
- * @param {string} [req.prompt] Optional custom prompt (`{0}`=sentence).
- * @returns {Promise<ExplanationResponse>} The explanation.
+ * @param {object} handlers `onToken` (per chunk).
+ * @param {AbortSignal} [signal] Aborts the stream.
+ * @returns {Promise<void>} Resolves when the explanation finishes.
  */
-export async function apiExplainSentence(req: {
-    sentence: string;
-    model: string;
-    sys_msg?: string;
-    prompt?: string;
-}): Promise<ExplanationResponse> {
-    return apiFetch<ExplanationResponse>("llm/explain_sentence", {
-        method: "POST",
-        body: JSON.stringify(req),
-    });
+export async function streamExplain(
+    req: { sentence: string; model: string; sys_msg?: string; prompt?: string },
+    handlers: { onToken: (token: string) => void },
+    signal?: AbortSignal
+): Promise<void> {
+    await streamSSE("llm/explain_sentence", req, { onToken: handlers.onToken }, signal);
 }
 
 /**

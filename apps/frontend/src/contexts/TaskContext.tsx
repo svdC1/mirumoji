@@ -16,7 +16,7 @@ import React, {
     useState,
     ReactNode,
 } from "react";
-import { toast } from "react-hot-toast";
+import { ApiError, toastApiError } from "@/shared/api/errors";
 import { useProfile } from "./ProfileContext";
 import { cancelJob, getJob, listJobs, submitJob, uploadProfileFile } from "@/shared/jobs/api";
 import type { Job, JobStatus, JobType, SubmitJobRequest, UploadedFile } from "@/shared/jobs/types";
@@ -65,6 +65,8 @@ export interface TaskContextType {
     uploadAndSubmit: (file: File, options: SubmitOptions) => Promise<Job | null>;
     /** Submits a job against an already-uploaded file. */
     submit: (req: SubmitJobRequest) => Promise<Job | null>;
+    /** Resolves once the given job reaches a terminal state (polls it). */
+    waitFor: (id: string) => Promise<Job>;
     /** Cancels a queued or running job. */
     cancel: (id: string) => Promise<void>;
     /** Removes a finished job or a failed upload from the tray. */
@@ -119,10 +121,19 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
         const finished = await Promise.all(justFinished.map((j) => getJob(j.id).catch(() => null)));
 
-        // Surface failures the way the old synchronous toastApiError did; the
-        // tray keeps them around with the same (now domain-coded) message.
+        // Surface failures through the same code -> friendly-message mapping the
+        // synchronous endpoints used (toastApiError), via the job's error_code.
         for (const j of finished) {
-            if (j?.status === "failed") toast.error(j.error ?? "A Task Failed");
+            if (j?.status === "failed") {
+                toastApiError(
+                    new ApiError(
+                        500,
+                        j.error ?? "A Task Failed",
+                        j.error_code ?? undefined,
+                        j.error_details ?? undefined
+                    )
+                );
+            }
         }
 
         setJobs((prev) => {
@@ -219,6 +230,14 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         [submit]
     );
 
+    const waitFor = useCallback(async (id: string): Promise<Job> => {
+        for (;;) {
+            const job = await getJob(id);
+            if (!isActive(job.status)) return job;
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        }
+    }, []);
+
     const cancel = useCallback(async (id: string) => {
         try {
             const updated = await cancelJob(id);
@@ -236,8 +255,8 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const busy = uploads.some((u) => u.status === "uploading") || hasActiveJobs;
 
     const value = useMemo(
-        () => ({ jobs, uploads, busy, uploadAndSubmit, submit, cancel, dismiss, refresh }),
-        [jobs, uploads, busy, uploadAndSubmit, submit, cancel, dismiss, refresh]
+        () => ({ jobs, uploads, busy, uploadAndSubmit, submit, waitFor, cancel, dismiss, refresh }),
+        [jobs, uploads, busy, uploadAndSubmit, submit, waitFor, cancel, dismiss, refresh]
     );
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

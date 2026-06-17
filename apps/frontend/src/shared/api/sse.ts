@@ -1,16 +1,15 @@
 /**
- * @packageDocumentation Server-Sent Events client for the streaming LLM
- * endpoints (breakdown / explain). Uses `fetch` + a stream reader (an
- * `EventSource` can't POST a JSON body), parsing each `data:` frame as JSON
- * (the server JSON-encodes every chunk so multi-line markdown survives).
+ * @packageDocumentation A reusable Server-Sent Events client over `fetch` (an
+ * `EventSource` can't POST a JSON body), mirroring `apiFetch` (profile header,
+ * {@link ApiError}). Each `data:` frame is JSON; a named `error` event aborts
+ * with an {@link ApiError}, and the stream ends on the `done` event.
  */
 
-import { API_BASE } from "@/shared/api/client";
-import { ApiError } from "@/shared/api/errors";
-import type { EnrichedJapaneseWord } from "@/shared/dict/types";
+import { API_BASE } from "./client";
+import { ApiError } from "./errors";
 
-/** Handlers for a streamed LLM response. */
-interface SSEHandlers {
+/** Per-frame callbacks for a streamed response. */
+export interface SSEHandlers {
     /** A decoded text chunk of the answer. */
     onToken: (token: string) => void;
     /** A named non-data event (e.g. breakdown's `focus`), with its JSON data. */
@@ -24,10 +23,11 @@ interface SSEHandlers {
  * @param {string} url The relative API path.
  * @param {unknown} body The JSON request body.
  * @param {SSEHandlers} handlers Per-frame callbacks.
- * @param {AbortSignal} [signal] Aborts the stream (e.g. dialog closed).
+ * @param {AbortSignal} [signal] Aborts the stream.
  * @returns {Promise<void>} Resolves at the `done` event.
+ * @throws {ApiError} On a non-2xx response or a streamed `error` event.
  */
-async function streamSSE(
+export async function streamSSE(
     url: string,
     body: unknown,
     handlers: SSEHandlers,
@@ -52,13 +52,17 @@ async function streamSSE(
     if (!res.ok || !res.body) {
         const text = await res.text().catch(() => "");
         let message = `Request Failed (${res.status})`;
+        let code: string | undefined;
         try {
             const parsed = JSON.parse(text);
-            if (parsed?.error?.message) message = parsed.error.message;
+            if (parsed?.error?.message) {
+                message = parsed.error.message;
+                code = parsed.error.code;
+            }
         } catch {
             /* not the JSON error envelope */
         }
-        throw new ApiError(res.status, message);
+        throw new ApiError(res.status, message, code);
     }
 
     const reader = res.body.getReader();
@@ -88,6 +92,18 @@ async function streamSSE(
             const data = dataLines.join("\n");
 
             if (event === "done") return;
+            if (event === "error") {
+                let message = "The request failed";
+                let code: string | undefined;
+                try {
+                    const parsed = JSON.parse(data);
+                    message = parsed.message ?? message;
+                    code = parsed.code;
+                } catch {
+                    /* keep the generic message */
+                }
+                throw new ApiError(500, message, code);
+            }
             if (event === "message") {
                 try {
                     handlers.onToken(JSON.parse(data) as string);
@@ -99,55 +115,4 @@ async function streamSSE(
             }
         }
     }
-}
-
-/**
- * Streams a word breakdown: the structured focus word first, then the
- * explanation token by token.
- *
- * @param {object} req The breakdown request.
- * @param {object} handlers `onFocus` (once) + `onToken` (per chunk).
- * @param {AbortSignal} [signal] Aborts the stream.
- * @returns {Promise<void>} Resolves when the explanation finishes.
- */
-export async function streamBreakdown(
-    req: { sentence: string; focus: string; model: string; sys_msg?: string; prompt?: string },
-    handlers: {
-        onFocus: (focus: EnrichedJapaneseWord | null) => void;
-        onToken: (token: string) => void;
-    },
-    signal?: AbortSignal
-): Promise<void> {
-    await streamSSE(
-        "llm/breakdown",
-        req,
-        {
-            onToken: handlers.onToken,
-            onEvent: (event, data) => {
-                if (event !== "focus") return;
-                try {
-                    handlers.onFocus(JSON.parse(data) as EnrichedJapaneseWord);
-                } catch {
-                    handlers.onFocus(null);
-                }
-            },
-        },
-        signal
-    );
-}
-
-/**
- * Streams an explanation of a whole sentence, token by token.
- *
- * @param {object} req The explanation request.
- * @param {object} handlers `onToken` (per chunk).
- * @param {AbortSignal} [signal] Aborts the stream.
- * @returns {Promise<void>} Resolves when the explanation finishes.
- */
-export async function streamExplain(
-    req: { sentence: string; model: string; sys_msg?: string; prompt?: string },
-    handlers: { onToken: (token: string) => void },
-    signal?: AbortSignal
-): Promise<void> {
-    await streamSSE("llm/explain_sentence", req, { onToken: handlers.onToken }, signal);
 }

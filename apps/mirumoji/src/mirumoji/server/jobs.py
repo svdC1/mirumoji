@@ -557,11 +557,14 @@ async def convert_handler(
     Returns:
         The new MP4 file's id and media URL
     """
-    src = await _file_path(uuid.UUID(job.params["file_id"]))
+    async with UnitOfWork() as uow:
+        file_rec = await uow.files.get(uuid.UUID(job.params["file_id"]))
+    src = media.BASE_PATH / file_rec.path
     opts = ConvertVideoRequest.model_validate(job.params.get("opts") or {})
     op_id = uuid.uuid4().hex
+    # Name the output after the original upload, not its op-id storage path
     out_loc = media.get_profile_dir(job.profile_id, "converted") / (
-        f"{src.stem}_{op_id}_converted.mp4"
+        f"{Path(file_rec.name).stem}_{op_id}_converted.mp4"
     )
     rel_out = media.get_relative_path(out_loc)
     await processor.convert_to_mp4(

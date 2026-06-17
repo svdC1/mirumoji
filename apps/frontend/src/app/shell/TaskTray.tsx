@@ -111,7 +111,9 @@ function statusText(job: Job): string {
         case "succeeded":
             return "Done";
         case "failed":
-            return job.error ?? "Failed";
+            // Short + structured; the full message goes to the toast (mapped)
+            // and will live on the dashboard's tasks tab.
+            return job.error_code ? `Failed · ${job.error_code}` : "Failed";
         case "cancelled":
             return "Cancelled";
         default:
@@ -146,7 +148,6 @@ function JobRow({
                             "truncate text-2xs",
                             job.status === "failed" ? "text-danger" : "text-ink-muted"
                         )}
-                        title={job.status === "failed" ? (job.error ?? undefined) : undefined}
                     >
                         {statusText(job)}
                     </p>
