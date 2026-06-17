@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from ...exceptions import LLMRequestError
+from ...exceptions import InvalidModelStringError, LLMRequestError
 from ..config import get_settings
 from ..models.requests import (
     BreakdownRequest,
@@ -36,6 +36,37 @@ async def list_providers() -> dict[str, Any]:
             used by the frontend to populate the model picker
     """
     return {"providers": llm.provider_status()}
+
+
+@llm_router.get("/models")
+async def list_models(provider: str) -> dict[str, list[str]]:
+    """
+    Lists the available models for a configured LLM provider
+
+    Lets the frontend offer a model dropdown for the cloud providers, so users
+    pick a valid model instead of typing one that 404s
+
+    Args:
+        provider (str): The provider id (`openai`, `anthropic`, `gemini`,
+            `local`)
+
+    Returns:
+        Mapping with a `models` list of model ids
+
+    Raises:
+        InvalidModelStringError: If the provider id is unknown
+        LLMProviderUnavailableError: If the provider isn't configured
+        LLMRequestError: If the provider's models endpoint fails
+    """
+    try:
+        prov = llm.LLMProvider(provider)
+    except ValueError as e:
+        raise InvalidModelStringError(
+            f"Unknown LLM provider '{provider}'",
+            details={"provider": provider},
+        ) from e
+    models = await asyncio.to_thread(llm.available_models, prov)
+    return {"models": models}
 
 
 @llm_router.post("/breakdown")

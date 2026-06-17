@@ -19,6 +19,20 @@ export async function apiProviders(): Promise<ProviderStatus[]> {
 }
 
 /**
+ * Lists the available models for a provider (`/llm/models`).
+ *
+ * @param {string} provider The provider id.
+ * @returns {Promise<string[]>} The available model ids.
+ */
+export async function apiListModels(provider: string): Promise<string[]> {
+    const res = await apiFetch<{ models: string[] }>(
+        `llm/models?provider=${encodeURIComponent(provider)}`,
+        { method: "GET" }
+    );
+    return res.models;
+}
+
+/**
  * Fetches the active profile's LLM template, or `null` when none is set.
  *
  * @returns {Promise<LlmTemplate | null>} The template, or `null` on 404.

@@ -70,6 +70,9 @@ export function LlmTemplatePanel() {
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [helpOpen, setHelpOpen] = useState(false);
+    // Best-effort model validity, reported by each picker (default valid).
+    const [breakdownValid, setBreakdownValid] = useState(true);
+    const [srtValid, setSrtValid] = useState(true);
 
     // Seed both sub-forms from the saved template, or from defaults when none.
     useEffect(() => {
@@ -107,6 +110,16 @@ export function LlmTemplatePanel() {
     };
 
     const onSave = async () => {
+        if (!breakdownValid) {
+            setSubTab("breakdown");
+            toast.error("Pick A Valid Word Breakdown Model");
+            return;
+        }
+        if (!srtValid) {
+            setSubTab("srt");
+            toast.error("Pick A Valid Subtitle Fix Model");
+            return;
+        }
         setSaving(true);
         try {
             await persist({
@@ -184,6 +197,7 @@ export function LlmTemplatePanel() {
                         providers={providers ?? []}
                         onProviderChange={setProvider}
                         onModelChange={setModelName}
+                        onValidityChange={setBreakdownValid}
                     />
                     <Field label="System Message" htmlFor="sys-msg">
                         <TextArea
@@ -245,6 +259,7 @@ export function LlmTemplatePanel() {
                         providers={providers ?? []}
                         onProviderChange={setSrtProvider}
                         onModelChange={setSrtModelName}
+                        onValidityChange={setSrtValid}
                     />
                     <Field label="System Message" htmlFor="srt-sys-msg">
                         <TextArea

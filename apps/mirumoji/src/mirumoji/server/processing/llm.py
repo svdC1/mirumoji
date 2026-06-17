@@ -88,6 +88,12 @@ class LLMClient(Protocol):
         """
         ...
 
+    def list_models(self) -> list[str]:
+        """
+        Returns the provider's available model ids
+        """
+        ...
+
 
 class OpenAICompatClient:
     """
@@ -145,6 +151,16 @@ class OpenAICompatClient:
         except Exception as e:
             raise LLMRequestError(f"LLM stream failed: {e}") from e
 
+    def list_models(self) -> list[str]:
+        try:
+            resp = self._client.models.list()
+            # Gemini's OpenAI-compatible /models prefixes ids with `models/`,
+            # which its chat endpoint then rejects -> Strip it
+            # (a no-op elsewhere)
+            return [m.id.removeprefix("models/") for m in resp.data]
+        except Exception as e:
+            raise LLMRequestError(f"Failed to list models: {e}") from e
+
 
 class AnthropicClient:
     """
@@ -190,6 +206,13 @@ class AnthropicClient:
                 yield from stream.text_stream
         except Exception as e:
             raise LLMRequestError(f"LLM stream failed: {e}") from e
+
+    def list_models(self) -> list[str]:
+        try:
+            resp = self._client.models.list()
+            return [m.id for m in resp.data]
+        except Exception as e:
+            raise LLMRequestError(f"Failed to list models: {e}") from e
 
 
 # --- Provider Registry + Detection ---
@@ -376,6 +399,23 @@ def client_for_model(selector: str) -> tuple[LLMClient, str]:
     """
     provider, model = parse_model(selector)
     return build_client(provider), model
+
+
+def available_models(provider: LLMProvider) -> list[str]:
+    """
+    Lists the available model ids for an LLM provider
+
+    Args:
+        provider (LLMProvider): The provider to query
+
+    Returns:
+        The provider's available model ids
+
+    Raises:
+        LLMProviderUnavailableError: If the provider isn't configured
+        LLMRequestError: If the provider's models endpoint fails
+    """
+    return build_client(provider).list_models()
 
 
 # --- Prompt Builders ---
