@@ -31,6 +31,7 @@ from ..paths import HOST_LOG_PATH
 from . import media
 from .config import setup_logging
 from .db import get_engine, init_db
+from .jobs import HANDLERS, JobQueueManager
 from .processing.processor import Processor
 from .routers.audio import audio_router
 from .routers.dict import dict_router
@@ -82,11 +83,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     # Intialise Application-Scoped Stateful Processor
     app.state.processor = Processor()
 
+    # Initialise Application-Scoped Async Job Queue Task
+    app.state.job_manager = JobQueueManager(app.state.processor)
+
+    # Register Job Handlers
+    for job_type, handler in HANDLERS.items():
+        app.state.job_manager.register_handler(job_type, handler)
+
+    LOGGER.info(f"Registered {len(HANDLERS)} Handlers To Job Manager")
+
+    await app.state.job_manager.start()
+
     LOGGER.info("Configuration Complete")
+
     yield
+
+    # Stop Job Queue Worker
+    # Needs to run before disposing the engine since `stop` marks running jobs
+    # failed in the database
+    await app.state.job_manager.stop()
+
+    # Dispose Engine
     await get_engine().dispose()
     LOGGER.info("Database Engine Disposed")
 
+    # Delete Temporary Data
     try:
         await asyncio.to_thread(
             shutil.rmtree,
