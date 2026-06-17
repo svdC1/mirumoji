@@ -33,13 +33,11 @@ from .config import setup_logging
 from .db import get_engine, init_db
 from .jobs import HANDLERS, JobQueueManager
 from .processing.processor import Processor
-from .routers.audio import audio_router
 from .routers.dict import dict_router
 from .routers.health import health_router
 from .routers.jobs import jobs_router
 from .routers.llm import llm_router
 from .routers.profile import profile_router
-from .routers.video import video_router
 
 LOGGER = logging.getLogger(__name__)
 
@@ -58,7 +56,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
         - Lifespan-Scoped `Processor` Initialisation
 
+        - Lifespan-Scoped `JobQueueManager` Initialisation
+
     info: Shutdown Operations
+        - Stops the Async Job Queue Task, marking any running jobs as failed
+
         - Disposes the Database Engine
 
         - Clears Temporary Media
@@ -241,8 +243,6 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
-    app.include_router(audio_router)
-    app.include_router(video_router)
     app.include_router(dict_router)
     app.include_router(llm_router)
     app.include_router(profile_router)

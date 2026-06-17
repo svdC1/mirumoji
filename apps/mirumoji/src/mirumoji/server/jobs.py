@@ -26,7 +26,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from . import media
 from .config import get_settings
@@ -35,6 +35,12 @@ from .models.requests import (
     ConvertVideoRequest,
     GenerateSrtRequest,
     TranscribeAudioRequest,
+)
+from .models.responses import (
+    ConvertResult,
+    JobResult,
+    SrtResult,
+    TranscribeResult,
 )
 from .processing import audio, llm
 from .processing.subtitles import sanitize_srt
@@ -45,7 +51,7 @@ if TYPE_CHECKING:
 
     _JobHandler: TypeAlias = Callable[
         [JobDTO, Processor],
-        Awaitable[dict[str, Any]],
+        Awaitable[JobResult],
     ]
     """
     The signature of a `Job Handler Function`
@@ -143,7 +149,7 @@ class JobQueueManager:
         self,
         job_id: uuid.UUID,
         *,
-        result: dict[str, Any] | None = None,
+        result: JobResult | None = None,
         error: str | None = None,
     ) -> None:
         """
@@ -151,7 +157,7 @@ class JobQueueManager:
 
         Args:
             job_id (uuid.UUID): The id of the job to terminate
-            result (dict[str, Any] | None): The job's successful result
+            result (JobResult | None): The job's successful result
             error (str | None): The message returned by the job on failure
         """
         async with UnitOfWork() as uow:
@@ -163,7 +169,7 @@ class JobQueueManager:
                     status="succeeded",
                     progress=1.0,
                     completed=1,
-                    result=result or {},
+                    result=result.model_dump() if result else {},
                 )
             await uow.commit()
 
@@ -385,7 +391,7 @@ async def _file_path(file_id: uuid.UUID) -> Path:
 async def generate_srt_handler(
     job: JobDTO,
     processor: Processor,
-) -> dict[str, Any]:
+) -> SrtResult:
     """
     Generates raw SRT from a profile video/audio file and stores it
 
@@ -434,11 +440,11 @@ async def generate_srt_handler(
                 type="srt",
             )
             await uow.commit()
-        return {
-            "srt_file_id": str(rec.id),
-            "srt_url": f"/media/{rel_srt.as_posix()}",
-            "srt_content": srt_content,
-        }
+        return SrtResult(
+            srt_file_id=str(rec.id),
+            srt_url=f"/media/{rel_srt.as_posix()}",
+            srt_content=srt_content,
+        )
     finally:
         await _clean_temp(tmp)
 
@@ -446,7 +452,7 @@ async def generate_srt_handler(
 async def transcribe_handler(
     job: JobDTO,
     processor: Processor,
-) -> dict[str, Any]:
+) -> TranscribeResult:
     """
     Transcribes a profile audio file to joined text and stores a transcript
 
@@ -498,7 +504,7 @@ async def transcribe_handler(
                 text=text,
             )
             await uow.commit()
-        return {"transcript_id": str(rec.id), "transcript": text}
+        return TranscribeResult(transcript_id=str(rec.id), transcript=text)
     finally:
         await _clean_temp(tmp)
 
@@ -506,7 +512,7 @@ async def transcribe_handler(
 async def convert_handler(
     job: JobDTO,
     processor: Processor,
-) -> dict[str, Any]:
+) -> ConvertResult:
     """
     Converts a profile video file to MP4 and stores the result
 
@@ -546,16 +552,16 @@ async def convert_handler(
             type="mp4",
         )
         await uow.commit()
-    return {
-        "file_id": str(rec.id),
-        "video_url": f"/media/{rel_out.as_posix()}",
-    }
+    return ConvertResult(
+        file_id=str(rec.id),
+        video_url=f"/media/{rel_out.as_posix()}",
+    )
 
 
 async def fix_srt_handler(
     job: JobDTO,
     processor: Processor,
-) -> dict[str, Any]:
+) -> SrtResult:
     """
     Refines a profile SRT file with an LLM and stores the cleaned result
 
@@ -599,11 +605,11 @@ async def fix_srt_handler(
             type="srt",
         )
         await uow.commit()
-    return {
-        "srt_file_id": str(rec.id),
-        "srt_url": f"/media/{rel_srt.as_posix()}",
-        "srt_content": fixed,
-    }
+    return SrtResult(
+        srt_file_id=str(rec.id),
+        srt_url=f"/media/{rel_srt.as_posix()}",
+        srt_content=fixed,
+    )
 
 
 HANDLERS: dict[str, _JobHandler] = {

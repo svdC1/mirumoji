@@ -75,21 +75,6 @@ class ExplainSentenceRequest(BaseModel):
     prompt: str | None = None
 
 
-class FixSrtRequest(BaseModel):
-    """
-    Request for the `/llm/fix_srt` endpoint
-
-    Args:
-        srt (str): Raw SRT content to clean up
-        model (str): Model selector in `provider:model` form
-        sys_msg (str | None): Optional custom system message
-    """
-
-    srt: str
-    model: str
-    sys_msg: str | None = None
-
-
 class ChatRequest(BaseModel):
     """
     Request for the streaming `/llm/stream` chat endpoint

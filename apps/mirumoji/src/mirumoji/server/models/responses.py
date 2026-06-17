@@ -43,63 +43,6 @@ class ExplanationResponse(BaseModel):
     explanation: str
 
 
-class FixSrtResponse(BaseModel):
-    """
-    Response for the `/llm/fix_srt` endpoint
-
-    Args:
-        srt (str): The cleaned-up SRT content
-    """
-
-    srt: str
-
-
-# --- Media Responses ---
-
-
-class AudioTranscriptResponse(BaseModel):
-    """
-    Response for the `/audio/transcribe` endpoint
-
-    Args:
-        transcript_id (str): Database ID of the saved transcript
-        transcript (str): The transcription text
-        original_file_name (str): Original uploaded file name
-        audio_url (str): Media URL serving the stored audio
-    """
-
-    transcript_id: str
-    transcript: str
-    original_file_name: str
-    audio_url: str
-
-
-class GenerateSrtResponse(BaseModel):
-    """
-    Response for the `/video/generate_srt` endpoint
-
-    Args:
-        file_id (str): Database ID of the saved SRT file
-        srt_content (str): The raw SRT content
-        srt_url (str): Media URL serving the stored SRT file
-    """
-
-    file_id: str
-    srt_content: str
-    srt_url: str
-
-
-class ConvertVideoResponse(BaseModel):
-    """
-    Response for the `/video/convert_to_mp4` endpoint
-
-    Args:
-        converted_video_url (str): Media URL serving the converted MP4
-    """
-
-    converted_video_url: str
-
-
 # --- Profile Responses ---
 
 
@@ -245,3 +188,61 @@ class JobResponse(BaseModel):
     error: str | None = None
     created_at: str
     updated_at: str
+
+
+# --- Job Results ---
+
+
+class JobResult(BaseModel):
+    """
+    Base for a job's typed result payload
+
+    info: Job Results
+        - Each `Job Handler` function returns one of these on success
+
+        - The worker stores it on the job's `result` column and it is surfaced
+          (as a plain object) in `JobResponse.result`
+
+        - The client narrows them by the job's `type`
+    """
+
+
+class SrtResult(JobResult):
+    """
+    Result of a `generate_srt` or `fix_srt` job
+
+    Args:
+        srt_file_id (str): Database ID of the saved SRT file
+        srt_url (str): Media URL serving the stored SRT file
+        srt_content (str): The SRT content
+    """
+
+    srt_file_id: str
+    srt_url: str
+    srt_content: str
+
+
+class TranscribeResult(JobResult):
+    """
+    Result of a `transcribe` job
+
+    Args:
+        transcript_id (str): Database ID of the saved transcript
+        transcript (str): The transcription text
+    """
+
+    transcript_id: str
+    transcript: str
+
+
+class ConvertResult(JobResult):
+    """
+    Result of a `convert` job
+
+    Args:
+        file_id (str): Database ID of the saved MP4 file
+        video_url (str): Media URL serving the converted MP4
+    """
+
+    file_id: str
+    video_url: str

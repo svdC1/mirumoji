@@ -1,17 +1,15 @@
 """
-FastAPI request-scoped dependencies that bridge transport concerns (headers,
-streamed request bodies) to the domain layer
+FastAPI request-scoped dependencies that bridge transport concerns (headers)
+to the domain layer
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
-from . import media
 from .db import UnitOfWork
 
 if TYPE_CHECKING:
@@ -45,31 +43,6 @@ def get_job_manager(request: Request) -> JobQueueManager:
         The single `JobQueueManager` built during application startup
     """
     return cast("JobQueueManager", request.app.state.job_manager)
-
-
-async def get_stream_file(
-    request: Request,
-    upload_id: str = Header(..., alias="X-Upload-ID"),
-    file_name: str = Header(..., alias="X-File-Name"),
-) -> Path:
-    """
-    Endpoint dependency that saves a streamed upload to temporary storage
-
-    Args:
-        request (Request): The `FastAPI.Request` object
-        upload_id (str): `X-Upload-ID` header identifying the upload
-        file_name (str): `X-File-Name` header with the original file name
-
-    Returns:
-        The path where the streamed file was saved
-
-    Raises:
-        UploadError: If the upload fails (mapped to HTTP 400 by the app's
-            exception handler)
-    """
-    temp_dir = media.get_temp_dir(upload_id)
-    dest = temp_dir / file_name
-    return await media.save_upload_file(request, dest)
 
 
 async def get_profile_id_from_header(

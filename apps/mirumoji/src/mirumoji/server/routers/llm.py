@@ -19,15 +19,12 @@ from ..models.requests import (
     BreakdownRequest,
     ChatRequest,
     ExplainSentenceRequest,
-    FixSrtRequest,
 )
 from ..models.responses import (
     BreakdownResponse,
     ExplanationResponse,
-    FixSrtResponse,
 )
 from ..processing import llm, text
-from ..processing.subtitles import sanitize_srt
 
 LOGGER = logging.getLogger(__name__)
 llm_router = APIRouter(prefix="/llm")
@@ -139,34 +136,6 @@ async def explain_sentence(
         model=model,
     )
     return ExplanationResponse(explanation=explanation)
-
-
-@llm_router.post("/fix_srt", response_model=FixSrtResponse)
-async def fix_srt(req: FixSrtRequest) -> FixSrtResponse:
-    """
-    Cleans up raw SRT content with an LLM
-
-    Args:
-        req (FixSrtRequest): The SRT-fix request
-
-    Returns:
-        The cleaned-up SRT content
-
-    Raises:
-        InvalidModelStringError: If the model selector is malformed
-        LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the request fails
-    """
-    client, model = llm.client_for_model(req.model)
-    system = req.sys_msg or get_settings().srt_sys_msg
-    fixed = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=req.srt,
-        model=model,
-    )
-    # Repair any timestamps the LLM may have corrupted before returning/saving.
-    return FixSrtResponse(srt=sanitize_srt(fixed))
 
 
 @llm_router.post("/stream")
