@@ -21,7 +21,10 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
+    Query,
+    Request,
     UploadFile,
     status,
 )
@@ -321,6 +324,69 @@ async def delete_clip(
 
 
 # --- Files ---
+
+
+@profile_router.post(
+    "/files",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ProfileFileResponse,
+)
+async def upload_file(
+    request: Request,
+    file_name: str = Header(..., alias="X-File-Name"),
+    file_type: str | None = Query(None, alias="type"),
+    profile_id: str = Depends(ensure_profile_exists),
+) -> ProfileFileResponse:
+    """
+    Streams an upload and stores it as a profile file (no processing)
+
+    info: Usage
+        - This is the upload-once entry point for the job system
+
+        - The returned file id is then passed to `POST /jobs` if an operation
+          on it is requested
+
+        - Avoids re-uploading the file
+
+    Args:
+        request (Request): The `FastAPI.Request` object (the body is the file)
+        file_name (str): The original file name (`X-File-Name`)
+        file_type (str | None): Optional file-type tag (`?type=`)
+        profile_id (str): Validated profile id
+
+    Returns:
+        The stored file's id, name, media URL, and type
+
+    Raises:
+        UploadError: If the upload fails
+        DatabaseError: If persistence fails
+    """
+    op_id = uuid.uuid4().hex
+    uploads_dir = media.get_profile_dir(profile_id, "uploads")
+    # The client filename is kept only for display
+    # The on-disk path is server-generated so a crafted name can't escape the
+    # uploads directory
+    dest = uploads_dir / f"{op_id}{Path(file_name).suffix}"
+    rel = media.get_relative_path(dest)
+
+    await media.save_upload_file(request, dest)
+
+    async with UnitOfWork() as uow:
+        rec = await uow.files.add(
+            profile_id=profile_id,
+            name=Path(file_name).name,
+            path=str(rel),
+            type=file_type,
+        )
+        await uow.commit()
+
+    return ProfileFileResponse(
+        id=str(rec.id),
+        name=rec.name,
+        url=f"/media/{rel.as_posix()}",
+        type=rec.type,
+        created_at=rec.created_at.isoformat() if rec.created_at else None,
+    )
 
 
 @profile_router.get("/files", response_model=list[ProfileFileResponse])
