@@ -36,7 +36,6 @@ from .processing.subtitles import sanitize_srt
 
 if TYPE_CHECKING:
     from .db.models import JobDTO
-    from .db.repos import _Uuid
     from .processing.processor import Processor
 
     _JobHandler: TypeAlias = Callable[
@@ -137,7 +136,7 @@ class JobQueueManager:
 
     async def _terminate_job(
         self,
-        job_id: _Uuid,
+        job_id: uuid.UUID,
         *,
         result: dict[str, Any] | None = None,
         error: str | None = None,
@@ -146,7 +145,7 @@ class JobQueueManager:
         Persists a job's terminal state to the database
 
         Args:
-            job_id (_Uuid): The id of the job to terminate
+            job_id (uuid.UUID): The id of the job to terminate
             result (dict[str, Any] | None): The job's successful result
             error (str | None): The message returned by the job on failure
         """
@@ -163,7 +162,7 @@ class JobQueueManager:
                 )
             await uow.commit()
 
-    async def _run_job(self, job_id: _Uuid) -> None:
+    async def _run_job(self, job_id: uuid.UUID) -> None:
         """
         Runs a single job, transitioning it through `running` to `succeeded` or
         `failed` and recording its result or error to the database
@@ -177,17 +176,23 @@ class JobQueueManager:
         intantly marked as failed with the error `Unknown Job Type`
 
         Args:
-            job_id (_Uuid): The id of the job to run
+            job_id (uuid.UUID): The id of the job to run
 
         Raises:
             RuntimeError: If the instance's queue hasn't been initialised with
                 `start` before the call
         """
         self._ensure_queue()
-        # Update Job In The Database
+        # Skip A Job Cancelled While Queued, Otherwise Mark It Running
+        # `cancel`` endpoint can only mark the job "cancelled" in the DB, but
+        # by then the job's id is already sitting in the in-process
+        # asyncio.Queue, and you can't pull a specific item back out of a
+        # Queue, so skip it here instead to honor the database status
         async with UnitOfWork() as uow:
-            await uow.jobs.update(job_id, status="running")
             job = await uow.jobs.get(job_id)
+            if job.status == "cancelled":
+                return
+            job = await uow.jobs.update(job_id, status="running")
             await uow.commit()
 
         handler = self.handlers.get(job.type)
@@ -394,7 +399,7 @@ async def generate_srt_handler(
     Returns:
         The new SRT file's id, media URL, and content
     """
-    src = await _file_path(job.params["file_id"])
+    src = await _file_path(uuid.UUID(job.params["file_id"]))
     opts = dict(job.params.get("opts") or {})
     op_id = uuid.uuid4().hex
     tmp = media.get_temp_dir(op_id)
@@ -455,7 +460,7 @@ async def transcribe_handler(
     Returns:
         The new transcript's id and text
     """
-    file_id = job.params["file_id"]
+    file_id = uuid.UUID(job.params["file_id"])
     src = await _file_path(file_id)
     opts = dict(job.params.get("opts") or {})
     clean_audio = bool(opts.pop("clean_audio", False))
@@ -513,7 +518,7 @@ async def convert_handler(
     Returns:
         The new MP4 file's id and media URL
     """
-    src = await _file_path(job.params["file_id"])
+    src = await _file_path(uuid.UUID(job.params["file_id"]))
     opts = dict(job.params.get("opts") or {})
     op_id = uuid.uuid4().hex
     out_loc = media.get_profile_dir(job.profile_id, "converted") / (
@@ -557,7 +562,7 @@ async def fix_srt_handler(
     Returns:
         The new SRT file's id, media URL, and content
     """
-    src = await _file_path(job.params["file_id"])
+    src = await _file_path(uuid.UUID(job.params["file_id"]))
     raw = await asyncio.to_thread(src.read_text, encoding="utf-8")
     client, model = llm.client_for_model(job.params["model"])
     system = job.params.get("sys_msg") or get_settings().srt_sys_msg

@@ -361,7 +361,8 @@ class Job(Base):
         parent_id (uuid.UUID | None): Parent batch job id, when this is a child
         type (str): Operation type (e.g. `transcribe`, `generate_srt`,
             `convert`, `fix_srt`, or a `batch_*` variant)
-        status (str): `queued`, `running`, `succeeded`, `failed`, or `canceled`
+        status (str): `queued`, `running`, `succeeded`, `failed`, or
+            `cancelled`
         progress (float): Progress fraction in `[0, 1]`
         total (int): Number of work items (1 for a single job, N for a batch)
         completed (int): Number of finished work items
@@ -568,7 +569,8 @@ class JobDTO(SafeORMModel):
         profile (ProfileDTO | None): Owning profile, when loaded
         parent_id (uuid.UUID | None): Parent batch job id, when this is a child
         type (str): Operation type
-        status (str): `queued`, `running`, `succeeded`, `failed`, or `canceled`
+        status (str): `queued`, `running`, `succeeded`, `failed`, or
+            `cancelled`
         progress (float): Progress fraction in `[0, 1]`
         total (int): Number of work items
         completed (int): Number of finished work items

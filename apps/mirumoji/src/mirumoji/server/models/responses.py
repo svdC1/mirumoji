@@ -209,3 +209,39 @@ class AnkiExportResponse(BaseModel):
     """
 
     anki_deck_url: str
+
+
+# --- Job Responses ---
+
+
+class JobResponse(BaseModel):
+    """
+    Response representing a processing job
+
+    Args:
+        id (str): Database ID of the job
+        type (str): Operation type
+        status (str): `queued`, `running`, `succeeded`, `failed`, or
+            `cancelled`
+        progress (float): Progress fraction in `[0, 1]`
+        total (int): Number of work items
+        completed (int): Number of finished work items
+        parent_id (str | None): Parent batch job id, when this is a child
+        result (dict[str, Any] | None): Produced references, or `None` until
+            finished
+        error (str | None): Failure message when `status` is `failed`
+        created_at (str): ISO-8601 creation timestamp
+        updated_at (str): ISO-8601 last-update timestamp
+    """
+
+    id: str
+    type: str
+    status: str
+    progress: float
+    total: int
+    completed: int
+    parent_id: str | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    created_at: str
+    updated_at: str

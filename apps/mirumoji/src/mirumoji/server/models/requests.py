@@ -12,9 +12,38 @@ tip: LLM Request Defaults
       prompt
 """
 
+from typing import Any, Literal
+
 from pydantic import BaseModel
 
 from .jpdict import BundleMode
+
+# --- Job Requests ---
+
+
+class SubmitJobRequest(BaseModel):
+    """
+    Request body for `POST /jobs`
+
+    Submits a long-running operation that runs using an existing profile file
+    and is tracked through the `jobs` table
+
+    Args:
+        type (Literal): The operation to run
+        file_id (str): The profile file the job operates on
+        opts (dict[str, Any] | None): Operation options (transcription /
+            conversion args)
+        model (str | None): LLM model selector in `provider:model` form
+            (`fix_srt` only)
+        sys_msg (str | None): Optional LLM system message (`fix_srt` only)
+    """
+
+    type: Literal["generate_srt", "transcribe", "convert", "fix_srt"]
+    file_id: str
+    opts: dict[str, Any] | None = None
+    model: str | None = None
+    sys_msg: str | None = None
+
 
 # --- Dictionary Requests ---
 

@@ -15,6 +15,7 @@ from . import media
 from .db import UnitOfWork
 
 if TYPE_CHECKING:
+    from .jobs import JobQueueManager
     from .processing.processor import Processor
 
 LOGGER = logging.getLogger(__name__)
@@ -31,6 +32,19 @@ def get_processor(request: Request) -> Processor:
         The single `Processor` instance built during application startup
     """
     return cast("Processor", request.app.state.processor)
+
+
+def get_job_manager(request: Request) -> JobQueueManager:
+    """
+    Endpoint dependency returning the lifespan-scoped `JobQueueManager`
+
+    Args:
+        request (Request): The `FastAPI.Request` object
+
+    Returns:
+        The single `JobQueueManager` built during application startup
+    """
+    return cast("JobQueueManager", request.app.state.job_manager)
 
 
 async def get_stream_file(

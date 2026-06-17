@@ -44,8 +44,6 @@ _ACTIVE_STATUSES = ("queued", "running")
 
 LOGGER = logging.getLogger("mirumoji")
 
-_Uuid = uuid.UUID | str
-
 
 class ProfileRepository:
     """
@@ -193,12 +191,12 @@ class FileRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add File : {e}") from e
 
-    async def get(self, file_id: _Uuid) -> FileDTO:
+    async def get(self, file_id: uuid.UUID) -> FileDTO:
         """
         Fetches a file by id
 
         Args:
-            file_id (uuid.UUID | str): The file id
+            file_id (uuid.UUID): The file id
 
         Returns:
             The matching `FileDTO`
@@ -242,12 +240,12 @@ class FileRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Files : {e}") from e
 
-    async def delete(self, file_id: _Uuid) -> None:
+    async def delete(self, file_id: uuid.UUID) -> None:
         """
         Deletes a file record
 
         Args:
-            file_id (uuid.UUID | str): The file id
+            file_id (uuid.UUID): The file id
 
         Raises:
             RecordNotFoundError: If the file does not exist
@@ -279,7 +277,7 @@ class TranscriptRepository:
     async def add(
         self,
         profile_id: str,
-        file_id: _Uuid,
+        file_id: uuid.UUID,
         text: str,
         llm_explanation: str | None = None,
     ) -> TranscriptDTO:
@@ -288,7 +286,7 @@ class TranscriptRepository:
 
         Args:
             profile_id (str): Owning profile id
-            file_id (uuid.UUID | str): Source file id
+            file_id (uuid.UUID): Source file id
             text (str): The transcription text
             llm_explanation (str | None): Optional saved explanation
 
@@ -311,12 +309,12 @@ class TranscriptRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add Transcript : {e}") from e
 
-    async def get(self, transcript_id: _Uuid) -> TranscriptDTO:
+    async def get(self, transcript_id: uuid.UUID) -> TranscriptDTO:
         """
         Fetches a transcript by id
 
         Args:
-            transcript_id (uuid.UUID | str): The transcript id
+            transcript_id (uuid.UUID): The transcript id
 
         Returns:
             The matching `TranscriptDTO`
@@ -367,12 +365,12 @@ class TranscriptRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Transcripts : {e}") from e
 
-    async def delete(self, transcript_id: _Uuid) -> None:
+    async def delete(self, transcript_id: uuid.UUID) -> None:
         """
         Deletes a transcript record
 
         Args:
-            transcript_id (uuid.UUID | str): The transcript id
+            transcript_id (uuid.UUID): The transcript id
 
         Raises:
             RecordNotFoundError: If the transcript does not exist
@@ -520,7 +518,7 @@ class ClipRepository:
     async def add(
         self,
         profile_id: str,
-        file_id: _Uuid,
+        file_id: uuid.UUID,
         start_time: float,
         end_time: float,
         llm_breakdown_response: dict[str, Any],
@@ -530,7 +528,7 @@ class ClipRepository:
 
         Args:
             profile_id (str): Owning profile id
-            file_id (uuid.UUID | str): Source file id
+            file_id (uuid.UUID): Source file id
             start_time (float): Clip start time in seconds
             end_time (float): Clip end time in seconds
             llm_breakdown_response (dict): Serialized breakdown payload
@@ -555,12 +553,12 @@ class ClipRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add Clip : {e}") from e
 
-    async def get(self, clip_id: _Uuid) -> ClipDTO:
+    async def get(self, clip_id: uuid.UUID) -> ClipDTO:
         """
         Fetches a clip by id
 
         Args:
-            clip_id (uuid.UUID | str): The clip id
+            clip_id (uuid.UUID): The clip id
 
         Returns:
             The matching `ClipDTO`
@@ -611,12 +609,12 @@ class ClipRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Clips: {e}") from e
 
-    async def delete(self, clip_id: _Uuid) -> None:
+    async def delete(self, clip_id: uuid.UUID) -> None:
         """
         Deletes a clip record
 
         Args:
-            clip_id (uuid.UUID | str): The clip id
+            clip_id (uuid.UUID): The clip id
 
         Raises:
             RecordNotFoundError: If the clip does not exist
@@ -650,7 +648,7 @@ class JobRepository:
         profile_id: str,
         type: str,
         params: dict[str, Any],
-        parent_id: _Uuid | None = None,
+        parent_id: uuid.UUID | None = None,
         total: int = 1,
     ) -> JobDTO:
         """
@@ -660,7 +658,7 @@ class JobRepository:
             profile_id (str): Owning profile id
             type (str): Operation type
             params (dict): Submitted parameters (file references, options)
-            parent_id (uuid.UUID | str | None): Parent batch job id, if any
+            parent_id (uuid.UUID | None): Parent batch job id, if any
             total (int): Number of work items (1 for a single job)
 
         Returns:
@@ -683,12 +681,12 @@ class JobRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add Job : {e}") from e
 
-    async def get(self, job_id: _Uuid) -> JobDTO:
+    async def get(self, job_id: uuid.UUID) -> JobDTO:
         """
         Fetches a job by id
 
         Args:
-            job_id (uuid.UUID | str): The job id
+            job_id (uuid.UUID): The job id
 
         Returns:
             The matching `JobDTO`
@@ -740,12 +738,12 @@ class JobRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Jobs : {e}") from e
 
-    async def list_children(self, parent_id: _Uuid) -> list[JobDTO]:
+    async def list_children(self, parent_id: uuid.UUID) -> list[JobDTO]:
         """
         Lists the child jobs of a batch parent
 
         Args:
-            parent_id (uuid.UUID | str): The parent job id
+            parent_id (uuid.UUID): The parent job id
 
         Returns:
             A list of child `JobDTO`, oldest first
@@ -786,7 +784,7 @@ class JobRepository:
 
     async def update(
         self,
-        job_id: _Uuid,
+        job_id: uuid.UUID,
         *,
         status: str | None = None,
         progress: float | None = None,
@@ -799,7 +797,7 @@ class JobRepository:
         unchanged)
 
         Args:
-            job_id (uuid.UUID | str): The job id
+            job_id (uuid.UUID): The job id
             status (str | None): New status
             progress (float | None): New progress fraction
             completed (int | None): New completed-item count
@@ -835,12 +833,12 @@ class JobRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Update Job : {e}") from e
 
-    async def delete(self, job_id: _Uuid) -> None:
+    async def delete(self, job_id: uuid.UUID) -> None:
         """
         Deletes a job (cascading to its children)
 
         Args:
-            job_id (uuid.UUID | str): The job id
+            job_id (uuid.UUID): The job id
 
         Raises:
             RecordNotFoundError: If the job does not exist

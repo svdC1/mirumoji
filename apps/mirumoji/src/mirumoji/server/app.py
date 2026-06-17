@@ -36,6 +36,7 @@ from .processing.processor import Processor
 from .routers.audio import audio_router
 from .routers.dict import dict_router
 from .routers.health import health_router
+from .routers.jobs import jobs_router
 from .routers.llm import llm_router
 from .routers.profile import profile_router
 from .routers.video import video_router
@@ -245,5 +246,6 @@ def create_app() -> FastAPI:
     app.include_router(dict_router)
     app.include_router(llm_router)
     app.include_router(profile_router)
+    app.include_router(jobs_router)
 
     return app
