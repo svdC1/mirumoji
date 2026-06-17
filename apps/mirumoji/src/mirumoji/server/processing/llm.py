@@ -16,6 +16,7 @@ tip: Model Selection
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Iterable, Iterator
@@ -446,13 +447,44 @@ def sse_format(chunks: Iterable[str]) -> Iterator[str]:
     """
     Wrap text chunks as Server-Sent Events, ending with a `done` event
 
+    info: JSON-Encoding
+        - Each chunk is JSON-encoded so that it can survive transport as a
+          single SSE `data:` line, even when it contains newlines (the
+          explanations are multi-line markdown)
+
+        - The client must use `JSON.parse` on every `data:` payload
+
     Args:
         chunks (Iterable[str]): Text chunks to emit
 
     Yields:
-        SSE-formatted strings (`data: <chunk>\\n\\n`), then a terminal
+        SSE-formatted strings (`data: <json>\\n\\n`), then a terminal
             `event: done` frame
     """
     for chunk in chunks:
-        yield f"data: {chunk}\n\n"
+        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
     yield "event: done\ndata:\n\n"
+
+
+def sse_breakdown(
+    focus_json: str | None,
+    chunks: Iterable[str],
+) -> Iterator[str]:
+    """
+    Stream a word breakdown: the structured focus first, then the explanation
+
+    The focus word (its stitched token + dictionary data) is emitted once as a
+    `focus` event, after which the LLM explanation streams as normal `data:`
+    frames via `sse_format`
+
+    Args:
+        focus_json (str | None): The focus word as compact JSON, or `None`
+        chunks (Iterable[str]): The explanation text chunks to stream
+
+    Yields:
+        A leading `event: focus` frame (when a focus is given), then the
+            `sse_format` explanation frames
+    """
+    if focus_json is not None:
+        yield f"event: focus\ndata: {focus_json}\n\n"
+    yield from sse_format(chunks)

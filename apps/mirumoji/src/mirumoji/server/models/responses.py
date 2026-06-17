@@ -6,43 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .jpdict import EnrichedJapaneseWord
-
-# --- LLM Responses ---
-
-
-class BreakdownResponse(BaseModel):
-    """
-    Response for the `/llm/breakdown` endpoint
-
-    warning: `focus`
-        - To tokenize a whole sentence use the `/dict/tokenize` endpoint
-          instead
-
-        - This only carries the focused word (its stitched token + dictionary
-          data) and the LLM explanation of its use within the sentence
-
-    Args:
-        focus (EnrichedJapaneseWord | None): The focused word + its dictionary
-            data, or `None` when no focus was provided
-        explanation (str): The LLM explanation
-    """
-
-    focus: EnrichedJapaneseWord | None = None
-    explanation: str
-
-
-class ExplanationResponse(BaseModel):
-    """
-    Response carrying a single LLM explanation
-
-    Args:
-        explanation (str): The LLM explanation
-    """
-
-    explanation: str
-
-
 # --- Profile Responses ---
 
 

@@ -20,10 +20,6 @@ from ..models.requests import (
     ChatRequest,
     ExplainSentenceRequest,
 )
-from ..models.responses import (
-    BreakdownResponse,
-    ExplanationResponse,
-)
 from ..processing import llm, text
 
 LOGGER = logging.getLogger(__name__)
@@ -42,10 +38,13 @@ async def list_providers() -> dict[str, Any]:
     return {"providers": llm.provider_status()}
 
 
-@llm_router.post("/breakdown", response_model=BreakdownResponse)
-async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
+@llm_router.post("/breakdown")
+async def breakdown(req: BreakdownRequest) -> StreamingResponse:
     """
-    Explains the nuance of a focus word within a sentence
+    Streams the nuance of a focus word within a sentence as Server-Sent Events
+
+    The focus word (its stitched token + dictionary data) is emitted once as a
+    `focus` event, then the LLM explanation streams as `data:` frames
 
     `sys_msg` and `prompt` are independently optional and fall back to the
     default breakdown system message and prompt
@@ -54,13 +53,13 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
         req (BreakdownRequest): The breakdown request
 
     Returns:
-        The focused `EnrichedJapaneseWord` (when a focus is given) and the LLM
-            explanation
+        An SSE stream: a `focus` frame (when a focus is given), the explanation
+            chunks, and a terminal `done` frame
 
     Raises:
         InvalidModelStringError: If the model selector is malformed
         LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the prompt template is invalid or the request fails
+        LLMRequestError: If the prompt template is invalid
     """
     client, model = llm.client_for_model(req.model)
     focus = req.focus or ""
@@ -79,27 +78,25 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
         )
         system = req.sys_msg or default_system
 
-    explanation = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=prompt,
-        model=model,
-    )
-
-    focus_word = None
+    focus_json: str | None = None
     if req.focus:
         words = await asyncio.to_thread(text.enrich, req.focus)
-        focus_word = words[0] if words else None
+        if words:
+            focus_json = words[0].model_dump_json()
 
-    return BreakdownResponse(focus=focus_word, explanation=explanation)
+    chunks = client.stream(system=system, prompt=prompt, model=model)
+    return StreamingResponse(
+        llm.sse_breakdown(focus_json, chunks),
+        media_type="text/event-stream",
+    )
 
 
-@llm_router.post("/explain_sentence", response_model=ExplanationResponse)
+@llm_router.post("/explain_sentence")
 async def explain_sentence(
     req: ExplainSentenceRequest,
-) -> ExplanationResponse:
+) -> StreamingResponse:
     """
-    Explains a whole sentence, without a focus word
+    Streams an explanation of a whole sentence as Server-Sent Events
 
     `sys_msg` and `prompt` are independently optional and fall back to the
     default breakdown system message and sentence prompt
@@ -108,12 +105,12 @@ async def explain_sentence(
         req (ExplainSentenceRequest): The explanation request
 
     Returns:
-        The LLM explanation
+        An SSE stream of explanation chunks ending with a `done` frame
 
     Raises:
         InvalidModelStringError: If the model selector is malformed
         LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the prompt template is invalid or the request fails
+        LLMRequestError: If the prompt template is invalid
     """
     client, model = llm.client_for_model(req.model)
 
@@ -129,13 +126,11 @@ async def explain_sentence(
         default_system, prompt = llm.sentence_breakdown_prompt(req.sentence)
         system = req.sys_msg or default_system
 
-    explanation = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=prompt,
-        model=model,
+    chunks = client.stream(system=system, prompt=prompt, model=model)
+    return StreamingResponse(
+        llm.sse_format(chunks),
+        media_type="text/event-stream",
     )
-    return ExplanationResponse(explanation=explanation)
 
 
 @llm_router.post("/stream")
