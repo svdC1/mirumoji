@@ -157,10 +157,10 @@ function JobRow({
                         <button
                             type="button"
                             onClick={onResult}
-                            className="mt-2 inline-flex items-center gap-1 rounded-control bg-shu/10 px-2 py-1 text-2xs font-medium text-shu transition-colors hover:bg-shu/20"
+                            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-control bg-shu/10 px-3 py-1.5 text-xs font-medium text-shu transition-colors hover:bg-shu/20"
                         >
                             {resultLabel}
-                            <ArrowRight size={12} />
+                            <ArrowRight size={13} />
                         </button>
                     )}
                 </div>
