@@ -5,6 +5,7 @@ Each CLI command uses `Typer` and `Rich` to expose the `shared` core's
 functionality in a user-friendly way
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Annotated
@@ -38,6 +39,8 @@ from ._common import (
     stream_command,
 )
 from .theme import console
+
+LOGGER = logging.getLogger(__name__)
 
 # Maps Environment Dependency Status To Console Symbols
 _SYMBOLS = {
@@ -456,6 +459,10 @@ def up(
     ip = host.get_host_lan_ip()
     os.environ[HOST_LAN_IP_VAR] = ip
     os.environ[TRANSCRIBE_BACKEND_VAR] = backend.value
+    LOGGER.info(
+        f"Starting Mirumoji (Backend '{backend.value}', "
+        f"Source '{source.value}', LAN IP '{ip}')"
+    )
 
     if source is ImageSource.BUILD:
         repo_path = stream_command(

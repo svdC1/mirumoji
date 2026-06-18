@@ -118,6 +118,7 @@ async def upsert_template(
             srt_model=req.srt_model,
         )
         await uow.commit()
+    LOGGER.info(f"Upserted LLM Template For Profile '{profile_id}'")
     return LlmTemplateResponse(
         id=str(template.id),
         sys_msg=template.sys_msg,
@@ -148,6 +149,7 @@ async def delete_template(
     async with UnitOfWork() as uow:
         await uow.templates.delete(profile_id)
         await uow.commit()
+    LOGGER.info(f"Deleted LLM Template For Profile '{profile_id}'")
     return {"success": True, "message": "Template deleted successfully."}
 
 
@@ -239,6 +241,10 @@ async def save_clip(
             )
             await uow.commit()
 
+        LOGGER.info(
+            f"Saved Clip '{clip_rec.id}' (File '{file_rec.id}') "
+            f"For Profile '{profile_id}'"
+        )
         return SaveClipResponse(
             clip_id=str(clip_rec.id),
             file_id=str(file_rec.id),
@@ -320,6 +326,7 @@ async def delete_clip(
         await uow.files.delete(clip.file_id)
         await uow.commit()
     await media.delete_file(file.path)
+    LOGGER.info(f"Deleted Clip '{clip_id}' For Profile '{profile_id}'")
     return {"success": True, "message": "Clip Deleted Successfully"}
 
 
@@ -380,6 +387,9 @@ async def upload_file(
         )
         await uow.commit()
 
+    LOGGER.info(
+        f"Uploaded File '{rec.id}' ('{rec.name}') For Profile '{profile_id}'"
+    )
     return ProfileFileResponse(
         id=str(rec.id),
         name=rec.name,
@@ -453,6 +463,7 @@ async def delete_file(
         await uow.files.delete(file_id)
         await uow.commit()
     await media.delete_file(file.path)
+    LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
     return {"success": True, "message": "File deleted successfully."}
 
 
@@ -497,6 +508,9 @@ async def save_subtitles(
         created = (
             existing.created_at.isoformat() if existing.created_at else None
         )
+        LOGGER.info(
+            f"Overwrote SRT File '{existing.id}' For Profile '{profile_id}'"
+        )
         return ProfileFileResponse(
             id=str(existing.id),
             name=existing.name,
@@ -521,6 +535,7 @@ async def save_subtitles(
         )
         await uow.commit()
 
+    LOGGER.info(f"Saved SRT File '{file_rec.id}' For Profile '{profile_id}'")
     return ProfileFileResponse(
         id=str(file_rec.id),
         name=file_rec.name,
@@ -604,6 +619,9 @@ async def delete_transcript(
             )
         await uow.transcripts.delete(transcript_id)
         await uow.commit()
+    LOGGER.info(
+        f"Deleted Transcript '{transcript_id}' For Profile '{profile_id}'"
+    )
     return {"success": True, "message": "Transcript deleted successfully."}
 
 
@@ -657,4 +675,8 @@ async def export_anki_deck(
     await asyncio.to_thread(anki.export_deck, cards, str(out_loc))
 
     rel_out = media.get_relative_path(out_loc)
+    LOGGER.info(
+        f"Exported Anki Deck With {len(cards)} Card(s) For Profile "
+        f"'{profile_id}'"
+    )
     return AnkiExportResponse(anki_deck_url=f"/media/{rel_out.as_posix()}")

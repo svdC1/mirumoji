@@ -104,6 +104,9 @@ async def submit_job(
         await uow.commit()
 
     await manager.submit_job(job.id)
+    LOGGER.info(
+        f"Job '{job.id}' ('{job.type}') Submitted For Profile '{profile_id}'"
+    )
     return _to_response(job)
 
 
@@ -193,5 +196,6 @@ async def cancel_job(
             )
         if job.status in ("queued", "running"):
             job = await uow.jobs.update(job_id, status="cancelled")
+            LOGGER.info(f"Job '{job_id}' Cancel Requested")
         await uow.commit()
     return _to_response(job)

@@ -8,21 +8,17 @@ packages themselves
 """
 
 import datetime
-import logging
 import os
 import platform
 import socket
-import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib.util import find_spec
 from typing import Any, Literal
 
 from dotenv import load_dotenv
-from tqdm.auto import tqdm
 
 from ..exceptions import ModalError, WhisperUnavailableError
-from ..paths import HOST_LOG_PATH
 from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
     DEFAULT_SRT_SYS_MSG,
@@ -218,62 +214,6 @@ def transcribe_backend() -> Literal["local", "modal", "none"]:
         f"Invalid MIRUMOJI_TRANSCRIBE_BACKEND '{choice}'; "
         f"expected one of: auto, local, modal",
     )
-
-
-# --- Logging ---
-
-
-class TqdmStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
-    """
-    Handler for displaying `tqdm` progress bars properly with python logging
-    """
-
-    def __init__(self) -> None:
-        super().__init__(sys.stdout)
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            msg = self.format(record)
-            tqdm.write(msg, file=self.stream)
-            self.flush()
-        except Exception:
-            self.handleError(record)
-
-
-def setup_logging() -> None:
-    """
-    Configures the `mirumoji` logger with custom formatters and handlers
-
-    Reads the logging level from the resolved settings, attaches a file handler
-    (under `HOST_LOG_PATH`) and a `tqdm`-aware stream handler, and creates the
-    logging directory if it doesn't already exist
-    """
-    level = getattr(logging, get_settings().logging_level, logging.INFO)
-
-    # Get the logger and set its level
-    logger = logging.getLogger("mirumoji")
-    logger.setLevel(level)
-
-    # Remove any existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-
-    formatter = logging.Formatter(
-        "{asctime} -- {levelname} -- ({name}:{funcName}) || {message}",
-        style="{",
-        datefmt="%H:%M:%S[%z]",
-    )
-
-    # Create DIR and add handlers
-    HOST_LOG_PATH.mkdir(parents=True, exist_ok=True)
-    log_file = str((HOST_LOG_PATH / "backend.log").resolve())
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    stream_handler = TqdmStreamHandler()
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
 
 
 # --- System Information ---

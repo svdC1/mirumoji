@@ -42,7 +42,7 @@ from .models import (
 
 _ACTIVE_STATUSES = ("queued", "running")
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 class ProfileRepository:

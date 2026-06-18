@@ -126,6 +126,7 @@ class OpenAICompatClient:
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
+            LOGGER.warning(f"LLM Completion Failed: {e}")
             raise LLMRequestError(f"LLM request failed: {e}") from e
 
     def stream(
@@ -149,6 +150,7 @@ class OpenAICompatClient:
                 if text:
                     yield text
         except Exception as e:
+            LOGGER.warning(f"LLM Stream Failed: {e}")
             raise LLMRequestError(f"LLM stream failed: {e}") from e
 
     def list_models(self) -> list[str]:
@@ -159,6 +161,7 @@ class OpenAICompatClient:
             # (a no-op elsewhere)
             return [m.id.removeprefix("models/") for m in resp.data]
         except Exception as e:
+            LOGGER.warning(f"LLM Model Listing Failed: {e}")
             raise LLMRequestError(f"Failed to list models: {e}") from e
 
 
@@ -187,6 +190,7 @@ class AnthropicClient:
                 if isinstance(block, TextBlock)
             )
         except Exception as e:
+            LOGGER.warning(f"LLM Completion Failed: {e}")
             raise LLMRequestError(f"LLM request failed: {e}") from e
 
     def stream(
@@ -205,6 +209,7 @@ class AnthropicClient:
             ) as stream:
                 yield from stream.text_stream
         except Exception as e:
+            LOGGER.warning(f"LLM Stream Failed: {e}")
             raise LLMRequestError(f"LLM stream failed: {e}") from e
 
     def list_models(self) -> list[str]:
@@ -212,6 +217,7 @@ class AnthropicClient:
             resp = self._client.models.list()
             return [m.id for m in resp.data]
         except Exception as e:
+            LOGGER.warning(f"LLM Model Listing Failed: {e}")
             raise LLMRequestError(f"Failed to list models: {e}") from e
 
 
@@ -367,6 +373,9 @@ def build_client(provider: LLMProvider) -> LLMClient:
             details={"provider": provider.value},
         )
     spec = LLM_PROVIDER_REGISTRY[provider]
+    LOGGER.debug(
+        f"Building '{spec.kind}' Client For LLM Provider '{provider.value}'"
+    )
     api_key = os.environ.get(spec.key_env) if spec.key_env else None
 
     if spec.kind == "anthropic":
@@ -398,6 +407,7 @@ def client_for_model(selector: str) -> tuple[LLMClient, str]:
         LLMProviderUnavailableError: If the provider is unavailable
     """
     provider, model = parse_model(selector)
+    LOGGER.info(f"Using LLM Provider '{provider.value}' Model '{model}'")
     return build_client(provider), model
 
 
@@ -415,7 +425,11 @@ def available_models(provider: LLMProvider) -> list[str]:
         LLMProviderUnavailableError: If the provider isn't configured
         LLMRequestError: If the provider's models endpoint fails
     """
-    return build_client(provider).list_models()
+    models = build_client(provider).list_models()
+    LOGGER.debug(
+        f"Listed {len(models)} Model(s) For LLM Provider '{provider.value}'"
+    )
+    return models
 
 
 # --- Prompt Builders ---

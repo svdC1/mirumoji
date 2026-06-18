@@ -27,9 +27,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..exceptions import MirumojiServerError
+from ..log import setup_logging
 from ..paths import HOST_LOG_PATH
 from . import media
-from .config import setup_logging
+from .config import get_settings
 from .db import get_engine, init_db
 from .jobs import HANDLERS, JobQueueManager
 from .processing.processor import Processor
@@ -73,15 +74,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """
 
     # Create Log Directory + Register Handlers
-    setup_logging()
-    LOGGER.info(f"Storing Logs At `{HOST_LOG_PATH / 'backend.log'}`")
+    setup_logging(
+        log_file="backend.log",
+        console=True,
+        level=get_settings().logging_level,
+    )
+    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH / 'backend.log'}'")
 
     # Create / Initialise Database
     await init_db()
 
     # Create Media Directory If It Doesn't Exist
     media.init_storage()
-    LOGGER.info(f"Serving `{media.BASE_PATH}` at `/media`")
+    LOGGER.info(f"Serving '{media.BASE_PATH}' At '/media'")
 
     # Intialise Application-Scoped Stateful Processor
     app.state.processor = Processor()
@@ -116,10 +121,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
             shutil.rmtree,
             media.TEMP_PATH,
         )
-        LOGGER.info(f"Deleted Temporary Media At `{media.TEMP_PATH}`")
-    except Exception as e:
-        LOGGER.error(
-            f"Failed To Delete Temporary Media At `{media.TEMP_PATH}` : `{e}`"
+        LOGGER.info(f"Deleted Temporary Media At '{media.TEMP_PATH}'")
+    except Exception:
+        LOGGER.exception(
+            f"Failed To Delete Temporary Media At '{media.TEMP_PATH}'"
         )
 
     LOGGER.info("Shut Down Complete")

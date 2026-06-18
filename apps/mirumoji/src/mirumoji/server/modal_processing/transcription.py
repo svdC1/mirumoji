@@ -66,15 +66,12 @@ def transcribe_job(
 
     import modal
 
+    from mirumoji.log import setup_logging
     from mirumoji.server.modal_processing.volume_io import download_from_volume
     from mirumoji.server.processing import whisper
 
-    # Configure Container Logging
-    logging.basicConfig(
-        level=logging.INFO,
-        style="{",
-        format="{levelname}-{name}-{message}",
-    )
+    # Configure Container Logging - stdout only, captured by Modal as job logs
+    setup_logging(log_file=None, console=True)
     logger = logging.getLogger(__name__)
 
     vol = modal.Volume.from_id(vol_id)
@@ -86,8 +83,8 @@ def transcribe_job(
         download_from_volume(vol, vol_fp, local_fp)
 
         logger.info(
-            f"'transcribe_job' Started For '{local_fp}' "
-            f"(output format '{output_format}')"
+            f"Transcription Started For '{local_fp}' "
+            f"(Output Format '{output_format}')"
         )
 
         model = whisper.load_model(w_model_args)

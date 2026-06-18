@@ -47,7 +47,7 @@ from ..config import get_settings
 from .conversion import video_conversion_job
 from .transcription import transcribe_job
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -86,9 +86,7 @@ def setup_modal() -> ModalRuntime:
     """
     settings = get_settings()
 
-    LOGGER.info(
-        "Modal Setup - Configuring Image",
-    )
+    LOGGER.info("Configuring Modal Image")
 
     # Build Image From Settings
     mirumoji_image = modal.Image.from_registry(
@@ -109,6 +107,6 @@ def setup_modal() -> ModalRuntime:
         include_source=True,
     )(transcribe_job)
 
-    LOGGER.info("Modal Setup - Ready")
+    LOGGER.info("Modal Runtime Ready")
 
     return ModalRuntime(app=app, transcribe=transcribe, convert=convert)

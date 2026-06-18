@@ -6,6 +6,7 @@ This is the single entry point for the package (`mirumoji`)
 
 import typer
 
+from ...log import setup_logging
 from .commands import (
     build,
     config_clear,
@@ -31,6 +32,19 @@ app = typer.Typer(
     add_completion=False,
     help="Mirumoji • Self-Hostable Japanese Immersion Toolkit",
 )
+
+
+@app.callback()
+def _configure() -> None:
+    """
+    Routes launcher logs to `launcher.log` before any command runs
+
+    info: Console Off
+        The console handler is disabled so diagnostic records never mix into a
+        command's `Rich` output, which is the launcher's user-facing surface
+    """
+    setup_logging(log_file="launcher.log", console=False)
+
 
 app.command("up")(up)
 app.command("down")(down)

@@ -35,7 +35,7 @@ from .repos import (
     TranscriptRepository,
 )
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 def _set_sqlite_pragma(
@@ -203,4 +203,4 @@ async def init_db() -> None:
     HOST_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    LOGGER.info(f"Initialised Mirumoji SQLite Database at {DB_URL}")
+    LOGGER.info(f"Initialised Mirumoji SQLite Database At '{DB_URL}'")

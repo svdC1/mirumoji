@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ...exceptions import FFmpegError, MissingFFmpegError, MissingFFprobeError
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 def get_ffmpeg_path() -> dict[str, str]:
@@ -71,7 +71,7 @@ def run_command(
         A `subprocess.CompletedProcess` object
     """
 
-    LOGGER.debug(f"Audio Processing - Running Command: {' '.join(command)}")
+    LOGGER.debug(f"Running Command: {' '.join(command)}")
 
     try:
         # Redirect `stdout` and `stderr` to `subprocess.PIPE`
@@ -87,22 +87,18 @@ def run_command(
         # Warn error if check=False
         if result.returncode != 0:
             LOGGER.warning(
-                f"Audio Processing - Command Failure Suppressed - "
-                f"Exit Code: {result.returncode}"
+                f"Command Failure Suppressed - Exit Code: {result.returncode}"
             )
 
-        LOGGER.debug(f"Audio Processing - STDOUT: '{result.stdout}'")
-        LOGGER.debug(f"Audio Processing - STDERR: '{result.stderr}'")
+        LOGGER.debug(f"STDOUT: '{result.stdout}'")
+        LOGGER.debug(f"STDERR: '{result.stderr}'")
 
         return result
 
     except subprocess.CalledProcessError as e:
-        LOGGER.error(
-            f"Audio Processing - Command Failed - "
-            f"Audio Processing - Exit Code: {e.returncode}"
-        )
-        LOGGER.error(f"Audio Processing - STDOUT: '{e.stdout}'")
-        LOGGER.error(f"Audio Processing - STDERR: '{e.stderr}'")
+        LOGGER.error(f"Command Failed - Exit Code: {e.returncode}")
+        LOGGER.error(f"STDOUT: '{e.stdout}'")
+        LOGGER.error(f"STDERR: '{e.stderr}'")
         raise
 
 
@@ -130,8 +126,7 @@ def to_wav(
 
     if not input.is_file():
         raise ValueError(
-            f"Audio Processing - WAV conversion failed - {input.as_posix()} is"
-            f" not a valid file"
+            f"WAV conversion failed - {input.as_posix()} is not a valid file"
         )
 
     output = Path(output_path).resolve()
@@ -155,12 +150,11 @@ def to_wav(
         run_command(command)
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
-            f"Audio Processing - Failed to convert '{input.as_posix()}' to WAV"
+            f"Failed to convert '{input.as_posix()}' to WAV"
         ) from e
 
     LOGGER.info(
-        f"Audio Processing - Converted '{input.as_posix()}' "
-        f"to WAV File At '{output.as_posix()}'"
+        f"Converted '{input.as_posix()}' to WAV File At '{output.as_posix()}'"
     )
     return output
 
@@ -208,20 +202,19 @@ def extract_audio(
 
     if ext in {".wav", ".mp3", ".m4a", ".flac", ".aac"}:
         LOGGER.info(
-            f"Audio Processing - Input {input_path} is already an "
+            f"Input {input_path} is already an "
             f"audio file ({ext}), no extraction needed"
         )
         return Path(input_path)
 
-    LOGGER.info(f"Audio Processing - Extracting audio from '{input_path}'")
+    LOGGER.info(f"Extracting audio from '{input_path}'")
 
     output = Path(output_path).resolve()
     input = Path(input_path).resolve()
 
     if not input.is_file():
         raise ValueError(
-            f"Audio Processing - Audio Extraction Failed -"
-            f"{input.as_posix()} is not a valid file"
+            f"Audio Extraction Failed -{input.as_posix()} is not a valid file"
         )
 
     cmd = [
@@ -242,11 +235,10 @@ def extract_audio(
         run_command(cmd)
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
-            f"Audio Processing - Failed to extract WAV audio from "
-            f"'{input.as_posix()}'"
+            f"Failed to extract WAV audio from '{input.as_posix()}'"
         ) from e
     LOGGER.info(
-        f"Audio Processing - Extracted audio from '{input.as_posix()}' to WAV "
+        f"Extracted audio from '{input.as_posix()}' to WAV "
         f"file at '{output.as_posix()}'"
     )
     return output
@@ -282,8 +274,7 @@ def filter_audio(
 
     if not input.is_file():
         raise ValueError(
-            f"Audio Processing - Audio Filtering Failed -"
-            f"{input.as_posix()} is not a valid file"
+            f"Audio Filtering Failed -{input.as_posix()} is not a valid file"
         )
 
     output = Path(output_path).resolve()
@@ -304,19 +295,16 @@ def filter_audio(
     ]
 
     LOGGER.info(
-        f"Audio Processing - Applying Band-Pass ({highpass} - {lowpass}) and "
+        f"Applying Band-Pass ({highpass} - {lowpass}) and "
         f"loudness normalization to {input.as_posix()}"
     )
     try:
         run_command(cmd)
     except subprocess.CalledProcessError as e:
-        raise FFmpegError(
-            f"Audio Processing - Failed to filter '{input.as_posix()}'"
-        ) from e
+        raise FFmpegError(f"Failed to filter '{input.as_posix()}'") from e
 
     LOGGER.info(
-        f"Audio Processing - Filtered '{input.as_posix()}' t"
-        f"WAV file at '{output.as_posix()}'"
+        f"Filtered '{input.as_posix()}' to WAV file at '{output.as_posix()}'"
     )
     return output
 
@@ -364,8 +352,7 @@ def to_mp4(
 
     if not input.is_file():
         raise ValueError(
-            f"Audio Processing - MP4 Conversion Failed -"
-            f"{input.as_posix()} is not a valid file"
+            f"MP4 Conversion Failed -{input.as_posix()} is not a valid file"
         )
 
     output = Path(output_path or input.with_suffix(".mp4")).resolve()
@@ -470,15 +457,14 @@ def to_mp4(
     cmd = nvidia_cmd if use_gpu else cpu_cmd
 
     LOGGER.info(
-        f"Audio Processing - Converting {input.as_posix()} to MP4 with "
-        f"use_gpu='{use_gpu}'"
+        f"Converting {input.as_posix()} to MP4 with use_gpu='{use_gpu}'"
     )
 
     result = run_command(cmd, check=False)
 
     if result.returncode != 0 and use_gpu:
         LOGGER.warning(
-            f"Audio Processing - GPU MP4 Conversion Failed For "
+            f"GPU MP4 Conversion Failed For "
             f"{input.as_posix()} - Retrying with CPU libx264"
         )
 
@@ -489,13 +475,11 @@ def to_mp4(
     try:
         result.check_returncode()
         LOGGER.info(
-            f"Audio Processing - Converted {input.as_posix()} to MP4 file at "
-            f"{output.as_posix()}"
+            f"Converted {input.as_posix()} to MP4 file at {output.as_posix()}"
         )
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
-            f"Audio Processing - CPU MP4 conversion for"
-            f"{input.as_posix()} failed"
+            f"CPU MP4 conversion for{input.as_posix()} failed"
         ) from e
 
     return output
@@ -548,8 +532,7 @@ def to_webm(
 
     if not input.is_file():
         raise ValueError(
-            f"Audio Processing - WebM Conversion Failed -"
-            f"{input.as_posix()} is not a valid file"
+            f"WebM Conversion Failed -{input.as_posix()} is not a valid file"
         )
 
     output = Path(output_path or input.with_suffix(".webm")).resolve()
@@ -645,15 +628,14 @@ def to_webm(
     cmd = gpu_cmd if use_gpu else cpu_cmd
 
     LOGGER.info(
-        f"Audio Processing - Converting {input.as_posix()} to WebM with "
-        f"use_gpu='{use_gpu}'"
+        f"Converting {input.as_posix()} to WebM with use_gpu='{use_gpu}'"
     )
 
     result = run_command(cmd, check=False)
 
     if result.returncode != 0 and use_gpu:
         LOGGER.warning(
-            f"Audio Processing - GPU-accelerated WebM Conversion Failed For "
+            f"GPU-accelerated WebM Conversion Failed For "
             f"{input.as_posix()} - Retrying with CPU-only libvpx-vp9"
         )
 
@@ -664,13 +646,11 @@ def to_webm(
     try:
         result.check_returncode()
         LOGGER.info(
-            f"Audio Processing - Converted {input.as_posix()} to WebM file at "
-            f"{output.as_posix()}"
+            f"Converted {input.as_posix()} to WebM file at {output.as_posix()}"
         )
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
-            f"Audio Processing - CPU WebM conversion for"
-            f"{input.as_posix()} failed"
+            f"CPU WebM conversion for{input.as_posix()} failed"
         ) from e
 
     return output

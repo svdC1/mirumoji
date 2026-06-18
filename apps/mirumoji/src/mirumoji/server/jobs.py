@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -61,7 +62,7 @@ if TYPE_CHECKING:
     results (e.g File references, strings, ...) in an awaitable coroutine
     """
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 # --- Manager ---
@@ -217,6 +218,12 @@ class JobQueueManager:
             job = await uow.jobs.update(job_id, status="running")
             await uow.commit()
 
+        LOGGER.info(
+            f"Job '{job_id}' ('{job.type}') Started "
+            f"For Profile '{job.profile_id}'"
+        )
+        started_at = time.monotonic()
+
         handler = self.handlers.get(job.type)
 
         if handler is None:
@@ -250,6 +257,10 @@ class JobQueueManager:
             return
         # Job Succeeded
         await self._terminate_job(job_id, result=result)
+        LOGGER.info(
+            f"Job '{job_id}' ('{job.type}') Succeeded In "
+            f"{time.monotonic() - started_at:.1f}s"
+        )
 
     async def _worker_loop(self) -> None:
         """
@@ -306,6 +317,7 @@ class JobQueueManager:
         async with UnitOfWork() as uow:
             unfinished = await uow.jobs.list_unfinished()
             requeue: list[uuid.UUID] = []
+            orphaned = 0
             for job in unfinished:
                 if job.status == "running":
                     await uow.jobs.update(
@@ -313,6 +325,7 @@ class JobQueueManager:
                         status="failed",
                         error="Interrupted By A Server Restart",
                     )
+                    orphaned += 1
                 else:
                     requeue.append(job.id)
             await uow.commit()
@@ -320,7 +333,12 @@ class JobQueueManager:
             for job_id in requeue:
                 await self.submit_job(job_id)
 
-        LOGGER.info(f"Re-Queued {len(requeue)} job(s)")
+        if orphaned:
+            LOGGER.warning(
+                f"Failed {orphaned} Orphaned Running "
+                f"Job(s) From A Previous Run"
+            )
+        LOGGER.info(f"Re-Queued {len(requeue)} Job(s)")
 
     async def start(self) -> None:
         """
@@ -345,6 +363,7 @@ class JobQueueManager:
             # Mark Any Running Job As Failed
             async with UnitOfWork() as uow:
                 unfinished = await uow.jobs.list_unfinished()
+                interrupted = 0
                 for job in unfinished:
                     if job.status == "running":
                         await uow.jobs.update(
@@ -352,7 +371,12 @@ class JobQueueManager:
                             status="failed",
                             error="Interrupted By A Server Restart",
                         )
+                        interrupted += 1
                 await uow.commit()
+            if interrupted:
+                LOGGER.warning(
+                    f"Marked {interrupted} Running Job(s) Failed On Shutdown"
+                )
             self._worker_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task

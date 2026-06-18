@@ -294,13 +294,13 @@ async def delete_file(
     if path.exists() and path.is_file():
         try:
             await asyncio.to_thread(path.unlink, missing_ok=not check)
-            LOGGER.info(f"Deleted file: '{path}'")
+            LOGGER.info(f"Deleted File '{path}'")
         except OSError as e:
             if check:
                 raise StorageError(
                     f"Failed to delete file '{path}' : {e}"
                 ) from e
-            LOGGER.error(f"Error Deleting File '{path}' : '{e}'")
+            LOGGER.error(f"Error Deleting File '{path}': '{e}'")
 
 
 async def delete_dir(dir_path_relative: str | os.PathLike[str]) -> None:
@@ -318,7 +318,7 @@ async def delete_dir(dir_path_relative: str | os.PathLike[str]) -> None:
     if path.exists() and path.is_dir():
         try:
             await asyncio.to_thread(shutil.rmtree, str(path))
-            LOGGER.info(f"Deleted directory: '{path}'")
+            LOGGER.info(f"Deleted Directory '{path}'")
         except OSError as e:
             raise StorageError(
                 f"Failed to delete directory '{path}' : {e}"
@@ -369,5 +369,5 @@ async def clean_temp(check: bool = False) -> None:
     except StorageError:
         if check:
             raise
-        LOGGER.error(f"Error clearing temp directory '{TEMP_PATH}'")
+        LOGGER.error(f"Error Clearing Temp Directory '{TEMP_PATH}'")
     TEMP_PATH.mkdir(parents=True, exist_ok=True)

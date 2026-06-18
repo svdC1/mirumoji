@@ -31,7 +31,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 # --- HELPERS ---

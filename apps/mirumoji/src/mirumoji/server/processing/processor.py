@@ -57,7 +57,7 @@ class Processor:
         self._model: WhisperModel | None = None
         self._runtime: ModalRuntime | None = None
         LOGGER.info(
-            f"Processor Initialised (transcribe backend: '{self.backend}')",
+            f"Processor Initialised (Backend='{self.backend}')",
         )
 
     # --- Lazy Backends ---
@@ -87,6 +87,7 @@ class Processor:
             The local `WhisperModel` object that should be used
         """
         if self._model is None:
+            LOGGER.info("Loading Local Whisper Model")
             self._model = whisper.load_model(w_model_args)
         return self._model
 
@@ -176,6 +177,10 @@ class Processor:
             ModalError: If the Modal job fails for any other reason
         """
         self._require_transcription()
+        LOGGER.info(
+            f"Transcribing '{media_path}' Via '{self.backend}' Backend "
+            f"(Format '{output_format}')"
+        )
         if self.backend == "modal":
             # Stream the input into a per-job ephemeral volume
             # (the only surface shared with the container), keyed by its
@@ -269,6 +274,9 @@ class Processor:
         """
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
+        LOGGER.info(
+            f"Converting '{input_path}' To MP4 Via '{self.backend}' Backend"
+        )
 
         if self.backend == "modal":
             # Stream the source into a per-job ephemeral volume,
