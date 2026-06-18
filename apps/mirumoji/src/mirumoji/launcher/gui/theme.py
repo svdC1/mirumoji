@@ -15,6 +15,9 @@ from typing import Any
 
 import flet as ft
 
+from ..core.docker_progress import classify
+from ..core.log_render import tokenize
+
 # --- Color Palette ---
 
 BG = "#15120F"  # app background
@@ -64,6 +67,37 @@ _STATUS_COLORS: dict[str, str] = {
     "warning": WARNING,
     "info": AI,
     "muted": INK_FAINT,
+}
+
+# Maps a Docker progress `kind` (see `core.docker_progress`) to a palette
+# colour
+_KIND_COLORS: dict[str, str] = {
+    "done": MATCHA,
+    "active": AI,
+    "idle": INK_FAINT,
+    "free": INK,
+}
+
+# Maps a log-segment `kind` (see `core.log_render`) to a palette colour. The
+# `level` kind is coloured by the level word via `_LEVEL_COLORS` instead
+_LOG_KIND_COLORS: dict[str, str] = {
+    "service": SHU,
+    "uuid": SHU_SOFT,
+    "url": AI,
+    "path": AI,
+    "number": "#C99A57",
+    "ok": MATCHA,
+    "bad": DANGER,
+    "warn": WARNING,
+    "plain": INK,
+}
+
+_LEVEL_COLORS: dict[str, str] = {
+    "DEBUG": INK_FAINT,
+    "INFO": AI,
+    "WARNING": WARNING,
+    "ERROR": DANGER,
+    "CRITICAL": DANGER,
 }
 
 # --- Global Theme ---
@@ -336,7 +370,12 @@ class TerminalSurface(ft.Container):
         logs_toggle (ft.IconButton): Hides / shows the log list
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, *, log_view: bool = False, **kwargs: Any) -> None:
+        # When `log_view`, free lines are tokenized and themed like the server
+        # console instead of the dimmed `key  value` split
+        self._log_view = log_view
+        # Highlight the docker service prefix only when logs are unfiltered
+        self.with_service = True
         # Log list (kept in memory so that logs aren't lost while collapsed)
         self.list_view = ft.ListView(
             expand=True,
@@ -347,6 +386,9 @@ class TerminalSurface(ft.Container):
         # Raw text of each shown line, kept parallel to `list_view.controls`
         # so the whole buffer can be copied to the clipboard
         self._lines: list[str] = []
+        # Docker layer id -> its in-place row, so per-layer progress updates
+        # overwrite one row instead of appending a line on every update
+        self._layer_rows: dict[str, ft.Text] = {}
 
         self.status_text = ft.Text(
             "Ready",
@@ -481,32 +523,104 @@ class TerminalSurface(ft.Container):
         self.status_text.color = _STATUS_COLORS.get(kind, INK_FAINT)
         self._repaint()
 
+    def _row_index(self, row: ft.Text) -> int | None:
+        """
+        Finds a row's position in the log list by identity
+
+        Args:
+            row (ft.Text): The control to locate
+
+        Returns:
+            Its index in `list_view.controls`, or `None` when it is absent
+        """
+        for index, control in enumerate(self.list_view.controls):
+            if control is row:
+                return index
+        return None
+
+    def _log_spans(self, text: str) -> list[ft.TextSpan]:
+        """
+        Builds themed spans for a container log line
+
+        Args:
+            text (str): The raw log line
+
+        Returns:
+            One `ft.TextSpan` per tokenized segment, coloured like the server
+            console (the service prefix is highlighted only when unfiltered)
+        """
+        spans: list[ft.TextSpan] = []
+        for segment, kind in tokenize(text, with_service=self.with_service):
+            if kind == "level":
+                color = _LEVEL_COLORS.get(segment, INK)
+            else:
+                color = _LOG_KIND_COLORS.get(kind, INK)
+            spans.append(ft.TextSpan(segment, ft.TextStyle(color=color)))
+        return spans
+
     def append_log(self, text: str) -> None:
         """
-        Appends one monospace output line, dimming a leading ``key  ↦`` column
+        Renders one monospace output line
+
+        Docker per-layer progress lines are collapsed by layer id, overwriting
+        a single in-place row coloured by status, so a `pull` reads like a
+        console instead of a flood of per-update lines. Every other line is
+        appended as usual, with a leading ``key  ↦`` column dimmed
 
         Args:
             text (str): The output line to render
         """
-        parts = text.split("  ", 2)
-        if len(parts) >= 2:
-            spans = [
-                ft.TextSpan(f"{parts[0]}  ", ft.TextStyle(color=INK_FAINT)),
-                ft.TextSpan("  ".join(parts[1:]), ft.TextStyle(color=INK)),
-            ]
+        kind, layer_id = classify(text)
+
+        # Collapse a known Docker layer into its existing in-place row
+        if layer_id is not None and layer_id in self._layer_rows:
+            color = _KIND_COLORS.get(kind, INK)
+            row = self._layer_rows[layer_id]
+            row.spans = [ft.TextSpan(text, ft.TextStyle(color=color))]
+            index = self._row_index(row)
+            if index is not None:
+                self._lines[index] = text
+            return
+
+        # Otherwise build a new row: a single coloured span for Docker
+        # progress, or the dimmed `key  value` split for any other line
+        if layer_id is not None:
+            color = _KIND_COLORS.get(kind, INK)
+            spans = [ft.TextSpan(text, ft.TextStyle(color=color))]
+        elif self._log_view:
+            spans = self._log_spans(text)
         else:
-            spans = [ft.TextSpan(text, ft.TextStyle(color=INK))]
-        self.list_view.controls.append(
-            ft.Text(spans=spans, size=13, font_family=MONO, selectable=True)
-        )
+            parts = text.split("  ", 2)
+            if len(parts) >= 2:
+                spans = [
+                    ft.TextSpan(
+                        f"{parts[0]}  ",
+                        ft.TextStyle(color=INK_FAINT),
+                    ),
+                    ft.TextSpan("  ".join(parts[1:]), ft.TextStyle(color=INK)),
+                ]
+            else:
+                spans = [ft.TextSpan(text, ft.TextStyle(color=INK))]
+
+        row = ft.Text(spans=spans, size=13, font_family=MONO, selectable=True)
+        if layer_id is not None:
+            self._layer_rows[layer_id] = row
+        self.list_view.controls.append(row)
         self._lines.append(text)
+
         # Batch-Removal -> Dropping the oldest line on every append is O(n) per
-        # line. Instead, let the buffer overshoot, then trim a block
-        # at once so that the expensive shift happens once per
-        # `_CULL_BATCH` lines
+        # line. Instead, let the buffer overshoot, then trim a block at once so
+        # the expensive shift happens once per `_CULL_BATCH` lines. Drop any
+        # collapsed layer rows that fall out of the window with it
         if len(self.list_view.controls) >= _MAX_LOG_LINES + _CULL_BATCH:
+            culled = {id(c) for c in self.list_view.controls[:_CULL_BATCH]}
             del self.list_view.controls[:_CULL_BATCH]
             del self._lines[:_CULL_BATCH]
+            self._layer_rows = {
+                lid: row
+                for lid, row in self._layer_rows.items()
+                if id(row) not in culled
+            }
 
     def clear(self) -> None:
         """
@@ -514,6 +628,7 @@ class TerminalSurface(ft.Container):
         """
         self.list_view.controls.clear()
         self._lines.clear()
+        self._layer_rows.clear()
 
 
 class NotificationBar(ft.SnackBar):

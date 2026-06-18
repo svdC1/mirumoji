@@ -13,17 +13,22 @@ info: Scope
 import subprocess
 import sys
 import threading
-from collections.abc import Generator
+from collections import OrderedDict, deque
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Any, TypeVar, cast, overload
 
 import typer
+from rich.console import Group, RenderableType
 from rich.live import Live
 from rich.table import Table
+from rich.text import Text
 
 from ..core import checks, envfile, process
 from ..core.constants import CONFIG_ENV_VARS, backend_vars
+from ..core.docker_progress import classify
 from ..core.errors import LauncherError
+from ..core.log_render import tokenize
 from ..core.models import Backend, CheckStatus, ImageSource
 from .theme import console, err_console
 
@@ -34,6 +39,125 @@ _ALL_ENV_VARS = [v.name for v in CONFIG_ENV_VARS]
 Every environment variable name that the launcher recognises in the user's
 configuration `.env` file
 """
+
+
+# --- Stream Rendering ---
+
+# Maps a Docker progress `kind` (see `core.docker_progress`) to a `Rich` style
+_KIND_STYLE = {"done": "success", "active": "info", "idle": "muted"}
+
+# Maps a log-segment `kind` (see `core.log_render`) to a `Rich` style for the
+# `logs` console view. The `level` kind is styled by its word via
+# `_LOG_LEVEL_STYLE`
+_LOG_STYLE = {
+    "service": "#E2533B",
+    "uuid": "#F08A6E",
+    "url": "underline #5E83A4",
+    "path": "#5E83A4",
+    "number": "#C99A57",
+    "ok": "#8AA06A",
+    "bad": "bold #C8503D",
+    "warn": "#D9A441",
+}
+
+_LOG_LEVEL_STYLE = {
+    "DEBUG": "#7E7567",
+    "INFO": "#5E83A4",
+    "WARNING": "#D9A441",
+    "ERROR": "bold #C8503D",
+    "CRITICAL": "bold #C8503D",
+}
+
+
+class StreamRender:
+    """
+    Bounded, Docker-aware live renderer for streamed subprocess output
+
+    question: Why
+        Docker emits plain progress lines (one line per update) when its
+        output is piped, producing a huge amount of output which grows
+        a `Rich` table out of bounds
+
+    info: How It Works
+        - Per-layer progress lines are collapsed by layer id into a single
+          in-place row, mirroring Docker's native console display, bounding
+          the layer section to the image's layer count
+
+        - Every other line (build output, `logs -f`, git) goes to a bounded
+          tail showing only the most recent lines
+
+    Args:
+        title (str): Heading shown above the rendered output
+        max_layers (int): Most layer rows to show at once
+        max_tail (int): Most non-layer lines to keep
+    """
+
+    def __init__(
+        self,
+        title: str,
+        *,
+        max_layers: int = 10,
+        max_tail: int = 8,
+    ) -> None:
+        self.title = title
+        self.max_layers = max_layers
+        self._layers: OrderedDict[str, str] = OrderedDict()
+        self._tail: deque[str] = deque(maxlen=max_tail)
+
+    def add(self, line: str) -> None:
+        """
+        Routes a single output line into the layer map or the bounded tail
+
+        Args:
+            line (str): The raw output line to render
+        """
+        _, layer_id = classify(line)
+        if layer_id is None:
+            self._tail.append(line)
+            return
+        # Collapse by layer id, keeping the most-recently-updated layers when
+        # the view is capped
+        self._layers[layer_id] = line
+        self._layers.move_to_end(layer_id)
+
+    @staticmethod
+    def _style_for(line: str) -> str:
+        """
+        Picks a theme style for a layer line from its Docker status
+
+        Args:
+            line (str): A matched Docker progress line
+
+        Returns:
+            The `rich` style name to render the line with
+        """
+        kind, _ = classify(line)
+        return _KIND_STYLE.get(kind, "muted")
+
+    def __rich__(self) -> Group:
+        """
+        Renders the current state as a `rich` group
+
+        Returns:
+            A `Group` of the title, the collapsed layer rows, and the tail
+        """
+        # A leading blank line lifts the block off the command prompt, and a
+        # blank line after the title separates it from the output rows
+        rows: list[RenderableType] = [Text("")]
+        if self.title:
+            rows.append(Text(self.title, style="heading"))
+            rows.append(Text(""))
+
+        layers = list(self._layers.values())
+        hidden = len(layers) - self.max_layers
+        if hidden > 0:
+            layers = layers[-self.max_layers :]
+            rows.append(Text(f"... {hidden} More Layer(s)", style="muted"))
+        rows.extend(Text(line, style=self._style_for(line)) for line in layers)
+
+        rows.extend(Text(f"↪ {line}", style="muted") for line in self._tail)
+
+        return Group(*rows)
 
 
 # --- Display Helpers ---
@@ -108,7 +232,7 @@ def fail(
 @overload
 def _consume_stream(
     gen: Generator[str, None, _T],
-    table: Table,
+    render: StreamRender,
     identifier: str,
     handle: None = None,
 ) -> _T: ...
@@ -117,7 +241,7 @@ def _consume_stream(
 @overload
 def _consume_stream(
     gen: Generator[str, None, _T],
-    table: Table,
+    render: StreamRender,
     identifier: str,
     handle: process.StreamHandle,
 ) -> _T | None: ...
@@ -125,18 +249,18 @@ def _consume_stream(
 
 def _consume_stream(
     gen: Generator[str, None, _T],
-    table: Table,
+    render: StreamRender,
     identifier: str,
     handle: process.StreamHandle | None = None,
 ) -> _T | None:
     """
-    Consumes a `core.process.stream` generator, pretty-printing each line to a
-    live `rich` table. In addition, maps launcher / subprocess errors to clean
-    `Typer` command exits
+    Consumes a `core.process.stream` generator, rendering each line through a
+    bounded `StreamRender`. In addition, maps launcher / subprocess errors to
+    clean `Typer` command exits
 
     Args:
         gen (Generator[str, None, T]): A generator yielding output lines
-        table (Table): The `rich` table to append each output line to
+        render (StreamRender): The bounded renderer to route each line through
         identifier (str): An identifier for the command (e.g `Docker`), used in
             error messages
         handle (process.StreamHandle | None): When given, consumption stops as
@@ -146,13 +270,12 @@ def _consume_stream(
     Returns:
         The generator's return value or None when the operation was cancelled
     """
-    # The `Live` is transient so that the progress table clears when the block
-    # exits (success or error). Exceptions are handled OUTSIDE the block so
-    # that the mapped error message prints cleanly instead of being swallowed
-    # by it
+    # The `Live` is transient so that the render clears when the block exits
+    # (success or error). Exceptions are handled OUTSIDE the block so that the
+    # mapped error message prints cleanly instead of being swallowed by it
     try:
         with Live(
-            table,
+            render,
             refresh_per_second=10,
             console=console,
             transient=True,
@@ -160,8 +283,8 @@ def _consume_stream(
             while True:
                 # On cancel (CTRL+C) the process is killed, but lines it
                 # already wrote stay buffered in the pipe and `readline` keeps
-                # returning them. Stop consuming at once instead of rendering
-                # each into the growing table, so the `Live` tears down before
+                # returning them. Stop consuming at once instead of appending
+                # each into the renderer, so the `Live` tears down before
                 # the interpreter shuts down on a daemon thread still writing
                 # to stdout
                 if handle is not None and handle.cancelled:
@@ -170,7 +293,7 @@ def _consume_stream(
                     line = next(gen)
                 except StopIteration as stop:
                     return cast(_T, stop.value)
-                table.add_row(f"↪ {line}", style="muted")
+                render.add(line)
 
     # Catch Launcher Exceptions
     except LauncherError as exc:
@@ -195,8 +318,8 @@ def stream_command(
 ) -> _T:
     """
     Consumes the streaming generator returned by `core.process.stream`,
-    pretty-printing each line inside a `rich` table and returning the process'
-    return value. Maps launcher errors to clean `Typer` command exits
+    rendering each line through a bounded `StreamRender` and returning the
+    process' return value. Maps launcher errors to clean `Typer` command exits
 
     info: Cancellation
         - When a `StreamHandle` is given (the same one passed to the streaming
@@ -214,35 +337,52 @@ def stream_command(
         gen (Generator[str, None, T]): A generator yielding output lines
         identifier (str): An identifier for the command being executed
             (e.g `Docker`)
-        title (str): The title of the `rich` table in which command output
-            will be displayed
+        title (str): The heading shown above the streamed output
         handle (process.StreamHandle | None): The cancellation token bound to
             `gen`, enabling `CTRL+C` to stop a followed stream
 
     Returns:
         The generator's return value
     """
-    table = Table(
-        title=title,
-        title_style="heading",
-        border_style="info",
-        show_header=False,
-    )
-    table.add_column()
+    render = StreamRender(title)
 
     # Without a handle there is nothing to cancel, so consume in place
     if handle is None:
-        return _consume_stream(gen, table, identifier)
+        return _consume_stream(gen, render, identifier)
 
-    # With a handle, consume on a worker thread and keep the main thread free
-    # to catch CTRL+C. A blocked `readline` (a CREATE_NO_WINDOW child gets no
-    # console signal on Windows) would otherwise defer the interrupt
-    # indefinitely. The short poll keeps the main thread responsive to it
+    return _drive(
+        lambda: _consume_stream(gen, render, identifier, handle), handle
+    )
+
+
+def _drive(
+    consume: Callable[[], _T | None], handle: process.StreamHandle
+) -> _T:
+    """
+    Runs `consume` on a worker thread so `CTRL+C` can stop a blocked read
+
+    A followed stream (`docker compose logs -f`) blocks inside `readline`
+    waiting for the next line, so consumption runs on a daemon worker while the
+    main thread stays free to catch the interrupt, cancel the handle (killing
+    the followed process), and exit cleanly
+
+    Args:
+        consume (Callable[[], T | None]): The consumer to run, returning the
+            stream's value or `None` when cancelled
+        handle (process.StreamHandle): The cancellation token bound to the
+            stream
+
+    Returns:
+        The consumer's return value
+    """
+    # A blocked `readline` (a CREATE_NO_WINDOW child gets no console signal on
+    # Windows) would otherwise defer the interrupt indefinitely. The short poll
+    # keeps the main thread responsive to it
     outcome: dict[str, Any] = {}
 
     def _worker() -> None:
         try:
-            outcome["value"] = _consume_stream(gen, table, identifier, handle)
+            outcome["value"] = consume()
         except BaseException as exc:
             # Re-raised on the main thread so Typer handles the exit / error
             outcome["error"] = exc
@@ -268,6 +408,80 @@ def stream_command(
     if error is not None:
         raise error
     return cast(_T, outcome.get("value"))
+
+
+def _log_line(line: str, *, with_service: bool) -> Text:
+    """
+    Builds a themed `Rich` line for the `logs` console view
+
+    Args:
+        line (str): A raw container log line
+        with_service (bool): Whether to highlight the docker service prefix
+
+    Returns:
+        A `Text` with each tokenized segment styled like the server console
+    """
+    text = Text()
+    for segment, kind in tokenize(line, with_service=with_service):
+        if kind == "level":
+            style = _LOG_LEVEL_STYLE.get(segment, "")
+        else:
+            style = _LOG_STYLE.get(kind, "")
+        text.append(segment, style=style)
+    return text
+
+
+def stream_logs(
+    gen: Generator[str, None, _T],
+    identifier: str,
+    *,
+    handle: process.StreamHandle | None = None,
+    with_service: bool = True,
+) -> _T:
+    """
+    Streams container logs straight to the console as a scrolling, themed view
+
+    info: Additional Information
+        - Unlike `stream_command`, this prints each line directly and lets the
+          terminal's own scrollback hold the history
+
+        - Each line is coloured like the server console
+
+        - Also maps launcher errors to clean `Typer` exits
+
+    Args:
+        gen (Generator[str, None, T]): A generator yielding log lines
+        identifier (str): An identifier for the command (e.g `Docker`)
+        handle (process.StreamHandle | None): The cancellation token enabling
+            `CTRL+C` to stop a followed (`-f`) stream
+        with_service (bool): Whether to highlight the docker service prefix
+            (pass `False` when logs are filtered to a single service)
+
+    Returns:
+        The generator's return value
+    """
+
+    def consume() -> _T | None:
+        try:
+            while True:
+                if handle is not None and handle.cancelled:
+                    return None
+                try:
+                    line = next(gen)
+                except StopIteration as stop:
+                    return cast(_T, stop.value)
+                console.print(_log_line(line, with_service=with_service))
+        except LauncherError as exc:
+            raise fail(str(exc)) from exc
+        except subprocess.CalledProcessError as exc:
+            err_console.print(subprocess_error_table(exc, name=identifier))
+            raise fail(f"{identifier} Command Failed") from exc
+        except FileNotFoundError as exc:
+            raise fail(f"Command `{exc.filename}` Couldn't Be Found") from exc
+
+    if handle is None:
+        return cast(_T, consume())
+    return _drive(consume, handle)
 
 
 # -- Up Validation ---

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
@@ -37,6 +38,7 @@ from ._common import (
     resolve_backend,
     resolve_source,
     stream_command,
+    stream_logs,
 )
 from .theme import console
 
@@ -125,7 +127,7 @@ def doctor() -> None:
             result.detail,
         )
 
-    console.print(table)
+    console.print(Padding(table, (1, 0, 0, 0)))
 
 
 def server(
@@ -199,7 +201,7 @@ def status() -> None:
             service.ports,
         )
 
-    console.print(table)
+    console.print(Padding(table, (1, 0, 0, 0)))
 
 
 def logs(
@@ -228,7 +230,7 @@ def logs(
     # A handle lets CTRL+C stop a followed tail (otherwise the read blocks
     # forever waiting for the next line)
     handle = process.StreamHandle()
-    stream_command(
+    stream_logs(
         gen=lifecycle.logs(
             service,
             follow=follow,
@@ -237,8 +239,8 @@ def logs(
             handle=handle,
         ),
         identifier="Docker",
-        title="Mirumoji Docker Compose Logs",
         handle=handle,
+        with_service=service is None,
     )
 
 
@@ -506,7 +508,7 @@ def up(
         title="Stop The Application",
         border_style="accent",
     )
-    console.print(success_table)
+    console.print(Padding(success_table, (1, 0, 0, 0)))
     console.print(stop_panel)
 
 
@@ -560,7 +562,7 @@ def config_show() -> None:
     for key, value in values.items():
         shown = f"{value[0:3]}•••" if key in _SECRET_NAMES and value else value
         table.add_row(key, shown)
-    console.print(table)
+    console.print(Padding(table, (1, 0, 0, 0)))
     console.print(
         f"Configuration Being Stored At  ↦  {HOST_CONFIG_FILE}", style="muted"
     )
