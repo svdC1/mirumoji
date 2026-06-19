@@ -75,6 +75,7 @@ class ProfileFileResponse(BaseModel):
         name (str): Base file name
         url (str): Media URL serving the file
         type (str | None): Optional file-type tag
+        folder (str | None): Optional group label for files uploaded together
         created_at (str | None): ISO-8601 creation timestamp
     """
 
@@ -82,6 +83,7 @@ class ProfileFileResponse(BaseModel):
     name: str
     url: str
     type: str | None = None
+    folder: str | None = None
     created_at: str | None = None
 
 
@@ -214,3 +216,28 @@ class ConvertResult(JobResult):
 
     file_id: str
     video_url: str
+
+
+class BatchResult(JobResult):
+    """
+    Result of a `batch_*` parent job
+
+    info: Per-File Detail
+        - The parent aggregates the outcome counts only
+
+        - Each child job carries its own typed result or error and is fetched
+          via `GET /jobs/{id}/children`
+
+    Args:
+        total (int): Number of files in the batch
+        succeeded (int): Number of files that finished successfully
+        failed (int): Number of files that failed
+        cancelled (int): Number of files skipped by a cancellation
+        children (list[str]): Database IDs of the child jobs, in submit order
+    """
+
+    total: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    children: list[str]

@@ -46,7 +46,9 @@ def _set_sqlite_pragma(
     Enforces SQLite pragmas on every new connection
 
     Enables foreign keys, Write-Ahead Logging, and normal synchronous mode for
-    better concurrency and performance
+    better concurrency and performance. A busy timeout makes a writer wait for
+    a held write lock rather than fail immediately, which matters once batch
+    jobs run several write transactions concurrently
 
     Args:
         dbapi_connection (Any): The raw DBAPI connection passed by SQLAlchemy's
@@ -57,6 +59,7 @@ def _set_sqlite_pragma(
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
 
 

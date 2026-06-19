@@ -55,3 +55,9 @@ DEFAULT_BREAKDOWN_SYS_MSG = (
     "  DO NOT OUTPUT romaji/furigana or any notes on pronunciation;\n"
     "  Conclude with the specific nuance within the context sentence."
 )
+
+MAX_LLM_CONCURRENCY = 4
+"""
+Defines how many LLM requests should be executed simultaneously when
+requesting an `SRT Fix` for a batch of files
+"""

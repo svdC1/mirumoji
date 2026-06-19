@@ -18,7 +18,7 @@ from ..db import UnitOfWork
 from ..db.models import JobDTO
 from ..dependencies import ensure_profile_exists, get_job_manager
 from ..jobs import JobQueueManager
-from ..models.requests import SubmitJobRequest
+from ..models.requests import SubmitBatchRequest, SubmitJobRequest
 from ..models.responses import JobResponse
 
 LOGGER = logging.getLogger(__name__)
@@ -110,6 +110,83 @@ async def submit_job(
     return _to_response(job)
 
 
+@jobs_router.post(
+    "/batch",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobResponse,
+)
+async def submit_batch(
+    req: SubmitBatchRequest,
+    profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
+) -> JobResponse:
+    """
+    Submits a batch job that runs one operation across several profile files
+
+    info: How It Works
+        - Creates a parent job + one `queued` child job per `file_id`
+
+        - enqueues the parent, and returns it for the client to track
+
+        - The worker runs the parent, which either runs the children in
+          parallel or one at a time depending on the handler
+
+        - Per-file status lives on the children, reachable via
+          `GET /jobs/{id}/children`
+
+    Args:
+        req (SubmitBatchRequest): The batch submission
+        profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
+
+    Returns:
+        The created parent job (`202 Accepted`)
+
+    Raises:
+        HTTPException: If a `file_id` is malformed or not owned by the profile
+        DatabaseError: If persistence fails
+    """
+    file_uuids: list[uuid.UUID] = []
+    for file_id in req.file_ids:
+        try:
+            file_uuids.append(uuid.UUID(file_id))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid File Id '{file_id}'",
+            ) from e
+
+    async with UnitOfWork() as uow:
+        for file_uuid in file_uuids:
+            file_rec = await uow.files.get(file_uuid)
+            if file_rec.profile_id != profile_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="File Not Found",
+                )
+        parent = await uow.jobs.add(
+            profile_id=profile_id,
+            type=req.type,
+            params=req.to_params(),
+            total=len(req.file_ids),
+        )
+        for file_id in req.file_ids:
+            await uow.jobs.add(
+                profile_id=profile_id,
+                type=req.child_type(),
+                params=req.child_params(file_id),
+                parent_id=parent.id,
+            )
+        await uow.commit()
+
+    await manager.submit_job(parent.id)
+    LOGGER.info(
+        f"Batch '{parent.id}' ('{parent.type}') Submitted For Profile "
+        f"'{profile_id}' Over {len(req.file_ids)} File(s)"
+    )
+    return _to_response(parent)
+
+
 @jobs_router.get("", response_model=list[JobResponse])
 async def list_jobs(
     active: bool = False,
@@ -163,6 +240,39 @@ async def get_job(
     return _to_response(job)
 
 
+@jobs_router.get("/{job_id}/children", response_model=list[JobResponse])
+async def list_job_children(
+    job_id: uuid.UUID,
+    profile_id: str = Depends(ensure_profile_exists),
+) -> list[JobResponse]:
+    """
+    Lists the per-file child jobs of a batch parent owned by the profile
+
+    Single-op jobs have no children and return an empty list
+
+    Args:
+        job_id (uuid.UUID): The parent job id
+        profile_id (str): Validated profile id
+
+    Returns:
+        The child jobs, in submit order
+
+    Raises:
+        HTTPException: If the parent isn't owned by the profile
+        RecordNotFoundError: If the parent does not exist
+        DatabaseError: If the query fails
+    """
+    async with UnitOfWork() as uow:
+        parent = await uow.jobs.get(job_id)
+        if parent.profile_id != profile_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job Not Found",
+            )
+        children = await uow.jobs.list_children(job_id)
+    return [_to_response(child) for child in children]
+
+
 @jobs_router.post("/{job_id}/cancel", response_model=JobResponse)
 async def cancel_job(
     job_id: uuid.UUID,
@@ -171,9 +281,13 @@ async def cancel_job(
     """
     Cancels a queued or running job owned by the active profile
 
-    A queued job is skipped by the worker when it would otherwise run. A
-    running job is marked cancelled on a best-effort basis (it may still
-    finish)
+    info: How Cancellation Works
+        - A queued job is skipped by the worker when it would otherwise run
+
+        - A running job is marked cancelled on a best-effort basis (it may
+          still finish)
+
+        - Cancelling a batch parent cascades to its still-active children
 
     Args:
         job_id (uuid.UUID): The job id
@@ -196,6 +310,10 @@ async def cancel_job(
             )
         if job.status in ("queued", "running"):
             job = await uow.jobs.update(job_id, status="cancelled")
+            children = await uow.jobs.list_children(job_id)
+            for child in children:
+                if child.status in ("queued", "running"):
+                    await uow.jobs.update(child.id, status="cancelled")
             LOGGER.info(f"Job '{job_id}' Cancel Requested")
         await uow.commit()
     return _to_response(job)

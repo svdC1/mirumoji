@@ -152,6 +152,8 @@ class File(Base):
         name (str): Base file name
         path (str): Media-relative path to the file
         type (str | None): Optional file-type tag
+        folder (str | None): Optional group label for files uploaded together
+            (e.g. a picked directory's name), used to group the file list
         created_at (datetime): UTC creation timestamp
     """
 
@@ -180,6 +182,11 @@ class File(Base):
 
     type: Mapped[str | None] = mapped_column(
         String(100),
+        nullable=True,
+    )
+
+    folder: Mapped[str | None] = mapped_column(
+        String(500),
         nullable=True,
     )
 
@@ -483,6 +490,7 @@ class FileDTO(SafeORMModel):
         name (str): Base file name
         path (str): Media-relative path to the file
         type (str | None): Optional file-type tag
+        folder (str | None): Optional group label for files uploaded together
         created_at (datetime): UTC creation timestamp
     """
 
@@ -492,6 +500,7 @@ class FileDTO(SafeORMModel):
     name: str
     path: str
     type: str | None
+    folder: str | None = None
     created_at: datetime
 
 

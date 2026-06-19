@@ -162,6 +162,7 @@ class FileRepository:
         name: str,
         path: str,
         type: str | None = None,
+        folder: str | None = None,
     ) -> FileDTO:
         """
         Adds a file record
@@ -171,6 +172,8 @@ class FileRepository:
             name (str): Base file name
             path (str): Media-relative path to the file
             type (str | None): Optional file-type tag
+            folder (str | None): Optional group label for files uploaded
+                together
 
         Returns:
             The created `FileDTO`
@@ -184,6 +187,7 @@ class FileRepository:
                 name=name,
                 path=path,
                 type=type,
+                folder=folder,
             )
             self.session.add(file)
             await self.session.flush()

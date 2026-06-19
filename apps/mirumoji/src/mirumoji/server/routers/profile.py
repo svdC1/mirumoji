@@ -342,6 +342,7 @@ async def upload_file(
     request: Request,
     file_name: str = Header(..., alias="X-File-Name"),
     file_type: str | None = Query(None, alias="type"),
+    folder: str | None = Query(None, alias="folder"),
     profile_id: str = Depends(ensure_profile_exists),
 ) -> ProfileFileResponse:
     """
@@ -355,14 +356,23 @@ async def upload_file(
 
         - Avoids re-uploading the file
 
+    info: Folder
+        - `?folder=` tags files uploaded together (e.g. from a picked
+          directory) with a shared group label so that the file list can group
+          them
+
+        - It is a query param rather than a header so a non-ASCII group name
+          never has to be encoded into a latin-1 header
+
     Args:
         request (Request): The `FastAPI.Request` object (the body is the file)
         file_name (str): The original file name (`X-File-Name`)
         file_type (str | None): Optional file-type tag (`?type=`)
+        folder (str | None): Optional group label (`?folder=`)
         profile_id (str): Validated profile id
 
     Returns:
-        The stored file's id, name, media URL, and type
+        The stored file's id, name, media URL, type, and folder
 
     Raises:
         UploadError: If the upload fails
@@ -384,6 +394,7 @@ async def upload_file(
             name=Path(file_name).name,
             path=str(rel),
             type=file_type,
+            folder=folder,
         )
         await uow.commit()
 
@@ -395,6 +406,7 @@ async def upload_file(
         name=rec.name,
         url=f"/media/{rel.as_posix()}",
         type=rec.type,
+        folder=rec.folder,
         created_at=rec.created_at.isoformat() if rec.created_at else None,
     )
 
@@ -423,6 +435,7 @@ async def list_files(
             name=f.name,
             url=f"/media/{Path(f.path).as_posix()}",
             type=f.type,
+            folder=f.folder,
             created_at=f.created_at.isoformat() if f.created_at else None,
         )
         for f in files

@@ -350,3 +350,239 @@ The body of a `POST /jobs` request
 A discriminated union keyed by a persisted job's `type` attribute, so that
 each operation's `opts` are validated against their own model
 """
+
+
+# --- Batch Job Submission Requests ---
+
+
+class BatchSubmitBase(BaseModel):
+    """
+    Shared fields for every batch job submission request
+
+    Args:
+        file_ids (list[str]): The profile files the batch operates on, one
+            child job per file (at least one)
+    """
+
+    file_ids: Annotated[list[str], Field(min_length=1)]
+
+
+class BatchGenerateSrtJobRequest(BatchSubmitBase):
+    """
+    Submission for a `batch_generate_srt` job
+
+    Args:
+        type (Literal['batch_generate_srt']): The operation discriminator
+        opts (GenerateSrtRequest): Curated transcription options shared by
+            every file in the batch
+    """
+
+    type: Literal["batch_generate_srt"]
+    opts: GenerateSrtRequest = Field(default_factory=GenerateSrtRequest)
+
+    def child_type(self) -> str:
+        """
+        The single-op `type` stored on each per-file child job
+
+        Returns:
+            The discriminator the child shares with its single-op handler
+        """
+        return "generate_srt"
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted parent job's `params`
+
+        Returns:
+            The file references and shared transcription options
+        """
+        return {
+            "file_ids": list(self.file_ids),
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+    def child_params(self, file_id: str) -> dict[str, Any]:
+        """
+        Builds one child job's `params`, matching the single-op shape
+
+        Args:
+            file_id (str): The profile file this child operates on
+
+        Returns:
+            The file reference and shared transcription options
+        """
+        return {
+            "file_id": file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class BatchTranscribeJobRequest(BatchSubmitBase):
+    """
+    Submission for a `batch_transcribe` job
+
+    Args:
+        type (Literal['batch_transcribe']): The operation discriminator
+        opts (TranscribeAudioRequest): `clean_audio` + curated transcription
+            options shared by every file in the batch
+    """
+
+    type: Literal["batch_transcribe"]
+    opts: TranscribeAudioRequest = Field(
+        default_factory=TranscribeAudioRequest,
+    )
+
+    def child_type(self) -> str:
+        """
+        The single-op `type` stored on each per-file child job
+
+        Returns:
+            The discriminator the child shares with its single-op handler
+        """
+        return "transcribe"
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted parent job's `params`
+
+        Returns:
+            The file references and shared transcription options
+        """
+        return {
+            "file_ids": list(self.file_ids),
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+    def child_params(self, file_id: str) -> dict[str, Any]:
+        """
+        Builds one child job's `params`, matching the single-op shape
+
+        Args:
+            file_id (str): The profile file this child operates on
+
+        Returns:
+            The file reference and shared transcription options
+        """
+        return {
+            "file_id": file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class BatchConvertJobRequest(BatchSubmitBase):
+    """
+    Submission for a `batch_convert` job
+
+    Args:
+        type (Literal['batch_convert']): The operation discriminator
+        opts (ConvertVideoRequest): Conversion options shared by every file in
+            the batch
+    """
+
+    type: Literal["batch_convert"]
+    opts: ConvertVideoRequest = Field(default_factory=ConvertVideoRequest)
+
+    def child_type(self) -> str:
+        """
+        The single-op `type` stored on each per-file child job
+
+        Returns:
+            The discriminator the child shares with its single-op handler
+        """
+        return "convert"
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted parent job's `params`
+
+        Returns:
+            The file references and shared conversion options
+        """
+        return {
+            "file_ids": list(self.file_ids),
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+    def child_params(self, file_id: str) -> dict[str, Any]:
+        """
+        Builds one child job's `params`, matching the single-op shape
+
+        Args:
+            file_id (str): The profile file this child operates on
+
+        Returns:
+            The file reference and shared conversion options
+        """
+        return {
+            "file_id": file_id,
+            "opts": self.opts.model_dump(exclude_none=True),
+        }
+
+
+class BatchFixSrtJobRequest(BatchSubmitBase):
+    """
+    Submission for a `batch_fix_srt` job
+
+    Args:
+        type (Literal['batch_fix_srt']): The operation discriminator
+        model (str): LLM model selector in `provider:model` form
+        sys_msg (str | None): Optional LLM system message shared by every file
+    """
+
+    type: Literal["batch_fix_srt"]
+    model: str
+    sys_msg: str | None = None
+
+    def child_type(self) -> str:
+        """
+        The single-op `type` stored on each per-file child job
+
+        Returns:
+            The discriminator the child shares with its single-op handler
+        """
+        return "fix_srt"
+
+    def to_params(self) -> dict[str, Any]:
+        """
+        Builds the persisted parent job's `params`
+
+        Returns:
+            The file references, model selector, and optional system message
+        """
+        return {
+            "file_ids": list(self.file_ids),
+            "model": self.model,
+            "sys_msg": self.sys_msg,
+        }
+
+    def child_params(self, file_id: str) -> dict[str, Any]:
+        """
+        Builds one child job's `params`, matching the single-op shape
+
+        Args:
+            file_id (str): The profile file this child operates on
+
+        Returns:
+            The file reference, model selector, and optional system message
+        """
+        return {
+            "file_id": file_id,
+            "model": self.model,
+            "sys_msg": self.sys_msg,
+        }
+
+
+SubmitBatchRequest: TypeAlias = Annotated[
+    BatchGenerateSrtJobRequest
+    | BatchTranscribeJobRequest
+    | BatchConvertJobRequest
+    | BatchFixSrtJobRequest,
+    Field(discriminator="type"),
+]
+"""
+The body of a `POST /jobs/batch` request
+
+A discriminated union keyed by the parent job's `type` attribute, so that each
+batch operation's shared `opts` are validated against their own model. The
+parent fans the shared options out to one child job per `file_id`
+"""
