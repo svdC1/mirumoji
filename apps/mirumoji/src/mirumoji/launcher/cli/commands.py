@@ -5,11 +5,13 @@ Each CLI command uses `Typer` and `Rich` to expose the `shared` core's
 functionality in a user-friendly way
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
@@ -36,8 +38,11 @@ from ._common import (
     resolve_backend,
     resolve_source,
     stream_command,
+    stream_logs,
 )
 from .theme import console
+
+LOGGER = logging.getLogger(__name__)
 
 # Maps Environment Dependency Status To Console Symbols
 _SYMBOLS = {
@@ -122,44 +127,7 @@ def doctor() -> None:
             result.detail,
         )
 
-    console.print(table)
-
-
-def server(
-    host: Annotated[
-        str,
-        typer.Option(help="Interface To Bind"),
-    ] = "0.0.0.0",
-    port: Annotated[
-        int,
-        typer.Option(help="Port To Listen On"),
-    ] = 8000,
-    reload: Annotated[
-        bool,
-        typer.Option(help="Reload On Code Changes (Development)"),
-    ] = False,
-) -> None:
-    """
-    Runs the Mirumoji server with uvicorn
-
-    Launches the FastAPI server directly with uvicorn (no Docker), using the
-    app factory. Intended for local development and Python-only iteration
-    """
-    try:
-        import uvicorn
-    except ModuleNotFoundError as exc:
-        raise fail(
-            "The Server Extra Is Not Installed — Run `pip install "
-            "mirumoji[server]`",
-        ) from exc
-
-    uvicorn.run(
-        "mirumoji.server.app:create_app",
-        host=host,
-        port=port,
-        reload=reload,
-        factory=True,
-    )
+    console.print(Padding(table, (1, 0, 0, 0)))
 
 
 def status() -> None:
@@ -196,7 +164,7 @@ def status() -> None:
             service.ports,
         )
 
-    console.print(table)
+    console.print(Padding(table, (1, 0, 0, 0)))
 
 
 def logs(
@@ -225,7 +193,7 @@ def logs(
     # A handle lets CTRL+C stop a followed tail (otherwise the read blocks
     # forever waiting for the next line)
     handle = process.StreamHandle()
-    stream_command(
+    stream_logs(
         gen=lifecycle.logs(
             service,
             follow=follow,
@@ -234,8 +202,8 @@ def logs(
             handle=handle,
         ),
         identifier="Docker",
-        title="Mirumoji Docker Compose Logs",
         handle=handle,
+        with_service=service is None,
     )
 
 
@@ -440,7 +408,9 @@ def up(
         - Builds the correct compose file based on the backend / image source
           choice
 
-        - Builds or pulls images
+        - Builds images locally for a build source. For a pull source it does
+          not pull explicitly, letting `docker compose up` fetch only the
+          missing images (use `mirumoji pull` to refresh on demand)
 
         - Runs Docker Compose Up using the managed config as the `--env-file`
     """
@@ -454,6 +424,10 @@ def up(
     ip = host.get_host_lan_ip()
     os.environ[HOST_LAN_IP_VAR] = ip
     os.environ[TRANSCRIBE_BACKEND_VAR] = backend.value
+    LOGGER.info(
+        f"Starting Mirumoji (Backend '{backend.value}', "
+        f"Source '{source.value}', LAN IP '{ip}')"
+    )
 
     if source is ImageSource.BUILD:
         repo_path = stream_command(
@@ -473,14 +447,9 @@ def up(
 
     compose_file = write_compose(backend, source)
 
-    if source is ImageSource.PULL:
-        stream_command(
-            gen=lifecycle.pull(compose_file),
-            identifier="Docker",
-            title="Pulling Images",
-        )
-        console.print("✓ Images Pulled", style="success")
-
+    # No explicit pull here. `docker compose up` already pulls any missing
+    # image and reuses cached ones, so a normal `up` doesn't need to hit
+    # Docker Hub. Run `mirumoji pull` to refresh images on demand
     stream_command(
         gen=lifecycle.up(
             compose_file, env_file=HOST_CONFIG_FILE, detach=detach
@@ -502,7 +471,7 @@ def up(
         title="Stop The Application",
         border_style="accent",
     )
-    console.print(success_table)
+    console.print(Padding(success_table, (1, 0, 0, 0)))
     console.print(stop_panel)
 
 
@@ -556,7 +525,7 @@ def config_show() -> None:
     for key, value in values.items():
         shown = f"{value[0:3]}•••" if key in _SECRET_NAMES and value else value
         table.add_row(key, shown)
-    console.print(table)
+    console.print(Padding(table, (1, 0, 0, 0)))
     console.print(
         f"Configuration Being Stored At  ↦  {HOST_CONFIG_FILE}", style="muted"
     )
@@ -625,3 +594,165 @@ def config_clear() -> None:
     deleted_keys = [k for k in results if k]
 
     console.print(f"✓ Deleted {len(deleted_keys)} Keys", style="success")
+
+
+# --- Dev Sub-App ---
+
+
+def dev_up(
+    transcribe: Annotated[
+        Backend | None,
+        typer.Option(
+            "--transcribe",
+            "-t",
+            help="Transcription Backend (Defaults To The Saved Config)",
+        ),
+    ] = None,
+    path: Annotated[
+        Path | None,
+        typer.Option(
+            "--path",
+            "-p",
+            help=(
+                "Path To The Local Mirumoji Repo Checkout (Defaults to "
+                "`Path.cwd()` When Left Empty)"
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    detach: Annotated[
+        bool,
+        typer.Option(
+            "--detach/--foreground",
+            "-d",
+            help="Run Detached (--detach) Or In The Foreground",
+        ),
+    ] = True,
+) -> None:
+    """
+    Launches the Mirumoji Docker Compose Application For Development Using
+    Images Built With `dev build`
+
+    Builds the `Mirumoji` images locally from a mirumoji repo clone at an
+    arbitrary path without updating it
+
+    Intended for development only. Accepts a path to a `mirumoji` repo
+    checkout and builds the frontend + backend images locally for the chosen
+    backend
+
+    info: Backend Resolution
+        The backend value is resolved in the following order
+
+        - Value Passed To --transcribe, If Present
+
+        - Value Stored in Config, If Present
+
+        - Shell's MIRUMOJI_TRANSCRIBE_BACKEND environment variable, If Present
+
+        - Default Value (`MODAL`)
+
+    info: Steps
+        - Resolves the backend according to the order of
+          precedence listed above
+
+        - Validates that every required variable is configured (the managed
+          config file is never altered in a run)
+
+        - Acquires the host's LAN IPv4 to build the frontend's self-signed
+          certificate
+
+        - Builds the correct compose file based on the backend choice
+
+        - Builds images locally
+
+        - Runs Docker Compose Up using the managed config as the `--env-file`
+    """
+
+    backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
+    source = ImageSource.BUILD
+    if path is None:
+        path = Path.cwd()
+
+    _validate_dependencies(backend, source)
+    require_env(backend, HOST_CONFIG_FILE)
+
+    ip = host.get_host_lan_ip()
+    os.environ[HOST_LAN_IP_VAR] = ip
+    os.environ[TRANSCRIBE_BACKEND_VAR] = backend.value
+    LOGGER.info(
+        f"Starting Mirumoji (Backend '{backend.value}', "
+        f"Source '{source.value}', LAN IP '{ip}')"
+    )
+
+    stream_command(
+        gen=lifecycle.build_images(path, backend),
+        identifier="Docker",
+        title="Building Images",
+    )
+
+    console.print("✓ Images Built", style="success")
+
+    compose_file = write_compose(backend, source)
+
+    stream_command(
+        gen=lifecycle.up(
+            compose_file,
+            env_file=HOST_CONFIG_FILE,
+            detach=detach,
+        ),
+        title="Starting Mirumoji",
+        identifier="Docker",
+    )
+
+    success_table = Table(
+        title="✓ Mirumoji Is Running",
+        border_style="success",
+        title_style="heading",
+    )
+    success_table.add_column("Local", style="ink")
+    success_table.add_column("LAN", style="ink")
+    success_table.add_row("https://localhost", f"https://{ip}", style="info")
+    stop_panel = Panel(
+        Syntax("mirumoji down", "bash"),
+        title="Stop The Application",
+        border_style="accent",
+    )
+    console.print(Padding(success_table, (1, 0, 0, 0)))
+    console.print(stop_panel)
+
+
+def dev_server(
+    host: Annotated[
+        str,
+        typer.Option(help="Interface To Bind"),
+    ] = "0.0.0.0",
+    port: Annotated[
+        int,
+        typer.Option(help="Port To Listen On"),
+    ] = 8000,
+    reload: Annotated[
+        bool,
+        typer.Option(help="Reload On Code Changes (Development)"),
+    ] = False,
+) -> None:
+    """
+    Runs the Mirumoji server with uvicorn
+
+    Launches the FastAPI server directly with uvicorn (no Docker), using the
+    app factory. Intended for local development and Python-only iteration
+    """
+    try:
+        import uvicorn
+    except ModuleNotFoundError as exc:
+        raise fail(
+            "The Server Extra Is Not Installed — Run `pip install "
+            "mirumoji[server]`",
+        ) from exc
+
+    uvicorn.run(
+        "mirumoji.server.app:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )

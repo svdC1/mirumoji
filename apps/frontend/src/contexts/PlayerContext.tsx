@@ -16,6 +16,8 @@ export interface PlayerContextState {
     setVideo: (file: File | null) => void;
     videoFileName: string | null;
     setVideoFileName: (name: string | null) => void;
+    videoFileId: string | null;
+    setVideoFileId: (id: string | null) => void;
     srt: File | null;
     setSrt: (file: File | null) => void;
     srtFileName: string | null;
@@ -52,6 +54,7 @@ export interface PlayerProviderProps {
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [video, setVideo] = useState<File | null>(null);
     const [videoFileName, setVideoFileName] = useState<string | null>(null);
+    const [videoFileId, setVideoFileId] = useState<string | null>(null);
     const [srt, setSrt] = useState<File | null>(null);
     const [srtFileName, setSrtFileName] = useState<string | null>(null);
     const [srtFileId, setSrtFileId] = useState<string | null>(null);
@@ -66,6 +69,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const clearPlayerState = useCallback(() => {
         setVideo(null);
         setVideoFileName(null);
+        setVideoFileId(null);
         setSrt(null);
         setSrtFileName(null);
         setSrtFileId(null);
@@ -83,6 +87,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             setVideo,
             videoFileName,
             setVideoFileName,
+            videoFileId,
+            setVideoFileId,
             srt,
             setSrt,
             srtFileName,
@@ -102,6 +108,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         [
             video,
             videoFileName,
+            videoFileId,
             srt,
             srtFileName,
             srtFileId,

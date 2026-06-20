@@ -22,9 +22,9 @@ This provides a consistent environment with all necessary dependencies pre-confi
 ???+ abstract "Prerequisites"
 
     - [`VSCode`](https://code.visualstudio.com/)
-    
+
     - [`Docker Desktop`](https://docs.docker.com/desktop/) *(Make Sure It's Running)*
-    
+
     - [`VSCode Dev Containers Extension`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 
 #### Clone Repository
@@ -50,12 +50,12 @@ code mirumoji
 - Click The Option `Reopen in Container`
 
 ???+ abstract "Chossing Between Images"
-    - Choose The `Mirumoji (GPU)` Development Container If You Have An `NVIDIA GPU` + Enough Disk Space _(~30GB Uncompressed)_ 
-    
-    - Choose The `Mirumoji (CPU)` Development Container _(~5.5GB Uncompressed)_ If Your Don't Have An `NVIDIA GPU`
+    - Choose The `Mirumoji (GPU)` Development Container If You Have An `NVIDIA GPU` + Enough Disk Space _(~9GB Uncompressed)_
+
+    - Choose The `Mirumoji (CPU)` Development Container _(~3GB Uncompressed)_ If You Don't Have An `NVIDIA GPU`
 
 
-???+ warning 
+???+ warning
     The First Startup Might Take A Few Minutes Since Images Need To Be Pulled
 
 #### Useful Commands
@@ -66,7 +66,14 @@ code mirumoji
     pip install -e .[server,dev]
     # The Container Already Forwards The `8000` Port
     # (Reloads On Code Changes)
-    mirumoji server
+    mirumoji dev server --reload
+    ```
+
+=== "Running the Full Stack From Source"
+    ```bash
+    # Builds the frontend + backend images from this checkout and runs the
+    # Docker Compose application (without updating the managed checkout)
+    mirumoji dev up
     ```
 
 === "Running the Frontend"
@@ -100,7 +107,7 @@ code mirumoji
     ```bash
     git checkout -b <BRANCH_NAME>
     ```
-    
+
     - Commit New Changes
     - Open A Pull Request According To The [`Pull Request Template`](https://github.com/svdC1/mirumoji/blob/main/.github/pull_request_template.md)
 

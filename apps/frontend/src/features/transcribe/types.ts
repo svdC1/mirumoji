@@ -21,11 +21,3 @@ export interface ChatBubbleProps {
     msg: Message;
     onWordClick: (sentence: string, word: string) => void;
 }
-
-/** Response from `/audio/transcribe`. */
-export interface AudioTranscriptResponse {
-    transcript_id: string;
-    transcript: string;
-    original_file_name: string;
-    audio_url: string;
-}

@@ -99,7 +99,7 @@ You can also setup Mirumoji [`Manually`](https://svdc1.github.io/mirumoji/docs/s
 
 ## Contributing
 
-> Pull Requests, bug reports, and feature requests are all welcome.
+- All contributions are welcome
 
-> See [`CONTRIBUTING`](https://github.com/svdC1/mirumoji/blob/main/.github/CONTRIBUTING.md)
-> for the dev container setup, quality gates, and PR conventions.
+- See [`CONTRIBUTING`](https://svdc1.github.io/mirumoji/docs/project/contributing) for more information on how to
+  contribute

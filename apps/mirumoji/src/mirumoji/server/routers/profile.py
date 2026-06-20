@@ -12,18 +12,29 @@ Attributes:
 import asyncio
 import json
 import logging
-import urllib.parse
 import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 
 from ...exceptions import RecordNotFoundError
 from .. import media
 from ..config import gpu_available
 from ..db import UnitOfWork
-from ..dependencies import ensure_profile_exists, get_stream_file
+from ..dependencies import ensure_profile_exists, get_job_manager
+from ..jobs import JobQueueManager
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
@@ -108,6 +119,7 @@ async def upsert_template(
             srt_model=req.srt_model,
         )
         await uow.commit()
+    LOGGER.info(f"Upserted LLM Template For Profile '{profile_id}'")
     return LlmTemplateResponse(
         id=str(template.id),
         sys_msg=template.sys_msg,
@@ -138,6 +150,7 @@ async def delete_template(
     async with UnitOfWork() as uow:
         await uow.templates.delete(profile_id)
         await uow.commit()
+    LOGGER.info(f"Deleted LLM Template For Profile '{profile_id}'")
     return {"success": True, "message": "Template deleted successfully."}
 
 
@@ -150,58 +163,65 @@ async def delete_template(
     status_code=status.HTTP_201_CREATED,
 )
 async def save_clip(
-    clip_file: Path = Depends(get_stream_file),
+    clip_file: UploadFile = File(...),
+    start_time: float = Form(...),
+    end_time: float = Form(...),
+    breakdown: str = Form(...),
     profile_id: str = Depends(ensure_profile_exists),
-    start_time: str = Header(..., alias="X-Clip-Start-Time"),
-    end_time: str = Header(..., alias="X-Clip-End-Time"),
-    breakdown: str = Header(..., alias="X-Breakdown"),
 ) -> SaveClipResponse:
     """
-    Saves a streamed video clip for the active profile
+    Saves an uploaded video clip for the active profile
 
-    Streams the upload, converts it to WebM for Anki compatibility, stores it
-    under the profile, and persists a file + clip record. Clip metadata is
-    carried via headers, since the request body is the streamed file
+    Receives the clip and its metadata as a single `multipart/form-data`
+    request (the clip is the file part, the rest are form fields), converts it
+    to WebM for Anki compatibility, stores it under the profile, and persists a
+    file + clip record
 
     Args:
-        clip_file (Path): Path to the streamed upload
+        clip_file (UploadFile): The recorded clip (multipart file part)
+        start_time (float): Clip start time in seconds
+        end_time (float): Clip end time in seconds
+        breakdown (str): JSON-encoded breakdown payload
         profile_id (str): Validated profile id
-        start_time (str): Clip start time in seconds (`X-Clip-Start-Time`)
-        end_time (str): Clip end time in seconds (`X-Clip-End-Time`)
-        breakdown (str): URL-encoded JSON breakdown payload (`X-Breakdown`)
 
     Returns:
         The saved clip's id, its file id, and its media URL
 
     Raises:
-        HTTPException: If the clip metadata headers are malformed
+        HTTPException: If the breakdown payload is not valid JSON
         FFmpegError: If the WebM conversion fails
         StorageError: If storing the clip fails
         DatabaseError: If persistence fails
     """
     try:
-        s_time = float(start_time)
-        e_time = float(end_time)
-        breakdown_data = json.loads(urllib.parse.unquote(breakdown))
-    except (ValueError, json.JSONDecodeError) as e:
+        breakdown_data = json.loads(breakdown)
+    except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid clip metadata headers: {e}",
+            detail=f"Invalid breakdown payload: {e}",
         ) from e
 
     op_id = uuid.uuid4().hex
+    # The uploaded filename is client-controlled, so never build a server path
+    # from it. Use the op id for both the scratch file and the stored clip,
+    # keeping only the (separator-free) suffix as a format hint for ffmpeg
+    suffix = Path(clip_file.filename or "").suffix
+    temp_dir = media.get_temp_dir(op_id)
+    src = temp_dir / f"{op_id}{suffix}"
     clips_dir = media.get_profile_dir(profile_id, "clips")
-    webm_loc = clips_dir / f"{op_id}_{Path(clip_file.name).stem}.webm"
+    webm_loc = clips_dir / f"{op_id}.webm"
     rel_path = media.get_relative_path(webm_loc)
 
     try:
+        await media.save_upload_object(clip_file, src)
+
         # Convert to WebM for Anki Compatibility (NVDEC decode w/ CPU fallback,
         # VP9 encode is always CPU)
         ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
         await asyncio.to_thread(
             audio.to_webm,
             ffmpeg_path=ffmpeg,
-            input_path=str(clip_file),
+            input_path=str(src),
             output_path=str(webm_loc),
             use_gpu=bool(gpu_available()["available"]),
         )
@@ -216,12 +236,16 @@ async def save_clip(
             clip_rec = await uow.clips.add(
                 profile_id=profile_id,
                 file_id=file_rec.id,
-                start_time=s_time,
-                end_time=e_time,
+                start_time=start_time,
+                end_time=end_time,
                 llm_breakdown_response=breakdown_data,
             )
             await uow.commit()
 
+        LOGGER.info(
+            f"Saved Clip '{clip_rec.id}' (File '{file_rec.id}') "
+            f"For Profile '{profile_id}'"
+        )
         return SaveClipResponse(
             clip_id=str(clip_rec.id),
             file_id=str(file_rec.id),
@@ -229,10 +253,10 @@ async def save_clip(
         )
     finally:
         try:
-            await media.delete_dir(media.get_relative_path(clip_file.parent))
+            await media.delete_dir(media.get_relative_path(temp_dir))
         except Exception:
             LOGGER.warning(
-                f"Failed to clean temp dir '{clip_file.parent}'",
+                f"Failed to clean temp dir '{temp_dir}'",
                 exc_info=True,
             )
 
@@ -303,10 +327,89 @@ async def delete_clip(
         await uow.files.delete(clip.file_id)
         await uow.commit()
     await media.delete_file(file.path)
+    LOGGER.info(f"Deleted Clip '{clip_id}' For Profile '{profile_id}'")
     return {"success": True, "message": "Clip Deleted Successfully"}
 
 
 # --- Files ---
+
+
+@profile_router.post(
+    "/files",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ProfileFileResponse,
+)
+async def upload_file(
+    request: Request,
+    file_name: str = Header(..., alias="X-File-Name"),
+    file_type: str | None = Query(None, alias="type"),
+    folder: str | None = Query(None, alias="folder"),
+    profile_id: str = Depends(ensure_profile_exists),
+) -> ProfileFileResponse:
+    """
+    Streams an upload and stores it as a profile file (no processing)
+
+    info: Usage
+        - This is the upload-once entry point for the job system
+
+        - The returned file id is then passed to `POST /jobs` if an operation
+          on it is requested
+
+        - Avoids re-uploading the file
+
+    info: Folder
+        - `?folder=` tags files uploaded together (e.g. from a picked
+          directory) with a shared group label so that the file list can group
+          them
+
+        - It is a query param rather than a header so a non-ASCII group name
+          never has to be encoded into a latin-1 header
+
+    Args:
+        request (Request): The `FastAPI.Request` object (the body is the file)
+        file_name (str): The original file name (`X-File-Name`)
+        file_type (str | None): Optional file-type tag (`?type=`)
+        folder (str | None): Optional group label (`?folder=`)
+        profile_id (str): Validated profile id
+
+    Returns:
+        The stored file's id, name, media URL, type, and folder
+
+    Raises:
+        UploadError: If the upload fails
+        DatabaseError: If persistence fails
+    """
+    op_id = uuid.uuid4().hex
+    uploads_dir = media.get_profile_dir(profile_id, "uploads")
+    # The client filename is kept only for display
+    # The on-disk path is server-generated so a crafted name can't escape the
+    # uploads directory
+    dest = uploads_dir / f"{op_id}{Path(file_name).suffix}"
+    rel = media.get_relative_path(dest)
+
+    await media.save_upload_file(request, dest)
+
+    async with UnitOfWork() as uow:
+        rec = await uow.files.add(
+            profile_id=profile_id,
+            name=Path(file_name).name,
+            path=str(rel),
+            type=file_type,
+            folder=folder,
+        )
+        await uow.commit()
+
+    LOGGER.info(
+        f"Uploaded File '{rec.id}' ('{rec.name}') For Profile '{profile_id}'"
+    )
+    return ProfileFileResponse(
+        id=str(rec.id),
+        name=rec.name,
+        url=f"/media/{rel.as_posix()}",
+        type=rec.type,
+        folder=rec.folder,
+        created_at=rec.created_at.isoformat() if rec.created_at else None,
+    )
 
 
 @profile_router.get("/files", response_model=list[ProfileFileResponse])
@@ -333,6 +436,7 @@ async def list_files(
             name=f.name,
             url=f"/media/{Path(f.path).as_posix()}",
             type=f.type,
+            folder=f.folder,
             created_at=f.created_at.isoformat() if f.created_at else None,
         )
         for f in files
@@ -343,21 +447,29 @@ async def list_files(
 async def delete_file(
     file_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's files
 
-    Deleting a file cascades (via foreign keys) to any transcripts or clips
-    that reference it
+    info: Source Of Truth
+        - Files are the single source of truth for a profile's artifacts. A job
+          that used or produced this file is meaningless without it, so those
+          jobs are cascade-deleted first (a batch parent takes its children)
+
+        - Deleting a file also cascades (via foreign keys) to any transcripts
+          or clips that reference it
 
     Args:
         file_id (uuid.UUID): Id of the file to delete
         profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
 
     Returns:
         A confirmation payload
 
     Raises:
+        HTTPException: If a job still being run by the worker uses this file
         RecordNotFoundError: If the file doesn't exist or isn't owned by the
             profile
         StorageError: If deleting the file fails
@@ -370,9 +482,18 @@ async def delete_file(
                 f"File '{file_id}' Not Found",
                 details={"file_id": str(file_id)},
             )
+        dependent = await uow.jobs.find_referencing_file(profile_id, file_id)
+        if manager.running_job_id in dependent:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A Running Job Uses This File, Cancel It First",
+            )
+        for job_id in dependent:
+            await uow.jobs.delete(job_id)
         await uow.files.delete(file_id)
         await uow.commit()
     await media.delete_file(file.path)
+    LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
     return {"success": True, "message": "File deleted successfully."}
 
 
@@ -417,6 +538,9 @@ async def save_subtitles(
         created = (
             existing.created_at.isoformat() if existing.created_at else None
         )
+        LOGGER.info(
+            f"Overwrote SRT File '{existing.id}' For Profile '{profile_id}'"
+        )
         return ProfileFileResponse(
             id=str(existing.id),
             name=existing.name,
@@ -441,6 +565,7 @@ async def save_subtitles(
         )
         await uow.commit()
 
+    LOGGER.info(f"Saved SRT File '{file_rec.id}' For Profile '{profile_id}'")
     return ProfileFileResponse(
         id=str(file_rec.id),
         name=file_rec.name,
@@ -499,18 +624,25 @@ async def list_transcripts(
 async def delete_transcript(
     transcript_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's transcripts
 
+    A transcribe job that produced this transcript is meaningless without it,
+    so those jobs are cascade-deleted first
+
     Args:
         transcript_id (uuid.UUID): Id of the transcript to delete
         profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
 
     Returns:
         A confirmation payload
 
     Raises:
+        HTTPException: If a job still being run by the worker produced this
+            transcript
         RecordNotFoundError: If the transcript doesn't exist or isn't owned by
             the profile
         DatabaseError: If the deletion fails
@@ -522,8 +654,21 @@ async def delete_transcript(
                 f"Transcript '{transcript_id}' Not Found",
                 details={"transcript_id": str(transcript_id)},
             )
+        dependent = await uow.jobs.find_referencing_transcript(
+            profile_id, transcript_id
+        )
+        if manager.running_job_id in dependent:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A Running Job Made This Transcript, Cancel It First",
+            )
+        for job_id in dependent:
+            await uow.jobs.delete(job_id)
         await uow.transcripts.delete(transcript_id)
         await uow.commit()
+    LOGGER.info(
+        f"Deleted Transcript '{transcript_id}' For Profile '{profile_id}'"
+    )
     return {"success": True, "message": "Transcript deleted successfully."}
 
 
@@ -577,4 +722,8 @@ async def export_anki_deck(
     await asyncio.to_thread(anki.export_deck, cards, str(out_loc))
 
     rel_out = media.get_relative_path(out_loc)
+    LOGGER.info(
+        f"Exported Anki Deck With {len(cards)} Card(s) For Profile "
+        f"'{profile_id}'"
+    )
     return AnkiExportResponse(anki_deck_url=f"/media/{rel_out.as_posix()}")

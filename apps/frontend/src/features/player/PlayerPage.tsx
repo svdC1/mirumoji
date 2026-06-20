@@ -5,7 +5,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, Loader2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { usePlayer } from "@/contexts/PlayerContext";
 import WordDialog from "@/shared/components/WordDialog";
 import { EmptyState } from "@/shared/ui";
@@ -28,9 +29,29 @@ interface DialogState {
  * @returns {JSX.Element} The player page.
  */
 export default function PlayerPage() {
-    const { video, videoUrl, srt, showFurigana, timestamp, setTimestamp } = usePlayer();
+    const {
+        video,
+        videoUrl,
+        videoFileId,
+        setVideo,
+        setVideoUrl,
+        setVideoFileName,
+        setVideoFileId,
+        srt,
+        showFurigana,
+        timestamp,
+        setTimestamp,
+    } = usePlayer();
     // The video element via a callback ref, so effects bind exactly when it mounts.
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    // A loaded source this browser can't decode (e.g. .mkv on iOS, which Chrome
+    // desktop plays fine). We don't guess from the extension; we let it try and
+    // flag it on the actual error, so the prompt only shows when truly needed.
+    const [unplayable, setUnplayable] = useState(false);
+    // True while the element is fetching/decoding a source (before it can show a
+    // frame or fails), so a slow or undecodable source reads as "loading" rather
+    // than a dead black box.
+    const [loading, setLoading] = useState(false);
 
     const { cues, preparing } = useCues(srt);
     const activeIdx = useActiveCue(videoEl, cues);
@@ -57,11 +78,69 @@ export default function PlayerPage() {
         setBlobUrl(null);
     }, [video, videoUrl]);
 
+    // A fresh source gets a clean attempt: clear any prior "can't decode" flag
+    // and show the loading state until it proves itself (or fails).
+    useEffect(() => {
+        setUnplayable(false);
+        setLoading(!!(video || videoUrl));
+    }, [video, videoUrl]);
+
+    // Hide the loading state once the element shows signs of life (metadata,
+    // first frame, or playback) or fails. Several events are watched because
+    // browsers that defer loading (iOS) may fire one but not another.
+    useEffect(() => {
+        if (!videoEl) return;
+        const ready = () => setLoading(false);
+        const events = ["loadedmetadata", "loadeddata", "canplay", "playing", "error"];
+        events.forEach((e) => videoEl.addEventListener(e, ready));
+        if (videoEl.readyState >= 1 || videoEl.error) ready();
+        return () => events.forEach((e) => videoEl.removeEventListener(e, ready));
+    }, [videoEl]);
+
+    // Whether a container decodes is runtime + browser specific (Chrome desktop
+    // plays .mkv, iOS Safari can't), so we try to play and react to the actual
+    // error rather than guessing from the extension. A file the browser can't
+    // match to a decoder fails with SRC_NOT_SUPPORTED, while one it starts
+    // decoding and then chokes on fails with DECODE, and both mean "can't play
+    // here". A convertible source stays loaded so it can be converted to MP4
+    // from the toolbar, and a bare URL that is simply gone is dropped.
+    useEffect(() => {
+        if (!videoEl) return;
+        const onError = () => {
+            const err = videoEl.error;
+            if (
+                !err ||
+                (err.code !== err.MEDIA_ERR_SRC_NOT_SUPPORTED && err.code !== err.MEDIA_ERR_DECODE)
+            ) {
+                return;
+            }
+            if (video || videoFileId) {
+                setUnplayable(true);
+                return;
+            }
+            toast.error("This Video Is No Longer Available");
+            setVideo(null);
+            setVideoUrl(null);
+            setVideoFileName(null);
+            setVideoFileId(null);
+        };
+        videoEl.addEventListener("error", onError);
+        // The element may have already failed before this listener attached
+        // (a fast local blob, or a source set before the effect ran).
+        if (videoEl.error) onError();
+        return () => videoEl.removeEventListener("error", onError);
+    }, [videoEl, video, videoFileId, setVideo, setVideoUrl, setVideoFileName, setVideoFileId]);
+
     // Restore the saved position on load; persist it on pause / source change.
     useEffect(() => {
         if (!videoEl || !blobUrl) return;
         const restore = () => {
-            if (timestamp && timestamp > 0) videoEl.currentTime = timestamp;
+            // Only resume within the new video's bounds; an out-of-range saved
+            // position (a shorter video) starts from the beginning instead.
+            const dur = videoEl.duration;
+            if (timestamp && timestamp > 0 && (!Number.isFinite(dur) || timestamp <= dur)) {
+                videoEl.currentTime = timestamp;
+            }
         };
         const save = () => setTimestamp(videoEl.currentTime);
         videoEl.addEventListener("loadedmetadata", restore, { once: true });
@@ -73,31 +152,6 @@ export default function PlayerPage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [videoEl, blobUrl]);
-
-    // Arrow keys skip the player by 5s (ignored while typing in a field).
-    useEffect(() => {
-        if (!videoEl) return;
-        const SKIP_SECONDS = 5;
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-            const active = document.activeElement as HTMLElement | null;
-            if (
-                active &&
-                (active.tagName === "INPUT" ||
-                    active.tagName === "TEXTAREA" ||
-                    active.tagName === "SELECT" ||
-                    active.isContentEditable)
-            ) {
-                return;
-            }
-            e.preventDefault();
-            const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : Infinity;
-            const delta = e.key === "ArrowRight" ? SKIP_SECONDS : -SKIP_SECONDS;
-            videoEl.currentTime = Math.min(Math.max(videoEl.currentTime + delta, 0), duration);
-        };
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, [videoEl]);
 
     const seek = (seconds: number) => {
         if (!videoEl) return;
@@ -118,9 +172,9 @@ export default function PlayerPage() {
         <div className="flex h-dvh flex-col bg-bg text-ink">
             <PlayerToolbar />
 
-            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-                {hasMedia ? (
-                    <div className="min-h-0 min-w-0 flex-1">
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                {hasMedia && !unplayable ? (
+                    <div className="relative min-h-0 min-w-0 flex-1">
                         <VideoStage
                             onVideoEl={setVideoEl}
                             blobUrl={blobUrl}
@@ -129,13 +183,25 @@ export default function PlayerPage() {
                             preparing={preparing}
                             onWordClick={onWordClick}
                         />
+                        {loading && (
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                <span className="inline-flex items-center gap-2 rounded-control bg-surface/90 px-3 py-1.5 text-xs font-medium text-ink-muted shadow-soft ring-1 ring-ink/10 backdrop-blur">
+                                    <Loader2 size={14} className="animate-spin text-shu" />
+                                    Loading Video
+                                </span>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex flex-1 items-center justify-center">
                         <EmptyState
                             icon={<Clapperboard size={32} />}
-                            title="Load a video to begin"
-                            description="Use the Load button in the toolbar to open a video and subtitles from your device or profile."
+                            title={unplayable ? "Convert To Play" : "Load a video to begin"}
+                            description={
+                                unplayable
+                                    ? "This browser can't play this video format. Use To MP4 in the toolbar to convert it, and it will load here automatically."
+                                    : "Use the Load button in the toolbar to open a video and subtitles from your device or profile."
+                            }
                         />
                     </div>
                 )}

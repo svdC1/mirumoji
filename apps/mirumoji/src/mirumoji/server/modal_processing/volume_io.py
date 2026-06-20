@@ -30,7 +30,7 @@ from ...exceptions import ModalVolumeError
 if TYPE_CHECKING:
     import modal
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 def upload_to_volume(

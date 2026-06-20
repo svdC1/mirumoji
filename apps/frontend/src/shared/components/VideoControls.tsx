@@ -106,7 +106,9 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
                 <div className="mt-2 flex items-center gap-3">
                     <button
                         type="button"
-                        onClick={() => (video.paused ? video.play() : video.pause())}
+                        onClick={() =>
+                            video.paused ? video.play().catch(() => undefined) : video.pause()
+                        }
                         aria-label={playing ? "Pause" : "Play"}
                         className="text-ink transition-colors hover:text-shu"
                     >

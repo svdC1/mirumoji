@@ -28,7 +28,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     Returns:
         The panel's root control
     """
-    terminal = theme.TerminalSurface()
+    terminal = theme.TerminalSurface(log_view=True)
 
     service_dd = theme.SettingsDropdown(
         "Service",
@@ -85,6 +85,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             if service_dd.dropdown.value == _ALL
             else service_dd.dropdown.value
         )
+        # Highlight the docker service prefix only when showing every service
+        terminal.with_service = service is None
 
         def settle() -> None:
             """

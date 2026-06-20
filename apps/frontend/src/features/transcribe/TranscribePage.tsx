@@ -6,14 +6,16 @@
 import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
 import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
-import { uploadFile } from "@/shared/api/client";
 import { apiTokenize } from "@/shared/dict/api";
 import { useBundleSettings } from "@/contexts/BundleSettingsContext";
-import { apiExplainSentence, apiGetTemplate } from "@/shared/llm/api";
+import { useOperationSettings } from "@/contexts/OperationSettingsContext";
+import { useTasks } from "@/contexts/TaskContext";
+import { apiGetTemplate, streamExplain } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import WordDialog from "@/shared/components/WordDialog";
 import { AudioPlayer, Button, buttonClasses, cn } from "@/shared/ui";
-import type { Message, AudioTranscriptResponse } from "./types";
+import type { Message } from "./types";
+import type { TranscribeResult } from "@/shared/jobs/types";
 import ChatBubble from "./components/ChatBubble";
 
 /**
@@ -22,8 +24,9 @@ import ChatBubble from "./components/ChatBubble";
  * @returns {JSX.Element} The transcribe page.
  */
 export default function TranscribePage() {
+    const { settings, whisperOpts } = useOperationSettings();
     const [messages, setMessages] = useState<Message[]>([]);
-    const [cleanAudio, setCleanAudio] = useState(false);
+    const [cleanAudio, setCleanAudio] = useState(settings.cleanAudio);
     const [llmExplain, setLlmExplain] = useState(false);
     const [recording, setRecording] = useState(false);
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
@@ -32,6 +35,7 @@ export default function TranscribePage() {
     const [sending, setSending] = useState(false);
     const [dialog, setDialog] = useState<{ sentence: string; word: string } | null>(null);
     const { mode } = useBundleSettings();
+    const tasks = useTasks();
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -128,7 +132,6 @@ export default function TranscribePage() {
         if (!fileToSend) return;
 
         setSending(true);
-        const tId = toast.loading("Uploading …");
         const loaderId = `loader-${Date.now()}`;
         const userMessageId = `user-${Date.now() + 1}`;
 
@@ -137,59 +140,80 @@ export default function TranscribePage() {
             { id: userMessageId, type: "user", audioUrl: previewUrl, isAudioMessage: true },
             { id: loaderId, type: "bot", loading: true, isAudioMessage: true },
         ]);
+        const dropLoader = () => setMessages((prev) => prev.filter((m) => m.id !== loaderId));
 
         try {
-            const query = `clean_audio=${cleanAudio}&language=ja`;
-            const result = await uploadFile<AudioTranscriptResponse>(
-                fileToSend,
-                `audio/transcribe?${query}`,
-                {},
-                (progress: number) =>
-                    toast.loading(`Uploading … ${progress.toFixed(0)}%`, { id: tId }),
-                () => toast.dismiss(tId)
-            );
-
-            const newMessages: Message[] = [];
-
-            if (result.transcript) {
-                let words;
-                try {
-                    words = await apiTokenize(result.transcript, mode);
-                } catch (e) {
-                    console.error("Failed to tokenize transcript:", e);
-                }
-                newMessages.push({
-                    id: `text-${Date.now() + 2}`,
-                    type: "bot",
-                    text: result.transcript,
-                    words,
-                    isTranscription: true,
-                });
+            // Submit a transcribe job (tracked in the tray) and wait for it
+            // inline so the transcript still lands in the chat.
+            const job = await tasks.uploadAndSubmit(fileToSend, {
+                jobType: "transcribe",
+                fileType: "audio",
+                opts: { ...whisperOpts(), clean_audio: cleanAudio },
+            });
+            if (!job) {
+                // Upload / submit failed (the tray surfaces it).
+                dropLoader();
+                return;
+            }
+            const done = await tasks.waitFor(job.id);
+            if (done.status !== "succeeded" || !done.result) {
+                // Failed / cancelled (the tray + a toast surface it).
+                dropLoader();
+                return;
             }
 
-            if (llmExplain && result.transcript) {
+            const { transcript } = done.result as unknown as TranscribeResult;
+            let words: Awaited<ReturnType<typeof apiTokenize>> | undefined;
+            try {
+                words = await apiTokenize(transcript, mode);
+            } catch (e) {
+                console.error("Failed to tokenize transcript:", e);
+            }
+            dropLoader();
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `text-${Date.now()}`,
+                    type: "bot",
+                    text: transcript,
+                    words,
+                    isTranscription: true,
+                },
+            ]);
+            deleteMedia();
+
+            if (llmExplain) {
                 const template = await apiGetTemplate();
                 if (!template) {
                     toast.error("Configure An LLM Model In Your Profile To Enable Explanations");
-                } else {
-                    const { explanation } = await apiExplainSentence({
-                        sentence: result.transcript,
-                        model: template.model,
-                        sys_msg: template.sys_msg || undefined,
-                    });
-                    newMessages.push({
-                        id: `explain-${Date.now() + 3}`,
-                        type: "bot",
-                        text: explanation,
-                    });
+                    return;
+                }
+                // Stream the explanation into its own bubble as it arrives.
+                const explainId = `explain-${Date.now()}`;
+                setMessages((prev) => [...prev, { id: explainId, type: "bot", text: "" }]);
+                try {
+                    await streamExplain(
+                        {
+                            sentence: transcript,
+                            model: template.model,
+                            sys_msg: template.sys_msg || undefined,
+                        },
+                        {
+                            onToken: (t) =>
+                                setMessages((prev) =>
+                                    prev.map((m) =>
+                                        m.id === explainId ? { ...m, text: (m.text ?? "") + t } : m
+                                    )
+                                ),
+                        }
+                    );
+                } catch (err) {
+                    toastApiError(err);
                 }
             }
-
-            setMessages((prev) => [...prev.filter((m) => m.id !== loaderId), ...newMessages]);
-            deleteMedia();
         } catch (err) {
             toastApiError(err);
-            setMessages((prev) => prev.filter((m) => m.id !== loaderId));
+            dropLoader();
         } finally {
             setSending(false);
         }
@@ -207,7 +231,7 @@ export default function TranscribePage() {
         );
 
     return (
-        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink md:h-dvh">
+        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink lg:h-dvh">
             <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
                     {messages.length === 0 ? (

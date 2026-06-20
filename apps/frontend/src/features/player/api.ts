@@ -1,10 +1,11 @@
 /**
- * @packageDocumentation Player video API helpers (SRT generation + MP4 convert).
+ * @packageDocumentation Player video API helpers. The long-running operations
+ * (SRT generation, MP4 convert, LLM fix) now run as jobs via the task tray;
+ * this only keeps the direct SRT-save helper.
  */
 
-import { apiFetch, uploadFile } from "@/shared/api/client";
+import { apiFetch } from "@/shared/api/client";
 import type { ProfileFile } from "@/features/profile/types";
-import type { ConvertVideoResponse, GenerateSrtResponse } from "./types";
 
 /**
  * Persists SRT content to the active profile (`POST /profiles/subtitles`).
@@ -26,48 +27,4 @@ export function saveSubtitles(req: {
         method: "POST",
         body: JSON.stringify(req),
     });
-}
-
-/**
- * Generates raw SRT subtitles from a video upload (`/video/generate_srt`).
- *
- * @param {File} file The video file.
- * @param {(percent: number) => void} onProgress Upload progress callback.
- * @param {() => void} onUploadComplete Called when the upload reaches 100%.
- * @returns {Promise<GenerateSrtResponse>} The generated SRT (content + url + id).
- */
-export function generateSrt(
-    file: File,
-    onProgress: (percent: number) => void,
-    onUploadComplete: () => void
-): Promise<GenerateSrtResponse> {
-    return uploadFile<GenerateSrtResponse>(
-        file,
-        "video/generate_srt",
-        {},
-        onProgress,
-        onUploadComplete
-    );
-}
-
-/**
- * Converts a video upload to MP4 (`/video/convert_to_mp4`).
- *
- * @param {File} file The video file.
- * @param {(percent: number) => void} onProgress Upload progress callback.
- * @param {() => void} onUploadComplete Called when the upload reaches 100%.
- * @returns {Promise<ConvertVideoResponse>} The converted video URL.
- */
-export function convertToMp4(
-    file: File,
-    onProgress: (percent: number) => void,
-    onUploadComplete: () => void
-): Promise<ConvertVideoResponse> {
-    return uploadFile<ConvertVideoResponse>(
-        file,
-        "video/convert_to_mp4",
-        {},
-        onProgress,
-        onUploadComplete
-    );
 }

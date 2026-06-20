@@ -1,6 +1,6 @@
 /**
  * @packageDocumentation Screen-size hooks. `useMediaQuery` subscribes to a CSS
- * media query. `useIsMobile` is the shared "below Tailwind's `sm` breakpoint"
+ * media query. `useIsMobile` is the shared "below Tailwind's `lg` breakpoint"
  * check used to switch between desktop and mobile component layouts.
  */
 
@@ -30,10 +30,11 @@ export function useMediaQuery(query: string): boolean {
 }
 
 /**
- * Whether the viewport is mobile-sized (below Tailwind's `md` = 768px). Matches
- * the `md:` breakpoint the player layout uses, so JS-driven swaps (toolbar,
- * panel-dock icons) stay in sync with the CSS layout.
+ * Whether the viewport is mobile-sized (below Tailwind's `lg` = 1024px, i.e. up
+ * to iPad Pro). Matches the `lg:` breakpoint the shell nav and player layout
+ * use, so JS-driven swaps (toolbar, panel-dock icons) stay in sync with the CSS
+ * layout.
  */
 export function useIsMobile(): boolean {
-    return useMediaQuery("(max-width: 767px)");
+    return useMediaQuery("(max-width: 1023px)");
 }

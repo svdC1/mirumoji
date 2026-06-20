@@ -7,7 +7,7 @@ This guide covers making it available on external networks so that you can acces
 ???+ question "Do I Need This"
     - If every device that uses Mirumoji is on the same Wi-Fi/LAN, you don't need
     any of this
-    
+
     - Just use `https://<your-machine-LAN-IP>`
 
 ## Choosing An Approach
@@ -21,8 +21,8 @@ This guide covers making it available on external networks so that you can acces
 
 | Approach | Best for | Exposure |
 | --- | --- | --- |
-| [`Tailscale`](#recommended-tailscale-private-access) *(recommended)* | Just You + Your Own Devices | `None` &rarr; Private Encrypted Network, No Open Ports |
-| [`Cloudflare Tunnel`](#alternative-cloudflare-tunnel-public-sharing) | Sharing With Other People | Public Hostname, Gated By Identity-Based Access |
+| [`Tailscale`](#tailscale-private-access) *(recommended)* | Just You + Your Own Devices | `None` &rarr; Private Encrypted Network, No Open Ports |
+| [`Cloudflare Tunnel`](#cloudflare-tunnel-public-sharing) | Sharing With Other People | Public Hostname, Gated By Identity-Based Access |
 
 ---
 
@@ -63,21 +63,21 @@ It's `free` for personal use and runs on every platform
 !!! warning "Certificate Warning"
     - Mirumoji's self-signed certificate is issued for your `LAN IP`, so reaching it
       by `Tailscale IP` shows the same one-time "not private" warning as on the LAN
-      
+
       - To remove the warning, use the `Tailscale Serve` approach below
 
 ???+ tip "Removing The Certificate Warning"
     - [`Tailscale Serve`](https://tailscale.com/kb/1242/tailscale-serve) can put a valid HTTPS certificate (via your `*.ts.net` MagicDNS name) in front of Mirumoji
 
     - To use it, Run the command below on the machine running Mirumoji
-    
+
     ```bash
     # Proxy your tailnet HTTPS name to the local frontend
     tailscale serve --bg https+insecure://localhost:443
     ```
-    
+
     - You can then reach Mirumoji at `https://<machine-name>.<tailnet>.ts.net` with a trusted certificate
-    
+
     - Flags vary slightly by Tailscale version. See the [`Tailscale Serve Docs`](https://tailscale.com/kb/1242/tailscale-serve)
 
 ---
@@ -135,9 +135,9 @@ Now anyone visiting must authenticate first
 
 ???+ danger "You Are Publishing A Service"
     - A public tunnel makes `Mirumoji` reachable from the internet
-    
+
     - Always keep an `Access Policy` in front of it
-    
+
     - Remember that anyone you allow can `read` and `modify` the profiles, media, and
       clips on your machine
 

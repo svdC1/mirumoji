@@ -1,21 +1,23 @@
 /**
  * @packageDocumentation The slim player top bar: load media, subtitle style,
- * furigana toggle, and the SRT actions (generate / convert / LLM fix).
+ * furigana toggle, and the SRT actions (generate / convert / LLM fix). The
+ * long-running actions are submitted as jobs and tracked in the task tray, which
+ * loads each result back into the player when it finishes.
  */
 
-import { useState } from "react";
 import { Sparkles, FileText, Clapperboard, RotateCcw, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { apiGetTemplate, apiFixSrt } from "@/shared/llm/api";
-import { toastApiError } from "@/shared/api/errors";
-import { staticUrl } from "@/shared/format/files";
+import { apiGetTemplate } from "@/shared/llm/api";
+import { ApiError, toastApiError } from "@/shared/api/errors";
+import type { SubmitJobRequest } from "@/shared/jobs/types";
 import { Button, IconButton, Popover, cn } from "@/shared/ui";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useTasks } from "@/contexts/TaskContext";
+import { useOperationSettings } from "@/contexts/OperationSettingsContext";
 import { LoadMediaPopover } from "./LoadMediaPopover";
 import { SubtitleStylePopover } from "./SubtitleStylePopover";
-import { generateSrt, convertToMp4, saveSubtitles } from "../api";
 
 /**
  * The PlayerToolbar component.
@@ -25,123 +27,125 @@ import { generateSrt, convertToMp4, saveSubtitles } from "../api";
 export function PlayerToolbar() {
     const {
         video,
-        videoUrl,
+        videoFileName,
+        videoFileId,
+        setVideoFileId,
         srt,
         srtFileId,
-        setSrt,
-        setSrtFileName,
         setSrtFileId,
-        setVideoUrl,
         showFurigana,
         setShowFurigana,
         clearPlayerState,
     } = usePlayer();
-    const { profileId } = useProfile();
+    const tasks = useTasks();
+    const { whisperOpts, convertOpts } = useOperationSettings();
 
-    // Progress/status lives in the buttons (a non-null string = busy), so the
-    // long-running actions don't need progress toasts. Only success/error
-    const [genStatus, setGenStatus] = useState<string | null>(null);
-    const [convStatus, setConvStatus] = useState<string | null>(null);
-    const [fixStatus, setFixStatus] = useState<string | null>(null);
-    const generating = genStatus !== null;
-    const converting = convStatus !== null;
-    const fixing = fixStatus !== null;
-    const busy = generating || converting || fixing;
+    // A profile file can be deleted from the Files tab while it's still loaded
+    // here, leaving us driving an action off an id the server no longer has.
+    // Submitting then 404s, so on that we drop the stale id (disabling its
+    // buttons) and say why, rather than acting on a file that's gone.
+    const submitByRef = async (req: SubmitJobRequest, onMissing: () => void): Promise<boolean> => {
+        try {
+            await tasks.submit(req);
+            return true;
+        } catch (err) {
+            if (err instanceof ApiError && err.status === 404) {
+                onMissing();
+                toast.error("That File Was Deleted From Your Profile");
+            } else {
+                toastApiError(err);
+            }
+            return false;
+        }
+    };
 
     // Mobile -> Compact bar with the SRT actions tucked into a "More" menu
     // Desktop -> Keeps every control inline
     const isMobile = useIsMobile();
     const [moreOpen, setMoreOpen] = useState(false);
 
+    // A profile video is operated on by reference (no re-upload); a device
+    // video is uploaded first. Either way the tray tracks it and loads the
+    // result back into the player.
     const handleGenerate = async () => {
-        if (!video) return;
-        setGenStatus("Uploading 0%");
-        try {
-            const result = await generateSrt(
-                video,
-                (p) => setGenStatus(`Uploading ${p.toFixed(0)}%`),
-                () => setGenStatus("Generating")
+        if (videoFileId) {
+            const ok = await submitByRef(
+                { type: "generate_srt", file_id: videoFileId, opts: whisperOpts() },
+                () => setVideoFileId(null)
             );
-            const file = new File([result.srt_content], `${video.name}.srt`, {
-                type: "application/x-subrip",
-            });
-            setSrt(file);
-            setSrtFileName(file.name);
-            setSrtFileId(result.file_id); // generated SRT is persisted server-side
-            toast.success("Subtitles Generated");
-        } catch (err) {
-            toastApiError(err);
-        } finally {
-            setGenStatus(null);
+            if (ok) toast.success("Subtitle Generation Started");
+            return;
         }
+        if (!video) return;
+        void tasks.uploadAndSubmit(video, {
+            jobType: "generate_srt",
+            fileType: "video",
+            opts: whisperOpts(),
+        });
+        toast.success("Subtitle Generation Started");
     };
 
     const handleConvert = async () => {
-        if (!video) return;
-        if (video.name.toLowerCase().endsWith(".mp4")) {
+        if (!video && !videoFileId) return;
+        const name = (videoFileName ?? video?.name ?? "").toLowerCase();
+        if (name.endsWith(".mp4")) {
             toast.success("Already MP4");
             return;
         }
-        setConvStatus("Uploading 0%");
-        try {
-            const result = await convertToMp4(
-                video,
-                (p) => setConvStatus(`Uploading ${p.toFixed(0)}%`),
-                () => setConvStatus("Converting")
+        if (videoFileId) {
+            const ok = await submitByRef(
+                { type: "convert", file_id: videoFileId, opts: convertOpts() },
+                () => setVideoFileId(null)
             );
-            // Keep the source file loaded so the toolbar still recognises a
-            // video and Generate SRT can use it (the source audio + timing
-            // match the converted result, so no re-download is needed). Point
-            // playback at the converted MP4 served from the profile.
-            setVideoUrl(staticUrl(result.converted_video_url));
-            toast.success("Conversion Complete");
-        } catch (err) {
-            toastApiError(err);
-        } finally {
-            setConvStatus(null);
+            if (ok) toast.success("Conversion Started");
+            return;
         }
+        if (!video) return;
+        void tasks.uploadAndSubmit(video, {
+            jobType: "convert",
+            fileType: "video",
+            opts: convertOpts(),
+        });
+        toast.success("Conversion Started");
     };
 
     const handleFixSrt = async () => {
         if (!srt) return;
-        setFixStatus("Fixing");
+        let template;
         try {
-            const template = await apiGetTemplate();
-            if (!template) {
-                toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
-                return;
-            }
-            const text = await srt.text();
-            const { srt: fixed } = await apiFixSrt({
-                srt: text,
-                model: template.srt_model || template.model,
-                sys_msg: template.srt_sys_msg || undefined,
-            });
-
-            // Persist the fixed SRT to the profile (replacing the source file in
-            // place when it's a known profile file), then re-tokenize locally.
-            if (profileId) {
-                try {
-                    const saved = await saveSubtitles({
-                        content: fixed,
-                        file_id: srtFileId ?? undefined,
-                        name: srt.name,
-                    });
-                    setSrtFileId(saved.id);
-                } catch (err) {
-                    console.error("Failed to persist fixed SRT:", err);
-                }
-            }
-
-            const file = new File([fixed], srt.name, { type: "application/x-subrip" });
-            setSrt(file);
-            setSrtFileName(file.name);
-            toast.success("Subtitles Fixed");
+            template = await apiGetTemplate();
         } catch (err) {
             toastApiError(err);
-        } finally {
-            setFixStatus(null);
+            return;
         }
+        if (!template) {
+            toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
+            return;
+        }
+        const model = template.srt_model || template.model;
+        const sysMsg = template.srt_sys_msg || undefined;
+
+        // A known profile SRT is fixed by reference. If that file was deleted
+        // the submit 404s, so we drop the stale id and fall through to
+        // re-uploading the in-memory SRT (a locally loaded one takes that path
+        // directly, since its content lives here regardless).
+        if (srtFileId) {
+            try {
+                await tasks.submit({ type: "fix_srt", file_id: srtFileId, model, sys_msg: sysMsg });
+                toast.success("Subtitle Fix Started");
+                return;
+            } catch (err) {
+                if (!(err instanceof ApiError && err.status === 404)) {
+                    toastApiError(err);
+                    return;
+                }
+                setSrtFileId(null);
+            }
+        }
+        void tasks
+            .uploadAndSubmit(srt, { jobType: "fix_srt", fileType: "srt", model, sysMsg })
+            .catch(toastApiError);
+        toast.success("Subtitle Fix Started");
     };
 
     const furiganaButton = (
@@ -159,7 +163,7 @@ export function PlayerToolbar() {
     );
 
     const resetButton = (
-        <IconButton label="Reset player" onClick={clearPlayerState} disabled={busy}>
+        <IconButton label="Reset player" onClick={clearPlayerState}>
             <RotateCcw size={18} />
         </IconButton>
     );
@@ -173,51 +177,30 @@ export function PlayerToolbar() {
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleGenerate}
-                loading={generating}
-                disabled={!video || busy}
+                disabled={!video && !videoFileId}
                 title="Transcribe Audio Into Subtitles Using Whisper"
             >
-                {generating ? (
-                    <span className="tabular-nums">{genStatus}</span>
-                ) : (
-                    <>
-                        <FileText size={15} /> Generate SRT
-                    </>
-                )}
+                <FileText size={15} /> Generate SRT
             </Button>
             <Button
                 variant="secondary"
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleConvert}
-                loading={converting}
-                disabled={!video || !!videoUrl || busy}
+                disabled={!video && !videoFileId}
                 title="Convert Video To MP4 Using FFMPEG"
             >
-                {converting ? (
-                    <span className="tabular-nums">{convStatus}</span>
-                ) : (
-                    <>
-                        <Clapperboard size={15} /> To MP4
-                    </>
-                )}
+                <Clapperboard size={15} /> To MP4
             </Button>
             <Button
                 variant="secondary"
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleFixSrt}
-                loading={fixing}
-                disabled={!srt || busy}
+                disabled={!srt}
                 title="Improve Subtitles With An LLM"
             >
-                {fixing ? (
-                    fixStatus
-                ) : (
-                    <>
-                        <Sparkles size={15} /> Fix SRT
-                    </>
-                )}
+                <Sparkles size={15} /> Fix SRT
             </Button>
         </>
     );

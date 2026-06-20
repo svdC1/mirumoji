@@ -6,100 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .jpdict import EnrichedJapaneseWord
-
-# --- LLM Responses ---
-
-
-class BreakdownResponse(BaseModel):
-    """
-    Response for the `/llm/breakdown` endpoint
-
-    warning: `focus`
-        - To tokenize a whole sentence use the `/dict/tokenize` endpoint
-          instead
-
-        - This only carries the focused word (its stitched token + dictionary
-          data) and the LLM explanation of its use within the sentence
-
-    Args:
-        focus (EnrichedJapaneseWord | None): The focused word + its dictionary
-            data, or `None` when no focus was provided
-        explanation (str): The LLM explanation
-    """
-
-    focus: EnrichedJapaneseWord | None = None
-    explanation: str
-
-
-class ExplanationResponse(BaseModel):
-    """
-    Response carrying a single LLM explanation
-
-    Args:
-        explanation (str): The LLM explanation
-    """
-
-    explanation: str
-
-
-class FixSrtResponse(BaseModel):
-    """
-    Response for the `/llm/fix_srt` endpoint
-
-    Args:
-        srt (str): The cleaned-up SRT content
-    """
-
-    srt: str
-
-
-# --- Media Responses ---
-
-
-class AudioTranscriptResponse(BaseModel):
-    """
-    Response for the `/audio/transcribe` endpoint
-
-    Args:
-        transcript_id (str): Database ID of the saved transcript
-        transcript (str): The transcription text
-        original_file_name (str): Original uploaded file name
-        audio_url (str): Media URL serving the stored audio
-    """
-
-    transcript_id: str
-    transcript: str
-    original_file_name: str
-    audio_url: str
-
-
-class GenerateSrtResponse(BaseModel):
-    """
-    Response for the `/video/generate_srt` endpoint
-
-    Args:
-        file_id (str): Database ID of the saved SRT file
-        srt_content (str): The raw SRT content
-        srt_url (str): Media URL serving the stored SRT file
-    """
-
-    file_id: str
-    srt_content: str
-    srt_url: str
-
-
-class ConvertVideoResponse(BaseModel):
-    """
-    Response for the `/video/convert_to_mp4` endpoint
-
-    Args:
-        converted_video_url (str): Media URL serving the converted MP4
-    """
-
-    converted_video_url: str
-
-
 # --- Profile Responses ---
 
 
@@ -169,6 +75,7 @@ class ProfileFileResponse(BaseModel):
         name (str): Base file name
         url (str): Media URL serving the file
         type (str | None): Optional file-type tag
+        folder (str | None): Optional group label for files uploaded together
         created_at (str | None): ISO-8601 creation timestamp
     """
 
@@ -176,6 +83,7 @@ class ProfileFileResponse(BaseModel):
     name: str
     url: str
     type: str | None = None
+    folder: str | None = None
     created_at: str | None = None
 
 
@@ -209,3 +117,127 @@ class AnkiExportResponse(BaseModel):
     """
 
     anki_deck_url: str
+
+
+# --- Job Responses ---
+
+
+class JobResponse(BaseModel):
+    """
+    Response representing a processing job
+
+    Args:
+        id (str): Database ID of the job
+        type (str): Operation type
+        status (str): `queued`, `running`, `succeeded`, `failed`, or
+            `cancelled`
+        progress (float): Progress fraction in `[0, 1]`
+        total (int): Number of work items
+        completed (int): Number of finished work items
+        parent_id (str | None): Parent batch job id, when this is a child
+        result (dict[str, Any] | None): Produced references, or `None` until
+            finished
+        error (str | None): Failure message when `status` is `failed`
+        error_code (str | None): Stable error code on failure (the domain
+            exception's code, or `ServerError` for an unexpected failure)
+        error_details (dict[str, Any] | None): Structured error context
+        created_at (str): ISO-8601 creation timestamp
+        updated_at (str): ISO-8601 last-update timestamp
+    """
+
+    id: str
+    type: str
+    status: str
+    progress: float
+    total: int
+    completed: int
+    parent_id: str | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    error_code: str | None = None
+    error_details: dict[str, Any] | None = None
+    created_at: str
+    updated_at: str
+
+
+# --- Job Results ---
+
+
+class JobResult(BaseModel):
+    """
+    Base for a job's typed result payload
+
+    info: Job Results
+        - Each `Job Handler` function returns one of these on success
+
+        - The worker stores it on the job's `result` column and it is surfaced
+          (as a plain object) in `JobResponse.result`
+
+        - The client narrows them by the job's `type`
+    """
+
+
+class SrtResult(JobResult):
+    """
+    Result of a `generate_srt` or `fix_srt` job
+
+    Args:
+        srt_file_id (str): Database ID of the saved SRT file
+        srt_url (str): Media URL serving the stored SRT file
+        srt_content (str): The SRT content
+    """
+
+    srt_file_id: str
+    srt_url: str
+    srt_content: str
+
+
+class TranscribeResult(JobResult):
+    """
+    Result of a `transcribe` job
+
+    Args:
+        transcript_id (str): Database ID of the saved transcript
+        transcript (str): The transcription text
+    """
+
+    transcript_id: str
+    transcript: str
+
+
+class ConvertResult(JobResult):
+    """
+    Result of a `convert` job
+
+    Args:
+        file_id (str): Database ID of the saved MP4 file
+        video_url (str): Media URL serving the converted MP4
+    """
+
+    file_id: str
+    video_url: str
+
+
+class BatchResult(JobResult):
+    """
+    Result of a `batch_*` parent job
+
+    info: Per-File Detail
+        - The parent aggregates the outcome counts only
+
+        - Each child job carries its own typed result or error and is fetched
+          via `GET /jobs/{id}/children`
+
+    Args:
+        total (int): Number of files in the batch
+        succeeded (int): Number of files that finished successfully
+        failed (int): Number of files that failed
+        cancelled (int): Number of files skipped by a cancellation
+        children (list[str]): Database IDs of the child jobs, in submit order
+    """
+
+    total: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    children: list[str]

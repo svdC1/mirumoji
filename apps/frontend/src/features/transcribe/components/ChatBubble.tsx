@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import TokenizedText from "@/shared/components/TokenizedText";
+import { ExplanationSkeleton } from "@/shared/components/ExplanationSkeleton";
 import { AudioPlayer, cn } from "@/shared/ui";
 import type { ChatBubbleProps } from "../types";
 
@@ -54,15 +55,21 @@ export default function ChatBubble({ msg, onWordClick }: ChatBubbleProps) {
                             onWordClick={onWordClick}
                         />
                     </p>
+                ) : msg.text ? (
+                    <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkBreaks]}
+                        className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap"
+                    >
+                        {msg.text}
+                    </ReactMarkdown>
                 ) : (
-                    msg.text && (
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkBreaks]}
-                            className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap"
-                        >
-                            {msg.text}
-                        </ReactMarkdown>
-                    )
+                    // A streamed explanation arrives empty, then fills in. Until
+                    // the first token, show the same skeleton as the word dialog
+                    // rather than an empty bubble. Fixed width so the bubble
+                    // (which sizes to its content) doesn't collapse.
+                    <div className="w-48">
+                        <ExplanationSkeleton />
+                    </div>
                 )}
             </div>
         </div>

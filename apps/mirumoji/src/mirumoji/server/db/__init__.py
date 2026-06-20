@@ -29,12 +29,13 @@ from .models import Base
 from .repos import (
     ClipRepository,
     FileRepository,
+    JobRepository,
     LlmTemplateRepository,
     ProfileRepository,
     TranscriptRepository,
 )
 
-LOGGER = logging.getLogger("mirumoji")
+LOGGER = logging.getLogger(__name__)
 
 
 def _set_sqlite_pragma(
@@ -45,7 +46,9 @@ def _set_sqlite_pragma(
     Enforces SQLite pragmas on every new connection
 
     Enables foreign keys, Write-Ahead Logging, and normal synchronous mode for
-    better concurrency and performance
+    better concurrency and performance. A busy timeout makes a writer wait for
+    a held write lock rather than fail immediately, which matters once batch
+    jobs run several write transactions concurrently
 
     Args:
         dbapi_connection (Any): The raw DBAPI connection passed by SQLAlchemy's
@@ -56,6 +59,7 @@ def _set_sqlite_pragma(
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
 
 
@@ -104,7 +108,7 @@ class UnitOfWork:
     tip: Usage
         - Enter the async context to open a session and access the mirumoji
           database repositories (`profiles`, `files`, `transcripts`,
-          `templates`, `clips`)
+          `templates`, `clips`, `jobs`)
 
         - Call `commit` to persist any changes
 
@@ -125,6 +129,7 @@ class UnitOfWork:
         transcripts (TranscriptRepository): Transcript data access
         templates (LlmTemplateRepository): LLM-template data access
         clips (ClipRepository): Clip data access
+        jobs (JobRepository): Job data access
     """
 
     def __init__(
@@ -149,6 +154,7 @@ class UnitOfWork:
         self.transcripts = TranscriptRepository(self.session)
         self.templates = LlmTemplateRepository(self.session)
         self.clips = ClipRepository(self.session)
+        self.jobs = JobRepository(self.session)
         return self
 
     async def __aexit__(
@@ -200,4 +206,4 @@ async def init_db() -> None:
     HOST_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    LOGGER.info(f"Initialised Mirumoji SQLite Database at {DB_URL}")
+    LOGGER.info(f"Initialised Mirumoji SQLite Database At '{DB_URL}'")

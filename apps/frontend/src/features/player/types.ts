@@ -34,15 +34,3 @@ export interface SettingsDrawerProps {
     showFurigana: boolean;
     onToggleFurigana: () => void;
 }
-
-/** Response from `/video/generate_srt`. */
-export interface GenerateSrtResponse {
-    file_id: string;
-    srt_content: string;
-    srt_url: string;
-}
-
-/** Response from `/video/convert_to_mp4`. */
-export interface ConvertVideoResponse {
-    converted_video_url: string;
-}

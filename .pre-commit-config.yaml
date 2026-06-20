@@ -25,7 +25,7 @@ repos:
       hooks:
           - id: sync-meta
             name: Sync README + LICENSE From .github
-            language: system
+            language: python
             entry: python scripts/sync_meta.py
             files: ^\.github/(README\.md|LICENSE)$
             pass_filenames: false
@@ -43,6 +43,6 @@ repos:
           - id: frontend-prettier
             name: Frontend Prettier
             language: node
-            entry: bash -c 'cd apps/frontend && npx prettier --write'
+            entry: bash -c 'cd apps/frontend && npx prettier --check src'
             files: ^apps/frontend/src/.*\.(ts|tsx|css|json)$
-            pass_filenames: true
+            pass_filenames: false

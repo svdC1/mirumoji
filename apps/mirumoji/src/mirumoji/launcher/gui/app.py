@@ -11,7 +11,8 @@ import logging
 import flet as ft
 
 from ... import __version__
-from ...paths import HOST_LOG_PATH, _package_path
+from ...log import setup_logging
+from ...paths import _package_path
 from ..core import envfile
 from . import theme
 from .panels import dashboard, environment, logs, settings
@@ -155,42 +156,14 @@ def _page_main(page: ft.Page) -> None:
     page.data = state
 
 
-def _configure_logging() -> None:
-    """
-    Routes launcher logs to a UTF-8 `launcher.log` file
-
-    The bundled GUI has no console, so `sys.stderr` is unavailable. With no
-    handler configured, a `WARNING`+ record falls back to logging's stderr
-    last-resort handler, which then raises while writing (no stderr, or a
-    non-UTF-8 console choking on glyphs like `↦` in error messages). That
-    exception kills the worker thread before its `on_error` callback runs,
-    leaving the UI stuck. Attaching a real UTF-8 file handler removes the
-    last-resort path entirely and keeps a log for debugging bundled runs
-    """
-    try:
-        HOST_LOG_PATH.mkdir(parents=True, exist_ok=True)
-        handler: logging.Handler = logging.FileHandler(
-            HOST_LOG_PATH / "launcher.log", encoding="utf-8"
-        )
-        handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s"
-            )
-        )
-    except OSError:
-        # If the log dir isn't writable, still attach a no-op handler so
-        # logging never reaches the broken stderr last-resort
-        handler = logging.NullHandler()
-
-    root = logging.getLogger()
-    root.addHandler(handler)
-    root.setLevel(logging.INFO)
-
-
 def main() -> None:
     """
-    Entry point for the `mirumoji gui` command — launches the desktop window
+    Entry point for the `mirumoji gui` command, launches the desktop window
     """
-    _configure_logging()
+    # The bundled GUI has no console, so a record reaching logging's stderr
+    # last-resort handler would raise mid-write (no stderr, or a non-UTF-8
+    # console choking on glyphs like `↦`) and stall the UI. `capture_root`
+    # attaches a UTF-8 file sink to the root logger, removing that path
+    setup_logging(log_file="launcher.log", console=False, capture_root=True)
     LOGGER.info(f"Starting Mirumoji GUI {__version__}")
     ft.run(_page_main, assets_dir=str(_ASSETS))

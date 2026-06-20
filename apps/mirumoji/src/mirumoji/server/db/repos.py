@@ -30,6 +30,8 @@ from .models import (
     ClipDTO,
     File,
     FileDTO,
+    Job,
+    JobDTO,
     LlmTemplate,
     LlmTemplateDTO,
     Profile,
@@ -38,9 +40,52 @@ from .models import (
     TranscriptDTO,
 )
 
-LOGGER = logging.getLogger("mirumoji")
+_ACTIVE_STATUSES = ("queued", "running")
 
-_Uuid = uuid.UUID | str
+LOGGER = logging.getLogger(__name__)
+
+
+def _job_references_file(job: Job, file_id: str) -> bool:
+    """
+    Whether a job uses or produced a given file
+
+    Checks the input reference in `params` (`file_id` for a single job,
+    `file_ids` for a batch parent) and the file outputs in `result`
+    (`srt_file_id` / `file_id`). Ids are compared as the strings stored in the
+    JSON columns
+
+    Args:
+        job (Job): The job to check
+        file_id (str): The file id, as stored in the JSON columns
+
+    Returns:
+        `True` if the job references the file
+    """
+    params = job.params or {}
+    if params.get("file_id") == file_id:
+        return True
+    if file_id in (params.get("file_ids") or []):
+        return True
+    result = job.result or {}
+    return (
+        result.get("srt_file_id") == file_id
+        or result.get("file_id") == file_id
+    )
+
+
+def _job_references_transcript(job: Job, transcript_id: str) -> bool:
+    """
+    Whether a job produced a given transcript
+
+    Args:
+        job (Job): The job to check
+        transcript_id (str): The transcript id, as stored in `result`
+
+    Returns:
+        `True` if the job's result references the transcript
+    """
+    result = job.result or {}
+    return result.get("transcript_id") == transcript_id
 
 
 class ProfileRepository:
@@ -160,6 +205,7 @@ class FileRepository:
         name: str,
         path: str,
         type: str | None = None,
+        folder: str | None = None,
     ) -> FileDTO:
         """
         Adds a file record
@@ -169,6 +215,8 @@ class FileRepository:
             name (str): Base file name
             path (str): Media-relative path to the file
             type (str | None): Optional file-type tag
+            folder (str | None): Optional group label for files uploaded
+                together
 
         Returns:
             The created `FileDTO`
@@ -182,6 +230,7 @@ class FileRepository:
                 name=name,
                 path=path,
                 type=type,
+                folder=folder,
             )
             self.session.add(file)
             await self.session.flush()
@@ -189,12 +238,12 @@ class FileRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add File : {e}") from e
 
-    async def get(self, file_id: _Uuid) -> FileDTO:
+    async def get(self, file_id: uuid.UUID) -> FileDTO:
         """
         Fetches a file by id
 
         Args:
-            file_id (uuid.UUID | str): The file id
+            file_id (uuid.UUID): The file id
 
         Returns:
             The matching `FileDTO`
@@ -238,12 +287,12 @@ class FileRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Files : {e}") from e
 
-    async def delete(self, file_id: _Uuid) -> None:
+    async def delete(self, file_id: uuid.UUID) -> None:
         """
         Deletes a file record
 
         Args:
-            file_id (uuid.UUID | str): The file id
+            file_id (uuid.UUID): The file id
 
         Raises:
             RecordNotFoundError: If the file does not exist
@@ -275,7 +324,7 @@ class TranscriptRepository:
     async def add(
         self,
         profile_id: str,
-        file_id: _Uuid,
+        file_id: uuid.UUID,
         text: str,
         llm_explanation: str | None = None,
     ) -> TranscriptDTO:
@@ -284,7 +333,7 @@ class TranscriptRepository:
 
         Args:
             profile_id (str): Owning profile id
-            file_id (uuid.UUID | str): Source file id
+            file_id (uuid.UUID): Source file id
             text (str): The transcription text
             llm_explanation (str | None): Optional saved explanation
 
@@ -307,12 +356,12 @@ class TranscriptRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add Transcript : {e}") from e
 
-    async def get(self, transcript_id: _Uuid) -> TranscriptDTO:
+    async def get(self, transcript_id: uuid.UUID) -> TranscriptDTO:
         """
         Fetches a transcript by id
 
         Args:
-            transcript_id (uuid.UUID | str): The transcript id
+            transcript_id (uuid.UUID): The transcript id
 
         Returns:
             The matching `TranscriptDTO`
@@ -363,12 +412,12 @@ class TranscriptRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Transcripts : {e}") from e
 
-    async def delete(self, transcript_id: _Uuid) -> None:
+    async def delete(self, transcript_id: uuid.UUID) -> None:
         """
         Deletes a transcript record
 
         Args:
-            transcript_id (uuid.UUID | str): The transcript id
+            transcript_id (uuid.UUID): The transcript id
 
         Raises:
             RecordNotFoundError: If the transcript does not exist
@@ -516,7 +565,7 @@ class ClipRepository:
     async def add(
         self,
         profile_id: str,
-        file_id: _Uuid,
+        file_id: uuid.UUID,
         start_time: float,
         end_time: float,
         llm_breakdown_response: dict[str, Any],
@@ -526,7 +575,7 @@ class ClipRepository:
 
         Args:
             profile_id (str): Owning profile id
-            file_id (uuid.UUID | str): Source file id
+            file_id (uuid.UUID): Source file id
             start_time (float): Clip start time in seconds
             end_time (float): Clip end time in seconds
             llm_breakdown_response (dict): Serialized breakdown payload
@@ -551,12 +600,12 @@ class ClipRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To Add Clip : {e}") from e
 
-    async def get(self, clip_id: _Uuid) -> ClipDTO:
+    async def get(self, clip_id: uuid.UUID) -> ClipDTO:
         """
         Fetches a clip by id
 
         Args:
-            clip_id (uuid.UUID | str): The clip id
+            clip_id (uuid.UUID): The clip id
 
         Returns:
             The matching `ClipDTO`
@@ -607,12 +656,12 @@ class ClipRepository:
         except Exception as e:
             raise DatabaseError(f"Failed To List Clips: {e}") from e
 
-    async def delete(self, clip_id: _Uuid) -> None:
+    async def delete(self, clip_id: uuid.UUID) -> None:
         """
         Deletes a clip record
 
         Args:
-            clip_id (uuid.UUID | str): The clip id
+            clip_id (uuid.UUID): The clip id
 
         Raises:
             RecordNotFoundError: If the clip does not exist
@@ -628,3 +677,302 @@ class ClipRepository:
             await self.session.delete(clip)
         except Exception as e:
             raise DatabaseError(f"Failed To Delete Clip : {e}") from e
+
+
+class JobRepository:
+    """
+    Data access for `Job` records
+
+    Attributes:
+        session (AsyncSession): The active asynchronous database session
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(
+        self,
+        profile_id: str,
+        type: str,
+        params: dict[str, Any],
+        parent_id: uuid.UUID | None = None,
+        total: int = 1,
+    ) -> JobDTO:
+        """
+        Adds a queued job record
+
+        Args:
+            profile_id (str): Owning profile id
+            type (str): Operation type
+            params (dict): Submitted parameters (file references, options)
+            parent_id (uuid.UUID | None): Parent batch job id, if any
+            total (int): Number of work items (1 for a single job)
+
+        Returns:
+            The created `JobDTO`
+
+        Raises:
+            DatabaseError: If the insert fails
+        """
+        try:
+            job = Job(
+                profile_id=profile_id,
+                type=type,
+                params=params,
+                parent_id=parent_id,
+                total=total,
+            )
+            self.session.add(job)
+            await self.session.flush()
+            return JobDTO.model_validate(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Add Job : {e}") from e
+
+    async def get(self, job_id: uuid.UUID) -> JobDTO:
+        """
+        Fetches a job by id
+
+        Args:
+            job_id (uuid.UUID): The job id
+
+        Returns:
+            The matching `JobDTO`
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the lookup fails
+        """
+        try:
+            job = await self.session.get(Job, job_id)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Fetch Job : {e}") from e
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        return JobDTO.model_validate(job)
+
+    async def list_for_profile(
+        self,
+        profile_id: str,
+        active_only: bool = False,
+    ) -> list[JobDTO]:
+        """
+        Lists a profile's top-level jobs (batch children are excluded)
+
+        Args:
+            profile_id (str): Owning profile id
+            active_only (bool): Restrict to `queued` / `running` jobs
+
+        Returns:
+            A list of top-level `JobDTO`, newest first
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = (
+                select(Job)
+                .where(Job.profile_id == profile_id)
+                .where(Job.parent_id.is_(None))
+                .order_by(Job.created_at.desc())
+            )
+            if active_only:
+                stmt = stmt.where(Job.status.in_(_ACTIVE_STATUSES))
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Jobs : {e}") from e
+
+    async def list_children(self, parent_id: uuid.UUID) -> list[JobDTO]:
+        """
+        Lists the child jobs of a batch parent
+
+        Args:
+            parent_id (uuid.UUID): The parent job id
+
+        Returns:
+            A list of child `JobDTO`, oldest first
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = (
+                select(Job)
+                .where(Job.parent_id == parent_id)
+                .order_by(Job.created_at.asc())
+            )
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Job Children : {e}") from e
+
+    async def list_unfinished(self) -> list[JobDTO]:
+        """
+        Lists every `queued` / `running` job across all profiles
+
+        Used on startup to reconcile jobs left over from a previous run (the
+        in-process queue does not survive a restart)
+
+        Returns:
+            A list of unfinished `JobDTO`
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        try:
+            stmt = select(Job).where(Job.status.in_(_ACTIVE_STATUSES))
+            rows = (await self.session.scalars(stmt)).all()
+            return [JobDTO.model_validate(r) for r in rows]
+        except Exception as e:
+            raise DatabaseError(f"Failed To List Unfinished Jobs : {e}") from e
+
+    async def find_referencing_file(
+        self,
+        profile_id: str,
+        file_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """
+        Finds the profile's top-level jobs that use or produced a file
+
+        A matching child resolves to its batch parent, so deleting the returned
+        ids removes whole batches (children cascade via the parent FK)
+
+        Args:
+            profile_id (str): Owning profile id
+            file_id (uuid.UUID): The file id
+
+        Returns:
+            The top-level job ids that reference the file
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        fid = str(file_id)
+        try:
+            stmt = select(Job).where(Job.profile_id == profile_id)
+            rows = (await self.session.scalars(stmt)).all()
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed To Find Jobs Referencing File : {e}",
+            ) from e
+        return {
+            (job.parent_id or job.id)
+            for job in rows
+            if _job_references_file(job, fid)
+        }
+
+    async def find_referencing_transcript(
+        self,
+        profile_id: str,
+        transcript_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """
+        Finds the profile's top-level jobs that produced a transcript
+
+        Args:
+            profile_id (str): Owning profile id
+            transcript_id (uuid.UUID): The transcript id
+
+        Returns:
+            The top-level job ids that reference the transcript
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        tid = str(transcript_id)
+        try:
+            stmt = select(Job).where(Job.profile_id == profile_id)
+            rows = (await self.session.scalars(stmt)).all()
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed To Find Jobs Referencing Transcript : {e}",
+            ) from e
+        return {
+            (job.parent_id or job.id)
+            for job in rows
+            if _job_references_transcript(job, tid)
+        }
+
+    async def update(
+        self,
+        job_id: uuid.UUID,
+        *,
+        status: str | None = None,
+        progress: float | None = None,
+        completed: int | None = None,
+        result: dict[str, Any] | None = None,
+        error: str | None = None,
+        error_code: str | None = None,
+        error_details: dict[str, Any] | None = None,
+    ) -> JobDTO:
+        """
+        Applies a partial update to a job (a `None` argument leaves the field
+        unchanged)
+
+        Args:
+            job_id (uuid.UUID): The job id
+            status (str | None): New status
+            progress (float | None): New progress fraction
+            completed (int | None): New completed-item count
+            result (dict | None): Produced references
+            error (str | None): Failure message
+            error_code (str | None): Stable error code
+            error_details (dict | None): Structured error context
+
+        Returns:
+            The updated `JobDTO`
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the update fails
+        """
+        job = await self.session.get(Job, job_id)
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        try:
+            if status is not None:
+                job.status = status
+            if progress is not None:
+                job.progress = progress
+            if completed is not None:
+                job.completed = completed
+            if result is not None:
+                job.result = result
+            if error is not None:
+                job.error = error
+            if error_code is not None:
+                job.error_code = error_code
+            if error_details is not None:
+                job.error_details = error_details
+            await self.session.flush()
+            return JobDTO.model_validate(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Update Job : {e}") from e
+
+    async def delete(self, job_id: uuid.UUID) -> None:
+        """
+        Deletes a job (cascading to its children)
+
+        Args:
+            job_id (uuid.UUID): The job id
+
+        Raises:
+            RecordNotFoundError: If the job does not exist
+            DatabaseError: If the deletion fails
+        """
+        job = await self.session.get(Job, job_id)
+        if job is None:
+            raise RecordNotFoundError(
+                f"Job '{job_id}' Not Found",
+                details={"job_id": str(job_id)},
+            )
+        try:
+            await self.session.delete(job)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Delete Job : {e}") from e

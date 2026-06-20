@@ -2,7 +2,7 @@
  * @packageDocumentation Records a video segment and uploads it as a saved clip.
  */
 
-import { uploadFile } from "@/shared/api/client";
+import { uploadFormData } from "@/shared/api/client";
 import { recordMediaStream } from "./recorder";
 import type { ClipBreakdown, SaveClipResponse } from "./types";
 
@@ -57,17 +57,17 @@ export async function createAndSaveClip(
         const clipFile = await recordMediaStream(videoElement, cueStart, adjustedCueEnd);
 
         onProgress("Uploading...", "loading");
-        // Clip metadata travels as headers since the body is the streamed file.
-        const headers = {
-            "X-Clip-Start-Time": cueStart.toString(),
-            "X-Clip-End-Time": adjustedCueEnd.toString(),
-            "X-Breakdown": encodeURIComponent(JSON.stringify(breakdown)),
-        };
+        // Clip + metadata travel together as multipart form fields, so the
+        // breakdown is a body field rather than a size-limited header.
+        const formData = new FormData();
+        formData.append("clip_file", clipFile);
+        formData.append("start_time", cueStart.toString());
+        formData.append("end_time", adjustedCueEnd.toString());
+        formData.append("breakdown", JSON.stringify(breakdown));
 
-        const response = await uploadFile<SaveClipResponse>(
-            clipFile,
+        const response = await uploadFormData<SaveClipResponse>(
             "profiles/clips",
-            headers,
+            formData,
             (progress: number) => onProgress(`Uploading... ${progress.toFixed(0)}%`, "loading"),
             () => onProgress("Saving...", "loading")
         );

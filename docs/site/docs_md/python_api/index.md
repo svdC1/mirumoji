@@ -3,17 +3,37 @@
 The `mirumoji` package is the unified Python distribution that ships 2
 surfaces of the project
 
-- [`Server`](server/index.md) &rarr; The FastAPI backend that tokenizes Japanese, runs Whisper
-  transcription, manages profiles, and exports Anki decks
+???+ abstract "Server"
+    The [`Backend REST API`](server/index.md) built with `FastAPI`. The frontend delegates all of heavy processing to it. The following are some of its core features
 
-- `Launcher` &rarr; The  `Typer` / `Rich` CLI (`mirumoji`) + `Flet` Desktop GUI
-  (`mirumoji gui`) that orchestrate the `Docker Compose Application`. See the `CLI`, `Core`,
-  and `GUI` Sections
+    - Tokenization of Japanese sentenes using `fugashi`
 
-Two Top-Level Modules Sit Alongside Those Sub-Packages
+    - Media transcription using `faster-whisper`
 
-- [`Paths`](paths.md) &rarr; Resolved Host / Storage Paths Shared Across The Package
-- [`Exceptions`](exceptions.md) &rarr; Package's Exception Hierarchy
+    - Data persistence using `SQLAlchemy` + `sqlite3`
+
+    - Optional routing of heavy GPU work to `Modal` cloud GPUs
+
+    - LLM provider SDK interaction
+
+???+ abstract "Launcher"
+    Designed to be a user-friendly front-door to the `Mirumoji Docker Compose Application`, this sub-package defines a logical [`core`](launcher/core/index.md) that drives 2 user-facing applications, the [`CLI`](launcher/cli/main.md) and the [`GUI`](launcher/gui/app.md)
+
+    !!! info "Core"
+        Executes system commands using the `subprocess` module to automatically execute the necessary steps to start `mirumoji`
+
+    !!! info "CLI"
+        A CLI application built with `Typer` + `Rich` and exposed as a package script (`mirumoji`)
+
+    !!! info "GUI"
+        A `Flet` Desktop GUI that orchestrate the `Docker Compose Application`
+
+???+ abstract Top-Level Modules
+    Three Top-Level Modules Sit Alongside Those Sub-Packages
+
+    - [`Paths`](paths.md) &rarr; Resolved Host / Storage Paths Shared Across The Package
+    - [`Exceptions`](exceptions.md) &rarr; Package's Exception Hierarchy
+    - [`Log`](log.md) &rarr; Centralized Logging Setup Shared By The Server, Launcher, And GUI
 
 These pages are generated from the source docstrings with
 [`mkdocstrings`](https://mkdocstrings.github.io/)

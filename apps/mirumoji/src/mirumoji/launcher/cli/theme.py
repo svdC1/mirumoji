@@ -23,6 +23,11 @@ MIRUMOJI_THEME = Theme(
         "ink": "#F4EEE3",
     }
 )
+"""
+Defines the `Rich` theme for the Mirumoji CLI mimicking the frontend's
+`Sumi & Shu` design
+"""
+
 
 console = Console(theme=MIRUMOJI_THEME, highlight=False)
 err_console = Console(theme=MIRUMOJI_THEME, stderr=True, highlight=False)

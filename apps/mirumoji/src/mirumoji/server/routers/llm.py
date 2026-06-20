@@ -13,21 +13,14 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from ...exceptions import LLMRequestError
+from ...exceptions import InvalidModelStringError, LLMRequestError
 from ..config import get_settings
 from ..models.requests import (
     BreakdownRequest,
     ChatRequest,
     ExplainSentenceRequest,
-    FixSrtRequest,
-)
-from ..models.responses import (
-    BreakdownResponse,
-    ExplanationResponse,
-    FixSrtResponse,
 )
 from ..processing import llm, text
-from ..processing.subtitles import sanitize_srt
 
 LOGGER = logging.getLogger(__name__)
 llm_router = APIRouter(prefix="/llm")
@@ -45,10 +38,44 @@ async def list_providers() -> dict[str, Any]:
     return {"providers": llm.provider_status()}
 
 
-@llm_router.post("/breakdown", response_model=BreakdownResponse)
-async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
+@llm_router.get("/models")
+async def list_models(provider: str) -> dict[str, list[str]]:
     """
-    Explains the nuance of a focus word within a sentence
+    Lists the available models for a configured LLM provider
+
+    Lets the frontend offer a model dropdown for the cloud providers, so users
+    pick a valid model instead of typing one that 404s
+
+    Args:
+        provider (str): The provider id (`openai`, `anthropic`, `gemini`,
+            `local`)
+
+    Returns:
+        Mapping with a `models` list of model ids
+
+    Raises:
+        InvalidModelStringError: If the provider id is unknown
+        LLMProviderUnavailableError: If the provider isn't configured
+        LLMRequestError: If the provider's models endpoint fails
+    """
+    try:
+        prov = llm.LLMProvider(provider)
+    except ValueError as e:
+        raise InvalidModelStringError(
+            f"Unknown LLM provider '{provider}'",
+            details={"provider": provider},
+        ) from e
+    models = await asyncio.to_thread(llm.available_models, prov)
+    return {"models": models}
+
+
+@llm_router.post("/breakdown")
+async def breakdown(req: BreakdownRequest) -> StreamingResponse:
+    """
+    Streams the nuance of a focus word within a sentence as Server-Sent Events
+
+    The focus word (its stitched token + dictionary data) is emitted once as a
+    `focus` event, then the LLM explanation streams as `data:` frames
 
     `sys_msg` and `prompt` are independently optional and fall back to the
     default breakdown system message and prompt
@@ -57,13 +84,13 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
         req (BreakdownRequest): The breakdown request
 
     Returns:
-        The focused `EnrichedJapaneseWord` (when a focus is given) and the LLM
-            explanation
+        An SSE stream: a `focus` frame (when a focus is given), the explanation
+            chunks, and a terminal `done` frame
 
     Raises:
         InvalidModelStringError: If the model selector is malformed
         LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the prompt template is invalid or the request fails
+        LLMRequestError: If the prompt template is invalid
     """
     client, model = llm.client_for_model(req.model)
     focus = req.focus or ""
@@ -82,27 +109,25 @@ async def breakdown(req: BreakdownRequest) -> BreakdownResponse:
         )
         system = req.sys_msg or default_system
 
-    explanation = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=prompt,
-        model=model,
-    )
-
-    focus_word = None
+    focus_json: str | None = None
     if req.focus:
         words = await asyncio.to_thread(text.enrich, req.focus)
-        focus_word = words[0] if words else None
+        if words:
+            focus_json = words[0].model_dump_json()
 
-    return BreakdownResponse(focus=focus_word, explanation=explanation)
+    chunks = client.stream(system=system, prompt=prompt, model=model)
+    return StreamingResponse(
+        llm.sse_breakdown(focus_json, chunks),
+        media_type="text/event-stream",
+    )
 
 
-@llm_router.post("/explain_sentence", response_model=ExplanationResponse)
+@llm_router.post("/explain_sentence")
 async def explain_sentence(
     req: ExplainSentenceRequest,
-) -> ExplanationResponse:
+) -> StreamingResponse:
     """
-    Explains a whole sentence, without a focus word
+    Streams an explanation of a whole sentence as Server-Sent Events
 
     `sys_msg` and `prompt` are independently optional and fall back to the
     default breakdown system message and sentence prompt
@@ -111,12 +136,12 @@ async def explain_sentence(
         req (ExplainSentenceRequest): The explanation request
 
     Returns:
-        The LLM explanation
+        An SSE stream of explanation chunks ending with a `done` frame
 
     Raises:
         InvalidModelStringError: If the model selector is malformed
         LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the prompt template is invalid or the request fails
+        LLMRequestError: If the prompt template is invalid
     """
     client, model = llm.client_for_model(req.model)
 
@@ -132,41 +157,11 @@ async def explain_sentence(
         default_system, prompt = llm.sentence_breakdown_prompt(req.sentence)
         system = req.sys_msg or default_system
 
-    explanation = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=prompt,
-        model=model,
+    chunks = client.stream(system=system, prompt=prompt, model=model)
+    return StreamingResponse(
+        llm.sse_format(chunks),
+        media_type="text/event-stream",
     )
-    return ExplanationResponse(explanation=explanation)
-
-
-@llm_router.post("/fix_srt", response_model=FixSrtResponse)
-async def fix_srt(req: FixSrtRequest) -> FixSrtResponse:
-    """
-    Cleans up raw SRT content with an LLM
-
-    Args:
-        req (FixSrtRequest): The SRT-fix request
-
-    Returns:
-        The cleaned-up SRT content
-
-    Raises:
-        InvalidModelStringError: If the model selector is malformed
-        LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the request fails
-    """
-    client, model = llm.client_for_model(req.model)
-    system = req.sys_msg or get_settings().srt_sys_msg
-    fixed = await asyncio.to_thread(
-        client.complete,
-        system=system,
-        prompt=req.srt,
-        model=model,
-    )
-    # Repair any timestamps the LLM may have corrupted before returning/saving.
-    return FixSrtResponse(srt=sanitize_srt(fixed))
 
 
 @llm_router.post("/stream")

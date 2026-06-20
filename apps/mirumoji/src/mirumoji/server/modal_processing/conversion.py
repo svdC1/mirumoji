@@ -52,18 +52,15 @@ def video_conversion_job(
 
     import modal
 
+    from mirumoji.log import setup_logging
     from mirumoji.server.modal_processing.volume_io import (
         download_from_volume,
         upload_to_volume,
     )
     from mirumoji.server.processing.audio import get_ffmpeg_path, to_mp4
 
-    # Configure Container Logging
-    logging.basicConfig(
-        level=logging.INFO,
-        style="{",
-        format="{levelname}-{name}-{message}",
-    )
+    # Configure Container Logging - stdout only, captured by Modal as job logs
+    setup_logging(log_file=None, console=True)
     logger = logging.getLogger(__name__)
 
     vol = modal.Volume.from_id(vol_id)
@@ -76,7 +73,7 @@ def video_conversion_job(
 
         local_out = workdir / f"{local_in.stem}_converted.mp4"
         logger.info(
-            f"'video_conversion_job' Converting '{local_in}' -> "
+            f"Converting '{local_in}' -> "
             f"'{local_out}' Using NVENC (kwargs: {to_mp4_kwargs})"
         )
 

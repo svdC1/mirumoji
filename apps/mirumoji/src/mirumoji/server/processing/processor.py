@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import modal
 
@@ -38,6 +39,21 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+K = TypeVar("K")
+"""
+The id that a caller assigns to one input file in a batch
+
+info: Batch Operations
+    - Each input is passed in under this id
+
+    - Its result is yielded back under the same id
+
+    - Results arrive as containers finish (in no fixed order), so this id is
+      how the caller tells which input a result belongs to
+
+    - The batch job handlers pass each file's child-job id
+"""
+
 
 class Processor:
     """
@@ -57,7 +73,7 @@ class Processor:
         self._model: WhisperModel | None = None
         self._runtime: ModalRuntime | None = None
         LOGGER.info(
-            f"Processor Initialised (transcribe backend: '{self.backend}')",
+            f"Processor Initialised (Backend='{self.backend}')",
         )
 
     # --- Lazy Backends ---
@@ -87,6 +103,7 @@ class Processor:
             The local `WhisperModel` object that should be used
         """
         if self._model is None:
+            LOGGER.info("Loading Local Whisper Model")
             self._model = whisper.load_model(w_model_args)
         return self._model
 
@@ -118,7 +135,7 @@ class Processor:
                 "whisper-local extra or configure Modal",
             )
 
-    # --- Transcription ---
+    # --- Single-File Operations  ---
 
     async def transcribe(
         self,
@@ -176,6 +193,10 @@ class Processor:
             ModalError: If the Modal job fails for any other reason
         """
         self._require_transcription()
+        LOGGER.info(
+            f"Transcribing '{media_path}' Via '{self.backend}' Backend "
+            f"(Format '{output_format}')"
+        )
         if self.backend == "modal":
             # Stream the input into a per-job ephemeral volume
             # (the only surface shared with the container), keyed by its
@@ -223,8 +244,6 @@ class Processor:
             return whisper.to_string(segments)
         return whisper.to_srt(segments)
 
-    # --- Conversion ---
-
     async def convert_to_mp4(
         self,
         input_path: str | os.PathLike[str],
@@ -269,6 +288,9 @@ class Processor:
         """
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
+        LOGGER.info(
+            f"Converting '{input_path}' To MP4 Via '{self.backend}' Backend"
+        )
 
         if self.backend == "modal":
             # Stream the source into a per-job ephemeral volume,
@@ -325,3 +347,251 @@ class Processor:
             **kwargs,
         )
         return out
+
+    # --- Modal Batch Helpers ---
+
+    @staticmethod
+    async def _upload_inputs(
+        vol: modal.Volume,
+        sources: dict[K, Path],
+    ) -> dict[K, str]:
+        """
+        Streams every batch input into a shared Modal volume under a unique
+        path
+
+        Each in-volume path is namespaced by the input's id so that two inputs
+        with the same file name never collide in the volume
+
+        Args:
+            vol (modal.Volume): The shared ephemeral batch volume
+            sources (dict[K, Path]): Each input's local file, mapped from its
+                id
+
+        Returns:
+            Each input's in-volume path, under the same ids as `sources`
+        """
+        vol_fps: dict[K, str] = {}
+        for key, src in sources.items():
+            vol_fp = f"batch/{key}/{Path(src).name}"
+            await asyncio.to_thread(
+                volume_io.upload_to_volume,
+                vol,
+                Path(src),
+                vol_fp,
+            )
+            vol_fps[key] = vol_fp
+        return vol_fps
+
+    @staticmethod
+    async def _collect_transcribe(
+        key: K,
+        call: modal.FunctionCall[str],
+    ) -> tuple[K, str | MirumojiServerError]:
+        """
+        Awaits one batched Modal transcription call, tagging it with its input
+        id
+
+        Args:
+            key (K): The id of the input that produced this call
+            call (modal.FunctionCall): The spawned transcription call handle
+
+        Returns:
+            The id paired with its raw transcription, or with the input's
+                failure (domain exceptions preserved, others wrapped in
+                `ModalError`)
+        """
+        try:
+            result = await call.get.aio()
+            return key, result
+        except MirumojiServerError as exc:
+            return key, exc
+        except Exception as exc:
+            return key, ModalError(f"Modal Transcription Job Failed: {exc}")
+
+    @staticmethod
+    async def _collect_convert(
+        key: K,
+        call: modal.FunctionCall[str],
+        vol: modal.Volume,
+        out_path: Path,
+    ) -> tuple[K, Path | MirumojiServerError]:
+        """
+        Awaits one batched Modal conversion call and streams its MP4 out
+        locally
+
+        Args:
+            key (K): The id of the input that produced this call
+            call (modal.FunctionCall): The spawned conversion call handle
+            vol (modal.Volume): The shared batch volume holding the output
+            out_path (Path): Local destination for the converted MP4
+
+        Returns:
+            The id paired with the converted MP4's local path, or with the
+                input's failure (domain exceptions preserved, others wrapped in
+                `ModalError`)
+        """
+        try:
+            out_vol_fp = await call.get.aio()
+            await asyncio.to_thread(
+                volume_io.download_from_volume,
+                vol,
+                out_vol_fp,
+                out_path,
+            )
+            return key, out_path
+        except MirumojiServerError as exc:
+            return key, exc
+        except Exception as exc:
+            return key, ModalError(f"Modal Video Conversion Job Failed: {exc}")
+
+    # --- Batch Operations ---
+
+    async def transcribe_batch(
+        self,
+        sources: dict[K, Path],
+        output_format: Literal["srt", "joined"] = "srt",
+        *,
+        w_model_args: dict[str, Any] | None = None,
+        w_transcribe_args: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[K, str | MirumojiServerError]]:
+        """
+        Transcribes many already-prepared audio files on `Modal` in parallel
+
+        info: Modal-Only
+            - This is the `modal` backend's batch fan-out path and assumes the
+              backend resolved to `modal`
+
+            - The `local` backend has a single GPU, so its batches run the
+              per-file transcription sequentially instead of calling this
+
+        info: Fan-Out
+            - All inputs share one ephemeral volume and one app run, then each
+              file is `spawn`-ed to its own container, bounded by the account's
+              concurrent-GPU limit
+
+            - Results are yielded as each container finishes (in no fixed
+              order), so the caller can update per-file state live
+
+        info: Result Keys
+            - `sources` maps each input's id to its audio file, and each result
+              is yielded under that same id
+
+            - Because results arrive out of order, the id is how the caller
+              knows which input a result belongs to
+
+            - In practice it is the file's child-job id, so the handler writes
+              the result straight onto the matching child row
+
+        info: Per-File Isolation
+            - One file failing does not fail the batch
+
+            - A failed file yields its exception instead of raising, so
+              sibling files still complete
+
+            - Domain exceptions are preserved across the Modal boundary, other
+              failures are wrapped in `ModalError`
+
+        Args:
+            sources (dict[K, Path]): Each input's local prepared audio file,
+                mapped from the id the caller assigned to that input
+            output_format (Literal["srt", "joined"]): `srt` for sentence-level
+                SRT content, `joined` for a single joined string
+            w_model_args (dict | None): Additional arguments for `WhisperModel`
+            w_transcribe_args (dict | None): Additional arguments for
+                `WhisperModel.transcribe`
+
+        Yields:
+            `(id, result)` for each input as its container finishes, where `id`
+                is the one the input was passed in under and `result` is the
+                raw transcription or that input's failure
+        """
+        runtime = self._get_runtime()
+        async with modal.Volume.ephemeral() as vol:
+            vol_fps = await self._upload_inputs(vol, sources)
+
+            async with runtime.app.run():
+                pending = []
+                for key, vol_fp in vol_fps.items():
+                    call = await runtime.transcribe.spawn.aio(
+                        vol_fp=vol_fp,
+                        vol_id=vol.object_id,
+                        output_format=output_format,
+                        w_model_args=w_model_args,
+                        w_transcribe_args=w_transcribe_args,
+                    )
+                    pending.append(self._collect_transcribe(key, call))
+
+                for finished in asyncio.as_completed(pending):
+                    yield await finished
+
+    async def convert_batch(
+        self,
+        sources: dict[K, Path],
+        out_paths: dict[K, Path],
+        *,
+        to_mp4_kwargs: dict[str, Any] | None = None,
+    ) -> AsyncIterator[tuple[K, Path | MirumojiServerError]]:
+        """
+        Converts many videos to MP4 on `Modal` in parallel
+
+        info: Modal-Only
+            - This is the `modal` backend's batch fan-out path and assumes the
+              backend resolved to `modal`
+
+            - The `local` backend converts its batches one file at a time
+              instead of calling this
+
+        info: Fan-Out
+            - All inputs share one ephemeral volume and one app run, each file
+              is `spawn`-ed to its own GPU container
+
+            - Each converted MP4 is streamed back out to its local destination
+              as the file finishes
+
+        info: Result Keys
+            - `sources` and `out_paths` map each input's id to its source video
+              and its destination, and each result is yielded under that same
+              id
+
+            - Because results arrive out of order, the id is how the caller
+              knows which input a result belongs to
+
+            - In practice it is the file's child-job id
+
+        info: Per-File Isolation
+            - One file failing yields its exception instead of raising, so
+              sibling files still complete
+
+            - Domain exceptions are preserved, other failures are wrapped in
+              `ModalError`
+
+        Args:
+            sources (dict[K, Path]): Each input's local source video, mapped
+                from the id the caller assigned to that input
+            out_paths (dict[K, Path]): Each input's local MP4 destination,
+                under the same ids as `sources`
+            to_mp4_kwargs (dict | None): Argument overrides for `audio.to_mp4`
+
+        Yields:
+            `(id, result)` for each input as its container finishes, where `id`
+                is the one the input was passed in under and `result` is the
+                converted MP4's local path or that input's failure
+        """
+        runtime = self._get_runtime()
+        async with modal.Volume.ephemeral() as vol:
+            vol_fps = await self._upload_inputs(vol, sources)
+
+            async with runtime.app.run():
+                pending = []
+                for key, vol_fp in vol_fps.items():
+                    call = await runtime.convert.spawn.aio(
+                        vol_fp=vol_fp,
+                        vol_id=vol.object_id,
+                        to_mp4_kwargs=to_mp4_kwargs,
+                    )
+                    pending.append(
+                        self._collect_convert(key, call, vol, out_paths[key]),
+                    )
+
+                for finished in asyncio.as_completed(pending):
+                    yield await finished
