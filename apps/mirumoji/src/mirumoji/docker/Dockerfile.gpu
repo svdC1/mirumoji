@@ -19,14 +19,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ARG MIRUMOJI_VERSION=3.0.0
 
 # --- System Dependencies + Python Shim ---
+# fugashi's wheel bundles libmecab, so no system mecab/libmecab-dev is needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
     ffmpeg \
     wget \
     xz-utils \
-    mecab \
-    libmecab-dev \
     python3.11 \
     python3.11-dev \
     python3.11-venv \
@@ -38,11 +35,9 @@ RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 # --- Upgrade PIP ---
+# CTranslate2 (faster-whisper's engine) uses the base image's CUDA 12 + cuDNN 9
+# directly, so no PyTorch is installed
 RUN python3.11 -m pip install --upgrade pip
-
-# --- Install PyTorch With CUDA Support ---
-RUN python3.11 -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cu124
 
 # --- Install The Published Package + Local Whisper Extra ---
 RUN python3.11 -m pip install \
@@ -52,9 +47,9 @@ RUN python3.11 -m pip install \
 RUN python3.11 -m unidic download
 RUN kotobase pull-db
 
-# --- Pre-Cache The Faster-Whisper Model ---
-RUN python3.11 -c "from huggingface_hub import snapshot_download; \
-    snapshot_download('Systran/faster-whisper-large-v3')"
+# --- Model Is NOT Baked ---
+# The faster-whisper model downloads on first use into the Hugging Face cache
+# volume the launcher mounts for the local/GPU backend, keeping this image small
 
 # --- Expose The Uvicorn Port ---
 EXPOSE 8000

@@ -24,12 +24,14 @@ import copy
 import datetime
 import logging
 import os
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import srt
 
 from ...exceptions import TranscriptionError, WhisperUnavailableError
+from ..constants import MODEL_DOWNLOAD_BACKOFF_BASE, MODEL_DOWNLOAD_RETRIES
 
 if TYPE_CHECKING:
     from faster_whisper import WhisperModel
@@ -67,9 +69,67 @@ Default keyword-arguments for `faster_whisper.WhisperModel`, loads the
 """
 
 
+def _is_transient_download_error(exc: BaseException) -> bool:
+    """
+    Reports whether a model-load failure is a transient download problem worth
+    retrying (a network blip or a server `5xx` / rate-limit) rather than a
+    permanent one (bad model id, auth, no disk space)
+
+    The exception __cause__ chain is walked so a wrapped error is still
+    classified
+
+    Args:
+        exc (BaseException): The exception raised while loading the model
+
+    Returns:
+        `True` if the failure looks transient, `False` otherwise
+    """
+    try:
+        from requests.exceptions import (
+            ChunkedEncodingError,
+            Timeout,
+        )
+        from requests.exceptions import (
+            ConnectionError as RequestsConnectionError,
+        )
+
+        network_errors: tuple[type[BaseException], ...] = (
+            RequestsConnectionError,
+            Timeout,
+            ChunkedEncodingError,
+        )
+    except ImportError:
+        network_errors = ()
+
+    transient_status = {408, 429, 500, 502, 503, 504}
+    err: BaseException | None = exc
+    seen: set[int] = set()
+    while err is not None and id(err) not in seen:
+        seen.add(id(err))
+        if network_errors and isinstance(err, network_errors):
+            return True
+        response = getattr(err, "response", None)
+        if getattr(response, "status_code", None) in transient_status:
+            return True
+        err = err.__cause__ or err.__context__
+    return False
+
+
 def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
     """
     Loads a `faster_whisper.WhisperModel` object
+
+    info: Model Download
+        - For the the `local` transcription backend, the first load pulls the
+          weights from the Hugging Face Hub (Docker Image doesn't have the
+          model baked in like the one `modal` runs when using the `modal`
+          backend)
+
+        - `huggingface_hub` resumes a partial download, so transient network
+          failures are retried with exponential backoff and each attempt
+          continues rather than restarting
+
+        - Permanent failures are raised immediately
 
     Args:
         w_model_args (dict | None): Additional arguments for
@@ -89,17 +149,34 @@ def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
             "Local Whisper transcription requires the 'whisper-local' extra "
             "(faster-whisper) to be installed",
         ) from e
-    try:
-        opts = copy.deepcopy(DEFAULT_MODEL_OPTS)
 
-        if w_model_args:
-            opts.update(w_model_args)
+    opts = copy.deepcopy(DEFAULT_MODEL_OPTS)
+    if w_model_args:
+        opts.update(w_model_args)
+    model_name = opts["model_size_or_path"]
 
-        return WhisperModel(**opts)
-    except Exception as e:
-        raise WhisperUnavailableError(
-            f"Failed to load Whisper model `{opts['model']}`: {e}",
-        ) from e
+    last_error: BaseException | None = None
+    for attempt in range(1, MODEL_DOWNLOAD_RETRIES + 1):
+        try:
+            return WhisperModel(**opts)
+        except Exception as e:
+            if not _is_transient_download_error(e):
+                raise WhisperUnavailableError(
+                    f"Failed To Load Whisper Model '{model_name}': {e}",
+                ) from e
+            last_error = e
+            if attempt < MODEL_DOWNLOAD_RETRIES:
+                delay = MODEL_DOWNLOAD_BACKOFF_BASE * (2 ** (attempt - 1))
+                LOGGER.warning(
+                    f"Whisper Model Download Attempt {attempt} Failed "
+                    f"({e}), Retrying In {delay:g}s",
+                )
+                time.sleep(delay)
+
+    raise WhisperUnavailableError(
+        f"Failed To Download Whisper Model '{model_name}' After "
+        f"{MODEL_DOWNLOAD_RETRIES} Attempts: {last_error}",
+    ) from last_error
 
 
 def transcribe(

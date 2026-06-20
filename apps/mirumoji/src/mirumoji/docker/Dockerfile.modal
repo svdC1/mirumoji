@@ -23,7 +23,6 @@ ARG MIRUMOJI_VERSION=3.0.0
 # --- System Dependencies + Python Shim ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    git \
     python3.11 \
     python3.11-dev \
     python3.11-venv \
@@ -34,11 +33,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# --- Install PyTorch (CUDA 12.4 Wheels) ---
-RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \
-    python3.11 -m pip install --no-cache-dir \
-    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cu124
+# --- Upgrade PIP ---
+# CTranslate2 (faster-whisper's engine) uses the base image's CUDA 12 + cuDNN 9
+# directly, so no PyTorch is installed
+RUN python3.11 -m pip install --no-cache-dir --upgrade pip
 
 # --- Install The Published Package + Local Whisper Extra ---
 RUN python3.11 -m pip install --no-cache-dir \

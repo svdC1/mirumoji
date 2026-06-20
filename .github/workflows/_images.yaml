@@ -48,6 +48,10 @@ jobs:
                       image_suffix: mirumoji-modal-gpu
                       tag_prefix: ""
                       cache: false
+                      # Push as eStargz so Modal lazy-pulls the (large, baked
+                      # model) image and the container starts before it finishes
+                      # downloading, cutting first-load time
+                      estargz: true
                     - name: frontend
                       context: ./apps/frontend
                       file: ./apps/frontend/Dockerfile
@@ -91,7 +95,11 @@ jobs:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.file }}
                   platforms: linux/amd64
-                  push: true
+                  # eStargz images use a registry exporter (`outputs`) instead of
+                  # the plain `push: true`, and must be pushed straight from
+                  # buildx or the format reverts to gzip
+                  push: ${{ matrix.estargz != true }}
+                  outputs: ${{ matrix.estargz && 'type=registry,compression=estargz,force-compression=true,oci-mediatypes=true' || '' }}
                   # The backend images install `mirumoji==<version>` from PyPI,
                   # so they must build the exact version being released
                   build-args: |

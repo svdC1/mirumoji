@@ -16,13 +16,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ARG MIRUMOJI_VERSION=3.0.0
 
 # --- System Dependencies ---
+# fugashi's wheel bundles libmecab, so no system mecab/libmecab-dev is needed
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     wget \
     xz-utils \
-    git \
-    mecab \
-    libmecab-dev \
     ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 

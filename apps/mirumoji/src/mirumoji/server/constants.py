@@ -61,3 +61,19 @@ MAX_LLM_CONCURRENCY = 4
 Defines how many LLM requests should be executed simultaneously when
 requesting an `SRT Fix` for a batch of files
 """
+
+# --- Local Whisper Model Download ---
+
+MODEL_DOWNLOAD_RETRIES = 4
+"""
+How many times to attempt loading the local Whisper model before giving up
+
+The first load pulls the weights from the Hugging Face Hub, so transient
+network failures are retried (the partial download resumes between attempts)
+"""
+
+MODEL_DOWNLOAD_BACKOFF_BASE = 2.0
+"""
+Base number of seconds for the exponential backoff between Whisper model
+download retries
+"""

@@ -75,8 +75,11 @@ server = [
 ]
 
 # GPU Server Deployment (Local Transcription)
+# ctranslate2 is pinned at the cuDNN-9 floor (>=4.5) so it matches the cuDNN 9
+# provided by the CUDA base image (no PyTorch needed for the CUDA runtime)
 whisper-local = [
     "faster-whisper>=1.2.1,<2",
+    "ctranslate2>=4.5,<5",
     "huggingface_hub>=1.0,<2",
     "sentencepiece>=0.2,<0.3",
     "requests>=2.32,<3"
