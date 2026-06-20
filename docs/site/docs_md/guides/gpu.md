@@ -3,7 +3,7 @@
 ???+ question "Why Use A GPU"
     - Mirumoji transcribes audio with [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper)
     and converts media with [`FFmpeg`](https://github.com/ffmpeg/ffmpeg)
-    
+
     - For anything longer than a short clip, like an anime episode, or a podcast, that work is `MUCH` faster on  GPU than a CPU
 
     - Mirumoji was designed for long media, so it needs a GPU to power the transcription and media conversion operations
@@ -28,8 +28,10 @@ Everything stays on your machine. No cloud account is involved
     - An `NVIDIA GPU` with up-to-date drivers
 
     - The [`NVIDIA Container Toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), which lets Docker Containers use the GPU
-    
-    - A few GB of disk for the GPU image and the transcription model
+
+    - A few GB of disk for the GPU images + the transcription model, which
+      downloads on the first transcription into a persistent cache volume and is
+      reused on every run after that
 
 !!! tip "Verify The Requirements On Your Machine"
     `Nvidia GPU` and `Nvidia Container Toolkit` should both report `ok`
@@ -61,7 +63,7 @@ The `free` tier includes a generous amount of monthly compute credits, which is 
     - With the `modal` backend, Mirumoji runs its lightweight CPU image on your machine and
       `delegates` only the heavy transcription / conversion of media to short-lived `Modal`
       GPU containers
-      
+
     !!! info "Step By Step Request Workflow"
         - You request a transcription / conversion on the frontend
 
@@ -94,7 +96,7 @@ The `free` tier includes a generous amount of monthly compute credits, which is 
 
 ### Configure Them In Mirumoji
 
-=== "CLI Setup" 
+=== "CLI Setup"
     ```bash
     mirumoji config set MIRUMOJI_TRANSCRIBE_BACKEND modal
     mirumoji config set MODAL_TOKEN_ID <your-token-id>

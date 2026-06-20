@@ -7,11 +7,11 @@ and redistributes
 
 ???+ abstract "License Locations"
     - The full license text for every bundled dependency can be found `inside the distributed artifacts`
-    
+
     - In the `Backend Docker Images`, they ship inside each `Python` package's metadata (`*.dist-info/`) and system package docs (`/usr/share/doc/...`)
-    
+
     - In The `Frontend Docker Image`, they ship inside each `npm` package and system package docs (`usr/share/doc/...`)
-    
+
     - The notices below cover the components whose licenses require explicit attribution
 
 ## Required Attributions
@@ -48,7 +48,7 @@ used in conformance with the group's
 
 | Component | Role | License |
 | --- | --- | --- |
-| [`PyTorch`](https://github.com/pytorch/pytorch) | ML Runtime (Whisper) | `BSD-3-Clause` |
+| [`CTranslate2`](https://github.com/OpenNMT/CTranslate2) | Whisper Inference Engine | `MIT` |
 | [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) | Transcription | `MIT` |
 | [`FFmpeg`](https://ffmpeg.org/) | Media Conversion | `LGPL / GPL` |
 | [`MeCab`](https://taku910.github.io/mecab/) | Morphological Analyzer (Used By Fugashi) | `BSD-3-Clause` |

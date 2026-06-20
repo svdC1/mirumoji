@@ -25,7 +25,7 @@ repos:
       hooks:
           - id: sync-meta
             name: Sync README + LICENSE From .github
-            language: system
+            language: python
             entry: python scripts/sync_meta.py
             files: ^\.github/(README\.md|LICENSE)$
             pass_filenames: false

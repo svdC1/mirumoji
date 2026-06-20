@@ -17,7 +17,7 @@ mirumoji [COMMAND] [OPTIONS]
         - `Saved Configuration File` (`mirumoji config show`)
 
         - `Base Default` (`modal`)
-    
+
     !!! info "Image Source"
         - `Flag` (`--pull / --build`)
 
@@ -43,24 +43,16 @@ mirumoji up [OPTIONS]
 
 ??? question "What It Does"
     - Resolves Your `Transcription Backend` / `Image Source` Options
-    
+
     - Validates That Required Keys Are Configured And External Dependencies Are Present
 
     - Discovers Your IPv4 LAN IP For The Self-Signed Frontend Certificate
-    
+
     - Builds / Pulls Images
-    
+
     - Runs `docker compose up`
 
     - Prints local and LAN URLs
-
-#### Examples
-
-```bash
-mirumoji up                 # use saved config
-mirumoji up -t local        # override the backend for this run only
-mirumoji up --build         # build images from source instead of pulling
-```
 
 ### `down`
 
@@ -74,13 +66,6 @@ mirumoji down [OPTIONS]
 | --- | --- | --- |
 | `-v`, `--volumes` / `--keep-volumes` | `--keep-volumes` | Also Delete Data Bolumes *(profiles, media, database)* |
 | `-y`, `--yes` | off | Skip Confirmation Prompt When Deleting Volumes|
-
-#### Examples
-
-```bash
-mirumoji down               # stop, keep data
-mirumoji down -v            # stop and permanently delete all data
-```
 
 ### `status`
 
@@ -104,13 +89,6 @@ mirumoji logs [SERVICE] [OPTIONS]
 | `-f`, `--follow` | off | Follow New Output |
 | `--tail N` | all | Show Only Last `N` Lines |
 
-#### Examples
-
-```bash
-mirumoji logs -f
-mirumoji logs backend --tail 100
-```
-
 ### `pull`
 
 Pulls Pre-Built Images From Docker Hub For The Chosen Transcription Backend
@@ -128,8 +106,6 @@ Backend Images Locally For The Chosen Backend
 mirumoji build [-t local|modal]
 ```
 
-## Development Commands
-
 ### `doctor`
 
 Reports The Status Of Every External Dependency (`Docker`, `Compose`, `Git`, `NVIDIA GPU` + `NVIDIA Contianer Toolkit`, `Flet`, `Flutter`)
@@ -137,22 +113,6 @@ Reports The Status Of Every External Dependency (`Docker`, `Compose`, `Git`, `NV
 ```bash
 mirumoji doctor
 ```
-
-### `server`
-
-Runs The `FastAPI` Server Directly With `uvicorn` (no Docker)
-
-Intended For Development &rarr; Requires The `server` Extra *(`pip install mirumoji[server]`)*
-
-```bash
-mirumoji server [OPTIONS]
-```
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `--host` | `0.0.0.0` | Interface To Bind |
-| `--port` | `8000` | Port To Listen On |
-| `--reload` | off | Reload On Code Changes |
 
 ### `gui`
 
@@ -181,22 +141,58 @@ mirumoji render [OPTIONS]
 | `--build` / `--pull` | `--pull` | Reference Locally Built Tags Or Docker Hub Images |
 | `-o`, `--output PATH` | `docker-compose.yaml` | Where To Write The File |
 
+## Development Commands
+
+### `dev server`
+
+Runs The `FastAPI` Server Directly With `uvicorn` (no Docker), Using The App Factory
+
+Intended For Development &rarr; Requires The `server` Extra *(`pip install mirumoji[server]`)*
+
+```bash
+mirumoji dev server [OPTIONS]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--host` | `0.0.0.0` | Interface To Bind |
+| `--port` | `8000` | Port To Listen On |
+| `--reload` | off | Reload On Code Changes |
+
+### `dev up`
+
+Builds The Frontend + Backend Images From A Local `Mirumoji` Repo Checkout And Runs The Docker Compose Application, Without Updating The Checkout
+
+Intended For Development &rarr; Builds From An Arbitrary Path Rather Than The Managed Checkout That `build` Uses
+
+```bash
+mirumoji dev up [OPTIONS]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `-t`, `--transcribe [local \| modal]` | Saved Config, Else `modal` | Transcription Backend |
+| `-p`, `--path PATH` | `Path.cwd()` | Path To The Local Mirumoji Repo Checkout |
+| `-d`, `--detach` / `--foreground` | `--detach` | Run In The Background / Stream In The Foreground |
+
+
+
 ## Configuration Commands
 
 ???+ info "Managed Configuration File"
     - All Settings Are Kept In A Single Managed `.env` File
 
     - It's Changed `Only` Through The Following Commands
-    
+
     - Run Commands (`up`, `build`, `pull`) Never Modify It
 
 ```bash
-mirumoji config set <KEY> <VALUE> # (1)! 
+mirumoji config set <KEY> <VALUE> # (1)!
 mirumoji config delete <KEY> # (2)!
-mirumoji config show # (3)! 
+mirumoji config show # (3)!
 mirumoji config path # (4)!
-mirumoji config import <PATH> # (5)! 
-mirumoji config clear # (6)! 
+mirumoji config import <PATH> # (5)!
+mirumoji config clear # (6)!
 ```
 
 1. Set Or Update One Variable. Rejects Unknown Keys, and Validates The Value Of Deployment
