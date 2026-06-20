@@ -29,7 +29,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-from ..exceptions import MirumojiServerError
+from ..exceptions import MirumojiServerError, RecordNotFoundError
 from . import media
 from .config import get_settings
 from .constants import MAX_LLM_CONCURRENCY
@@ -143,6 +143,19 @@ class JobQueueManager:
         self._worker_task: asyncio.Task[None] | None = None
         self.processor = processor
         self.handlers: dict[str, _JobHandler] = {}
+        # The job the worker is currently executing, so its row is never
+        # deleted out from under it (a `cancelled` job may still be in flight)
+        self._running: uuid.UUID | None = None
+
+    @property
+    def running_job_id(self) -> uuid.UUID | None:
+        """
+        The id of the job the worker is currently executing, or `None`
+
+        Returns:
+            The in-flight job id, or `None` when the worker is idle
+        """
+        return self._running
 
     def _ensure_queue(self) -> asyncio.Queue[uuid.UUID]:
         """
@@ -184,6 +197,10 @@ class JobQueueManager:
             - Any produced `result` is still recorded so that the client can
               inspect what finished before the cancellation
 
+        info: Deletion
+            - The job may be deleted while it runs, so a missing row is
+              tolerated and the call returns quietly rather than erroring
+
         info: Work Items
             - On success, `completed` is set to `total`
 
@@ -200,29 +217,35 @@ class JobQueueManager:
             error_details (dict | None): Structured error context on failure
         """
         async with UnitOfWork() as uow:
-            current = await uow.jobs.get(job_id)
-            if current.status == "cancelled":
-                if result is not None:
-                    await uow.jobs.update(job_id, result=result.model_dump())
-                    await uow.commit()
+            try:
+                current = await uow.jobs.get(job_id)
+                if current.status == "cancelled":
+                    if result is not None:
+                        await uow.jobs.update(
+                            job_id, result=result.model_dump()
+                        )
+                        await uow.commit()
+                    return
+                if error is not None:
+                    await uow.jobs.update(
+                        job_id,
+                        status="failed",
+                        error=error,
+                        error_code=error_code,
+                        error_details=error_details,
+                    )
+                else:
+                    await uow.jobs.update(
+                        job_id,
+                        status="succeeded",
+                        progress=1.0,
+                        completed=total,
+                        result=result.model_dump() if result else {},
+                    )
+                await uow.commit()
+            except RecordNotFoundError:
+                # The job was deleted while it ran -> nothing to terminate
                 return
-            if error is not None:
-                await uow.jobs.update(
-                    job_id,
-                    status="failed",
-                    error=error,
-                    error_code=error_code,
-                    error_details=error_details,
-                )
-            else:
-                await uow.jobs.update(
-                    job_id,
-                    status="succeeded",
-                    progress=1.0,
-                    completed=total,
-                    result=result.model_dump() if result else {},
-                )
-            await uow.commit()
 
     async def _run_job(self, job_id: uuid.UUID) -> None:
         """
@@ -245,65 +268,77 @@ class JobQueueManager:
                 `start` before the call
         """
         self._ensure_queue()
-        # Skip A Job Cancelled While Queued, Otherwise Mark It Running
-        # `cancel`` endpoint can only mark the job "cancelled" in the DB, but
-        # by then the job's id is already sitting in the in-process
-        # asyncio.Queue, and you can't pull a specific item back out of a
-        # Queue, so skip it here instead to honor the database status
-        async with UnitOfWork() as uow:
-            job = await uow.jobs.get(job_id)
-            if job.status == "cancelled":
-                return
-            job = await uow.jobs.update(job_id, status="running")
-            await uow.commit()
-
-        LOGGER.info(
-            f"Job '{job_id}' ('{job.type}') Started "
-            f"For Profile '{job.profile_id}'"
-        )
-        started_at = time.monotonic()
-
-        handler = self.handlers.get(job.type)
-
-        if handler is None:
-            # Fail The Job If It Has No Registered Handler
-            await self._terminate_job(
-                job_id,
-                error=f"Unknown Job Type '{job.type}'",
-            )
-            return
-
+        # Mark the worker as holding this job, so its row can't be deleted out
+        # from under the bookkeeping below (cleared however the job ends)
+        self._running = job_id
         try:
-            result = await handler(job, self.processor)
-        except MirumojiServerError as exc:
-            # Domain Failure - > Surface the stable code + user-facing message
-            LOGGER.warning(f"Job '{job_id}' ({job.type}) Failed: {exc.code}")
-            await self._terminate_job(
-                job_id,
-                error=str(exc),
-                error_code=exc.code,
-                error_details=exc.details,
+            # Skip A Job Cancelled (Or Deleted) While Queued, Otherwise Mark It
+            # Running. The `cancel` endpoint can only mark the job "cancelled"
+            # in the DB, but by then the job's id is already sitting in the
+            # in-process asyncio.Queue, and you can't pull a specific item back
+            # out of a Queue, so skip it here instead to honor the DB status
+            async with UnitOfWork() as uow:
+                try:
+                    job = await uow.jobs.get(job_id)
+                except RecordNotFoundError:
+                    return
+                if job.status == "cancelled":
+                    return
+                job = await uow.jobs.update(job_id, status="running")
+                await uow.commit()
+
+            LOGGER.info(
+                f"Job '{job_id}' ('{job.type}') Started "
+                f"For Profile '{job.profile_id}'"
             )
-            # A batch that fails at the orchestration level leaves children
-            # mid-flight, so fail them too (a no-op for a single job)
-            await _fail_orphaned_children(job_id)
-            return
-        except Exception:
-            # Unexpected Failure ->Log it, but don't leak the raw message
-            LOGGER.exception(f"Job '{job_id}' ({job.type}) Failed")
-            await self._terminate_job(
-                job_id,
-                error="An Unexpected Error Occurred",
-                error_code="ServerError",
+            started_at = time.monotonic()
+
+            handler = self.handlers.get(job.type)
+
+            if handler is None:
+                # Fail The Job If It Has No Registered Handler
+                await self._terminate_job(
+                    job_id,
+                    error=f"Unknown Job Type '{job.type}'",
+                )
+                return
+
+            try:
+                result = await handler(job, self.processor)
+            except MirumojiServerError as exc:
+                # Domain Failure -> Surface the stable code + the message
+                LOGGER.warning(
+                    f"Job '{job_id}' ({job.type}) Failed: {exc.code}"
+                )
+                await self._terminate_job(
+                    job_id,
+                    error=str(exc),
+                    error_code=exc.code,
+                    error_details=exc.details,
+                )
+                # A batch that fails at the orchestration level leaves children
+                # mid-flight, so fail them too (a no-op for a single job)
+                await _fail_orphaned_children(job_id)
+                return
+            except Exception:
+                # Unexpected Failure -> Log it, but don't leak the raw message
+                LOGGER.exception(f"Job '{job_id}' ({job.type}) Failed")
+                await self._terminate_job(
+                    job_id,
+                    error="An Unexpected Error Occurred",
+                    error_code="ServerError",
+                )
+                await _fail_orphaned_children(job_id)
+                return
+
+            # Job Succeeded
+            await self._terminate_job(job_id, total=job.total, result=result)
+            LOGGER.info(
+                f"Job '{job_id}' ('{job.type}') Succeeded In "
+                f"{time.monotonic() - started_at:.1f}s"
             )
-            await _fail_orphaned_children(job_id)
-            return
-        # Job Succeeded
-        await self._terminate_job(job_id, total=job.total, result=result)
-        LOGGER.info(
-            f"Job '{job_id}' ('{job.type}') Succeeded In "
-            f"{time.monotonic() - started_at:.1f}s"
-        )
+        finally:
+            self._running = None
 
     async def _worker_loop(self) -> None:
         """
@@ -504,6 +539,38 @@ async def _file_path(file_id: uuid.UUID) -> Path:
     async with UnitOfWork() as uow:
         file_rec = await uow.files.get(file_id)
     return media.BASE_PATH / file_rec.path
+
+
+# Subtitle files come from anywhere, so they are not always UTF-8 (Shift-JIS is
+# common for Japanese subtitles). Try the likely encodings in order
+_TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "cp932")
+
+
+def _read_text_best_effort(path: Path) -> str:
+    """
+    Reads a subtitle file, tolerating the common non-UTF-8 encodings
+
+    Tries UTF-8 (with and without a BOM) then Shift-JIS. A file that decodes as
+    none of these is not usable subtitle text, so the final attempt's
+    `UnicodeDecodeError` is allowed to surface and fail the job loudly
+
+    Args:
+        path (Path): The file to read
+
+    Returns:
+        The decoded text
+
+    Raises:
+        UnicodeDecodeError: If the file is not text in any expected encoding
+    """
+    data = path.read_bytes()
+    *fallbacks, final = _TEXT_ENCODINGS
+    for encoding in fallbacks:
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode(final)
 
 
 # --- Per-File Helpers ---
@@ -801,7 +868,7 @@ async def _fix_srt(
         The new SRT file's id, media URL, and content
     """
     src = await _file_path(uuid.UUID(params["file_id"]))
-    raw = await asyncio.to_thread(src.read_text, encoding="utf-8")
+    raw = await asyncio.to_thread(_read_text_best_effort, src)
     client, model = llm.client_for_model(params["model"])
     system = params.get("sys_msg") or get_settings().srt_sys_msg
     fixed = await asyncio.to_thread(
@@ -918,6 +985,27 @@ async def _load_children(parent_id: uuid.UUID) -> list[JobDTO]:
         return await uow.jobs.list_children(parent_id)
 
 
+async def _safe_update(job_id: uuid.UUID, **fields: Any) -> None:
+    """
+    Applies a partial job update, tolerating a row deleted while a job runs
+
+    A batch's parent or child row can be deleted mid-flight (the user deleted
+    the job, or a file it relied on cascaded), so a missing row is treated as
+    the job being gone rather than an error that would crash the worker and
+    log a noisy rollback
+
+    Args:
+        job_id (uuid.UUID): The job id to update
+        **fields (Any): Fields forwarded to `JobRepository.update`
+    """
+    async with UnitOfWork() as uow:
+        try:
+            await uow.jobs.update(job_id, **fields)
+        except RecordNotFoundError:
+            return
+        await uow.commit()
+
+
 async def _start_child(child_id: uuid.UUID) -> None:
     """
     Marks a child job `running`
@@ -925,9 +1013,7 @@ async def _start_child(child_id: uuid.UUID) -> None:
     Args:
         child_id (uuid.UUID): The child job id
     """
-    async with UnitOfWork() as uow:
-        await uow.jobs.update(child_id, status="running")
-        await uow.commit()
+    await _safe_update(child_id, status="running")
 
 
 async def _succeed_child(child_id: uuid.UUID, result: JobResult) -> None:
@@ -938,15 +1024,13 @@ async def _succeed_child(child_id: uuid.UUID, result: JobResult) -> None:
         child_id (uuid.UUID): The child job id
         result (JobResult): The child's typed result
     """
-    async with UnitOfWork() as uow:
-        await uow.jobs.update(
-            child_id,
-            status="succeeded",
-            progress=1.0,
-            completed=1,
-            result=result.model_dump(),
-        )
-        await uow.commit()
+    await _safe_update(
+        child_id,
+        status="succeeded",
+        progress=1.0,
+        completed=1,
+        result=result.model_dump(),
+    )
 
 
 async def _fail_child(
@@ -965,15 +1049,13 @@ async def _fail_child(
         error_code (str | None): The stable error code
         error_details (dict | None): Structured error context
     """
-    async with UnitOfWork() as uow:
-        await uow.jobs.update(
-            child_id,
-            status="failed",
-            error=error,
-            error_code=error_code,
-            error_details=error_details,
-        )
-        await uow.commit()
+    await _safe_update(
+        child_id,
+        status="failed",
+        error=error,
+        error_code=error_code,
+        error_details=error_details,
+    )
 
 
 async def _cancel_child(child_id: uuid.UUID) -> None:
@@ -983,9 +1065,7 @@ async def _cancel_child(child_id: uuid.UUID) -> None:
     Args:
         child_id (uuid.UUID): The child job id
     """
-    async with UnitOfWork() as uow:
-        await uow.jobs.update(child_id, status="cancelled")
-        await uow.commit()
+    await _safe_update(child_id, status="cancelled")
 
 
 async def _bump_parent(
@@ -1003,30 +1083,28 @@ async def _bump_parent(
         total (int): Number of files in the batch
     """
     progress = completed / total if total else 1.0
-    async with UnitOfWork() as uow:
-        await uow.jobs.update(
-            parent_id,
-            completed=completed,
-            progress=progress,
-        )
-        await uow.commit()
+    await _safe_update(parent_id, completed=completed, progress=progress)
 
 
 async def _job_cancelled(job_id: uuid.UUID) -> bool:
     """
-    Reports whether a job has been cancelled
+    Reports whether a job should stop (it was cancelled or deleted)
 
     Used by batch runners to stop launching more work once the parent is
-    cancelled
+    cancelled. A deleted job is reported the same way, so the runner also stops
+    when the job is removed mid-flight
 
     Args:
         job_id (uuid.UUID): The job id to check
 
     Returns:
-        `True` if the job's status is `cancelled`
+        `True` if the job's status is `cancelled`, or the job no longer exists
     """
     async with UnitOfWork() as uow:
-        job = await uow.jobs.get(job_id)
+        try:
+            job = await uow.jobs.get(job_id)
+        except RecordNotFoundError:
+            return True
     return job.status == "cancelled"
 
 
@@ -1051,12 +1129,15 @@ async def _fail_orphaned_children(parent_id: uuid.UUID) -> None:
         children = await uow.jobs.list_children(parent_id)
         for child in children:
             if child.status in ("queued", "running"):
-                await uow.jobs.update(
-                    child.id,
-                    status="failed",
-                    error="The Batch Failed Before This File Finished",
-                    error_code="ServerError",
-                )
+                try:
+                    await uow.jobs.update(
+                        child.id,
+                        status="failed",
+                        error="The Batch Failed Before This File Finished",
+                        error_code="ServerError",
+                    )
+                except RecordNotFoundError:
+                    continue
         await uow.commit()
 
 
@@ -1156,9 +1237,10 @@ async def _run_bounded_batch(
           provider calls
 
     info: Cancellation
-        Before a file starts, the parent's status is rechecked, so once the
-        parent is cancelled every remaining file is marked cancelled instead
-        of running
+        The parent's status is rechecked before each file starts and again
+        before its result is recorded, so a cancel (or a deletion, which reads
+        the same way) stops the batch and never resurrects a cancelled child as
+        succeeded
 
     info: Per-File Isolation
         A file's failure is recorded on its own child row and never
@@ -1203,6 +1285,10 @@ async def _run_bounded_batch(
                     error_code="ServerError",
                 )
                 await tally.record("failed")
+                return
+            if await _job_cancelled(job.id):
+                await _cancel_child(child.id)
+                await tally.record("cancelled")
                 return
             await _succeed_child(child.id, result)
             await tally.record("succeeded")
@@ -1601,13 +1687,7 @@ async def batch_generate_srt_handler(
     children = await _load_children(job.id)
     if processor.backend == "modal":
         return await _run_modal_generate_srt_batch(job, children, processor)
-    return await _run_bounded_batch(
-        job,
-        children,
-        processor,
-        _generate_srt,
-        1,
-    )
+    return await _run_bounded_batch(job, children, processor, _generate_srt, 1)
 
 
 async def batch_transcribe_handler(
@@ -1630,13 +1710,7 @@ async def batch_transcribe_handler(
     children = await _load_children(job.id)
     if processor.backend == "modal":
         return await _run_modal_transcribe_batch(job, children, processor)
-    return await _run_bounded_batch(
-        job,
-        children,
-        processor,
-        _transcribe,
-        1,
-    )
+    return await _run_bounded_batch(job, children, processor, _transcribe, 1)
 
 
 async def batch_convert_handler(
@@ -1659,13 +1733,7 @@ async def batch_convert_handler(
     children = await _load_children(job.id)
     if processor.backend == "modal":
         return await _run_modal_convert_batch(job, children, processor)
-    return await _run_bounded_batch(
-        job,
-        children,
-        processor,
-        _convert,
-        1,
-    )
+    return await _run_bounded_batch(job, children, processor, _convert, 1)
 
 
 async def batch_fix_srt_handler(
@@ -1687,13 +1755,8 @@ async def batch_fix_srt_handler(
         The batch outcome counts and child ids
     """
     children = await _load_children(job.id)
-    concurrency = MAX_LLM_CONCURRENCY
     return await _run_bounded_batch(
-        job,
-        children,
-        processor,
-        _fix_srt,
-        concurrency,
+        job, children, processor, _fix_srt, MAX_LLM_CONCURRENCY
     )
 
 

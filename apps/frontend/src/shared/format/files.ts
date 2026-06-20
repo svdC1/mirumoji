@@ -4,6 +4,37 @@
 
 import { API_BASE } from "@/shared/api/client";
 
+const VIDEO_EXTS = [
+    "mp4",
+    "mov",
+    "mkv",
+    "webm",
+    "avi",
+    "flv",
+    "wmv",
+    "mpeg",
+    "mpg",
+    "m4v",
+    "3gp",
+    "ogv",
+    "ts",
+];
+const AUDIO_EXTS = ["mp3", "wav", "m4a", "aac", "ogg", "flac", "opus", "weba"];
+
+/**
+ * A coarse file-type tag inferred from the extension (for display + filtering).
+ *
+ * @param {string} name The file name.
+ * @returns {string | undefined} `video` / `audio` / `srt`, or `undefined`.
+ */
+export function inferFileType(name: string): string | undefined {
+    const ext = name.split(".").pop()?.toLowerCase() ?? "";
+    if (VIDEO_EXTS.includes(ext)) return "video";
+    if (AUDIO_EXTS.includes(ext)) return "audio";
+    if (ext === "srt") return "srt";
+    return undefined;
+}
+
 /**
  * Truncates a filename to `start…end` when it's longer than the budget.
  *

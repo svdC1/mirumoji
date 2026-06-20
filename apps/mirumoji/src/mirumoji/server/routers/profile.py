@@ -33,7 +33,8 @@ from ...exceptions import RecordNotFoundError
 from .. import media
 from ..config import gpu_available
 from ..db import UnitOfWork
-from ..dependencies import ensure_profile_exists
+from ..dependencies import ensure_profile_exists, get_job_manager
+from ..jobs import JobQueueManager
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
@@ -446,21 +447,29 @@ async def list_files(
 async def delete_file(
     file_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's files
 
-    Deleting a file cascades (via foreign keys) to any transcripts or clips
-    that reference it
+    info: Source Of Truth
+        - Files are the single source of truth for a profile's artifacts. A job
+          that used or produced this file is meaningless without it, so those
+          jobs are cascade-deleted first (a batch parent takes its children)
+
+        - Deleting a file also cascades (via foreign keys) to any transcripts
+          or clips that reference it
 
     Args:
         file_id (uuid.UUID): Id of the file to delete
         profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
 
     Returns:
         A confirmation payload
 
     Raises:
+        HTTPException: If a job still being run by the worker uses this file
         RecordNotFoundError: If the file doesn't exist or isn't owned by the
             profile
         StorageError: If deleting the file fails
@@ -473,6 +482,14 @@ async def delete_file(
                 f"File '{file_id}' Not Found",
                 details={"file_id": str(file_id)},
             )
+        dependent = await uow.jobs.find_referencing_file(profile_id, file_id)
+        if manager.running_job_id in dependent:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A Running Job Uses This File, Cancel It First",
+            )
+        for job_id in dependent:
+            await uow.jobs.delete(job_id)
         await uow.files.delete(file_id)
         await uow.commit()
     await media.delete_file(file.path)
@@ -607,18 +624,25 @@ async def list_transcripts(
 async def delete_transcript(
     transcript_id: uuid.UUID,
     profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's transcripts
 
+    A transcribe job that produced this transcript is meaningless without it,
+    so those jobs are cascade-deleted first
+
     Args:
         transcript_id (uuid.UUID): Id of the transcript to delete
         profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
 
     Returns:
         A confirmation payload
 
     Raises:
+        HTTPException: If a job still being run by the worker produced this
+            transcript
         RecordNotFoundError: If the transcript doesn't exist or isn't owned by
             the profile
         DatabaseError: If the deletion fails
@@ -630,6 +654,16 @@ async def delete_transcript(
                 f"Transcript '{transcript_id}' Not Found",
                 details={"transcript_id": str(transcript_id)},
             )
+        dependent = await uow.jobs.find_referencing_transcript(
+            profile_id, transcript_id
+        )
+        if manager.running_job_id in dependent:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A Running Job Made This Transcript, Cancel It First",
+            )
+        for job_id in dependent:
+            await uow.jobs.delete(job_id)
         await uow.transcripts.delete(transcript_id)
         await uow.commit()
     LOGGER.info(

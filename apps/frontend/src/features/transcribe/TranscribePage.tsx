@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
 import { apiTokenize } from "@/shared/dict/api";
 import { useBundleSettings } from "@/contexts/BundleSettingsContext";
+import { useOperationSettings } from "@/contexts/OperationSettingsContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { apiGetTemplate, streamExplain } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
@@ -23,8 +24,9 @@ import ChatBubble from "./components/ChatBubble";
  * @returns {JSX.Element} The transcribe page.
  */
 export default function TranscribePage() {
+    const { settings, whisperOpts } = useOperationSettings();
     const [messages, setMessages] = useState<Message[]>([]);
-    const [cleanAudio, setCleanAudio] = useState(false);
+    const [cleanAudio, setCleanAudio] = useState(settings.cleanAudio);
     const [llmExplain, setLlmExplain] = useState(false);
     const [recording, setRecording] = useState(false);
     const [recordedFile, setRecordedFile] = useState<File | null>(null);
@@ -146,7 +148,7 @@ export default function TranscribePage() {
             const job = await tasks.uploadAndSubmit(fileToSend, {
                 jobType: "transcribe",
                 fileType: "audio",
-                opts: { clean_audio: cleanAudio, language: "ja" },
+                opts: { ...whisperOpts(), clean_audio: cleanAudio },
             });
             if (!job) {
                 // Upload / submit failed (the tray surfaces it).

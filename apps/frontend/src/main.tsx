@@ -15,6 +15,7 @@ import { Toaster } from "react-hot-toast";
 import { ProfileProvider } from "./contexts/ProfileContext";
 import { SubtitleSettingsProvider } from "./contexts/SubtitleSettingsContext";
 import { BundleSettingsProvider } from "./contexts/BundleSettingsContext";
+import { OperationSettingsProvider } from "./contexts/OperationSettingsContext";
 import { TaskProvider } from "./contexts/TaskContext";
 
 /**
@@ -50,11 +51,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <ProfileProvider>
                 <SubtitleSettingsProvider>
                     <BundleSettingsProvider>
-                        <BrowserRouter basename={import.meta.env.BASE_URL}>
-                            <TaskProvider>
-                                <App />
-                            </TaskProvider>
-                        </BrowserRouter>
+                        <OperationSettingsProvider>
+                            <BrowserRouter basename={import.meta.env.BASE_URL}>
+                                <TaskProvider>
+                                    <App />
+                                </TaskProvider>
+                            </BrowserRouter>
+                        </OperationSettingsProvider>
                     </BundleSettingsProvider>
                 </SubtitleSettingsProvider>
             </ProfileProvider>

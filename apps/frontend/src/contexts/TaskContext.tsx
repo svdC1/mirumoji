@@ -17,23 +17,39 @@ import React, {
     ReactNode,
 } from "react";
 import { ApiError, toastApiError } from "@/shared/api/errors";
+import { inferFileType } from "@/shared/format/files";
 import { useProfile } from "./ProfileContext";
-import { cancelJob, getJob, listJobs, submitJob, uploadProfileFile } from "@/shared/jobs/api";
-import type { Job, JobStatus, JobType, SubmitJobRequest, UploadedFile } from "@/shared/jobs/types";
+import {
+    cancelJob,
+    deleteJob as deleteJobApi,
+    getJob,
+    listJobs,
+    submitBatch as submitBatchApi,
+    submitJob,
+    uploadProfileFile,
+} from "@/shared/jobs/api";
+import type {
+    BatchSubmitRequest,
+    Job,
+    JobStatus,
+    JobType,
+    SubmitJobRequest,
+    UploadedFile,
+} from "@/shared/jobs/types";
 
 /** How often to re-poll while any job is active. */
 const POLL_INTERVAL_MS = 2000;
 
 const ACTIVE_STATUSES: JobStatus[] = ["queued", "running"];
 
-/** A client-side upload feeding a job, shown in the tray during its upload. */
+/** A client-side upload, shown in the tray during its upload. */
 export interface UploadTask {
     /** Client-generated id (distinct from server job ids). */
     id: string;
-    /** Display name (the uploaded file name). */
+    /** Display name (the uploaded file name, or a folder / file count). */
     name: string;
-    /** The job that will be submitted once the upload finishes. */
-    jobType: JobType;
+    /** The job that will be submitted once the upload finishes, if any. */
+    jobType?: JobType;
     /** Upload progress in `[0, 100]`. */
     progress: number;
     /** `uploading` while in flight, `error` if the upload failed. */
@@ -65,10 +81,19 @@ export interface TaskContextType {
     uploadAndSubmit: (file: File, options: SubmitOptions) => Promise<Job | null>;
     /** Submits a job against an already-uploaded file. */
     submit: (req: SubmitJobRequest) => Promise<Job | null>;
+    /** Submits a batch job over several already-uploaded files. */
+    submitBatch: (req: BatchSubmitRequest) => Promise<Job | null>;
+    /**
+     * Uploads several files into the profile (no job), tracked in the tray as a
+     * single aggregate task. Returns how many uploaded successfully.
+     */
+    uploadFiles: (files: File[], folder?: string) => Promise<number>;
     /** Resolves once the given job reaches a terminal state (polls it). */
     waitFor: (id: string) => Promise<Job>;
     /** Cancels a queued or running job. */
     cancel: (id: string) => Promise<void>;
+    /** Permanently deletes a finished job (server-side) and drops it locally. */
+    deleteJob: (id: string) => Promise<void>;
     /** Removes a finished job or a failed upload from the tray. */
     dismiss: (id: string) => void;
     /** Re-fetches the active jobs immediately. */
@@ -175,6 +200,41 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return job;
     }, []);
 
+    const submitBatch = useCallback(async (req: BatchSubmitRequest): Promise<Job | null> => {
+        const job = await submitBatchApi(req);
+        setJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)].sort(byNewest));
+        return job;
+    }, []);
+
+    const uploadFiles = useCallback(async (files: File[], folder?: string): Promise<number> => {
+        if (files.length === 0) return 0;
+        const uploadId = `lib-${Date.now()}`;
+        const name = folder ?? `${files.length} File(s)`;
+        setUploads((prev) => [...prev, { id: uploadId, name, progress: 0, status: "uploading" }]);
+        const patch = (changes: Partial<UploadTask>) =>
+            setUploads((prev) => prev.map((u) => (u.id === uploadId ? { ...u, ...changes } : u)));
+
+        let ok = 0;
+        for (let i = 0; i < files.length; i++) {
+            try {
+                await uploadProfileFile(
+                    files[i],
+                    inferFileType(files[i].name),
+                    // Overall progress across the whole set.
+                    (percent) => patch({ progress: ((i + percent / 100) / files.length) * 100 }),
+                    () => undefined,
+                    folder
+                );
+                ok += 1;
+            } catch {
+                // Keep going; the panel reports the final success count.
+            }
+            patch({ progress: ((i + 1) / files.length) * 100 });
+        }
+        setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+        return ok;
+    }, []);
+
     const uploadAndSubmit = useCallback(
         async (file: File, options: SubmitOptions): Promise<Job | null> => {
             // Reuse the file id when this exact File was already uploaded.
@@ -247,6 +307,11 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, []);
 
+    const deleteJob = useCallback(async (id: string) => {
+        await deleteJobApi(id);
+        setJobs((prev) => prev.filter((j) => j.id !== id));
+    }, []);
+
     const dismiss = useCallback((id: string) => {
         setJobs((prev) => prev.filter((j) => j.id !== id));
         setUploads((prev) => prev.filter((u) => u.id !== id));
@@ -255,8 +320,34 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const busy = uploads.some((u) => u.status === "uploading") || hasActiveJobs;
 
     const value = useMemo(
-        () => ({ jobs, uploads, busy, uploadAndSubmit, submit, waitFor, cancel, dismiss, refresh }),
-        [jobs, uploads, busy, uploadAndSubmit, submit, waitFor, cancel, dismiss, refresh]
+        () => ({
+            jobs,
+            uploads,
+            busy,
+            uploadAndSubmit,
+            submit,
+            submitBatch,
+            uploadFiles,
+            waitFor,
+            cancel,
+            deleteJob,
+            dismiss,
+            refresh,
+        }),
+        [
+            jobs,
+            uploads,
+            busy,
+            uploadAndSubmit,
+            submit,
+            submitBatch,
+            uploadFiles,
+            waitFor,
+            cancel,
+            deleteJob,
+            dismiss,
+            refresh,
+        ]
     );
 
     return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

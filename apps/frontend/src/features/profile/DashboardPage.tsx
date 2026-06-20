@@ -10,7 +10,9 @@ import { ProfilePanel } from "./components/ProfilePanel";
 import { FilesPanel } from "./components/FilesPanel";
 import { TranscriptsPanel } from "./components/TranscriptsPanel";
 import { ClipsPanel } from "./components/ClipsPanel";
+import { TasksPanel } from "./components/TasksPanel";
 import { LlmTemplatePanel } from "./components/LlmTemplatePanel";
+import { AdvancedPanel } from "./components/AdvancedPanel";
 
 /**
  * The DashboardPage component.
@@ -29,7 +31,9 @@ export default function DashboardPage() {
             {tab === "files" && <FilesPanel />}
             {tab === "transcripts" && <TranscriptsPanel />}
             {tab === "clips" && <ClipsPanel />}
+            {tab === "tasks" && <TasksPanel />}
             {tab === "llm-template" && <LlmTemplatePanel />}
+            {tab === "advanced" && <AdvancedPanel />}
         </div>
     );
 }

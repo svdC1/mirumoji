@@ -13,6 +13,8 @@ export { Tabs } from "./Tabs";
 export type { TabItem, TabsProps } from "./Tabs";
 export { Toggle } from "./Toggle";
 export type { ToggleProps } from "./Toggle";
+export { Checkbox } from "./Checkbox";
+export type { CheckboxProps } from "./Checkbox";
 export { Input, Select, Label, Field } from "./Field";
 export type { FieldProps, LabelProps } from "./Field";
 export { TextArea } from "./TextArea";

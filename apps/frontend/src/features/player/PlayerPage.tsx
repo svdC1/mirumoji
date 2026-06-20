@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { Clapperboard } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { usePlayer } from "@/contexts/PlayerContext";
 import WordDialog from "@/shared/components/WordDialog";
 import { EmptyState } from "@/shared/ui";
@@ -28,7 +29,18 @@ interface DialogState {
  * @returns {JSX.Element} The player page.
  */
 export default function PlayerPage() {
-    const { video, videoUrl, srt, showFurigana, timestamp, setTimestamp } = usePlayer();
+    const {
+        video,
+        videoUrl,
+        setVideo,
+        setVideoUrl,
+        setVideoFileName,
+        setVideoFileId,
+        srt,
+        showFurigana,
+        timestamp,
+        setTimestamp,
+    } = usePlayer();
     // The video element via a callback ref, so effects bind exactly when it mounts.
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
 
@@ -56,6 +68,28 @@ export default function PlayerPage() {
         }
         setBlobUrl(null);
     }, [video, videoUrl]);
+
+    // A source that can't load (a 404 from a profile file deleted out from
+    // under the player, or an undecodable container) otherwise leaves a dead
+    // element that throws on the next play(). Drop it and say why.
+    useEffect(() => {
+        if (!videoEl) return;
+        const onError = () => {
+            const err = videoEl.error;
+            if (!err || err.code !== err.MEDIA_ERR_SRC_NOT_SUPPORTED) return;
+            toast.error(
+                videoUrl
+                    ? "This Video Is No Longer Available"
+                    : "This Video Format Isn't Supported, Convert It To MP4 First"
+            );
+            setVideo(null);
+            setVideoUrl(null);
+            setVideoFileName(null);
+            setVideoFileId(null);
+        };
+        videoEl.addEventListener("error", onError);
+        return () => videoEl.removeEventListener("error", onError);
+    }, [videoEl, videoUrl, setVideo, setVideoUrl, setVideoFileName, setVideoFileId]);
 
     // Restore the saved position on load; persist it on pause / source change.
     useEffect(() => {

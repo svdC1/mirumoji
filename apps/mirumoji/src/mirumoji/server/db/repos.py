@@ -45,6 +45,49 @@ _ACTIVE_STATUSES = ("queued", "running")
 LOGGER = logging.getLogger(__name__)
 
 
+def _job_references_file(job: Job, file_id: str) -> bool:
+    """
+    Whether a job uses or produced a given file
+
+    Checks the input reference in `params` (`file_id` for a single job,
+    `file_ids` for a batch parent) and the file outputs in `result`
+    (`srt_file_id` / `file_id`). Ids are compared as the strings stored in the
+    JSON columns
+
+    Args:
+        job (Job): The job to check
+        file_id (str): The file id, as stored in the JSON columns
+
+    Returns:
+        `True` if the job references the file
+    """
+    params = job.params or {}
+    if params.get("file_id") == file_id:
+        return True
+    if file_id in (params.get("file_ids") or []):
+        return True
+    result = job.result or {}
+    return (
+        result.get("srt_file_id") == file_id
+        or result.get("file_id") == file_id
+    )
+
+
+def _job_references_transcript(job: Job, transcript_id: str) -> bool:
+    """
+    Whether a job produced a given transcript
+
+    Args:
+        job (Job): The job to check
+        transcript_id (str): The transcript id, as stored in `result`
+
+    Returns:
+        `True` if the job's result references the transcript
+    """
+    result = job.result or {}
+    return result.get("transcript_id") == transcript_id
+
+
 class ProfileRepository:
     """
     Data access for `Profile` records
@@ -785,6 +828,73 @@ class JobRepository:
             return [JobDTO.model_validate(r) for r in rows]
         except Exception as e:
             raise DatabaseError(f"Failed To List Unfinished Jobs : {e}") from e
+
+    async def find_referencing_file(
+        self,
+        profile_id: str,
+        file_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """
+        Finds the profile's top-level jobs that use or produced a file
+
+        A matching child resolves to its batch parent, so deleting the returned
+        ids removes whole batches (children cascade via the parent FK)
+
+        Args:
+            profile_id (str): Owning profile id
+            file_id (uuid.UUID): The file id
+
+        Returns:
+            The top-level job ids that reference the file
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        fid = str(file_id)
+        try:
+            stmt = select(Job).where(Job.profile_id == profile_id)
+            rows = (await self.session.scalars(stmt)).all()
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed To Find Jobs Referencing File : {e}",
+            ) from e
+        return {
+            (job.parent_id or job.id)
+            for job in rows
+            if _job_references_file(job, fid)
+        }
+
+    async def find_referencing_transcript(
+        self,
+        profile_id: str,
+        transcript_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """
+        Finds the profile's top-level jobs that produced a transcript
+
+        Args:
+            profile_id (str): Owning profile id
+            transcript_id (uuid.UUID): The transcript id
+
+        Returns:
+            The top-level job ids that reference the transcript
+
+        Raises:
+            DatabaseError: If the query fails
+        """
+        tid = str(transcript_id)
+        try:
+            stmt = select(Job).where(Job.profile_id == profile_id)
+            rows = (await self.session.scalars(stmt)).all()
+        except Exception as e:
+            raise DatabaseError(
+                f"Failed To Find Jobs Referencing Transcript : {e}",
+            ) from e
+        return {
+            (job.parent_id or job.id)
+            for job in rows
+            if _job_references_transcript(job, tid)
+        }
 
     async def update(
         self,

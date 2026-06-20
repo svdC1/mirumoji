@@ -9,28 +9,23 @@ import { FolderOpen } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiFetch } from "@/shared/api/client";
 import { toastApiError } from "@/shared/api/errors";
-import { staticUrl, truncateFilename } from "@/shared/format/files";
+import { getFileExtension, staticUrl, truncateFilename } from "@/shared/format/files";
 import { IconButton, Popover, Button, cn } from "@/shared/ui";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { ProfileFile } from "@/features/profile/types";
 
-const VIDEO_ACCEPT = [
-    "video/*",
-    ".mp4",
-    ".mov",
-    ".mkv",
-    ".webm",
-    ".avi",
-    ".flv",
-    ".wmv",
-    ".mpeg",
-    ".mpg",
-    ".m4v",
-    ".3gp",
-    ".ogv",
-    ".ts",
-].join(",");
+// Containers a browser <video> can play directly. Other uploads (mkv, avi, ...)
+// need converting to MP4 first, so they are not offered as profile videos here.
+const PLAYABLE_VIDEO_EXTS = ["mp4", "webm", "ogv", "ogg", "m4v", "mov"];
+
+function isPlayableVideo(name: string): boolean {
+    return PLAYABLE_VIDEO_EXTS.includes(getFileExtension(name).toLowerCase());
+}
+
+function isSrt(name: string): boolean {
+    return getFileExtension(name).toLowerCase() === "srt";
+}
 
 function FileList({
     title,
@@ -76,8 +71,15 @@ export function LoadMediaPopover({ className }: { className?: string }) {
     const [open, setOpen] = useState(false);
     const videoInputRef = useRef<HTMLInputElement | null>(null);
     const srtInputRef = useRef<HTMLInputElement | null>(null);
-    const { setVideo, setVideoUrl, setSrt, setVideoFileName, setSrtFileName, setSrtFileId } =
-        usePlayer();
+    const {
+        setVideo,
+        setVideoUrl,
+        setSrt,
+        setVideoFileName,
+        setVideoFileId,
+        setSrtFileName,
+        setSrtFileId,
+    } = usePlayer();
     const { profileId } = useProfile();
 
     const { data: files } = useSWR<ProfileFile[]>(
@@ -86,8 +88,8 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         { revalidateOnFocus: false, keepPreviousData: true }
     );
 
-    const videoFiles = (files ?? []).filter((f) => f.type === "mp4");
-    const subtitleFiles = (files ?? []).filter((f) => f.type === "srt");
+    const videoFiles = (files ?? []).filter((f) => isPlayableVideo(f.name));
+    const subtitleFiles = (files ?? []).filter((f) => isSrt(f.name));
 
     const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -95,6 +97,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         setVideoUrl(null);
         setVideo(file);
         setVideoFileName(file.name);
+        setVideoFileId(null); // device file isn't a profile record
     };
 
     const onPickSrt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,11 +109,12 @@ export function LoadMediaPopover({ className }: { className?: string }) {
     };
 
     const selectProfileFile = async (file: ProfileFile) => {
-        if (file.type === "mp4") {
+        if (isPlayableVideo(file.name)) {
             setVideo(null);
             setVideoUrl(staticUrl(file.url));
             setVideoFileName(file.name);
-        } else if (file.type === "srt") {
+            setVideoFileId(file.id); // track the profile file for in-place ops
+        } else if (isSrt(file.name)) {
             try {
                 const res = await fetch(staticUrl(file.url));
                 const text = await res.text();
@@ -152,10 +156,15 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                         >
                             Select Subtitles
                         </Button>
+                        {/*
+                         * No `accept`: iOS maps accept tokens to UTTypes and
+                         * greys anything it can't map, and Matroska (.mkv) has
+                         * no Apple UTType, so any video filter hides .mkv on
+                         * iOS. Leaving it open keeps every container selectable.
+                         */}
                         <input
                             ref={videoInputRef}
                             type="file"
-                            accept={VIDEO_ACCEPT}
                             onChange={onPickVideo}
                             className="hidden"
                         />

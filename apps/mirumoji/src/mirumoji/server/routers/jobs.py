@@ -317,3 +317,49 @@ async def cancel_job(
             LOGGER.info(f"Job '{job_id}' Cancel Requested")
         await uow.commit()
     return _to_response(job)
+
+
+@jobs_router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_job(
+    job_id: uuid.UUID,
+    profile_id: str = Depends(ensure_profile_exists),
+    manager: JobQueueManager = Depends(get_job_manager),
+) -> None:
+    """
+    Deletes a finished job owned by the active profile (its record, not its
+    produced files)
+
+    A batch parent's child jobs are removed with it. A job that is still active
+    (`queued` / `running`) or still being finished by the worker (a `cancelled`
+    job whose handler has not returned yet) is refused, so the worker is never
+    left holding a deleted row
+
+    Args:
+        job_id (uuid.UUID): The job id
+        profile_id (str): Validated profile id
+        manager (JobQueueManager): The job worker
+
+    Raises:
+        HTTPException: If the job isn't owned by the profile, or is still
+            active or in flight
+        RecordNotFoundError: If the job does not exist
+        DatabaseError: If the deletion fails
+    """
+    async with UnitOfWork() as uow:
+        job = await uow.jobs.get(job_id)
+        if job.profile_id != profile_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job Not Found",
+            )
+        if (
+            job.status in ("queued", "running")
+            or job_id == manager.running_job_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The Job Is Still Finishing, Try Again In A Moment",
+            )
+        await uow.jobs.delete(job_id)
+        await uow.commit()
+    LOGGER.info(f"Job '{job_id}' Deleted For Profile '{profile_id}'")

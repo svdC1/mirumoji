@@ -8,6 +8,7 @@ export type ProfileFile = {
     name: string;
     url: string;
     type: string | null;
+    folder?: string | null;
     created_at?: string | null;
 };
 

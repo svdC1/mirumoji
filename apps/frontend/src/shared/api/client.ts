@@ -78,6 +78,12 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
         throw new ApiError(res.status, message, code, details, displayMessage);
     }
 
+    // A 204 carries no body (a DELETE), but the server still tags it
+    // application/json, so parsing it as JSON would throw on the empty body.
+    if (res.status === 204) {
+        return undefined as T;
+    }
+
     const ct = res.headers.get("content-type") ?? "";
     if (ct.includes("application/json")) {
         return res.json() as Promise<T>;

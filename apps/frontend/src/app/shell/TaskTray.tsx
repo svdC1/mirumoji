@@ -6,58 +6,14 @@
  * shell's Sumi & Shu surface language so it reads as part of the chrome.
  */
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-    ArrowRight,
-    Ban,
-    CheckCircle2,
-    ChevronDown,
-    Clock,
-    ListChecks,
-    UploadCloud,
-    X,
-    XCircle,
-} from "lucide-react";
-import { usePlayer } from "@/contexts/PlayerContext";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ChevronDown, ListChecks, UploadCloud, X, XCircle } from "lucide-react";
 import { useTasks, type UploadTask } from "@/contexts/TaskContext";
-import { staticUrl } from "@/shared/format/files";
-import type { ConvertResult, Job, JobStatus, SrtResult } from "@/shared/jobs/types";
+import { isActive, RESULT_LABELS, statusText, typeLabel } from "@/shared/jobs/labels";
+import { ProgressBar, StatusGlyph } from "@/shared/jobs/JobBits";
+import { useJobResult } from "@/shared/jobs/useJobResult";
+import type { Job } from "@/shared/jobs/types";
 import { cn, IconButton, Spinner } from "@/shared/ui";
-
-const RESULT_LABELS: Record<string, string> = {
-    generate_srt: "Load Subtitles",
-    fix_srt: "Load Subtitles",
-    convert: "Open Video",
-    transcribe: "View Transcript",
-};
-
-const TYPE_LABELS: Record<string, string> = {
-    generate_srt: "Generate Subtitles",
-    transcribe: "Transcribe",
-    convert: "Convert To MP4",
-    fix_srt: "Fix Subtitles",
-};
-
-function typeLabel(type: string): string {
-    return TYPE_LABELS[type] ?? type;
-}
-
-function isActive(status: JobStatus): boolean {
-    return status === "queued" || status === "running";
-}
-
-/** A thin determinate progress bar in the Shu accent. */
-function ProgressBar({ percent }: { percent: number }) {
-    return (
-        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-ink/10">
-            <div
-                className="h-full rounded-full bg-shu transition-[width] duration-300"
-                style={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
-            />
-        </div>
-    );
-}
 
 /** A row for a client-side upload that is feeding a job. */
 function UploadRow({ task, onDismiss }: { task: UploadTask; onDismiss: () => void }) {
@@ -77,7 +33,7 @@ function UploadRow({ task, onDismiss }: { task: UploadTask; onDismiss: () => voi
                         {task.name}
                     </p>
                     <p className="text-2xs text-ink-muted">
-                        {typeLabel(task.jobType)} ·{" "}
+                        {task.jobType ? typeLabel(task.jobType) : "Upload"} ·{" "}
                         {failed
                             ? (task.error ?? "Upload Failed")
                             : `Uploading ${Math.round(task.progress)}%`}
@@ -92,33 +48,6 @@ function UploadRow({ task, onDismiss }: { task: UploadTask; onDismiss: () => voi
             </div>
         </li>
     );
-}
-
-function StatusGlyph({ status }: { status: JobStatus }) {
-    if (status === "running") return <Spinner className="h-4 w-4" />;
-    if (status === "queued") return <Clock size={16} className="text-ink-muted" />;
-    if (status === "succeeded") return <CheckCircle2 size={16} className="text-matcha" />;
-    if (status === "failed") return <XCircle size={16} className="text-danger" />;
-    return <Ban size={16} className="text-ink-faint" />;
-}
-
-function statusText(job: Job): string {
-    switch (job.status) {
-        case "queued":
-            return "Queued";
-        case "running":
-            return job.total > 1 ? `Running · ${job.completed} / ${job.total}` : "Running";
-        case "succeeded":
-            return "Done";
-        case "failed":
-            // Short + structured; the full message goes to the toast (mapped)
-            // and will live on the dashboard's tasks tab.
-            return job.error_code ? `Failed · ${job.error_code}` : "Failed";
-        case "cancelled":
-            return "Cancelled";
-        default:
-            return job.status;
-    }
 }
 
 /** A row for a server-side job. */
@@ -184,30 +113,23 @@ function JobRow({
  */
 export function TaskTray() {
     const { jobs, uploads, busy, cancel, dismiss } = useTasks();
-    const player = usePlayer();
-    const navigate = useNavigate();
+    const applyResult = useJobResult();
     const [open, setOpen] = useState(false);
 
-    /** Applies a finished job's result (load it into the player / open it). */
+    // Pop the tray open when a new upload starts (player or Files tab), so its
+    // progress surfaces instead of hiding in the collapsed pill. Only a brand
+    // new upload id triggers it, so progress ticks don't fight a manual
+    // collapse.
+    const seenUploads = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        const isNew = uploads.some((u) => !seenUploads.current.has(u.id));
+        seenUploads.current = new Set(uploads.map((u) => u.id));
+        if (isNew) setOpen(true);
+    }, [uploads]);
+
+    /** Applies a finished job's result, then collapses the tray. */
     const runResult = (job: Job) => {
-        const result = job.result;
-        if (!result) return;
-        if (job.type === "generate_srt" || job.type === "fix_srt") {
-            const srt = result as unknown as SrtResult;
-            const file = new File([srt.srt_content], "subtitles.srt", {
-                type: "application/x-subrip",
-            });
-            player.setSrt(file);
-            player.setSrtFileName(file.name);
-            player.setSrtFileId(srt.srt_file_id);
-            navigate("/player");
-        } else if (job.type === "convert") {
-            const conv = result as unknown as ConvertResult;
-            player.setVideoUrl(staticUrl(conv.video_url));
-            navigate("/player");
-        } else if (job.type === "transcribe") {
-            navigate("/dashboard");
-        }
+        applyResult(job);
         setOpen(false);
     };
 
