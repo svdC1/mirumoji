@@ -9,18 +9,19 @@ import { FolderOpen } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiFetch } from "@/shared/api/client";
 import { toastApiError } from "@/shared/api/errors";
-import { getFileExtension, staticUrl, truncateFilename } from "@/shared/format/files";
+import {
+    getFileExtension,
+    inferFileType,
+    staticUrl,
+    truncateFilename,
+} from "@/shared/format/files";
 import { IconButton, Popover, Button, cn } from "@/shared/ui";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { ProfileFile } from "@/features/profile/types";
 
-// Containers a browser <video> can play directly. Other uploads (mkv, avi, ...)
-// need converting to MP4 first, so they are not offered as profile videos here.
-const PLAYABLE_VIDEO_EXTS = ["mp4", "webm", "ogv", "ogg", "m4v", "mov"];
-
-function isPlayableVideo(name: string): boolean {
-    return PLAYABLE_VIDEO_EXTS.includes(getFileExtension(name).toLowerCase());
+function isVideo(name: string): boolean {
+    return inferFileType(name) === "video";
 }
 
 function isSrt(name: string): boolean {
@@ -47,7 +48,7 @@ function FileList({
                                 onClick={() => onSelect(f)}
                                 className="w-full rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu"
                             >
-                                {truncateFilename(f.name, 12, 12)}
+                                {truncateFilename(f.name, 8, 12)}
                             </button>
                         </li>
                     ))
@@ -79,6 +80,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         setVideoFileId,
         setSrtFileName,
         setSrtFileId,
+        setTimestamp,
     } = usePlayer();
     const { profileId } = useProfile();
 
@@ -88,16 +90,25 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         { revalidateOnFocus: false, keepPreviousData: true }
     );
 
-    const videoFiles = (files ?? []).filter((f) => isPlayableVideo(f.name));
+    const videoFiles = (files ?? []).filter((f) => isVideo(f.name));
     const subtitleFiles = (files ?? []).filter((f) => isSrt(f.name));
 
     const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        // The input has no `accept` (an iOS/.mkv workaround), so it accepts any
+        // file. Reject non-video picks here so Generate SRT / Convert never run
+        // FFmpeg/Whisper over a text or other unrelated file.
+        if (!isVideo(file.name)) {
+            toast.error("Please Select A Video File");
+            e.target.value = "";
+            return;
+        }
         setVideoUrl(null);
         setVideo(file);
         setVideoFileName(file.name);
         setVideoFileId(null); // device file isn't a profile record
+        setTimestamp(null); // a new video starts from the beginning
     };
 
     const onPickSrt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,11 +120,16 @@ export function LoadMediaPopover({ className }: { className?: string }) {
     };
 
     const selectProfileFile = async (file: ProfileFile) => {
-        if (isPlayableVideo(file.name)) {
+        if (isVideo(file.name)) {
+            // Load every video the same way and let the player try to play it.
+            // A container this browser can't decode (e.g. .mkv on iOS) is caught
+            // there and offered for conversion. videoFileId is always set, so the
+            // toolbar's by-reference actions stay enabled even when it won't play.
             setVideo(null);
             setVideoUrl(staticUrl(file.url));
             setVideoFileName(file.name);
             setVideoFileId(file.id); // track the profile file for in-place ops
+            setTimestamp(null); // a new video starts from the beginning
         } else if (isSrt(file.name)) {
             try {
                 const res = await fetch(staticUrl(file.url));

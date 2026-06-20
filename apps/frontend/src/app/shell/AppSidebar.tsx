@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ProfileChip } from "./ProfileChip";
 import { cn, IconButton } from "@/shared/ui";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 
 interface NavEntry {
     to: string;
@@ -47,10 +48,12 @@ function RailBody({
     expanded,
     pathname,
     onNavigate,
+    scrollable,
 }: {
     expanded: boolean;
     pathname: string;
     onNavigate: () => void;
+    scrollable: boolean;
 }) {
     return (
         <div className="flex h-full flex-col">
@@ -69,7 +72,11 @@ function RailBody({
                 {expanded && <span className="font-display text-lg text-ink">Mirumoji</span>}
             </Link>
 
-            <nav className="flex-1 py-2">
+            {/* On a short mobile viewport (landscape phone) the items must scroll
+                so the lower ones stay reachable; the desktop rail keeps its
+                original non-scrolling layout, where the scrollbar squeezed the
+                collapsed icon column. */}
+            <nav className={cn("flex-1 py-2", scrollable && "min-h-0 overflow-y-auto")}>
                 {NAV.map((entry) => {
                     const active = isActive(pathname, entry);
                     const Icon = entry.icon;
@@ -115,6 +122,9 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
     const { pathname } = useLocation();
     const [hovered, setHovered] = useState(false);
     const [open, setOpen] = useState(false);
+    // Only the mobile drawer scrolls its nav; the desktop rail keeps its
+    // original non-scrolling layout (see RailBody).
+    const isMobile = useIsMobile();
 
     return (
         <>
@@ -124,7 +134,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
             {/* Mobile top bar — non-immersive routes. Holds the menu button (and
                 brand) so it fills the top strip instead of floating over content. */}
             {!immersive && (
-                <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-ink/10 bg-surface/80 px-3 backdrop-blur md:hidden">
+                <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-ink/10 bg-surface/80 px-3 backdrop-blur lg:hidden">
                     <IconButton label="Open menu" onClick={() => setOpen(true)}>
                         <Menu size={20} />
                     </IconButton>
@@ -152,7 +162,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
             )}
 
             {/* Drawer overlay + panel — mobile (all routes) + immersive desktop. */}
-            <div className={immersive ? "" : "md:hidden"}>
+            <div className={immersive ? "" : "lg:hidden"}>
                 {open && (
                     <div
                         className="fixed inset-0 z-40 bg-black/50"
@@ -176,6 +186,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                                 expanded
                                 pathname={pathname}
                                 onNavigate={() => setOpen(false)}
+                                scrollable={isMobile}
                             />
                         </div>
                     </div>
@@ -188,7 +199,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                     onMouseEnter={() => setHovered(true)}
                     onMouseLeave={() => setHovered(false)}
                     className={cn(
-                        "fixed left-0 top-0 z-40 hidden h-dvh overflow-hidden border-r border-ink/10 bg-surface transition-[width] duration-200 md:block",
+                        "fixed left-0 top-0 z-40 hidden h-dvh overflow-hidden border-r border-ink/10 bg-surface transition-[width] duration-200 lg:block",
                         hovered ? "w-60 shadow-lift" : "w-16"
                     )}
                 >
@@ -196,6 +207,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                         expanded={hovered}
                         pathname={pathname}
                         onNavigate={() => setHovered(false)}
+                        scrollable={false}
                     />
                 </aside>
             )}

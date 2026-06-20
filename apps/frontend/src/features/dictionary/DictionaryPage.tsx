@@ -60,7 +60,7 @@ export default function DictionaryPage() {
     };
 
     return (
-        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-3xl px-4 py-8">
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] lg:min-h-dvh w-full max-w-3xl px-4 py-8">
             <div className="mx-auto mb-6 max-w-xl">
                 <h1 className="mb-6 text-center font-display text-3xl text-ink">Dictionary</h1>
 

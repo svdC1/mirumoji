@@ -49,6 +49,17 @@ const OPERATIONS: {
     },
 ];
 
+// What each operation needs every selected file to be. inferFileType (extension)
+// is the only reliable media-vs-non-media signal — the browser can't tell an
+// undecodable video from a non-media file — so a text file can't be fed to
+// FFmpeg/Whisper, nor a video to the subtitle fixer.
+const OP_ACCEPTS: Record<BatchJobType, { types: string[]; note: string }> = {
+    batch_generate_srt: { types: ["video", "audio"], note: "Media Files Only" },
+    batch_transcribe: { types: ["audio"], note: "Audio Files Only" },
+    batch_convert: { types: ["video"], note: "Video Files Only" },
+    batch_fix_srt: { types: ["srt"], note: "Subtitle Files Only" },
+};
+
 /**
  * The BatchDialog component.
  *
@@ -77,18 +88,31 @@ export function BatchDialog({
 
     const fileIds = files.map((f) => f.id);
 
-    // Fix Subtitles feeds each file's text to the LLM, so a non-subtitle file
-    // would be decoded as garbage and balloon into a huge request. Gate it to
-    // subtitle selections only.
-    const allSrt = files.length > 0 && files.every((f) => inferFileType(f.name) === "srt");
-    const isOpDisabled = (t: BatchJobType) => t === "batch_fix_srt" && !allSrt;
+    // An operation can run only if every selected file is a kind it accepts, so
+    // a non-matching file (a text file under Convert, a video under Fix
+    // Subtitles) is never fed to the wrong tool.
+    const isOpDisabled = (t: BatchJobType) =>
+        files.length === 0 ||
+        !files.every((f) => OP_ACCEPTS[t].types.includes(inferFileType(f.name) ?? ""));
 
-    // Drop an op that the current selection no longer supports.
+    // A stable signature of the selection's file kinds, so the reset effect only
+    // re-runs when the selection actually changes (not on every render).
+    const selectionSig = files.map((f) => inferFileType(f.name) ?? "?").join("|");
+
+    // Drop an operation the current selection no longer supports, settling on
+    // the first one it does.
     useEffect(() => {
-        if (open && type === "batch_fix_srt" && !allSrt) setType("batch_generate_srt");
-    }, [open, allSrt, type]);
+        if (!open || !isOpDisabled(type)) return;
+        const fallback = OPERATIONS.find((op) => !isOpDisabled(op.type));
+        if (fallback) setType(fallback.type);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, type, selectionSig]);
 
     const buildRequest = async (): Promise<BatchSubmitRequest | null> => {
+        if (isOpDisabled(type)) {
+            toast.error("That Operation Doesn't Match The Selected Files");
+            return null;
+        }
         const base = { type, file_ids: fileIds };
         if (type === "batch_generate_srt") return { ...base, opts: whisperOpts() };
         if (type === "batch_transcribe") {
@@ -97,10 +121,6 @@ export function BatchDialog({
         if (type === "batch_convert") return { ...base, opts: convertOpts() };
         // batch_fix_srt: model + system message come from the LLM Template,
         // exactly like the single-file Fix SRT action.
-        if (!allSrt) {
-            toast.error("Fix Subtitles Only Works On Subtitle Files");
-            return null;
-        }
         const template = await apiGetTemplate();
         if (!template) {
             toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
@@ -171,7 +191,7 @@ export function BatchDialog({
                                             {op.label}
                                         </span>
                                         <span className="block text-2xs text-ink-muted">
-                                            {disabled ? "Subtitle Files Only" : op.description}
+                                            {disabled ? OP_ACCEPTS[op.type].note : op.description}
                                         </span>
                                     </span>
                                 </button>

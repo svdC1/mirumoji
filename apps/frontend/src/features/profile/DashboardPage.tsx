@@ -23,7 +23,7 @@ export default function DashboardPage() {
     const [tab, setTab] = useState("profile");
 
     return (
-        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-4xl px-4 py-8">
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] lg:min-h-dvh w-full max-w-4xl px-4 py-8">
             <h1 className="mb-6 font-display text-3xl text-ink">Dashboard</h1>
             <Tabs items={tabs} value={tab} onChange={setTab} className="mb-6" />
 

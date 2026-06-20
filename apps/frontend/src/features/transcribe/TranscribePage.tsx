@@ -231,7 +231,7 @@ export default function TranscribePage() {
         );
 
     return (
-        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink md:h-dvh">
+        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink lg:h-dvh">
             <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
                     {messages.length === 0 ? (

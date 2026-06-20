@@ -64,11 +64,11 @@ export function SubtitlePanel({
     if (collapsed) {
         // Mobile: a slim full-width bar below the video. Desktop: a vertical rail.
         return (
-            <div className="flex w-full shrink-0 items-center gap-2 border-t border-ink/10 bg-surface px-3 py-2 md:h-full md:w-11 md:flex-col md:border-l md:border-t-0 md:px-0 md:py-3">
+            <div className="flex w-full shrink-0 items-center gap-2 border-t border-ink/10 bg-surface px-3 py-2 lg:h-full lg:w-11 lg:flex-col lg:border-l lg:border-t-0 lg:px-0 lg:py-3">
                 <IconButton label="Show Subtitles" onClick={onToggle}>
                     <ExpandIcon size={18} />
                 </IconButton>
-                <span className="text-2xs uppercase tracking-widest text-ink-faint md:mt-3 md:[writing-mode:vertical-rl]">
+                <span className="text-2xs uppercase tracking-widest text-ink-faint lg:mt-3 lg:[writing-mode:vertical-rl]">
                     Subtitles
                 </span>
             </div>
@@ -77,7 +77,7 @@ export function SubtitlePanel({
 
     // Mobile: full-width, fills the space below the video. Desktop: a fixed rail.
     return (
-        <aside className="flex min-h-0 w-full flex-1 flex-col border-t border-ink/10 bg-surface md:h-full md:w-80 md:flex-none md:border-l md:border-t-0 lg:w-96">
+        <aside className="flex min-h-0 w-full flex-1 flex-col border-t border-ink/10 bg-surface lg:h-full lg:w-80 lg:flex-none lg:border-l lg:border-t-0 xl:w-96">
             <div className="flex items-center gap-2 border-b border-ink/10 px-3 py-2.5">
                 <h2 className="flex-1 font-display text-sm text-ink">Subtitles</h2>
                 <span className="text-2xs text-ink-faint">{cues.length} Cues</span>

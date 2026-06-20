@@ -53,7 +53,7 @@ export default function HomePage() {
     );
 
     return (
-        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] md:min-h-dvh w-full max-w-5xl px-4 py-10">
+        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] lg:min-h-dvh w-full max-w-5xl px-4 py-10">
             <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <span
@@ -144,7 +144,7 @@ export default function HomePage() {
                 ((clips && clips.length > 0) || (transcripts && transcripts.length > 0)) && (
                     <div className="mb-10 grid gap-6 sm:grid-cols-2">
                         {clips && clips.length > 0 && (
-                            <div>
+                            <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between">
                                     <h2 className="font-display text-ink">Recent Clips</h2>
                                     <Link
@@ -170,7 +170,7 @@ export default function HomePage() {
                             </div>
                         )}
                         {transcripts && transcripts.length > 0 && (
-                            <div>
+                            <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between">
                                     <h2 className="font-display text-ink">Recent Transcripts</h2>
                                     <Link

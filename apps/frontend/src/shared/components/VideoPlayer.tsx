@@ -74,12 +74,13 @@ export function VideoPlayer({
         };
     }, [el]);
 
-    // Spacebar toggles play/pause for the primary, on-page player. Ignored
-    // while typing so it never hijacks the spacebar inside form controls.
+    // Keyboard controls for the primary, on-page player: the spacebar toggles
+    // play/pause and the arrows skip by 5s. Ignored while typing so they never
+    // hijack a form control.
     useEffect(() => {
         if (!el || !keyboardControls) return;
+        const SKIP_SECONDS = 5;
         const onKey = (e: KeyboardEvent) => {
-            if (e.code !== "Space" && e.key !== " ") return;
             const target = e.target as HTMLElement | null;
             if (
                 target &&
@@ -90,9 +91,16 @@ export function VideoPlayer({
             ) {
                 return;
             }
-            e.preventDefault();
-            if (el.paused) el.play().catch(() => undefined);
-            else el.pause();
+            if (e.code === "Space" || e.key === " ") {
+                e.preventDefault();
+                if (el.paused) el.play().catch(() => undefined);
+                else el.pause();
+            } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                e.preventDefault();
+                const duration = Number.isFinite(el.duration) ? el.duration : Infinity;
+                const delta = e.key === "ArrowRight" ? SKIP_SECONDS : -SKIP_SECONDS;
+                el.currentTime = Math.min(Math.max(el.currentTime + delta, 0), duration);
+            }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);

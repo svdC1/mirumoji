@@ -27,6 +27,7 @@ import {
     KanjiInfoDisplay,
     TokenizedExamples,
 } from "./DictDisplays";
+import { ExplanationSkeleton } from "./ExplanationSkeleton";
 
 export interface WordDialogProps {
     sentence: string;
@@ -370,7 +371,7 @@ export default function WordDialog({
 
     const dictSubTab = (active: boolean) =>
         cn(
-            "flex-1 py-2 text-sm transition-colors",
+            "flex-1 py-2 text-2xs transition-colors sm:text-sm",
             active ? "border-b-2 border-ai text-ink" : "text-ink-faint hover:text-ink-muted"
         );
 
@@ -466,15 +467,7 @@ export default function WordDialog({
                                 Template) to enable explanations.
                             </div>
                         ) : !explanation ? (
-                            <div className="w-full space-y-4">
-                                <div className="h-6 w-1/3 animate-pulse rounded bg-ink/10" />
-                                {Array.from({ length: 4 }).map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="h-4 w-full animate-pulse rounded bg-ink/10"
-                                    />
-                                ))}
-                            </div>
+                            <ExplanationSkeleton />
                         ) : (
                             <motion.div
                                 initial={{ opacity: 0, y: 6 }}
