@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "3.1.0rc2"
+version = "3.1.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "Self-Hostable Japanese Language Immersion Tool"
@@ -118,7 +118,7 @@ mirumoji = "mirumoji.launcher.cli.main:app"
 Repository = "https://github.com/svdC1/mirumoji"
 Issues = "https://github.com/svdC1/mirumoji/issues"
 Documentation = "https://svdc1.github.io/mirumoji/docs"
-Changelog = "https://svdc1.github.io/mirumoji/docs/changelog"
+Changelog = "https://svdc1.github.io/mirumoji/docs/project/changelog"
 
 [tool.setuptools]
 include-package-data = true
