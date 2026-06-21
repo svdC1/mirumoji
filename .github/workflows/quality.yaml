@@ -1,10 +1,6 @@
 name: Quality Gates
 
-on:
-    push:
-        branches: [main, v3-refactor]
-    pull_request:
-        branches: [main, v3-refactor]
+on: [push, pull_request]
 
 jobs:
     # --- Python: Ruff + MyPy ---
@@ -13,33 +9,31 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v6
+            - name: Checkout Repository
+              uses: actions/checkout@v6
 
             - name: Set up Python
               uses: actions/setup-python@v6
               with:
                   python-version: "3.11"
+                  cache: "pip"
 
             - name: Install Dependencies
-              # Install every runtime extra so mypy can resolve all imports.
-              # torch is not a declared dependency (it ships in the GPU image /
-              # is user-installed), but whisper-local code imports it, so mypy
-              # needs it present.
+              # Install every runtime extra so mypy can resolve all imports
               run: |
                   python -m pip install --upgrade pip
                   pip install -e "apps/mirumoji[server,whisper-local,dev,gui]"
-                  pip install torch==2.6.0
 
             - name: Ruff Check
-              run: ruff check apps/mirumoji/src
+              run: ruff check apps/mirumoji/src/
 
             - name: Ruff Format Check
-              run: ruff format --check apps/mirumoji/src
+              run: ruff format --check apps/mirumoji/src/
 
             - name: MyPy
               run: |
                   cd apps/mirumoji
-                  mypy src
+                  mypy src/
 
     # --- Python: PyTest ---
     python-test:
@@ -47,12 +41,14 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v6
+            - name: Checkout Repository
+              uses: actions/checkout@v6
 
             - name: Set up Python
               uses: actions/setup-python@v6
               with:
                   python-version: "3.11"
+                  cache: "pip"
 
             - name: Install Dependencies
               run: |
@@ -70,7 +66,8 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v6
+            - name: Checkout Repository
+              uses: actions/checkout@v6
 
             - name: Set up Node
               uses: actions/setup-node@v6
