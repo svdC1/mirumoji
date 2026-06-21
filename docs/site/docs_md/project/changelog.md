@@ -77,9 +77,9 @@ includes a few breaking changes, listed first
 - `Launcher` &rarr; the launcher's logs and the Docker download progress are tidier
   and easier to follow, in both the CLI and the desktop app
 
-- `Docker Images` &rarr; the GPU images are roughly 5 GB smaller. PyTorch was removed
-  because transcription does not need it, the speech model now downloads on first use
-  instead of being shipped inside the image, and the Modal image loads faster
+- `Docker Images` &rarr; the GPU images are smaller. PyTorch was removed because
+  transcription does not need it, and the speech model now downloads on first use into a
+  persistent cache instead of being baked into the local GPU images
 
 ### Fixed
 
