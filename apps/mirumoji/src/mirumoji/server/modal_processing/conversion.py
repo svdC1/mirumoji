@@ -1,5 +1,5 @@
 """
-Defines `Modal` GPU jobs for `NVENC` video conversion
+Defines the `Modal` GPU job for video conversion
 """
 
 from typing import Any
@@ -11,7 +11,13 @@ def video_conversion_job(
     to_mp4_kwargs: dict[str, Any] | None = None,
 ) -> str:
     """
-    Convert a video to MP4 on a `Modal` GPU using `NVENC`
+    Convert a video to MP4 inside a `Modal` GPU container
+
+    info: Encoder
+        The container probes `NVENC` and uses the on-device GPU pipeline only
+        when an encoder is present, falling back to CPU `libx264` otherwise.
+        The data center compute GPUs (`A100` / `H100` / `B200`) have no
+        `NVENC`, so they convert on CPU
 
     info: File Transfer
         - The input video is read out of the per-job ephemeral volume into a
@@ -53,6 +59,7 @@ def video_conversion_job(
     import modal
 
     from mirumoji.log import setup_logging
+    from mirumoji.server.config import nvenc_available
     from mirumoji.server.modal_processing.volume_io import (
         download_from_volume,
         upload_to_volume,
@@ -71,18 +78,24 @@ def video_conversion_job(
         local_in = workdir / Path(vol_fp).name
         download_from_volume(vol, vol_fp, local_in)
 
+        # Probe NVENC inside the container, where the conversion runs. The data
+        # center compute GPUs (A100 / H100 / B200) have NVDEC but no NVENC, so
+        # this keeps the job on CPU there instead of attempting a doomed encode
+        ffmpeg = get_ffmpeg_path()["ffmpeg"]
+        use_gpu = nvenc_available(ffmpeg)
+
         local_out = workdir / f"{local_in.stem}_converted.mp4"
         logger.info(
-            f"Converting '{local_in}' -> "
-            f"'{local_out}' Using NVENC (kwargs: {to_mp4_kwargs})"
+            f"Converting '{local_in}' -> '{local_out}' "
+            f"(use_gpu={use_gpu}, kwargs: {to_mp4_kwargs})"
         )
 
         kwargs = dict(to_mp4_kwargs or {})
         kwargs.update(
-            ffmpeg_path=get_ffmpeg_path()["ffmpeg"],
+            ffmpeg_path=ffmpeg,
             input_path=local_in,
             output_path=local_out,
-            use_gpu=True,
+            use_gpu=use_gpu,
         )
         result_p = to_mp4(**kwargs)
 

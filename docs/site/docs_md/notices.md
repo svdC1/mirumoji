@@ -44,6 +44,14 @@ used in conformance with the group's
 
 - This applies only to the GPU image variant
 
+### FFmpeg &rarr; Bundled Static Build (GPU / Modal Images)
+
+- The `GPU` and `Modal` server images bundle a static `FFmpeg` build from [`BtbN/FFmpeg-Builds`](https://github.com/BtbN/FFmpeg-Builds), configured as `GPL` so it includes the `NVENC` / `NVDEC` encoders and the `scale_cuda` filter used for hardware-accelerated video conversion
+
+- This build is redistributed under the [`GNU GPL v3`](https://www.gnu.org/licenses/gpl-3.0.html). The corresponding source is available from [`ffmpeg.org`](https://ffmpeg.org/download.html) and the build configuration from the `BtbN/FFmpeg-Builds` repository
+
+- The `CPU` image variants keep the distribution's `LGPL` `FFmpeg` installed via `apt`
+
 ## Notable Components
 
 | Component | Role | License |

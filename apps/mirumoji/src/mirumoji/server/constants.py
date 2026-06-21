@@ -77,3 +77,56 @@ MODEL_DOWNLOAD_BACKOFF_BASE = 2.0
 Base number of seconds for the exponential backoff between Whisper model
 download retries
 """
+
+# --- FFMPEG Conversion ---
+
+DEFAULT_CONVERSION_PRESET = "balanced"
+"""
+The conversion preset used when a request does not specify one
+
+Names a key of `CONVERSION_PRESETS`
+"""
+
+CONVERSION_PRESETS: dict[str, dict[str, tuple[str, str]]] = {
+    "performance": {
+        "x264": ("veryfast", "26"),
+        "nvenc": ("p2", "30"),
+    },
+    "balanced": {
+        "x264": ("medium", "23"),
+        "nvenc": ("p4", "26"),
+    },
+    "quality": {
+        "x264": ("slow", "20"),
+        "nvenc": ("p6", "22"),
+    },
+}
+"""
+FFmpeg encoder arguments used when converting video to MP4
+
+A dictionary containing bundles of ffmpeg encoder arguments keyed by
+the name of a specific preset
+
+info: Format
+    Each value is `(speed, quality)` for one encoder
+    - libx264    -> (`-preset`, `-crf`)
+    - h264_nvenc -> (`-preset`, `-cq`)
+
+abstract: `performance`
+    - Prioritises conversion speed over output quality
+    - The fastest encoder presets paired with a lower quality target, for when
+      throughput matters more than fidelity
+
+abstract: `balanced`
+    - Balances conversion speed with output quality
+    - The default, with mid-range encoder presets and a moderate quality target
+      that suits most playback
+
+abstract: `quality`
+    - Prioritises output quality
+    - The slowest encoder presets paired with a higher quality target, for when
+      fidelity matters more than encode time
+
+`resolution` and `target_bitrate` options stay separate (output geometry and a
+rate ceiling), so a preset only trades encode speed against quality
+"""

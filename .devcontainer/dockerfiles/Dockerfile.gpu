@@ -18,7 +18,6 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     git \
-    ffmpeg \
     wget \
     xz-utils \
     software-properties-common \
@@ -26,6 +25,20 @@ RUN apt-get update && \
     gnupg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# --- Static ffmpeg 7.x With NVENC / NVDEC + scale_cuda ---
+# Ubuntu's apt ffmpeg (4.x) is built without the CUDA filters, so the on-device
+# GPU conversion pipeline (scale_cuda) is impossible there. BtbN's GPL static
+# build ships nvenc, nvdec, and scale_cuda (which needs only the CUDA driver at
+# run time). Matches the published GPU image so dev parity holds
+ARG FFMPEG_RELEASE=latest
+ARG FFMPEG_BUILD=ffmpeg-n7.1-latest-linux64-gpl-7.1
+RUN wget -O /tmp/ffmpeg.tar.xz \
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/${FFMPEG_RELEASE}/${FFMPEG_BUILD}.tar.xz" \
+    && tar -xf /tmp/ffmpeg.tar.xz -C /tmp \
+    && mv /tmp/${FFMPEG_BUILD}/bin/ffmpeg /tmp/${FFMPEG_BUILD}/bin/ffprobe /usr/local/bin/ \
+    && rm -rf /tmp/ffmpeg.tar.xz /tmp/${FFMPEG_BUILD} \
+    && ffmpeg -version
 
 # --- Install Python 3.11 ---
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \

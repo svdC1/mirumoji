@@ -286,11 +286,29 @@ export function AdvancedPanel() {
             ) : (
                 <>
                     <p className="text-sm text-ink-muted">MP4 Conversion Output Settings</p>
+                    <div>
+                        <InfoLabel
+                            label="Quality Preset"
+                            info="Encoder speed against output quality, default is Balanced"
+                        />
+                        <div className="flex gap-1 rounded-control bg-surface-2 p-1">
+                            {(["performance", "balanced", "quality"] as const).map((p) => (
+                                <button
+                                    key={p}
+                                    type="button"
+                                    className={segBtn((draft.convert.preset ?? "balanced") === p)}
+                                    onClick={() => setC({ preset: p })}
+                                >
+                                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <InfoLabel
                                 label="Resolution"
-                                info="Target canvas size, width x height"
+                                info="Maximum output size, width x height"
                             />
                             <Input
                                 value={draft.convert.resolution ?? ""}
@@ -299,7 +317,7 @@ export function AdvancedPanel() {
                             />
                         </div>
                         <div>
-                            <InfoLabel label="Target Bitrate" info="Target video bitrate" />
+                            <InfoLabel label="Target Bitrate" info="Video bitrate ceiling" />
                             <Input
                                 value={draft.convert.target_bitrate ?? ""}
                                 placeholder="2500k"

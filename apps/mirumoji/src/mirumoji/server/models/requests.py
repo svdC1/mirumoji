@@ -209,12 +209,15 @@ class ConvertVideoRequest(BaseModel):
     Options for `/video/convert_to_mp4`
 
     Args:
-        resolution (str): Target canvas `WxH`
-        target_bitrate (str): Target video bitrate
+        resolution (str): Maximum output size `WxH` (aspect preserved)
+        target_bitrate (str): Video bitrate ceiling
+        preset (Literal): Encoder speed / quality preset, one of
+            `performance`, `balanced`, `quality`
     """
 
     resolution: str = "1280x720"
     target_bitrate: str = "2500k"
+    preset: Literal["performance", "balanced", "quality"] = "balanced"
 
 
 # --- Job Submission Requests ---

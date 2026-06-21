@@ -21,7 +21,6 @@ ARG MIRUMOJI_VERSION=3.0.0
 # --- System Dependencies + Python Shim ---
 # fugashi's wheel bundles libmecab, so no system mecab/libmecab-dev is needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     wget \
     xz-utils \
     python3.11 \
@@ -29,6 +28,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-venv \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# --- Static ffmpeg 7.x With NVENC / NVDEC + scale_cuda ---
+# Ubuntu's apt ffmpeg (4.x) is built without the CUDA filters, so the on-device
+# GPU conversion pipeline (scale_cuda) is impossible there. BtbN's GPL static
+# build ships nvenc, nvdec, and scale_cuda (which needs only the CUDA driver at
+# run time). Pinned to the 7.1 release line. For byte-reproducible builds, swap
+# `latest` for a dated `autobuild-*` release tag
+ARG FFMPEG_RELEASE=latest
+ARG FFMPEG_BUILD=ffmpeg-n7.1-latest-linux64-gpl-7.1
+RUN wget -O /tmp/ffmpeg.tar.xz \
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/${FFMPEG_RELEASE}/${FFMPEG_BUILD}.tar.xz" \
+    && tar -xf /tmp/ffmpeg.tar.xz -C /tmp \
+    && mv /tmp/${FFMPEG_BUILD}/bin/ffmpeg /tmp/${FFMPEG_BUILD}/bin/ffprobe /usr/local/bin/ \
+    && rm -rf /tmp/ffmpeg.tar.xz /tmp/${FFMPEG_BUILD} \
+    && ffmpeg -version
 
 # --- Point 'python' + 'python3' At python3.11 ---
 RUN update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11  1 && \

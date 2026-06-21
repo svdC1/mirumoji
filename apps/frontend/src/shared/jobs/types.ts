@@ -37,10 +37,14 @@ export interface TranscribeOpts {
     vad_filter?: boolean;
 }
 
+/** Encoder speed/quality preset for conversion, mirroring the server. */
+export type ConversionPreset = "performance" | "balanced" | "quality";
+
 /** Conversion options, mirroring the server's `ConvertVideoRequest`. */
 export interface ConvertOpts {
     resolution?: string;
     target_bitrate?: string;
+    preset?: ConversionPreset;
 }
 
 /** A server-side job, mirroring the API's `JobResponse`. */

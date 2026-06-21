@@ -263,6 +263,60 @@ def gpu_available() -> dict[str, bool | str]:
     return {"available": True, "name": name}
 
 
+def nvenc_available(ffmpeg_path: str) -> bool:
+    """
+    Checks whether the NVIDIA `NVENC` H.264 encoder is actually usable by the
+    given `FFMPEG` build on the current machine
+
+    question: Why A Real Probe
+        - A CUDA device being present (`gpu_available`) does not mean an
+          encoder exists. The data center compute GPUs (`A100`, `H100`, `Bx00`)
+          expose `NVDEC` for decoding but have no `NVENC` encoder at all
+
+        - This runs a tiny synthetic encode and checks the exit code, so it
+          reports the true capability of whatever GPU and `FFMPEG` build are
+          present instead of guessing from a hard-coded GPU list
+
+    info: Where To Call It
+        - Run this in the same process that runs the conversion, since that is
+          where `FFMPEG` actually executes
+
+        - For the `local` backend that is the host, for the `modal` backend
+          that is the GPU container
+
+    Args:
+        ffmpeg_path (str): Path to the system's FFMPEG executable
+
+    Returns:
+        `True` if `h264_nvenc` initialises and encodes a probe frame, `False`
+            otherwise
+    """
+    cmd = [
+        ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=black:s=64x64:d=0.1",
+        "-c:v",
+        "h264_nvenc",
+        "-f",
+        "null",
+        "-",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=30,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def get_system_info() -> dict[str, Any]:
     """
     Uses `os`, `socket`, and `platform` to collect basic information about the

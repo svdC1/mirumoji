@@ -28,7 +28,7 @@ from ...exceptions import (
     WhisperUnavailableError,
 )
 from .. import media
-from ..config import gpu_available, transcribe_backend
+from ..config import nvenc_available, transcribe_backend
 from ..modal_processing import volume_io
 from . import audio, whisper
 
@@ -254,14 +254,15 @@ class Processor:
         Converts a video to MP4 using `FFMPEG`
 
         info: Backend Differences
-            - When using the `local` backend, an attempt is made to use the
-              local NVIDIA GPU's `NVENC` for faster encoding. If this a CPU
-              deployment or `NVENC` fails for any reason, it falls back to the
-              slower CPU enconding
+            - Both backends probe `NVENC` where the conversion actually runs
+              and take the on-device GPU pipeline only when an encoder is
+              present, falling back to CPU `libx264` otherwise
 
-            - When using the `modal` backend, the conversion happens inside a
-              `Modal` container running a image that is already configured
-              with `NVENC` capability, so `NVENC` enconding is used
+            - For `local` the probe runs on the host
+
+            - For `modal` it runs inside the GPU container so that the data
+              center compute GPUs (`A100` / `H100` / `B200`), which have no
+              `NVENC`, convert on CPU
 
         Args:
             input_path (str | os.PathLike[str]): Absolute path to the source
@@ -269,7 +270,7 @@ class Processor:
             output_path (str | os.PathLike[str]): Absolute destination path for
                 the MP4
             to_mp4_kwargs (dict | None): Argument overrides for `audio.to_mp4`
-                (resolution, target_bitrate, use_gpu)
+                (resolution, target_bitrate, preset)
 
         Returns:
             The path to the converted MP4
@@ -332,16 +333,19 @@ class Processor:
                 ) from e
             return out
 
-        # Local Backend. Only attempt the GPU path when a CUDA device is
-        # actually present, so CPU-only deployments don't waste a doomed NVENC
-        # attempt before falling back
+        # Local Backend. Only take the GPU path when this machine's ffmpeg can
+        # actually use NVENC, so CPU-only deployments (and CUDA GPUs without an
+        # encoder, like A100 / H100) skip the doomed attempt and go straight to
+        # CPU. The probe runs ffmpeg, so it runs in a thread to keep the loop
+        # responsive
+        ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
         kwargs = {
-            "use_gpu": bool(gpu_available()["available"]),
+            "use_gpu": await asyncio.to_thread(nvenc_available, ffmpeg),
             **(to_mp4_kwargs or {}),
         }
         await asyncio.to_thread(
             audio.to_mp4,
-            ffmpeg_path=audio.get_ffmpeg_path()["ffmpeg"],
+            ffmpeg_path=ffmpeg,
             input_path=str(input_path),
             output_path=str(out),
             **kwargs,

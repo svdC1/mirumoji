@@ -19,7 +19,7 @@ starting from **`v3.0.0`**
 
 ---
 
-## [`3.1.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.1.0) - 2026-06-20
+## [`3.1.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.1.0) - 2026-06-21
 
 This release moves every long-running media operation into a background job system,
 adds batch processing so one operation can run over many files at once, and makes the
@@ -62,6 +62,10 @@ includes a few breaking changes, listed first
 - `Frontend` &rarr; when setting up an LLM, you can now pick the model from a
   searchable list of your provider's models instead of typing its exact name
 
+- `Frontend` &rarr; video conversion now has a quality preset (`Performance`,
+  `Balanced`, or `Quality`) alongside the resolution and bitrate options, so you can
+  trade encode speed for output quality
+
 - `CLI` &rarr; `mirumoji dev up` builds and runs the app from a local source
   checkout, for testing the Docker setup during development
 
@@ -80,6 +84,13 @@ includes a few breaking changes, listed first
 - `Docker Images` &rarr; the GPU images are smaller. PyTorch was removed because
   transcription does not need it, and the speech model now downloads on first use into a
   persistent cache instead of being baked into the local GPU images
+
+- `Server` &rarr; video conversion is faster and leaner. On the GPU the whole decode,
+  scale, and encode pipeline now stays on the GPU instead of copying frames back and
+  forth, and the GPU and Modal images ship a newer FFmpeg build to support it.
+  Conversion also picks the encoder from what the GPU can actually do, so machines whose
+  GPU cannot encode (and CPU-only setups) go straight to a fast CPU encode. Converted
+  videos keep their original aspect ratio now rather than being padded with black bars
 
 ### Fixed
 
@@ -100,6 +111,10 @@ includes a few breaking changes, listed first
   while one of those jobs is still running), cancelling or deleting a running job no
   longer leaves the job list in a broken state, and a failed job now shows a clear
   reason
+
+- `Server` &rarr; converting a video on a cloud GPU that has no video encoder (such as
+  an `A100`, `H100`, or `B200`) no longer wastes time on a failed hardware-encode
+  attempt before falling back, which had made GPU conversion slower than plain CPU
 
 - `CLI` &rarr; `mirumoji logs -f` no longer crashes when you press Ctrl+C, and
   re-running `mirumoji up` no longer contacts Docker Hub when the images are already

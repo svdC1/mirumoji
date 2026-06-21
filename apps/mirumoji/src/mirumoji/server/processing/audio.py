@@ -10,8 +10,52 @@ import subprocess
 from pathlib import Path
 
 from ...exceptions import FFmpegError, MissingFFmpegError, MissingFFprobeError
+from ..constants import CONVERSION_PRESETS, DEFAULT_CONVERSION_PRESET
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _resolve_preset(preset: str) -> dict[str, tuple[str, str]]:
+    """
+    Looks up an encoder bundle by preset name
+
+    Args:
+        preset (str): One of `performance`, `balanced`, `quality`
+
+    Raises:
+        ValueError: If `preset` is not a known preset
+
+    Returns:
+        The per-encoder `(speed, quality)` bundle for the preset
+    """
+    try:
+        return CONVERSION_PRESETS[preset]
+    except KeyError as e:
+        raise ValueError(
+            f"Unknown conversion preset '{preset}'. "
+            f"Expected one of: {', '.join(CONVERSION_PRESETS)}"
+        ) from e
+
+
+def _double_bitrate(bitrate: str) -> str:
+    """
+    Doubles a bitrate string for use as the VBV buffer size, preserving its
+    unit suffix (e.g. `2500k` -> `5000k`)
+
+    Args:
+        bitrate (str): A bitrate like `2500k`, `4M`, or `2500000`
+
+    Returns:
+        The doubled bitrate string, or the input unchanged if it can't be
+        parsed
+    """
+    text = bitrate.strip()
+    digits = text.rstrip("kKmMgG")
+    unit = text[len(digits) :]
+    try:
+        return f"{int(float(digits)) * 2}{unit}"
+    except ValueError:
+        return bitrate
 
 
 def get_ffmpeg_path() -> dict[str, str]:
@@ -315,6 +359,7 @@ def to_mp4(
     output_path: str | os.PathLike[str] | None = None,
     resolution: str = "1280x720",
     target_bitrate: str = "2500k",
+    preset: str = DEFAULT_CONVERSION_PRESET,
     use_gpu: bool = False,
 ) -> Path:
     """
@@ -322,8 +367,27 @@ def to_mp4(
     encoding
 
     info: Hardware Acceleration
-        When `use_gpu` is `True`, this function attempts to decode the source
-        using `NVDEC`, and re-encode using `NVENC` (`h264_nvenc`)
+        - When `use_gpu` is `True`, the whole pipeline stays on the GPU
+
+        - `NVDEC` decodes, `scale_cuda` scales, and `NVENC` (`h264_nvenc`)
+          encodes, so no frame ever crosses the PCIe bus to system memory
+
+        - Callers gate `use_gpu` on `config.nvenc_available`, since the data
+          center compute GPUs (`A100`, `H100`, `B200`) have `NVDEC` but no
+          `NVENC`
+
+        - The GPU command still falls back to CPU `libx264` if it
+          fails for any other reason
+
+    info: Geometry
+        The video is scaled to fit within `resolution` while preserving aspect
+        ratio. It is not padded to a fixed canvas, so the output keeps the
+        source's aspect ratio (the player letterboxes as needed)
+
+    info: Rate Control
+        `preset` sets the encoder speed and quality (`-crf` / `-cq`), while
+        `target_bitrate` is applied as a ceiling (`-maxrate` + `-bufsize`), so
+        the file targets a quality level but never exceeds the bitrate cap
 
     Args:
         ffmpeg_path (str): Path to the system's FFMPEG executable
@@ -332,17 +396,19 @@ def to_mp4(
         output_path (str | os.PathLike[str] | None): Path in which to save the
             MP4 file. When set to `None`, the file is saved to `input_path`
             with a `.mp4` suffix
-        resolution (str): Target canvas `WxH`. Aspect is preserved.
+        resolution (str): Maximum output size `WxH`. Aspect is preserved.
             Defaults to `1280x720`
-        target_bitrate (str):  Target video bitrate. Default to `2500k`
-        use_gpu (bool): When `True`, attempts NVIDIA hardware acceleration
-            falling back to CPU `libx264` if the GPU path fails for any reason
+        target_bitrate (str): Video bitrate ceiling. Defaults to `2500k`
+        preset (str): One of `performance`, `balanced`, `quality`. Defaults to
+            `balanced`
+        use_gpu (bool): When `True`, runs the fully on-device NVIDIA pipeline,
+            falling back to CPU `libx264` if it fails for any reason
 
     Raises:
         FFmpegError: If any of the FFMPEG commands have returned a non-zero
             exit code
-        ValueError: If `input_path` doesn't exist or is not a file, or if an
-            invalid resolution is provided
+        ValueError: If `input_path` doesn't exist or is not a file, if an
+            invalid resolution is provided, or if `preset` is unknown
 
     Returns:
         Path to the resulting MP4
@@ -365,13 +431,10 @@ def to_mp4(
             f"Resolution must be 'WxH', got '{resolution}'"
         ) from e
 
-    # --- FFMPEG Parameters ---
+    bundle = _resolve_preset(preset)
+    bufsize = _double_bitrate(target_bitrate)
 
-    # Scale To Fit +  Pad To Canvas (Center)
-    vf = (
-        f"scale=w={w}:h={h}:force_original_aspect_ratio=decrease,"
-        f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
-    )
+    # --- FFMPEG Parameters ---
 
     # Set Longer Analyze Duration And Probesize For Complex Video Files
     input_args = [
@@ -383,15 +446,28 @@ def to_mp4(
 
     # --- CPU Parameters ---
 
+    # Scale To Fit (Aspect Preserved), Keep Dimensions Even For H.264
+    cpu_vf = (
+        f"scale=w={w}:h={h}:"
+        "force_original_aspect_ratio=decrease:force_divisible_by=2"
+    )
+
+    # libx264 multi-threads automatically (frame-level threading across the
+    # available cores), so no explicit `-threads` flag is needed
+    x264_speed, x264_crf = bundle["x264"]
     cpu_enc = [
         "-c:v",
         "libx264",
         "-profile:v",
         "high",
         "-preset",
-        "veryfast",
+        x264_speed,
         "-crf",
-        "23",
+        x264_crf,
+        "-maxrate",
+        target_bitrate,
+        "-bufsize",
+        bufsize,
         "-pix_fmt",
         "yuv420p",
     ]
@@ -403,7 +479,7 @@ def to_mp4(
         "-i",
         input.as_posix(),
         "-vf",
-        vf,
+        cpu_vf,
         *cpu_enc,
         "-c:a",
         "aac",
@@ -414,34 +490,49 @@ def to_mp4(
         output.as_posix(),
     ]
 
-    # --- GPU Parameters (NVDEC decode + NVENC encode) ---
+    # --- GPU Parameters (fully on-device NVDEC + scale_cuda + NVENC) ---
 
+    # `scale_cuda` scales the decoded CUDA frames on the GPU and emits 8-bit
+    # `yuv420p` so `h264_nvenc` can consume them directly
+    gpu_vf = (
+        f"scale_cuda=w={w}:h={h}:"
+        "force_original_aspect_ratio=decrease:force_divisible_by=2:"
+        "format=yuv420p"
+    )
+
+    nvenc_speed, nvenc_cq = bundle["nvenc"]
     nvidia_enc = [
         "-c:v",
         "h264_nvenc",
         "-preset",
-        "p6",
-        "-rc:v",
+        nvenc_speed,
+        "-rc",
         "vbr",
+        "-cq",
+        nvenc_cq,
         "-b:v",
+        "0",
+        "-maxrate",
         target_bitrate,
-        "-pix_fmt",
-        "yuv420p",
+        "-bufsize",
+        bufsize,
     ]
 
-    # `-hwaccel cuda` decodes with NVDEC. Without `-hwaccel_output_format cuda`
-    # the frames are downloaded to system memory, so the CPU scale/pad filters
-    # run normally and NVENC re-uploads them for encoding
+    # `-hwaccel_output_format cuda` keeps NVDEC's decoded frames in GPU memory,
+    # so the whole decode -> scale -> encode pipeline runs on the device
+    # without PCIe round-trip to system memory
     nvidia_cmd = [
         ffmpeg_path,
         "-y",
         "-hwaccel",
         "cuda",
+        "-hwaccel_output_format",
+        "cuda",
         *input_args,
         "-i",
         input.as_posix(),
         "-vf",
-        vf,
+        gpu_vf,
         *nvidia_enc,
         "-c:a",
         "aac",
@@ -457,7 +548,8 @@ def to_mp4(
     cmd = nvidia_cmd if use_gpu else cpu_cmd
 
     LOGGER.info(
-        f"Converting {input.as_posix()} to MP4 with use_gpu='{use_gpu}'"
+        f"Converting {input.as_posix()} to MP4 "
+        f"(preset='{preset}', use_gpu='{use_gpu}')"
     )
 
     result = run_command(cmd, check=False)
@@ -491,19 +583,26 @@ def to_webm(
     output_path: str | os.PathLike[str] | None = None,
     resolution: str = "1280x720",
     target_bitrate: str = "2500k",
-    use_gpu: bool = False,
 ) -> Path:
     """
     Converts any video supported by `FFMPEG` to an WebM file using VP9 + Opus
     encoding
 
-    info: Hardware Acceleration
-        - When `use_gpu` is `True`, this function attempts to decode the source
-          with NVIDIA `NVDEC` hardware acceleration, falling back to normal
-          decoding when it fails for any reason
+    info: CPU-Only
+        - VP9 has no `NVENC` encoder, so the encode is always CPU `libvpx-vp9`
 
-        - VP9 encoding is always CPU `libvpx-vp9`, since `NVENC` has
-          no VP9 encoder
+        - Decoding on `NVDEC` then copying the frames back to system memory for
+          the CPU encode buys nothing on a short clip, so there is no GPU path
+
+    info: Geometry
+        The video is scaled to fit within `resolution` while preserving aspect
+        ratio (no fixed-canvas padding), so the output keeps the source's
+        aspect ratio
+
+    info: Rate Control
+        This is used for saved clips, which are short and become `Anki` card
+        media, so it encodes at high quality (`-cpu-used 1`, `-crf 28`) with
+        `target_bitrate` applied as a constrained-quality ceiling (`-b:v`)
 
     Args:
         ffmpeg_path (str): Path to the system's FFMPEG executable
@@ -512,15 +611,12 @@ def to_webm(
         output_path (str | os.PathLike[str] | None): Path in which to save the
             WebM file. When set to `None`, the file is saved to `input_path
             with a `.webm` suffix
-        resolution (str): Target canvas `WxH`. Aspect is preserved.
+        resolution (str): Maximum output size `WxH`. Aspect is preserved.
             Defaults to `1280x720`
-        target_bitrate (str):  Target video bitrate. Default to `2500k`
-        use_gpu (bool): When `True`, tries to decode with NVIDIA `NVDEC`
-            hardware acceleration
+        target_bitrate (str): Video bitrate ceiling. Defaults to `2500k`
 
     Raises:
-        FFmpegError: If any of the FFMPEG commands have returned a non-zero
-            exit code
+        FFmpegError: If the FFMPEG command returned a non-zero exit code
         ValueError: If `input_path` doesn't exist or is not a file, or if an
             invalid resolution is provided
 
@@ -547,10 +643,10 @@ def to_webm(
 
     # --- FFMPEG Parameters ---
 
-    # Scale To Fit +  Pad To Canvas (Center)
+    # Scale To Fit (Aspect Preserved), Keep Dimensions Even
     vf = (
-        f"scale=w={w}:h={h}:force_original_aspect_ratio=decrease,"
-        f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
+        f"scale=w={w}:h={h}:"
+        "force_original_aspect_ratio=decrease:force_divisible_by=2"
     )
 
     # Set Longer Analyze Duration And Probesize For Complex Video Files
@@ -564,18 +660,21 @@ def to_webm(
     # --- CPU Encode (VP9 has no NVENC encoder, so always `libvpx-vp9`) ---
 
     # without `-row-mt`, `-tile-columns` and `-threads` libvpx-vp9 encodes
-    # almost single-threaded and is extremely slow
-    # `-cpu-used 2` trades a little quality for a large speed gain
+    # almost single-threaded and is extremely slow. Clips are short and become
+    # Anki card media, so they are encoded at high quality (`-cpu-used 1`,
+    # `-crf 28`)
     threads = str(os.cpu_count() or 4)
     cpu_enc = [
         "-c:v",
         "libvpx-vp9",
+        "-crf",
+        "28",
         "-b:v",
         target_bitrate,
         "-deadline",
         "good",
         "-cpu-used",
-        "2",
+        "1",
         "-row-mt",
         "1",
         "-tile-columns",
@@ -584,7 +683,7 @@ def to_webm(
         threads,
     ]
 
-    cpu_cmd = [
+    cmd = [
         ffmpeg_path,
         "-y",
         *input_args,
@@ -600,48 +699,9 @@ def to_webm(
         output.as_posix(),
     ]
 
-    # --- GPU decode (NVDEC) + the same CPU VP9 encode ---
-
-    # `-hwaccel cuda` decodes with NVDEC. Without `-hwaccel_output_format cuda`
-    # the frames are downloaded to system memory, so the CPU scale/pad filters
-    # and the libvpx-vp9 encoder run normally
-    gpu_cmd = [
-        ffmpeg_path,
-        "-y",
-        "-hwaccel",
-        "cuda",
-        *input_args,
-        "-i",
-        input.as_posix(),
-        "-vf",
-        vf,
-        *cpu_enc,
-        "-c:a",
-        "libopus",
-        "-b:a",
-        "128k",
-        output.as_posix(),
-    ]
-
-    # --- Determine Decoder ---
-
-    cmd = gpu_cmd if use_gpu else cpu_cmd
-
-    LOGGER.info(
-        f"Converting {input.as_posix()} to WebM with use_gpu='{use_gpu}'"
-    )
+    LOGGER.info(f"Converting {input.as_posix()} to WebM")
 
     result = run_command(cmd, check=False)
-
-    if result.returncode != 0 and use_gpu:
-        LOGGER.warning(
-            f"GPU-accelerated WebM Conversion Failed For "
-            f"{input.as_posix()} - Retrying with CPU-only libvpx-vp9"
-        )
-
-        # Retry fully on CPU. `check=False` so a failure flows into the
-        # `check_returncode()` below and is wrapped as `FFmpegError`
-        result = run_command(cpu_cmd, check=False)
 
     try:
         result.check_returncode()
@@ -650,7 +710,7 @@ def to_webm(
         )
     except subprocess.CalledProcessError as e:
         raise FFmpegError(
-            f"CPU WebM conversion for{input.as_posix()} failed"
+            f"CPU WebM conversion for {input.as_posix()} failed"
         ) from e
 
     return output
