@@ -19,6 +19,22 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.1.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.1.1) - 2026-06-22
+
+A patch release with two fixes
+
+### Fixed
+
+- `Server` &rarr; GPU video conversion now correctly detects `NVENC`. The capability
+  check encoded a probe frame smaller than `NVENC`'s minimum supported size, so it always
+  failed and every conversion fell back to CPU, even on a GPU whose encoder works
+
+- `Package` &rarr; the package reports its real version again. `__version__` was not
+  updated for the `3.1.0` release, so the version shown in the desktop launcher (and used
+  to name the local data directory) was stale
+
+---
+
 ## [`3.1.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.1.0) - 2026-06-21
 
 This release moves every long-running media operation into a background job system,

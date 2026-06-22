@@ -8,6 +8,7 @@ packages themselves
 """
 
 import datetime
+import logging
 import os
 import platform
 import socket
@@ -24,6 +25,8 @@ from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
     DEFAULT_SRT_SYS_MSG,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 # --- Environment Loading + Settings ---
 
@@ -291,6 +294,10 @@ def nvenc_available(ffmpeg_path: str) -> bool:
         `True` if `h264_nvenc` initialises and encodes a probe frame, `False`
             otherwise
     """
+    # The probe frame must clear NVENC's minimum supported dimensions (~145x49
+    # for H.264). A smaller frame is rejected with "Frame Dimension less than
+    # the minimum supported value", which would make this report False on a GPU
+    # whose encoder actually works
     cmd = [
         ffmpeg_path,
         "-hide_banner",
@@ -299,7 +306,9 @@ def nvenc_available(ffmpeg_path: str) -> bool:
         "-f",
         "lavfi",
         "-i",
-        "color=black:s=64x64:d=0.1",
+        "color=black:s=256x256:d=0.1",
+        "-frames:v",
+        "1",
         "-c:v",
         "h264_nvenc",
         "-f",
@@ -310,11 +319,20 @@ def nvenc_available(ffmpeg_path: str) -> bool:
         result = subprocess.run(
             cmd,
             capture_output=True,
+            text=True,
             timeout=30,
         )
-        return result.returncode == 0
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError) as e:
+        LOGGER.warning(f"NVENC Probe Could Not Run, Converting On CPU: {e}")
         return False
+
+    if result.returncode != 0:
+        LOGGER.warning(
+            f"NVENC Probe Failed, Converting On CPU: {result.stderr.strip()}"
+        )
+        return False
+
+    return True
 
 
 def get_system_info() -> dict[str, Any]:
