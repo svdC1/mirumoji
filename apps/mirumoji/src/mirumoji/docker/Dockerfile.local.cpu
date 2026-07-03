@@ -33,7 +33,7 @@ RUN python3.11 -m pip install --no-cache-dir ".[server]"
 
 # --- Download UniDic Dictionary + Kotobase DB ---
 RUN python3.11 -m unidic download
-RUN kotobase pull-db
+RUN kotobase db pull
 
 # --- Expose The Uvicorn Port ---
 EXPOSE 8000

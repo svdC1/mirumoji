@@ -58,7 +58,7 @@ RUN python3.11 -m pip install ".[server,whisper-local]"
 
 # --- Download UniDic Dictionary + Kotobase DB ---
 RUN python3.11 -m unidic download
-RUN kotobase pull-db
+RUN kotobase db pull
 
 # --- Model Is NOT Baked ---
 # The faster-whisper model downloads on first use into the Hugging Face cache

@@ -61,7 +61,7 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
 # the first container open stays fast
 RUN python3.11 -m pip install "fugashi[unidic]" kotobase
 RUN python3.11 -m unidic download && \
-    kotobase pull-db
+    kotobase db pull
 
 # --- Expose Vite Dev Port + Uvicorn Port ---
 EXPOSE 8000
