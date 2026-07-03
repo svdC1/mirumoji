@@ -148,20 +148,6 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
-[tool.ruff.lint.flake8-bugbear]
-# FastAPI's dependency-injection helpers are factories designed to be called in
-# parameter defaults. Allow them so B008 still catches real accidental calls
-extend-immutable-calls = [
-    "fastapi.Depends",
-    "fastapi.Header",
-    "fastapi.Query",
-    "fastapi.Path",
-    "fastapi.Body",
-    "fastapi.Form",
-    "fastapi.File",
-    "fastapi.Cookie",
-]
-
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

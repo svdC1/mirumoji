@@ -11,8 +11,17 @@ Attributes:
 
 import logging
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    status,
+)
 
 from ..db import UnitOfWork
 from ..db.models import JobDTO
@@ -58,9 +67,9 @@ def _to_response(job: JobDTO) -> JobResponse:
     response_model=JobResponse,
 )
 async def submit_job(
-    req: SubmitJobRequest,
-    profile_id: str = Depends(ensure_profile_exists),
-    manager: JobQueueManager = Depends(get_job_manager),
+    req: Annotated[SubmitJobRequest, Body()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    manager: Annotated[JobQueueManager, Depends(get_job_manager)],
 ) -> JobResponse:
     """
     Submits a long-running job to perform an operation on an existing profile
@@ -116,9 +125,9 @@ async def submit_job(
     response_model=JobResponse,
 )
 async def submit_batch(
-    req: SubmitBatchRequest,
-    profile_id: str = Depends(ensure_profile_exists),
-    manager: JobQueueManager = Depends(get_job_manager),
+    req: Annotated[SubmitBatchRequest, Body()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    manager: Annotated[JobQueueManager, Depends(get_job_manager)],
 ) -> JobResponse:
     """
     Submits a batch job that runs one operation across several profile files
@@ -189,15 +198,15 @@ async def submit_batch(
 
 @jobs_router.get("", response_model=list[JobResponse])
 async def list_jobs(
-    active: bool = False,
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    active: Annotated[bool, Query()] = False,
 ) -> list[JobResponse]:
     """
     Lists the active profile's top-level jobs (batch children are excluded)
 
     Args:
-        active (bool): Restrict to `queued` / `running` jobs
         profile_id (str): Validated profile id
+        active (bool): Restrict to `queued` / `running` jobs
 
     Returns:
         The profile's jobs, newest first
@@ -212,8 +221,8 @@ async def list_jobs(
 
 @jobs_router.get("/{job_id}", response_model=JobResponse)
 async def get_job(
-    job_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
+    job_id: Annotated[uuid.UUID, Path()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> JobResponse:
     """
     Fetches a single job owned by the active profile
@@ -242,8 +251,8 @@ async def get_job(
 
 @jobs_router.get("/{job_id}/children", response_model=list[JobResponse])
 async def list_job_children(
-    job_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
+    job_id: Annotated[uuid.UUID, Path()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> list[JobResponse]:
     """
     Lists the per-file child jobs of a batch parent owned by the profile
@@ -275,8 +284,8 @@ async def list_job_children(
 
 @jobs_router.post("/{job_id}/cancel", response_model=JobResponse)
 async def cancel_job(
-    job_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
+    job_id: Annotated[uuid.UUID, Path()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> JobResponse:
     """
     Cancels a queued or running job owned by the active profile
@@ -321,9 +330,9 @@ async def cancel_job(
 
 @jobs_router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(
-    job_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
-    manager: JobQueueManager = Depends(get_job_manager),
+    job_id: Annotated[uuid.UUID, Path()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    manager: Annotated[JobQueueManager, Depends(get_job_manager)],
 ) -> None:
     """
     Deletes a finished job owned by the active profile (its record, not its

@@ -8,9 +8,9 @@ Attributes:
 
 import asyncio
 import logging
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body, Query
 from fastapi.responses import StreamingResponse
 
 from ...exceptions import InvalidModelStringError, LLMRequestError
@@ -39,7 +39,9 @@ async def list_providers() -> dict[str, Any]:
 
 
 @llm_router.get("/models")
-async def list_models(provider: str) -> dict[str, list[str]]:
+async def list_models(
+    provider: Annotated[str, Query()],
+) -> dict[str, list[str]]:
     """
     Lists the available models for a configured LLM provider
 
@@ -70,7 +72,9 @@ async def list_models(provider: str) -> dict[str, list[str]]:
 
 
 @llm_router.post("/breakdown")
-async def breakdown(req: BreakdownRequest) -> StreamingResponse:
+async def breakdown(
+    req: Annotated[BreakdownRequest, Body()],
+) -> StreamingResponse:
     """
     Streams the nuance of a focus word within a sentence as Server-Sent Events
 
@@ -124,7 +128,7 @@ async def breakdown(req: BreakdownRequest) -> StreamingResponse:
 
 @llm_router.post("/explain_sentence")
 async def explain_sentence(
-    req: ExplainSentenceRequest,
+    req: Annotated[ExplainSentenceRequest, Body()],
 ) -> StreamingResponse:
     """
     Streams an explanation of a whole sentence as Server-Sent Events
@@ -165,7 +169,7 @@ async def explain_sentence(
 
 
 @llm_router.post("/stream")
-async def stream(req: ChatRequest) -> StreamingResponse:
+async def stream(req: Annotated[ChatRequest, Body()]) -> StreamingResponse:
     """
     Streams a chat completion as Server-Sent Events
 

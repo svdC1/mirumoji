@@ -14,10 +14,11 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
+    Body,
     Depends,
     File,
     Form,
@@ -28,6 +29,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi import Path as FPath
 
 from ...exceptions import RecordNotFoundError
 from .. import media
@@ -58,7 +60,7 @@ profile_router = APIRouter(
 
 @profile_router.get("/template", response_model=LlmTemplateResponse)
 async def get_template(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> LlmTemplateResponse:
     """
     Retrieves the active profile's LLM template
@@ -92,8 +94,8 @@ async def get_template(
 
 @profile_router.post("/template", response_model=LlmTemplateResponse)
 async def upsert_template(
-    req: LlmTemplateRequest,
-    profile_id: str = Depends(ensure_profile_exists),
+    req: Annotated[LlmTemplateRequest, Body()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> LlmTemplateResponse:
     """
     Creates or updates the active profile's LLM template
@@ -131,7 +133,7 @@ async def upsert_template(
 
 @profile_router.delete("/template", status_code=status.HTTP_200_OK)
 async def delete_template(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> dict[str, Any]:
     """
     Deletes the active profile's LLM template
@@ -162,11 +164,11 @@ async def delete_template(
     status_code=status.HTTP_201_CREATED,
 )
 async def save_clip(
-    clip_file: UploadFile = File(...),
-    start_time: float = Form(...),
-    end_time: float = Form(...),
-    breakdown: str = Form(...),
-    profile_id: str = Depends(ensure_profile_exists),
+    clip_file: Annotated[UploadFile, File()],
+    start_time: Annotated[float, Form()],
+    end_time: Annotated[float, Form()],
+    breakdown: Annotated[str, Form()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> SaveClipResponse:
     """
     Saves an uploaded video clip for the active profile
@@ -261,7 +263,7 @@ async def save_clip(
 
 @profile_router.get("/clips", response_model=list[ClipResponse])
 async def list_clips(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> list[ClipResponse]:
     """
     Lists the active profile's saved clips
@@ -294,8 +296,8 @@ async def list_clips(
 
 @profile_router.delete("/clips/{clip_id}", status_code=status.HTTP_200_OK)
 async def delete_clip(
-    clip_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
+    clip_id: Annotated[uuid.UUID, FPath()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's saved clips and its file
@@ -339,10 +341,10 @@ async def delete_clip(
 )
 async def upload_file(
     request: Request,
-    file_name: str = Header(..., alias="X-File-Name"),
-    file_type: str | None = Query(None, alias="type"),
-    folder: str | None = Query(None, alias="folder"),
-    profile_id: str = Depends(ensure_profile_exists),
+    file_name: Annotated[str, Header(alias="X-File-Name")],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    file_type: Annotated[str | None, Query(alias="type")] = None,
+    folder: Annotated[str | None, Query(alias="folder")] = None,
 ) -> ProfileFileResponse:
     """
     Streams an upload and stores it as a profile file (no processing)
@@ -366,9 +368,9 @@ async def upload_file(
     Args:
         request (Request): The `FastAPI.Request` object (the body is the file)
         file_name (str): The original file name (`X-File-Name`)
+        profile_id (str): Validated profile id
         file_type (str | None): Optional file-type tag (`?type=`)
         folder (str | None): Optional group label (`?folder=`)
-        profile_id (str): Validated profile id
 
     Returns:
         The stored file's id, name, media URL, type, and folder
@@ -412,7 +414,7 @@ async def upload_file(
 
 @profile_router.get("/files", response_model=list[ProfileFileResponse])
 async def list_files(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> list[ProfileFileResponse]:
     """
     Lists the active profile's saved files
@@ -443,9 +445,9 @@ async def list_files(
 
 @profile_router.delete("/files/{file_id}", status_code=status.HTTP_200_OK)
 async def delete_file(
-    file_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
-    manager: JobQueueManager = Depends(get_job_manager),
+    file_id: Annotated[uuid.UUID, FPath()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    manager: Annotated[JobQueueManager, Depends(get_job_manager)],
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's files
@@ -497,7 +499,7 @@ async def delete_file(
 
 @profile_router.post("/subtitles", response_model=ProfileFileResponse)
 async def save_subtitles(
-    req: SaveSubtitlesRequest,
+    req: Annotated[SaveSubtitlesRequest, Body()],
     profile_id: str = Depends(ensure_profile_exists),
 ) -> ProfileFileResponse:
     """
@@ -583,7 +585,7 @@ async def save_subtitles(
     response_model=list[ProfileTranscriptResponse],
 )
 async def list_transcripts(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> list[ProfileTranscriptResponse]:
     """
     Lists the active profile's transcripts
@@ -620,9 +622,9 @@ async def list_transcripts(
     status_code=status.HTTP_200_OK,
 )
 async def delete_transcript(
-    transcript_id: uuid.UUID,
-    profile_id: str = Depends(ensure_profile_exists),
-    manager: JobQueueManager = Depends(get_job_manager),
+    transcript_id: Annotated[uuid.UUID, FPath()],
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    manager: Annotated[JobQueueManager, Depends(get_job_manager)],
 ) -> dict[str, Any]:
     """
     Deletes one of the active profile's transcripts
@@ -675,7 +677,7 @@ async def delete_transcript(
 
 @profile_router.get("/anki_export", response_model=AnkiExportResponse)
 async def export_anki_deck(
-    profile_id: str = Depends(ensure_profile_exists),
+    profile_id: Annotated[str, Depends(ensure_profile_exists)],
 ) -> AnkiExportResponse:
     """
     Exports the active profile's saved clips as an Anki deck

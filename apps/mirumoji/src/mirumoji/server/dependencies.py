@@ -6,7 +6,7 @@ to the domain layer
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
@@ -46,13 +46,13 @@ def get_job_manager(request: Request) -> JobQueueManager:
 
 
 async def get_profile_id_from_header(
-    x_profile_id: str = Header(None),
+    x_profile_id: Annotated[str | None, Header()] = None,
 ) -> str | None:
     """
-    Extracts the `X-Profile-ID` header, if present
+    Extracts the `X-Profile-ID` header, returning `None` when it's not present
 
     Args:
-        x_profile_id (str): The `X-Profile-ID` Header
+        x_profile_id (str | None): The `X-Profile-ID` Header
 
     Returns:
         The Header value, or `None` when absent
@@ -61,7 +61,10 @@ async def get_profile_id_from_header(
 
 
 async def ensure_profile_exists(
-    profile_id: str = Depends(get_profile_id_from_header),
+    profile_id: Annotated[
+        str | None,
+        Depends(get_profile_id_from_header),
+    ],
 ) -> str:
     """
     Dependency that requires `X-Profile-ID` and ensures the profile exists
@@ -81,7 +84,7 @@ async def ensure_profile_exists(
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="X-Profile-ID header is required for this operation.",
+            detail="X-Profile-ID Header Is Required For This Operation",
         )
     async with UnitOfWork() as uow:
         await uow.profiles.ensure(profile_id)
@@ -90,7 +93,10 @@ async def ensure_profile_exists(
 
 
 async def get_profile_id_optional(
-    profile_id: str = Depends(get_profile_id_from_header),
+    profile_id: Annotated[
+        str | None,
+        Depends(get_profile_id_from_header),
+    ],
 ) -> str | None:
     """
     Dependency that returns the profile id when present, ensuring it exists
