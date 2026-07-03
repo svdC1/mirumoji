@@ -45,6 +45,12 @@ class BundleMode(str, Enum):
 
 
 # --- Kotobase Data Models ---
+#
+# Flat Pydantic models of kotobase's nested DTOs.
+# The server flattens the nested lookup result once (see
+# `processing.text.query_kotobase`) so that the frontend can render
+# these directly without traversing kotobase's DTO hierarchies.
+# Tag codes are expanded into human-readable labels server-side
 
 
 class JMWordSense(BaseModel):
@@ -52,54 +58,59 @@ class JMWordSense(BaseModel):
     Represents a single `sense` (distinct meanings, translations, or nuances
     of a Japanese word) for a word within the Japanese-Multilingual Dictionary
 
-    info: `order`
-        - Represents the sequential arrangement of word meanings based on
-          lexicographical hierarchy
+    info: Sense Order
+        - Senses are returned in their editorial order
 
-        - Senses progress logically from primary, literal definitions
-          to secondary, figurative, or technical nuances
+        - They progress from primary, literal definitions to secondary,
+          figurative, or technical nuances
 
-        - This order is editorially curated and does not reflect mathematical
-          usage frequency
+        - The order is already preserved in the list returned by kotobase,
+          so no explicit field carries it
+
+    info: Readable Tags
+        `pos`, `field`, and `misc` carry human-readable labels (e.g.
+        `Godan verb with 'u' ending` instead of the raw JMDict code `v5u`),
+        expanded server-side
 
     Args:
-        order (int): editorial priority order
-        pos (str):  Grammatical classifications like verb (v5u), noun (n), or
-            adjective (adj-no) that apply to this specific meaning
-        gloss (str): The English equivalent of the word
+        glosses (list[str]): English equivalents for this sense
+        pos (list[str]): Readable grammatical classifications
+        field (list[str]): Readable subject-domain labels (e.g. medicine)
+        misc (list[str]): Readable usage labels (e.g. colloquial, archaic)
+        antonyms (list[str]): Antonym cross-references
+        xrefs (list[str]): Related-entry cross-references
     """
 
-    order: int
-    pos: str
-    gloss: str
+    glosses: list[str] = Field(default_factory=list)
+    pos: list[str] = Field(default_factory=list)
+    field: list[str] = Field(default_factory=list)
+    misc: list[str] = Field(default_factory=list)
+    antonyms: list[str] = Field(default_factory=list)
+    xrefs: list[str] = Field(default_factory=list)
 
 
 class JMEntry(BaseModel):
     """
-    Represents a single word entry in the `Japanase-Multilingual Dictionary`
+    Represents a single word entry in the `Japanese-Multilingual Dictionary`
 
-    info: `rank`
-        `Kotobase` calculates the `rank` attribute based on JMDict's `<pri>`
-        tags. The following are the possible values and their meanings
+    info: `freq_rank`
+        - `Kotobase` derives this field from JMDict's `nfxx` priority tags,
+          which split the 24000 most common words into 500-word bands
 
-        - `0` &rarr; High-frequency words found across standard textbooks
-          (ichi1) and newspapers (news1)
-
-        - `1-48` &rarr; The specific 500-word corpus interval the word belongs
-          to (e.g., tier 5 means the word is within the top `2001-2500` most
-          common words)
-
-        - `99` &rarr; Low-priority or niche words containing auxiliary tags
+        - `1` is the most common band and `48` the least, `None` means the
+          word is outside the ranked corpus
 
     Args:
-        rank (int): A categorized numerical value mapping the word's real-world
-            popularity
-        kana (list[str] | None): List of kana readings
-        kanji (list[str] | None): List of kanji readings
-        senses (list[WordSense] | None): List of `JMWordSense` models
+        is_common (bool): Whether any form carries a JMDict common-word
+            priority tag
+        freq_rank (int | None): The 500-word frequency band, when ranked
+        kana (list[str]): Kana reading forms
+        kanji (list[str]): Kanji written forms
+        senses (list[JMWordSense]): The entry's senses, in editorial order
     """
 
-    rank: int
+    is_common: bool = Field(default=False)
+    freq_rank: int | None = Field(default=None)
     kana: list[str] = Field(default_factory=list)
     kanji: list[str] = Field(default_factory=list)
     senses: list[JMWordSense] = Field(default_factory=list)
@@ -111,41 +122,130 @@ class JMNEntry(BaseModel):
     Dictionary`
 
     Args:
-        kana (list[str] | None): List of kana readings
-        kanji (list[str] | None): List of kanji readings
-        translation_type (str | None): Type of name
-        gloss (list[str] | None): list of translation strings
+        kana (list[str]): Kana reading forms
+        kanji (list[str]): Kanji written forms
+        name_types (list[str]): Readable name-type labels (e.g. surname,
+            place name)
+        gloss (list[str]): Translation strings
     """
 
     kana: list[str] = Field(default_factory=list)
     kanji: list[str] = Field(default_factory=list)
-    translation_type: str = Field(default="")
+    name_types: list[str] = Field(default_factory=list)
     gloss: list[str] = Field(default_factory=list)
 
 
 class KanjiInfo(BaseModel):
     """
-    Represents a single Kanji entry in `KANJIDIC2`
+    Represents a single Kanji entry aggregated from `KANJIDIC2`, `KRADFILE`,
+    and `KanjiVG`
+
+    info: `jlpt`
+        - kotobae exposes both the kanji jlpt level from the `Tanos` study
+          lists,  and the pre-2010 `KANJIDIC2` level
+
+        - The server exposes only one aggreagated jlpt level which prefers the
+          more updataded `Tanos` level, and falls back to the pre-2010 level
+          when the former is not available
 
     Args:
         literal (str): Kanji literal
         grade (int | None): Optional Japanese grade in which Kanji is learned
         stroke_count (int | None): Number of strokes in handwriting
-        meanings (list[str] | None): List of known meanings
-        onyomi (list[str] | None): List of `on` readings
-        kunyomi (list[str] | None): List of `kun` readings
-        jlpt_kanjidic (int | None): Optional JLPT level present in `KANJIDIC2`
-        jlpt_tanos (int | None): Optional JLPT level in `Tanos` list
+        freq (int | None): Frequency-of-use rank (1 = most common), when
+            ranked
+        jlpt (int | None): JLPT level (5 easiest to 1 hardest), when listed
+        is_joyo (bool): Whether the Kanji is in the Joyo (regular use) set
+        meanings (list[str]): List of known meanings
+        onyomi (list[str]): List of `on` readings
+        kunyomi (list[str]): List of `kun` readings
+        nanori (list[str]): Name-only readings
+        radicals (list[str]): The Kanji's radical components (`KRADFILE`)
+        has_stroke_order (bool): Whether a `KanjiVG` stroke-order SVG exists
+            for this Kanji
     """
 
     literal: str
     grade: int | None = Field(default=None)
     stroke_count: int | None = Field(default=None)
+    freq: int | None = Field(default=None)
+    jlpt: int | None = Field(default=None)
+    is_joyo: bool = Field(default=False)
     meanings: list[str] = Field(default_factory=list)
     onyomi: list[str] = Field(default_factory=list)
     kunyomi: list[str] = Field(default_factory=list)
-    jlpt_kanjidic: int | None = Field(default=None)
-    jlpt_tanos: int | None = Field(default=None)
+    nanori: list[str] = Field(default_factory=list)
+    radicals: list[str] = Field(default_factory=list)
+    has_stroke_order: bool = Field(default=False)
+
+
+class FuriganaSegment(BaseModel):
+    """
+    One segment of a word's furigana segmentation (`JmdictFurigana`)
+
+    info: Rendering
+        - `ruby` is the text (kanji or kana) and `rt` is the kana reading
+          annotation of that text (appears on top of `ruby` in frontend)
+
+        - Kana-only words carry no `rt`, so they render as plain text
+
+    Args:
+        ruby (str): The text (kanji or kana)
+        rt (str | None): The kana reading annotation, when the text is kanji
+    """
+
+    ruby: str
+    rt: str | None = Field(default=None)
+
+
+class Example(BaseModel):
+    """
+    A single `Tatoeba` example sentence with its translations
+
+    Args:
+        text (str): The Japanese sentence
+        translations (list[str]): English translations of the sentence
+    """
+
+    text: str
+    translations: list[str] = Field(default_factory=list)
+
+
+class RadicalInfo(BaseModel):
+    """
+    A single search radical (`RADKFILE`)
+
+    Args:
+        radical (str): The radical glyph
+        stroke_count (int | None): The radical's stroke count
+    """
+
+    radical: str
+    stroke_count: int | None = Field(default=None)
+
+
+class KanjiAudio(BaseModel):
+    """
+    Pronunciation clips available for a single Kanji (`Kanji Alive`)
+
+    info: Clips
+        - `Kanji Alive` records example-word pronunciations per Kanji, so
+          each clip id names one recorded example word
+
+        - A clip's bytes are streamed by the audio clip endpoint using its id
+
+    Args:
+        kanji (str): The Kanji literal the clips belong to
+        clips (list[str]): Clip ids, one per recorded example word
+        fmt (str): Audio container format of the clips (e.g. `mp3`)
+        attribution (str | None): Attribution string required by the source
+            license, when provided
+    """
+
+    kanji: str
+    clips: list[str] = Field(default_factory=list)
+    fmt: str = Field(default="mp3")
+    attribution: str | None = Field(default=None)
 
 
 class KotobaseData(BaseModel):
@@ -155,38 +255,42 @@ class KotobaseData(BaseModel):
     multiple words)
 
     info: `meanings`
-        - Exposes the `gloss` attributes (English equivalent of the word) of
-          all `JMWordSense` models contained inside the first
-          Japanase-Multilingual Dictionary entry for the query
+        - Exposes the English equivalents contained in the first
+          Japanese-Multilingual Dictionary entry for the query, one string
+          per sense
 
         - If the query has only `JMNEntry` entries, the first entry's `gloss`
           attribute is used
 
     Args:
-      query (str): query literal (either a single Japanese word or a wildcard
-          pattern)
-      jmentries (list[JMEntry]): All Japanese-Multilingual Dictionary entries
-          for the query
-      jmnentries (list[JMNEntry]): All `Japanese-Multilingual Dictionary`
-          name entries for the query
-      kanji (list[KanjiInfo]): `KANJIDIC2` entries for all Kanji present in
-          the query
-      meanings (list[str]): All English equivalents contained in the first
-          `JMEntry`, or `JMNEntry`
-      jlpt (str): JLPT vocabulary level for the word extracted from the `Tanos`
-          list. Defaults to `Unknown` when it's a wildcard query or the word
-          is not in the list
-      examples (list[str]): List of example sentences containing the single
-          word or any words matched by the wildcard query
+        query (str): query literal (either a single Japanese word or a
+            wildcard pattern)
+        jmentries (list[JMEntry]): All Japanese-Multilingual Dictionary
+            entries for the query
+        jmnentries (list[JMNEntry]): All `Japanese-Multilingual Dictionary`
+            name entries for the query
+        kanji (list[KanjiInfo]): Kanji entries for all Kanji present in the
+            query
+        furigana (list[FuriganaSegment]): Furigana segmentation of the query
+            word's primary form, empty for wildcard queries or unknown words
+        meanings (list[str]): All English equivalents contained in the first
+            `JMEntry`, or `JMNEntry`
+        jlpt (str): JLPT vocabulary level for the word extracted from the
+            `Tanos` list. Defaults to `Unknown` when it's a wildcard query or
+            the word is not in the list
+        examples (list[Example]): Example sentences (with translations)
+            containing the single word or any words matched by the wildcard
+            query
     """
 
     query: str
     jmentries: list[JMEntry] = Field(default_factory=list)
     jmnentries: list[JMNEntry] = Field(default_factory=list)
     kanji: list[KanjiInfo] = Field(default_factory=list)
+    furigana: list[FuriganaSegment] = Field(default_factory=list)
     meanings: list[str] = Field(default_factory=list)
     jlpt: str = Field(default="Unknown")
-    examples: list[str] = Field(default_factory=list)
+    examples: list[Example] = Field(default_factory=list)
 
 
 # --- Fugashi Data Models ---

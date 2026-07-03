@@ -61,7 +61,7 @@ server = [
     "fastapi>=0.136.3,<0.137",
     "uvicorn>=0.49,<0.50",
     "fugashi[unidic]>=1.5.2,<2",
-    "kotobase>=0.2.7,<0.3",
+    "kotobase>=0.4.1,<0.5",
     "pydantic>=2.13.4,<3",
     "pydantic[email]",
     "srt>=3.5.3,<4",
