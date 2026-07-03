@@ -12,6 +12,10 @@ import PlayerPage from "@/features/player/PlayerPage";
 import TranscribePage from "@/features/transcribe/TranscribePage";
 import TextPage from "@/features/text/TextPage";
 import DictionaryPage from "@/features/dictionary/DictionaryPage";
+import SearchResults from "@/features/dictionary/SearchResults";
+import WordView from "@/features/dictionary/WordView";
+import KanjiView from "@/features/dictionary/KanjiView";
+import RadicalSearch from "@/features/dictionary/RadicalSearch";
 import DashboardPage from "@/features/profile/DashboardPage";
 import GuidePage from "@/features/guide/GuidePage";
 import NotFoundPage from "./NotFoundPage";
@@ -38,7 +42,12 @@ export default function App() {
                     <Route path="/player" element={<PlayerPage />} />
                     <Route path="/transcribe" element={<TranscribePage />} />
                     <Route path="/text" element={<TextPage />} />
-                    <Route path="/dictionary" element={<DictionaryPage />} />
+                    <Route path="/dictionary" element={<DictionaryPage />}>
+                        <Route index element={<SearchResults />} />
+                        <Route path="word/:term" element={<WordView />} />
+                        <Route path="kanji/:char" element={<KanjiView />} />
+                        <Route path="radicals" element={<RadicalSearch />} />
+                    </Route>
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/saved" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/guide" element={<GuidePage />} />

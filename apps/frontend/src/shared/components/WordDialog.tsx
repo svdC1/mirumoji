@@ -1,32 +1,49 @@
 /**
  * @packageDocumentation A draggable word lookup: a streamed LLM nuance
- * explanation + dictionary definitions, with an optional "save clip"
- * action when opened from a video. Shared by the player, text analyzer, and
- * transcribe pages.
+ * explanation + a dictionary reference organized into collapsible sections
+ * (Entry, Kanji, Examples, Grammar), with an optional "save clip" action when
+ * opened from a video and a deep link into the Dictionary hub. Shared by the
+ * player, text analyzer, and transcribe pages.
+ *
+ * Gesture layering: dragging is owned by the header grab bar (moving only the
+ * panel transform) while scrolling happens inside the body, so the two never
+ * fight and in-flight stroke animations keep running through a drag.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, useDragControls } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { Copy, Check, Bookmark, Sparkles, BookOpen, ArrowLeft } from "lucide-react";
+import {
+    ArrowUpRight,
+    Bookmark,
+    BookOpen,
+    Check,
+    ChevronRight,
+    Copy,
+    Sparkles,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiDictQuery, apiTokenize, isEmptyDict } from "@/shared/dict/api";
+import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { apiGetTemplate, streamBreakdown } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import { toHiragana } from "@/shared/japanese/kana";
 import { createAndSaveClip } from "@/shared/clips/create";
-import { cn } from "@/shared/ui";
+import { Badge, cn } from "@/shared/ui";
 import type { EnrichedJapaneseWord, KotobaseData, Token } from "@/shared/dict/types";
 import type { BreakdownResponse } from "@/shared/llm/types";
 import type { ClipBreakdown } from "@/shared/clips/types";
 import {
+    ExamplesSection,
+    GrammarSection,
     JmdictEntryDisplay,
     JmnedictEntryDisplay,
-    KanjiInfoDisplay,
-    TokenizedExamples,
+    KanjiCard,
 } from "./DictDisplays";
+import FuriganaText from "./FuriganaText";
 import { ExplanationSkeleton } from "./ExplanationSkeleton";
 
 export interface WordDialogProps {
@@ -47,53 +64,44 @@ const toApiPrompt = (prompt: string): string =>
     prompt.replace(/{sentence}/g, "{0}").replace(/{focus}/g, "{1}");
 
 type MainTab = "llm" | "dict";
-type DictTab = "jmdict" | "jmnedict" | "kanji" | "examples" | "grammar";
+type SectionKey = "entry" | "names" | "kanji" | "examples" | "grammar";
 
 /**
- * Renders the morphological detail carried by a stitched word's underlying
- * UniDic tokens — surface, reading, part-of-speech hierarchy, conjugation, and
- * the dictionary base form — that the dictionary entries don't show.
+ * One collapsible dictionary section: a compact header row when closed,
+ * expanding to its content when open.
  *
- * @param {{ tokens: Token[] }} props The word's constituent tokens.
- * @returns {JSX.Element | null} The grammar breakdown, or `null` when empty.
+ * @param {object} props The section title/count, open state, and content.
+ * @returns {JSX.Element} The section.
  */
-function TokenGrammar({ tokens }: { tokens: Token[] }) {
-    if (!tokens || tokens.length === 0) {
-        return <p className="py-4 text-center italic text-ink-muted">No grammar data.</p>;
-    }
-    const clean = (v: string) => (v && v !== "*" ? v : "");
-    const fieldsOf = (t: Token): [string, string][] => {
-        const reading = clean(t.kana) ? toHiragana(t.kana) : "";
-        const pos = [t.pos1, t.pos2, t.pos3, t.pos4].map(clean).filter(Boolean).join(" · ");
-        const conj = [t.cType, t.cForm].map(clean).filter(Boolean).join(" · ");
-        const base = clean(t.orthBase) && t.orthBase !== t.surface ? t.orthBase : "";
-        const rows: [string, string][] = [];
-        if (reading) rows.push(["Reading", reading]);
-        if (pos) rows.push(["Part Of Speech", pos]);
-        if (conj) rows.push(["Conjugation", conj]);
-        if (base) rows.push(["Base Form", base]);
-        if (clean(t.goshu)) rows.push(["Word Origin", t.goshu]);
-        return rows;
-    };
+function Section({
+    title,
+    count,
+    open,
+    onToggle,
+    children,
+}: {
+    title: string;
+    count?: number;
+    open: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+}) {
     return (
-        <div className="space-y-3">
-            {tokens.map((t, i) => (
-                <div key={i} className="rounded-control border border-ink/10 p-3">
-                    <div lang="ja" className="mb-2 font-display text-xl text-ink">
-                        {t.surface}
-                    </div>
-                    <dl className="space-y-1 text-sm">
-                        {fieldsOf(t).map(([label, val]) => (
-                            <div key={label} className="flex gap-3">
-                                <dt className="w-32 shrink-0 text-ink-faint">{label}</dt>
-                                <dd lang="ja" className="text-ink">
-                                    {val}
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </div>
-            ))}
+        <div className="border-b border-ink/10 last:border-b-0">
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                className="flex w-full items-center gap-1.5 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:text-shu"
+            >
+                <ChevronRight
+                    size={15}
+                    className={cn("shrink-0 transition-transform", open && "rotate-90")}
+                />
+                {title}
+                {count != null && <span className="text-ink-faint">({count})</span>}
+            </button>
+            {open && <div className="pb-3">{children}</div>}
         </div>
     );
 }
@@ -123,15 +131,12 @@ export default function WordDialog({
     const [streaming, setStreaming] = useState(false);
     const [tab, setTab] = useState<MainTab>("dict");
     const [noModel, setNoModel] = useState(false);
-    const [dictTab, setDictTab] = useState<DictTab>("jmdict");
+    const [openSection, setOpenSection] = useState<SectionKey | null>("entry");
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
     const [dictData, setDictData] = useState<KotobaseData | null | undefined>(undefined);
-    // The dictionary tab can drill into another word (e.g. by clicking a word in
-    // an example sentence) without affecting the LLM breakdown's focus.
-    const [dictWord, setDictWord] = useState(word);
-    // Morphology of the current dict word (tokenized directly, no LLM needed) so
-    // the grammar breakdown is available on the always-visible dictionary tab.
+    // Morphology of the word (tokenized directly, no LLM needed) backing the
+    // Grammar section.
     const [dictTokens, setDictTokens] = useState<Token[]>([]);
 
     // Reset the LLM breakdown when the dialog moves to a new word/sentence (the
@@ -147,11 +152,9 @@ export default function WordDialog({
         setNoModel(false);
     }
 
-    const [screenWidth, setScreenWidth] = useState(
-        typeof window !== "undefined" ? window.innerWidth : 0
-    );
+    const { mode } = useBundleSettings();
     const dragControls = useDragControls();
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const bodyRef = useRef<HTMLDivElement>(null);
 
     // Typewriter: reveal `displayed` toward the streamed `explanation` buffer,
     // taking bigger steps when further behind so it keeps up with a fast stream
@@ -169,22 +172,13 @@ export default function WordDialog({
     // Follow the text as it types, but only when the reader is already near the
     // bottom, so scrolling up to re-read isn't fought.
     useEffect(() => {
-        const el = scrollRef.current;
+        const el = bodyRef.current;
         if (!el || displayed.length >= explanation.length) return;
         if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
             el.scrollTop = el.scrollHeight;
         }
     }, [displayed, explanation]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const handleResize = () => setScreenWidth(window.innerWidth);
-        window.addEventListener("resize", handleResize);
-        handleResize();
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
-
-    const isMobile = screenWidth < 1380;
     const canSaveClip = !!(videoFile || videoUrl);
 
     // Streams the breakdown: the focus word, then the explanation token by token
@@ -262,48 +256,69 @@ export default function WordDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key, tab]);
 
-    // Reset the dictionary drill-in target whenever the dialog's word changes.
-    useEffect(() => setDictWord(word), [word]);
-
-    // Loaded regardless of the active tab so the LLM heading can show the
+    // Tokenize the sentence first (fast local morphology) and pick the
+    // clicked word's bundle out of it: its in-context reading + part of
+    // speech rank the dictionary entries (a lone word tokenized without
+    // context could resolve to a different reading), and its tokens back the
+    // Grammar section. Then look the word up with those hints. Loaded
+    // regardless of the active tab so the LLM heading can show the
     // dictionary reading rather than the streamed focus event.
     useEffect(() => {
+        let cancelled = false;
         setDictData(undefined);
-        apiDictQuery(dictWord)
-            .then((entry) => {
-                if (isEmptyDict(entry)) {
-                    setDictData(null);
-                    return;
+        setDictTokens([]);
+
+        const run = async () => {
+            let hints: { reading?: string; pos?: string } | undefined;
+            try {
+                const ws = await apiTokenize(sentence, mode);
+                if (cancelled) return;
+                // The dialog's word is a lemma from this same tokenization,
+                // so matching by lemma recovers the clicked bundle
+                const clicked = ws.find((w) => w.lemma === word);
+                if (clicked) {
+                    setDictTokens(clicked.tokens);
+                    hints = {
+                        reading: clicked.reading || undefined,
+                        pos: clicked.pos || undefined,
+                    };
+                } else {
+                    // A word absent from the sentence (opened from outside
+                    // tokenized text) tokenizes alone as the fallback
+                    const lone = await apiTokenize(word, mode);
+                    if (cancelled) return;
+                    setDictTokens(lone.flatMap((w) => w.tokens));
+                    const reading = lone.map((w) => w.reading).join("");
+                    hints = {
+                        reading: reading || undefined,
+                        pos: lone[0]?.pos || undefined,
+                    };
                 }
-                setDictData(entry);
-                // Reset to a valid sub-tab for this entry; the previous word's
-                // sub-tab may not exist here, which would render blank.
-                if (entry.jmentries.length > 0) setDictTab("jmdict");
-                else if (entry.jmnentries.length > 0) setDictTab("jmnedict");
-                else if (entry.kanji.length > 0) setDictTab("kanji");
-                else if (entry.examples.length > 0) setDictTab("examples");
-            })
-            .catch((e) => {
+            } catch {
+                // Tokenization only provides hints here; the lookup proceeds
+                // without them
+            }
+            try {
+                const entry = await apiDictQuery(word, false, hints);
+                if (cancelled) return;
+                setDictData(isEmptyDict(entry) ? null : entry);
+                // Open the first section that has content for this word
+                if (entry.jmentries.length > 0) setOpenSection("entry");
+                else if (entry.jmnentries.length > 0) setOpenSection("names");
+                else if (entry.kanji.length > 0) setOpenSection("kanji");
+                else setOpenSection("examples");
+            } catch (e) {
+                if (cancelled) return;
                 console.error("apiDictQuery error", e);
                 setDictData(null);
                 toastApiError(e);
-            });
-    }, [dictWord]);
-
-    // Tokenize the current dict word for its grammar breakdown (no LLM needed).
-    // Force "words" so the whole word stays one bundle and exposes all of its
-    // underlying tokens, independent of the user's reading preference.
-    useEffect(() => {
-        if (tab !== "dict") return;
-        let cancelled = false;
-        setDictTokens([]);
-        apiTokenize(dictWord, "words")
-            .then((ws) => !cancelled && setDictTokens(ws[0]?.tokens ?? []))
-            .catch(() => !cancelled && setDictTokens([]));
+            }
+        };
+        run();
         return () => {
             cancelled = true;
         };
-    }, [tab, dictWord]);
+    }, [sentence, word, mode]);
 
     const handleCopy = () => {
         let textToCopy = "";
@@ -369,97 +384,95 @@ export default function WordDialog({
             active ? "border-b-2 border-shu text-ink" : "text-ink-faint hover:text-ink-muted"
         );
 
-    const dictSubTab = (active: boolean) =>
-        cn(
-            "flex-1 py-2 text-2xs transition-colors sm:text-sm",
-            active ? "border-b-2 border-ai text-ink" : "text-ink-faint hover:text-ink-muted"
+    const toggle = (section: SectionKey) =>
+        setOpenSection((current) => (current === section ? null : section));
+
+    // Words in examples and cross-references open their entry in the
+    // Dictionary hub in a new tab, so playback never stops. BASE_URL keeps
+    // the link working under a non-root deployment base
+    const openInDict = (target: string) =>
+        window.open(
+            `${import.meta.env.BASE_URL}dictionary/word/${encodeURIComponent(target)}`,
+            "_blank",
+            "noreferrer"
         );
+
+    const reading = dictData?.jmentries[0]?.kana[0] || dictData?.jmnentries[0]?.kana[0] || "";
+    const firstEntry = dictData?.jmentries[0];
+    // The ruby annotation already shows the reading, so the italic reading
+    // beside the headword only appears when no furigana is known
+    const showReading = !!reading && (dictData?.furigana.length ?? 0) === 0;
 
     return (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-                ref={scrollRef}
                 drag
-                dragListener={!isMobile}
+                dragListener={false}
                 dragControls={dragControls}
                 dragMomentum={false}
-                className="pointer-events-auto relative max-h-[70vh] w-full max-w-lg overflow-y-auto rounded-card border border-ink/10 bg-surface p-5 text-ink shadow-lift"
+                className="pointer-events-auto relative flex max-h-[75vh] w-full max-w-lg flex-col overflow-hidden rounded-card border border-ink/10 bg-surface text-ink shadow-lift"
             >
-                {isMobile && (
-                    <div
-                        onPointerDown={(event) =>
-                            dragControls.start(event, { snapToCursor: false })
-                        }
-                        className="absolute left-0 right-0 top-0 z-20 flex h-10 cursor-grab items-center justify-center"
-                        style={{ touchAction: "none" }}
-                    >
-                        <div className="mt-1 h-1.5 w-10 rounded-full bg-ink/30" />
-                    </div>
-                )}
+                {/* Grab bar: the only drag surface, so scrolling inside the
+                    body never starts a drag. */}
+                <div
+                    onPointerDown={(event) => dragControls.start(event, { snapToCursor: false })}
+                    className="flex h-8 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
+                    style={{ touchAction: "none" }}
+                >
+                    <div className="h-1.5 w-10 rounded-full bg-ink/30" />
+                </div>
 
-                <div className={isMobile ? "pt-8" : ""}>
-                    <div className="absolute right-4 top-3 z-30 flex space-x-3">
-                        {canSaveClip && (
-                            <button
-                                className={cn(
-                                    "transition-colors",
-                                    saving ? "text-ink-faint" : "text-ink-muted hover:text-matcha"
-                                )}
-                                onClick={handleSave}
-                                disabled={saving}
-                                aria-label="Save clip"
-                            >
-                                <Bookmark size={22} />
-                            </button>
-                        )}
-                        <button
-                            className="text-ink-muted transition-colors hover:text-ai"
-                            onClick={handleCopy}
-                            aria-label="Copy content"
-                        >
-                            {copied ? <Check size={22} /> : <Copy size={22} />}
-                        </button>
-                        <button
-                            className="text-2xl leading-none text-ink-muted hover:text-ink"
-                            onClick={onClose}
-                            aria-label="Close"
-                        >
-                            ×
-                        </button>
-                    </div>
-
-                    <div
-                        className={cn(
-                            "mb-4 flex border-b border-ink/10",
-                            isMobile ? "mt-6" : "mt-2"
-                        )}
-                    >
+                <div className="absolute right-4 top-2.5 z-30 flex space-x-3">
+                    {canSaveClip && (
                         <button
                             className={cn(
-                                tabClasses(tab === "llm"),
-                                dictWord !== word && "cursor-not-allowed opacity-40"
+                                "transition-colors",
+                                saving ? "text-ink-faint" : "text-ink-muted hover:text-matcha"
                             )}
-                            onClick={() => setTab("llm")}
-                            disabled={dictWord !== word}
-                            aria-label="LLM Explanation"
-                            title={
-                                dictWord !== word
-                                    ? "Explanation Is For The Original Word"
-                                    : "LLM Explanation"
-                            }
+                            onClick={handleSave}
+                            disabled={saving}
+                            aria-label="Save clip"
                         >
-                            <Sparkles size={18} className="mx-auto" />
+                            <Bookmark size={20} />
                         </button>
-                        <button
-                            className={tabClasses(tab === "dict")}
-                            onClick={() => setTab("dict")}
-                            aria-label="Dictionary"
-                            title="Dictionary"
-                        >
-                            <BookOpen size={18} className="mx-auto" />
-                        </button>
-                    </div>
+                    )}
+                    <button
+                        className="text-ink-muted transition-colors hover:text-ai"
+                        onClick={handleCopy}
+                        aria-label="Copy content"
+                    >
+                        {copied ? <Check size={20} /> : <Copy size={20} />}
+                    </button>
+                    <button
+                        className="text-2xl leading-none text-ink-muted hover:text-ink"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </div>
 
+                <div className="flex shrink-0 border-b border-ink/10 px-5">
+                    <button
+                        className={tabClasses(tab === "llm")}
+                        onClick={() => setTab("llm")}
+                        aria-label="LLM Explanation"
+                        title="LLM Explanation"
+                    >
+                        <Sparkles size={18} className="mx-auto" />
+                    </button>
+                    <button
+                        className={tabClasses(tab === "dict")}
+                        onClick={() => setTab("dict")}
+                        aria-label="Dictionary"
+                        title="Dictionary"
+                    >
+                        <BookOpen size={18} className="mx-auto" />
+                    </button>
+                </div>
+
+                {/* Body: scrolls internally without touching the drag transform. */}
+                <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-3">
                     {tab === "llm" ? (
                         noModel ? (
                             <div className="py-6 text-center italic text-ink-muted">
@@ -478,11 +491,9 @@ export default function WordDialog({
                                     <h2 lang="ja" className="font-display text-2xl font-bold">
                                         {word}
                                     </h2>
-                                    {(dictData?.jmentries[0]?.kana[0] ||
-                                        dictData?.jmnentries[0]?.kana[0]) && (
+                                    {reading && (
                                         <span lang="ja" className="text-base italic text-ink-muted">
-                                            {dictData?.jmentries[0]?.kana[0] ||
-                                                dictData?.jmnentries[0]?.kana[0]}
+                                            {reading}
                                         </span>
                                     )}
                                 </div>
@@ -498,86 +509,63 @@ export default function WordDialog({
                         <p className="text-center italic text-ink-muted">Loading dictionary…</p>
                     ) : dictData === null ? (
                         <p className="text-center italic text-ink-muted">
-                            No dictionary entry found for &quot;{dictWord}&quot;.
+                            No dictionary entry found for &quot;{word}&quot;.
                         </p>
                     ) : (
                         <div>
-                            <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-ink/10 pb-3">
-                                {dictWord !== word && (
-                                    <button
-                                        onClick={() => setDictWord(word)}
-                                        aria-label="Back to original word"
-                                        title="Back"
-                                        className="text-ink-muted transition-colors hover:text-ink"
-                                    >
-                                        <ArrowLeft size={20} />
-                                    </button>
-                                )}
-                                <h2 lang="ja" className="font-display text-2xl font-bold">
-                                    {dictData.query || dictWord}
+                            <div className="mb-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-ink/10 pb-3">
+                                <h2 className="font-display text-2xl font-bold">
+                                    <FuriganaText
+                                        segments={dictData.furigana}
+                                        fallback={dictData.query || word}
+                                    />
                                 </h2>
-                                {(dictData.jmentries[0]?.kana[0] ||
-                                    dictData.jmnentries[0]?.kana[0]) && (
+                                <Link
+                                    to={`/dictionary/word/${encodeURIComponent(word)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label="Open in Dictionary"
+                                    title="Open In Dictionary"
+                                    className="text-ink-muted transition-colors hover:text-shu"
+                                >
+                                    <ArrowUpRight size={18} />
+                                </Link>
+                                {showReading && (
                                     <span lang="ja" className="text-base italic text-ink-muted">
-                                        {dictData.jmentries[0]?.kana[0] ||
-                                            dictData.jmnentries[0]?.kana[0]}
+                                        {reading}
                                     </span>
                                 )}
-                            </div>
-                            <div className="mb-2 flex border-b border-ink/10">
-                                {dictData.jmentries.length > 0 && (
-                                    <button
-                                        className={dictSubTab(dictTab === "jmdict")}
-                                        onClick={() => setDictTab("jmdict")}
-                                    >
-                                        Common
-                                    </button>
-                                )}
-                                {dictData.jmnentries.length > 0 && (
-                                    <button
-                                        className={dictSubTab(dictTab === "jmnedict")}
-                                        onClick={() => setDictTab("jmnedict")}
-                                    >
-                                        Proper Nouns
-                                    </button>
-                                )}
-                                {dictData.kanji.length > 0 && (
-                                    <button
-                                        className={dictSubTab(dictTab === "kanji")}
-                                        onClick={() => setDictTab("kanji")}
-                                    >
-                                        Kanji
-                                    </button>
-                                )}
-                                {dictData.examples.length > 0 && (
-                                    <button
-                                        className={dictSubTab(dictTab === "examples")}
-                                        onClick={() => setDictTab("examples")}
-                                    >
-                                        Examples
-                                    </button>
-                                )}
-                                {dictTokens.length > 0 && (
-                                    <button
-                                        className={dictSubTab(dictTab === "grammar")}
-                                        onClick={() => setDictTab("grammar")}
-                                    >
-                                        Grammar
-                                    </button>
+                                {firstEntry?.is_common && <Badge tone="success">Common</Badge>}
+                                {dictData.jlpt !== "Unknown" && (
+                                    <Badge tone="accent">{dictData.jlpt}</Badge>
                                 )}
                             </div>
-                            {dictTab === "jmdict" ? (
-                                <div>
+
+                            {dictData.jmentries.length > 0 && (
+                                <Section
+                                    title="Entry"
+                                    count={dictData.jmentries.length}
+                                    open={openSection === "entry"}
+                                    onToggle={() => toggle("entry")}
+                                >
                                     {dictData.jmentries.map((entry, i) => (
                                         <JmdictEntryDisplay
                                             key={i}
                                             entry={entry}
                                             isLast={i === dictData.jmentries.length - 1}
+                                            onRefClick={(ref) => openInDict(ref.split("・")[0])}
                                         />
                                     ))}
-                                </div>
-                            ) : dictTab === "jmnedict" ? (
-                                <div>
+                                </Section>
+                            )}
+
+                            {dictData.jmnentries.length > 0 && (
+                                <Section
+                                    title="Names"
+                                    count={dictData.jmnentries.length}
+                                    open={openSection === "names"}
+                                    onToggle={() => toggle("names")}
+                                >
                                     {dictData.jmnentries.map((entry, i) => (
                                         <JmnedictEntryDisplay
                                             key={i}
@@ -585,24 +573,48 @@ export default function WordDialog({
                                             isLast={i === dictData.jmnentries.length - 1}
                                         />
                                     ))}
-                                </div>
-                            ) : dictTab === "kanji" ? (
-                                <div>
+                                </Section>
+                            )}
+
+                            {dictData.kanji.length > 0 && (
+                                <Section
+                                    title="Kanji"
+                                    count={dictData.kanji.length}
+                                    open={openSection === "kanji"}
+                                    onToggle={() => toggle("kanji")}
+                                >
                                     {dictData.kanji.map((kanji, i) => (
-                                        <KanjiInfoDisplay
-                                            key={i}
-                                            kanjiInfo={kanji}
+                                        <KanjiCard
+                                            key={kanji.literal}
+                                            kanji={kanji}
                                             isLast={i === dictData.kanji.length - 1}
                                         />
                                     ))}
-                                </div>
-                            ) : dictTab === "examples" ? (
-                                <TokenizedExamples
-                                    examples={dictData.examples}
-                                    onWordClick={(_, w) => setDictWord(w)}
-                                />
-                            ) : (
-                                <TokenGrammar tokens={dictTokens} />
+                                </Section>
+                            )}
+
+                            {dictData.examples.length > 0 && (
+                                <Section
+                                    title="Examples"
+                                    count={dictData.examples.length}
+                                    open={openSection === "examples"}
+                                    onToggle={() => toggle("examples")}
+                                >
+                                    <ExamplesSection
+                                        examples={dictData.examples}
+                                        onWordClick={(_, w) => openInDict(w)}
+                                    />
+                                </Section>
+                            )}
+
+                            {dictTokens.length > 0 && (
+                                <Section
+                                    title="Grammar"
+                                    open={openSection === "grammar"}
+                                    onToggle={() => toggle("grammar")}
+                                >
+                                    <GrammarSection tokens={dictTokens} />
+                                </Section>
                             )}
                         </div>
                     )}
