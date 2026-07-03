@@ -19,10 +19,15 @@ services:
   frontend:
     image: svdc1/mirumoji:frontend-latest
     ports:
-      - "80:80"    # HTTP (Redirects To HTTPS)
-      - "443:443"  # HTTPS (Self-Digned Cert Built For HOST_LAN_IP At Runtime)
+      - "80:80"    # HTTP (Redirects To HTTPS, Serves The CA Download)
+      - "443:443"  # HTTPS (Cert For HOST_LAN_IP Signed By The Local CA At Runtime)
     environment:
       - HOST_LAN_IP=${HOST_LAN_IP:-127.0.0.1}
+    volumes:
+      # Persists the local CA across restarts so devices that installed it
+      # (For The PWA / Trusted HTTPS) stay trusted. The CA is served at
+      # /mirumoji-ca.crt for the one-time per-device install
+      - certs:/etc/nginx/ssl
     depends_on:
       - backend
     networks:
@@ -63,6 +68,7 @@ services:
 volumes:
   data:
   logs:
+  certs:
 
 networks:
   app-network:

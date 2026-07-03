@@ -176,6 +176,11 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         def up_done(ip: str) -> None:
             terminal.append_log("Local  ↦  https://localhost")
             terminal.append_log(f"LAN    ↦  https://{ip}")
+            terminal.append_log(
+                f"Trust Other Devices ↦ Install "
+                f"http://{ip}/mirumoji-ca.crt Once Per Device "
+                f"(Enables The Installable PWA)"
+            )
             done("Mirumoji Is Running")
 
         run_stream(

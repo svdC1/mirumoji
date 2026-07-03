@@ -462,6 +462,11 @@ def up(
         title="✓ Mirumoji Is Running",
         border_style="success",
         title_style="heading",
+        caption=(
+            f"Trust Other Devices: Install http://{ip}/mirumoji-ca.crt "
+            f"Once Per Device For A Trusted HTTPS Origin (Enables The "
+            f"Installable PWA)"
+        ),
     )
     success_table.add_column("Local", style="ink")
     success_table.add_column("LAN", style="ink")
@@ -708,6 +713,11 @@ def dev_up(
         title="✓ Mirumoji Is Running",
         border_style="success",
         title_style="heading",
+        caption=(
+            f"Trust Other Devices  ↦  Install http://{ip}/mirumoji-ca.crt "
+            f"Once Per Device For A Trusted HTTPS Origin (Enables The "
+            f"Installable PWA)"
+        ),
     )
     success_table.add_column("Local", style="ink")
     success_table.add_column("LAN", style="ink")

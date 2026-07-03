@@ -11,6 +11,7 @@ import {
     Sparkles,
     Mic,
     Languages,
+    MonitorDown,
 } from "lucide-react";
 import { Card } from "@/shared/ui";
 
@@ -60,6 +61,11 @@ const STEPS: Step[] = [
         icon: Languages,
         title: "Analyze Text",
         body: "Paste any Japanese into the Text Analyzer to read it with furigana and tap words for lookups",
+    },
+    {
+        icon: MonitorDown,
+        title: "Install The App",
+        body: "Install Mirumoji as an app on your mobile device or desktop. See the documentation's PWA guide for detailed instructions on how to install",
     },
 ];
 
