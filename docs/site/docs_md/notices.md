@@ -16,15 +16,54 @@ and redistributes
 
 ## Required Attributions
 
-### JMdict / JMnedict &rarr; Dictionary Data
+### JMdict / JMnedict / KANJIDIC2 / KRADFILE &rarr; Dictionary Data
 
-- Mirumoji's dictionary lookups use data derived from the `JMdict` and
-`JMnedict` dictionary files, the property of the
+- Mirumoji's dictionary lookups use data derived from the `JMdict`,
+`JMnedict`, `KANJIDIC2`, and `KRADFILE / RADKFILE` files, the property of the
 [`Electronic Dictionary Research and Development Group (EDRDG)`](https://www.edrdg.org/),
 used in conformance with the group's
 [`Licence`](https://www.edrdg.org/edrdg/licence.html)
 
 - These files are made available under the `Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)` Licence
+
+- This data is accessed via [`kotobase`](https://github.com/svdC1/kotobase), which also includes a similar notice
+
+### KanjiVG &rarr; Kanji Stroke-Order Diagrams
+
+- The kanji stroke-order drawings are rendered from
+[`KanjiVG`](https://kanjivg.tagaini.net/) data, copyright `Ulrich Apel`,
+released under the
+[`Creative Commons Attribution-ShareAlike 3.0`](https://creativecommons.org/licenses/by-sa/3.0/)
+licence
+
+- This data is accessed via [`kotobase`](https://github.com/svdC1/kotobase), which also includes a similar notice
+
+### Tatoeba &rarr; Example Sentences
+
+- Example sentences and their translations come from the
+[`Tatoeba Project`](https://tatoeba.org/), released under the
+[`Creative Commons Attribution 2.0 FR`](https://creativecommons.org/licenses/by/2.0/fr/)
+licence
+
+- This data is accessed via [`kotobase`](https://github.com/svdC1/kotobase), which also includes a similar notice
+
+### Kanji Alive &rarr; Pronunciation Audio
+
+- Kanji pronunciation clips come from the
+[`Kanji Alive`](https://kanjialive.com/) project of the University of Chicago,
+released under the
+[`Creative Commons Attribution 4.0`](https://creativecommons.org/licenses/by/4.0/)
+licence
+
+- This data is accessed via [`kotobase`](https://github.com/svdC1/kotobase), which also includes a similar notice
+
+### JmdictFurigana &rarr; Furigana Segmentation
+
+- The per-kanji furigana segmentation comes from the
+[`JmdictFurigana`](https://github.com/Doublevil/JmdictFurigana) project,
+released under the `MIT` licence
+
+- The underlying dictionary data falls under the `EDRDG` licence above
 
 - This data is accessed via [`kotobase`](https://github.com/svdC1/kotobase), which also includes a similar notice
 
@@ -58,6 +97,7 @@ used in conformance with the group's
 | --- | --- | --- |
 | [`CTranslate2`](https://github.com/OpenNMT/CTranslate2) | Whisper Inference Engine | `MIT` |
 | [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) | Transcription | `MIT` |
+| [`kotobase`](https://github.com/svdC1/kotobase) | Japanese Dictionary Database | `MIT`|
 | [`FFmpeg`](https://ffmpeg.org/) | Media Conversion | `LGPL / GPL` |
 | [`MeCab`](https://taku910.github.io/mecab/) | Morphological Analyzer (Used By Fugashi) | `BSD-3-Clause` |
 | [`FastAPI`](https://github.com/tiangolo/fastapi) | Python Server Framework | `MIT` |
