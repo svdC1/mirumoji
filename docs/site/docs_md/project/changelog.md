@@ -19,6 +19,58 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.2.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.2.0) - 2026-07-03
+
+This release turns the dictionary into a full study hub *(kanji stroke-order animations,
+radical search, English lookup, pronunciation audio)* and makes `Mirumoji` installable as
+an app on every device via a one-time certificate install. As a `v3.x` release (see the
+`v0.1.0` note above) it includes a breaking change
+
+### Breaking Changes
+
+- `REST API` &rarr; The dictionary lookup response was restructured to carry the richer
+  data below *(senses with multiple glosses and readable tags, examples with translations,
+  furigana, fuller kanji profiles)*. Clients of `/dict/query` and `/dict/analyze` need to
+  adopt the new shape
+
+### Added
+
+- `Frontend` &rarr; The `Dictionary` page is now a study hub. One search bar covers
+  Japanese words, wildcard patterns, English meanings, and finding kanji by their
+  radicals *(matching all or any of them)*, a breadcrumb trail connects every view, and
+  the landing page offers your recent lookups plus kanji and words to explore
+
+- `Frontend` &rarr; Kanji show animated stroke-order diagrams that draw themselves
+  *(with replay, step, and speed controls on the kanji page)*, their radical components,
+  pronunciation clips, words that use the kanji, and example sentences
+
+- `Frontend` &rarr; Word entries show accurate furigana above the headword, senses with
+  plain-language grammar tags instead of dictionary codes, common-word and JLPT badges,
+  antonym and see-also links, and example sentences with English translations
+
+- `Frontend` &rarr; The word pop-up in the player was reorganized into collapsible
+  sections *(Entry, Names, Kanji, Examples, Grammar)* with playable stroke animations,
+  grammar terms that explain themselves on hover, and a link into the Dictionary
+
+### Changed
+
+- `Server` &rarr; Dictionary lookups run on `kotobase 0.4.1` and use the sentence context
+  of a clicked word *(its reading and part of speech)* to rank the right entry first, so
+  words that share a written form resolve to the reading you actually clicked
+
+- `Docker Images` &rarr; The server images now bake the pronunciation audio pack
+  alongside the dictionary database
+
+### Fixed
+
+- `PWA` &rarr; Mirumoji can be installed as an app (with offline interface caching) on
+  phones and other devices. The server now runs a persistent local certificate
+  authority, and installing its certificate once per device *(downloadable from the
+  running app, see the new docs guide)* makes the connection fully trusted. The app couldn't
+  be installed before because browsers require a fully trusted certificate for service
+  worker registration
+---
+
 ## [`3.1.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.1.1) - 2026-06-22
 
 A patch release with two fixes

@@ -1,3 +1,10 @@
-"""Mirumoji — Japanese immersion toolkit."""
+"""
+Mirumoji, A Japanese Immersion Toolkit
+"""
 
-__version__ = "3.1.1"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("mirumoji")
+except PackageNotFoundError:
+    __version__ = "3.2.0"
