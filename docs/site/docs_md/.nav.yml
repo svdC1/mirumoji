@@ -8,6 +8,7 @@ nav:
       - Manual Setup: setup/manual.md
   - CLI Reference: cli.md
   - Guides:
+      - Installing the App: guides/pwa.md
       - Using a GPU: guides/gpu.md
       - Sharing Outside Your Network: guides/sharing.md
   - Project:
