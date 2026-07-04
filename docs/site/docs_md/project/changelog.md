@@ -19,7 +19,7 @@ starting from **`v3.0.0`**
 
 ---
 
-## [`3.2.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.2.0) - 2026-07-03
+## [`3.2.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.2.0) - 2026-07-04
 
 This release turns the dictionary into a full study hub *(kanji stroke-order animations,
 radical search, English lookup, pronunciation audio)* and makes `Mirumoji` installable as
