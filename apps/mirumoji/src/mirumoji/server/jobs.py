@@ -488,6 +488,12 @@ class JobQueueManager:
                 await self._worker_task
             self._worker_task = None
 
+            # Cancelling the worker leaves any FFMPEG subprocess it was running
+            # alive in a detached thread, since a thread cannot be interrupted.
+            # Terminate it so an in-flight conversion does not outlive the
+            # server and keep the media file (and process) alive
+            await asyncio.to_thread(audio.terminate_running_commands)
+
         self.queue = None
 
         LOGGER.info("Job Worker Stopped")
