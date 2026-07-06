@@ -186,6 +186,22 @@ ADVANCED_VARS: tuple[EnvVar, ...] = (
         description="Docker Hub Image That Modal Containers Will Run",
     ),
     EnvVar(
+        "MIRUMOJI_MODAL_SCALEDOWN_WINDOW",
+        description=(
+            "Seconds To Keep An Idle Modal GPU Container Warm Before It "
+            "Scales Down (Higher Speeds Up Back-To-Back Jobs At A Higher Cost)"
+        ),
+        default="60",
+    ),
+    EnvVar(
+        "MIRUMOJI_MAX_LLM_CONCURRENCY",
+        description=(
+            "How Many LLM Requests Run At Once When Fixing A Batch Of "
+            "Subtitles"
+        ),
+        default="4",
+    ),
+    EnvVar(
         "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
         description=(
             "The Default LLM System Message Used For SRT Fixing When A "

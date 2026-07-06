@@ -32,7 +32,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from ..exceptions import MirumojiServerError, RecordNotFoundError
 from . import media
 from .config import get_settings
-from .constants import MAX_LLM_CONCURRENCY
 from .db import UnitOfWork
 from .models.requests import (
     ConvertVideoRequest,
@@ -1744,8 +1743,8 @@ async def batch_fix_srt_handler(
     Runs a batch of `fix_srt` operations, one child job per file
 
     LLM SRT-fixing is provider-agnostic and I/O-bound, so the files run through
-    the bounded-concurrency runner on every backend, capped by
-    `MAX_LLM_CONCURRENCY`
+    the bounded-concurrency runner on every backend, capped by the configured
+    `max_llm_concurrency`
 
     Args:
         job (JobDTO): The batch parent job (its children hold the file ids)
@@ -1756,7 +1755,11 @@ async def batch_fix_srt_handler(
     """
     children = await _load_children(job.id)
     return await _run_bounded_batch(
-        job, children, processor, _fix_srt, MAX_LLM_CONCURRENCY
+        job,
+        children,
+        processor,
+        _fix_srt,
+        get_settings().max_llm_concurrency,
     )
 
 

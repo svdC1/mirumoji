@@ -231,6 +231,7 @@ Keys Against Their Allowed Options
     | `MODAL_TOKEN_ID` | Required | Modal Token ID |
     | `MODAL_TOKEN_SECRET` | Required | Modal Token Secret |
     | `MIRUMOJI_MODAL_GPU` | `A10G` | GPU Type To Use In The Modal Containers |
+    | `MIRUMOJI_MODAL_SCALEDOWN_WINDOW` | `60` | Seconds To Keep An Idle Modal Container Warm Before Scaling Down |
     | `MODAL_FORCE_BUILD` | `0` | Force Modal to Rebuild Its Cached App Image |
 
 === "Advanced"
@@ -240,6 +241,7 @@ Keys Against Their Allowed Options
     | --- | --- |
     | `MIRUMOJI_LOGGING_LEVEL` | Python Logging Level For The Backend |
     | `MIRUMOJI_MODAL_IMAGE` | Docker Hub Image That The Modal Containers Run |
+    | `MIRUMOJI_MAX_LLM_CONCURRENCY` | How Many LLM Requests Run At Once When Fixing A Batch Of Subtitles (Default `4`) |
     | `MIRUMOJI_SRT_DEFAULT_SYS_MSG` | Default LLM System Message For Subtitle Refinement |
     | `MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG` | Default LLM System Message For Word Breakdowns |
 

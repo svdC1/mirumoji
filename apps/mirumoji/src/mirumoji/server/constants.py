@@ -58,8 +58,20 @@ DEFAULT_BREAKDOWN_SYS_MSG = (
 
 MAX_LLM_CONCURRENCY = 4
 """
-Defines how many LLM requests should be executed simultaneously when
-requesting an `SRT Fix` for a batch of files
+Default number of LLM requests executed simultaneously when requesting an
+`SRT Fix` for a batch of files
+
+Overridable at runtime with `MIRUMOJI_MAX_LLM_CONCURRENCY`
+"""
+
+DEFAULT_MODAL_SCALEDOWN_WINDOW = 60
+"""
+Default number of seconds an idle `Modal` GPU container is kept warm before it
+scales down
+
+Matches Modal's own default. Raising it (via `MIRUMOJI_MODAL_SCALEDOWN_WINDOW`)
+keeps a container warm longer, so back-to-back jobs skip the cold start at the
+cost of more idle GPU time
 """
 
 # --- Local Whisper Model Download ---

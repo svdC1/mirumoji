@@ -23,7 +23,9 @@ from dotenv import load_dotenv
 from ..exceptions import ModalError, WhisperUnavailableError
 from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
+    DEFAULT_MODAL_SCALEDOWN_WINDOW,
     DEFAULT_SRT_SYS_MSG,
+    MAX_LLM_CONCURRENCY,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -48,6 +50,27 @@ def _load_env_once() -> None:
     load_dotenv()
 
 
+def _env_int(key: str, default: int) -> int:
+    """
+    Reads a non-negative integer from the environment, falling back on error
+
+    Args:
+        key (str): Environment variable name
+        default (int): Value to use when the variable is unset or invalid
+
+    Returns:
+        The parsed integer, or `default` when unset or not a valid integer
+    """
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        LOGGER.warning(f"Invalid {key} '{raw}', Using Default {default}")
+        return default
+
+
 @dataclass(frozen=True)
 class Settings:
     """
@@ -57,6 +80,10 @@ class Settings:
         logging_level (str): Python logging level name
         modal_gpu (str): GPU type requested for Modal jobs
         modal_image (str): Docker image used for Modal containers
+        modal_scaledown_window (int): Seconds an idle Modal container is kept
+            warm before it scales down
+        max_llm_concurrency (int): How many LLM requests run at once when
+            fixing a batch of subtitles
         srt_sys_msg (str): System message for SRT-fixing
         breakdown_sys_msg (str): System message for word-nuance breakdowns
     """
@@ -64,6 +91,8 @@ class Settings:
     logging_level: str
     modal_gpu: str
     modal_image: str
+    modal_scaledown_window: int
+    max_llm_concurrency: int
     srt_sys_msg: str
     breakdown_sys_msg: str
 
@@ -90,6 +119,14 @@ def get_settings() -> Settings:
         modal_image=os.environ.get(
             "MIRUMOJI_MODAL_IMAGE",
             "docker.io/svdc1/mirumoji-modal-gpu:latest",
+        ),
+        modal_scaledown_window=_env_int(
+            "MIRUMOJI_MODAL_SCALEDOWN_WINDOW",
+            DEFAULT_MODAL_SCALEDOWN_WINDOW,
+        ),
+        max_llm_concurrency=_env_int(
+            "MIRUMOJI_MAX_LLM_CONCURRENCY",
+            MAX_LLM_CONCURRENCY,
         ),
         srt_sys_msg=os.environ.get(
             "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
