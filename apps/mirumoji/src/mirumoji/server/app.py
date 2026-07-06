@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..exceptions import MirumojiServerError
-from ..log import takeover_logging
+from ..log import takeover_logging, teardown_logging
 from ..paths import HOST_LOG_PATH
 from . import media
 from .config import get_settings
@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
         - Clears Temporary Media
 
+        - Tears Down The Logging Setup
     Args:
       app (FastAPI): The API object
 
@@ -121,6 +122,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
         )
 
     LOGGER.info("Shut Down Complete")
+
+    # Close the log handlers last, so nothing above loses its output. This
+    # releases the log file, which lives inside the storage directory, so that
+    # directory can be deleted after the server stops (an open handle would
+    # otherwise block removing it on Windows)
+    teardown_logging()
 
 
 async def mirumoji_exception_handler(

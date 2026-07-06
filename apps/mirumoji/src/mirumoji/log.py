@@ -14,6 +14,7 @@ info: One Setup
       single request's logs can be followed across the file
 """
 
+import contextlib
 import logging
 import os
 from contextvars import ContextVar
@@ -448,9 +449,15 @@ def takeover_logging(
     resolved = _resolve_level(level)
 
     # Route every existing logger to root by dropping its own handlers and
-    # re-enabling propagation, so no logger keeps its framework-specific format
+    # re-enabling propagation, so no logger keeps its framework-specific
+    # format. The stripped handlers are closed, not just detached, so a file
+    # handler (e.g. the launcher's own log when it runs the dev server)
+    # releases its file rather than leaking the open handle
     for name in list(logging.root.manager.loggerDict):
         existing = logging.getLogger(name)
+        for handler in existing.handlers:
+            with contextlib.suppress(Exception):
+                handler.close()
         existing.handlers.clear()
         existing.propagate = True
         existing.setLevel(logging.NOTSET)
@@ -472,3 +479,27 @@ def takeover_logging(
         console_handler = _build_console_handler()
         console_handler.addFilter(noise_filter)
         root.addHandler(console_handler)
+
+
+def teardown_logging() -> None:
+    """
+    Closes and removes every handler this module attached, releasing the log
+    file
+
+    warning: Why It Matters
+        - On Windows, an open file handle blocks deleting the folder it lives
+          in, and `platformdirs` nests the log directory inside the data
+          directory (`.../mirumoji/{version}/Logs`)
+
+        - So the rotating log handler holds the whole data directory open. Call
+          this at server shutdown, and before wiping the storage directory,
+          so the directory can actually be removed
+
+    info: Coverage
+        Clears the managed handlers from the root logger (where `takeover`
+        attaches them) and from every named logger (where `setup_logging`
+        attaches them for the launcher), closing each so its file is released
+    """
+    _clear_managed(logging.getLogger())
+    for name in list(logging.root.manager.loggerDict):
+        _clear_managed(logging.getLogger(name))
