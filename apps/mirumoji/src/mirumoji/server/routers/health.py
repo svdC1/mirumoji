@@ -5,28 +5,27 @@ Attributes:
   health_router (APIRouter): The FastAPI Router Object
 """
 
-from typing import Any
-
 from fastapi import APIRouter
 
 from ..config import get_system_info
+from ..models.responses import HealthStatusResponse, SystemInfoResponse
 
 health_router = APIRouter(prefix="/health")
 
 
-@health_router.get("/status")
-async def health_check() -> dict[str, str]:
+@health_router.get("/status", response_model=HealthStatusResponse)
+async def health_check() -> HealthStatusResponse:
     """
     Minimal ping endpoint to check if the API is running
 
     Returns:
         UP status confirmation
     """
-    return {"status": "ok"}
+    return HealthStatusResponse(status="ok")
 
 
-@health_router.get("/system")
-async def gpu_check() -> dict[str, Any]:
+@health_router.get("/system", response_model=SystemInfoResponse)
+async def gpu_check() -> SystemInfoResponse:
     """
     Collects information about the system running the API, including OS, GPUs,
     Python Version , etc
@@ -34,4 +33,4 @@ async def gpu_check() -> dict[str, Any]:
     Returns:
         Information about the system running the API
     """
-    return get_system_info()
+    return SystemInfoResponse(**get_system_info())

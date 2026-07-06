@@ -6,6 +6,22 @@ from typing import Any
 
 from pydantic import BaseModel
 
+# --- Common Responses ---
+
+
+class MessageResponse(BaseModel):
+    """
+    Generic success envelope for endpoints that only confirm an action
+
+    Args:
+        success (bool): Whether the action succeeded
+        message (str): A short human-readable confirmation
+    """
+
+    success: bool
+    message: str
+
+
 # --- Profile Responses ---
 
 
@@ -241,3 +257,79 @@ class BatchResult(JobResult):
     failed: int
     cancelled: int
     children: list[str]
+
+
+# --- LLM Responses ---
+
+
+class ProviderStatusResponse(BaseModel):
+    """
+    Availability of a single LLM provider
+
+    Args:
+        provider (str): The provider id (`openai`, `anthropic`, `gemini`,
+            `local`)
+        available (bool): Whether the provider is usable in this deployment
+    """
+
+    provider: str
+    available: bool
+
+
+class ProvidersResponse(BaseModel):
+    """
+    Availability of every known LLM provider
+
+    Args:
+        providers (list[ProviderStatusResponse]): One entry per provider
+    """
+
+    providers: list[ProviderStatusResponse]
+
+
+class ModelsResponse(BaseModel):
+    """
+    The models offered by a configured LLM provider
+
+    Args:
+        models (list[str]): The available model ids
+    """
+
+    models: list[str]
+
+
+# --- Health Responses ---
+
+
+class HealthStatusResponse(BaseModel):
+    """
+    Minimal liveness confirmation
+
+    Args:
+        status (str): `ok` while the server is running
+    """
+
+    status: str
+
+
+class SystemInfoResponse(BaseModel):
+    """
+    Basic information about the system running the server
+
+    Args:
+        time (str): Server time in ISO-8601, suffixed with `Z`
+        hostname (str): The host name
+        platform (str): A terse platform description
+        python (str): The Python version
+        cpu_cores (int | None): Logical CPU count, or `None` when unknown
+        gpu_available (bool): Whether a CUDA GPU is available to transcription
+        gpu_name (str): The GPU name, or empty when none
+    """
+
+    time: str
+    hostname: str
+    platform: str
+    python: str
+    cpu_cores: int | None = None
+    gpu_available: bool
+    gpu_name: str

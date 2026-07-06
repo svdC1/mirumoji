@@ -8,7 +8,7 @@ Attributes:
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import StreamingResponse
@@ -20,28 +20,35 @@ from ..models.requests import (
     ChatRequest,
     ExplainSentenceRequest,
 )
+from ..models.responses import (
+    ModelsResponse,
+    ProvidersResponse,
+    ProviderStatusResponse,
+)
 from ..processing import llm, text
 
 LOGGER = logging.getLogger(__name__)
 llm_router = APIRouter(prefix="/llm")
 
 
-@llm_router.get("/providers")
-async def list_providers() -> dict[str, Any]:
+@llm_router.get("/providers", response_model=ProvidersResponse)
+async def list_providers() -> ProvidersResponse:
     """
     Reports which LLM providers are usable in this deployment
 
     Returns:
-        Mapping with a `providers` list of `{"provider", "available"}` entries,
-            used by the frontend to populate the model picker
+        A `providers` list of `{"provider", "available"}` entries, used by the
+            frontend to populate the model picker
     """
-    return {"providers": llm.provider_status()}
+    return ProvidersResponse(
+        providers=[ProviderStatusResponse(**p) for p in llm.provider_status()]
+    )
 
 
-@llm_router.get("/models")
+@llm_router.get("/models", response_model=ModelsResponse)
 async def list_models(
     provider: Annotated[str, Query()],
-) -> dict[str, list[str]]:
+) -> ModelsResponse:
     """
     Lists the available models for a configured LLM provider
 
@@ -68,7 +75,7 @@ async def list_models(
             details={"provider": provider},
         ) from e
     models = await asyncio.to_thread(llm.available_models, prov)
-    return {"models": models}
+    return ModelsResponse(models=models)
 
 
 @llm_router.post("/breakdown")

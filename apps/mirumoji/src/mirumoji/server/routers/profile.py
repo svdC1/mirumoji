@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -41,6 +41,7 @@ from ..models.responses import (
     AnkiExportResponse,
     ClipResponse,
     LlmTemplateResponse,
+    MessageResponse,
     ProfileFileResponse,
     ProfileTranscriptResponse,
     SaveClipResponse,
@@ -131,10 +132,14 @@ async def upsert_template(
     )
 
 
-@profile_router.delete("/template", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/template",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_template(
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes the active profile's LLM template
 
@@ -152,7 +157,7 @@ async def delete_template(
         await uow.templates.delete(profile_id)
         await uow.commit()
     LOGGER.info(f"Deleted LLM Template For Profile '{profile_id}'")
-    return {"success": True, "message": "Template deleted successfully."}
+    return MessageResponse(success=True, message="Template Deleted")
 
 
 # --- Clips ---
@@ -294,11 +299,15 @@ async def list_clips(
     ]
 
 
-@profile_router.delete("/clips/{clip_id}", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/clips/{clip_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_clip(
     clip_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes one of the active profile's saved clips and its file
 
@@ -328,7 +337,7 @@ async def delete_clip(
         await uow.commit()
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted Clip '{clip_id}' For Profile '{profile_id}'")
-    return {"success": True, "message": "Clip Deleted Successfully"}
+    return MessageResponse(success=True, message="Clip Deleted")
 
 
 # --- Files ---
@@ -443,12 +452,16 @@ async def list_files(
     ]
 
 
-@profile_router.delete("/files/{file_id}", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/files/{file_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_file(
     file_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
     manager: Annotated[JobQueueManager, Depends(get_job_manager)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes one of the active profile's files
 
@@ -494,7 +507,7 @@ async def delete_file(
         await uow.commit()
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
-    return {"success": True, "message": "File deleted successfully."}
+    return MessageResponse(success=True, message="File Deleted")
 
 
 @profile_router.post("/subtitles", response_model=ProfileFileResponse)
@@ -619,13 +632,14 @@ async def list_transcripts(
 
 @profile_router.delete(
     "/transcripts/{transcript_id}",
+    response_model=MessageResponse,
     status_code=status.HTTP_200_OK,
 )
 async def delete_transcript(
     transcript_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
     manager: Annotated[JobQueueManager, Depends(get_job_manager)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes one of the active profile's transcripts
 
@@ -669,7 +683,7 @@ async def delete_transcript(
     LOGGER.info(
         f"Deleted Transcript '{transcript_id}' For Profile '{profile_id}'"
     )
-    return {"success": True, "message": "Transcript deleted successfully."}
+    return MessageResponse(success=True, message="Transcript Deleted")
 
 
 # --- Anki Export ---
