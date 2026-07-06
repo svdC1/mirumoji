@@ -959,19 +959,20 @@ class JobRepository:
         """
         Deletes a job (cascading to its children)
 
+        info: Idempotent
+            A job that is already gone (e.g. removed as another file's
+            cascade in the same sweep) is a no-op rather than an error,
+            so a multi-file delete never fails on a shared batch parent
+
         Args:
             job_id (uuid.UUID): The job id
 
         Raises:
-            RecordNotFoundError: If the job does not exist
             DatabaseError: If the deletion fails
         """
         job = await self.session.get(Job, job_id)
         if job is None:
-            raise RecordNotFoundError(
-                f"Job '{job_id}' Not Found",
-                details={"job_id": str(job_id)},
-            )
+            return
         try:
             await self.session.delete(job)
         except Exception as e:

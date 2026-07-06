@@ -110,18 +110,20 @@ export function FilesPanel() {
 
     const clearSelection = () => setSelected(new Set());
 
-    // Deleting a file cascades its dependent jobs away server-side, so the
-    // Tasks tab is refreshed alongside the file list.
+    // Deleting a file cascades its dependent jobs away server-side. The server
+    // returns those job ids, so they are pruned from the task tray immediately
+    // (which polls only while a job is active) and the Tasks tab is refreshed.
     const onDelete = async (id: string) => {
         setDeleting(id);
         try {
-            await deleteFile(id);
+            const res = await deleteFile(id);
             toast.success("File Deleted");
             setSelected((prev) => {
                 const next = new Set(prev);
                 next.delete(id);
                 return next;
             });
+            res.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
             mutate(SWR_KEY);
             mutate("jobs/history");
         } catch (e) {
@@ -136,6 +138,12 @@ export function FilesPanel() {
         if (ids.length === 0) return;
         const results = await Promise.allSettled(ids.map((id) => deleteFile(id)));
         const ok = results.filter((r) => r.status === "fulfilled").length;
+        // Prune the tray of every job cascaded away by the successful deletes.
+        for (const r of results) {
+            if (r.status === "fulfilled") {
+                r.value.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
+            }
+        }
         clearSelection();
         if (ok > 0) toast.success(`Deleted ${ok} File(s)`);
         if (ok < ids.length) toast.error(`${ids.length - ok} File(s) Could Not Be Deleted`);

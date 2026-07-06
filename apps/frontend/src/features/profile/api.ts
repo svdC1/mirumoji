@@ -5,16 +5,24 @@
 
 import { apiFetch } from "@/shared/api/client";
 import type { Clip } from "@/shared/clips/types";
-import type { AnkiExportResponse, ProfileFile, ProfileTranscript } from "./types";
+import type {
+    AnkiExportResponse,
+    FileDeleteResponse,
+    ProfileFile,
+    ProfileTranscript,
+} from "./types";
 
 /** Lists the active profile's files (`GET /profiles/files`). */
 export function listFiles(): Promise<ProfileFile[]> {
     return apiFetch<ProfileFile[]>("profiles/files", { method: "GET" });
 }
 
-/** Deletes a profile file by id (`DELETE /profiles/files/{id}`). */
-export async function deleteFile(fileId: string): Promise<void> {
-    await apiFetch(`profiles/files/${fileId}`, { method: "DELETE" });
+/**
+ * Deletes a profile file by id (`DELETE /profiles/files/{id}`), returning the
+ * ids of the jobs it cascaded away so the caller can prune the task tray.
+ */
+export function deleteFile(fileId: string): Promise<FileDeleteResponse> {
+    return apiFetch<FileDeleteResponse>(`profiles/files/${fileId}`, { method: "DELETE" });
 }
 
 /** Lists the active profile's transcripts (`GET /profiles/transcripts`). */

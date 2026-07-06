@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
@@ -40,6 +41,7 @@ from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
     ClipResponse,
+    FileDeleteResponse,
     LlmTemplateResponse,
     MessageResponse,
     ProfileFileResponse,
@@ -54,6 +56,18 @@ profile_router = APIRouter(
     prefix="/profiles",
     dependencies=[Depends(ensure_profile_exists)],
 )
+
+
+@lru_cache(maxsize=1)
+def _file_delete_lock() -> asyncio.Lock:
+    """
+    Returns the process-wide lock serializing file deletions
+
+    Built once on first use (bound to the running loop then) rather than at
+    import. File deletes cascade shared batch-parent jobs away, so running them
+    one at a time avoids concurrent transactions colliding on the same rows
+    """
+    return asyncio.Lock()
 
 
 # --- LLM Template ---
@@ -454,14 +468,14 @@ async def list_files(
 
 @profile_router.delete(
     "/files/{file_id}",
-    response_model=MessageResponse,
+    response_model=FileDeleteResponse,
     status_code=status.HTTP_200_OK,
 )
 async def delete_file(
     file_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
     manager: Annotated[JobQueueManager, Depends(get_job_manager)],
-) -> MessageResponse:
+) -> FileDeleteResponse:
     """
     Deletes one of the active profile's files
 
@@ -473,13 +487,22 @@ async def delete_file(
         - Deleting a file also cascades (via foreign keys) to any transcripts
           or clips that reference it
 
+    warning: Serialized
+        - Selecting several files that share a batch parent job and deleting
+          them at once would otherwise run concurrent transactions that both
+          delete that shared parent, colliding on SQLite's single writer
+
+        - The critical section is held under a process-wide lock so the deletes
+          run one at a time, and `JobRepository.delete` is idempotent for the
+          shared parent
+
     Args:
         file_id (uuid.UUID): Id of the file to delete
         profile_id (str): Validated profile id
         manager (JobQueueManager): The job worker
 
     Returns:
-        A confirmation payload
+        A confirmation payload plus the ids of the jobs deleted with the file
 
     Raises:
         HTTPException: If a job still being run by the worker uses this file
@@ -488,7 +511,7 @@ async def delete_file(
         StorageError: If deleting the file fails
         DatabaseError: If the deletion fails
     """
-    async with UnitOfWork() as uow:
+    async with _file_delete_lock(), UnitOfWork() as uow:
         file = await uow.files.get(file_id)
         if file.profile_id != profile_id:
             raise RecordNotFoundError(
@@ -507,7 +530,11 @@ async def delete_file(
         await uow.commit()
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
-    return MessageResponse(success=True, message="File Deleted")
+    return FileDeleteResponse(
+        success=True,
+        message="File Deleted",
+        deleted_job_ids=[str(job_id) for job_id in dependent],
+    )
 
 
 @profile_router.post("/subtitles", response_model=ProfileFileResponse)

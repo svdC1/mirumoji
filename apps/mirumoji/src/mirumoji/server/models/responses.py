@@ -82,6 +82,19 @@ class ClipResponse(BaseModel):
     breakdown: dict[str, Any]
 
 
+class FileDeleteResponse(MessageResponse):
+    """
+    Confirmation for deleting a profile file, plus what it cascaded
+
+    Args:
+        deleted_job_ids (list[str]): Ids of the jobs removed alongside the file
+            (a batch parent covers its children), so the client can prune them
+            from the task tray
+    """
+
+    deleted_job_ids: list[str] = []
+
+
 class ProfileFileResponse(BaseModel):
     """
     Response representing a profile file
