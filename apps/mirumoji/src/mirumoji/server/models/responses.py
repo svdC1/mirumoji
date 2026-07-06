@@ -105,6 +105,10 @@ class ProfileFileResponse(BaseModel):
         url (str): Media URL serving the file
         type (str | None): Optional file-type tag
         folder (str | None): Optional group label for files uploaded together
+        source_file_id (str | None): Id of the root media this file derives
+            from (its source video), or `None` when it is itself a root
+        origin (str | None): How the file came to be (`upload`, `generated`,
+            `fixed`, `converted`, `subtitle`, or `clip`)
         created_at (str | None): ISO-8601 creation timestamp
     """
 
@@ -113,6 +117,8 @@ class ProfileFileResponse(BaseModel):
     url: str
     type: str | None = None
     folder: str | None = None
+    source_file_id: str | None = None
+    origin: str | None = None
     created_at: str | None = None
 
 

@@ -35,6 +35,7 @@ from fastapi import Path as FPath
 from ...exceptions import RecordNotFoundError
 from .. import media
 from ..db import UnitOfWork
+from ..db.models import FileDTO
 from ..dependencies import ensure_profile_exists, get_job_manager
 from ..jobs import JobQueueManager
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
@@ -68,6 +69,30 @@ def _file_delete_lock() -> asyncio.Lock:
     one at a time avoids concurrent transactions colliding on the same rows
     """
     return asyncio.Lock()
+
+
+def _file_response(file: FileDTO) -> ProfileFileResponse:
+    """
+    Maps a stored file record to its API response, including its lineage
+
+    Args:
+        file (FileDTO): The stored file
+
+    Returns:
+        The `ProfileFileResponse`
+    """
+    return ProfileFileResponse(
+        id=str(file.id),
+        name=file.name,
+        url=f"/media/{Path(file.path).as_posix()}",
+        type=file.type,
+        folder=file.folder,
+        source_file_id=(
+            str(file.source_file_id) if file.source_file_id else None
+        ),
+        origin=file.origin,
+        created_at=file.created_at.isoformat() if file.created_at else None,
+    )
 
 
 # --- LLM Template ---
@@ -251,6 +276,7 @@ async def save_clip(
                 name=webm_loc.name,
                 path=str(rel_path),
                 type="clip",
+                origin="clip",
             )
             clip_rec = await uow.clips.add(
                 profile_id=profile_id,
@@ -419,20 +445,14 @@ async def upload_file(
             path=str(rel),
             type=file_type,
             folder=folder,
+            origin="upload",
         )
         await uow.commit()
 
     LOGGER.info(
         f"Uploaded File '{rec.id}' ('{rec.name}') For Profile '{profile_id}'"
     )
-    return ProfileFileResponse(
-        id=str(rec.id),
-        name=rec.name,
-        url=f"/media/{rel.as_posix()}",
-        type=rec.type,
-        folder=rec.folder,
-        created_at=rec.created_at.isoformat() if rec.created_at else None,
-    )
+    return _file_response(rec)
 
 
 @profile_router.get("/files", response_model=list[ProfileFileResponse])
@@ -453,17 +473,7 @@ async def list_files(
     """
     async with UnitOfWork() as uow:
         files = await uow.files.list_for_profile(profile_id)
-    return [
-        ProfileFileResponse(
-            id=str(f.id),
-            name=f.name,
-            url=f"/media/{Path(f.path).as_posix()}",
-            type=f.type,
-            folder=f.folder,
-            created_at=f.created_at.isoformat() if f.created_at else None,
-        )
-        for f in files
-    ]
+    return [_file_response(f) for f in files]
 
 
 @profile_router.delete(
@@ -572,22 +582,26 @@ async def save_subtitles(
             existing = None
 
     if existing is not None:
-        # Overwrite in place (write_file appends, so clear it first).
+        # Overwrite in place (write_file appends, so clear it first). The
+        # existing record's name, folder, and lineage are preserved as-is.
         await media.delete_file(existing.path)
         await media.write_file(existing.path, req.content)
-        created = (
-            existing.created_at.isoformat() if existing.created_at else None
-        )
         LOGGER.info(
             f"Overwrote SRT File '{existing.id}' For Profile '{profile_id}'"
         )
-        return ProfileFileResponse(
-            id=str(existing.id),
-            name=existing.name,
-            url=f"/media/{Path(existing.path).as_posix()}",
-            type=existing.type,
-            created_at=created,
-        )
+        return _file_response(existing)
+
+    # Resolve the source media this SRT belongs to (the loaded video), so the
+    # saved SRT is named after it, shares its folder, and groups under it
+    source = None
+    if req.source_file_id:
+        try:
+            async with UnitOfWork() as uow:
+                candidate = await uow.files.get(uuid.UUID(req.source_file_id))
+            if candidate.profile_id == profile_id:
+                source = candidate
+        except (ValueError, RecordNotFoundError):
+            source = None
 
     # Create a new SRT file under the profile.
     op_id = uuid.uuid4().hex
@@ -596,25 +610,23 @@ async def save_subtitles(
     rel_srt = media.get_relative_path(srt_loc)
     await media.write_file(rel_srt, req.content)
 
+    default_name = f"{Path(source.name).stem}.srt" if source else srt_loc.name
     async with UnitOfWork() as uow:
         file_rec = await uow.files.add(
             profile_id=profile_id,
-            name=req.name or srt_loc.name,
+            name=req.name or default_name,
             path=str(rel_srt),
             type="srt",
+            folder=source.folder if source else None,
+            source_file_id=(
+                (source.source_file_id or source.id) if source else None
+            ),
+            origin="subtitle",
         )
         await uow.commit()
 
     LOGGER.info(f"Saved SRT File '{file_rec.id}' For Profile '{profile_id}'")
-    return ProfileFileResponse(
-        id=str(file_rec.id),
-        name=file_rec.name,
-        url=f"/media/{rel_srt.as_posix()}",
-        type="srt",
-        created_at=(
-            file_rec.created_at.isoformat() if file_rec.created_at else None
-        ),
-    )
+    return _file_response(file_rec)
 
 
 # --- Transcripts ---

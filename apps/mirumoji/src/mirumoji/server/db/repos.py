@@ -206,6 +206,8 @@ class FileRepository:
         path: str,
         type: str | None = None,
         folder: str | None = None,
+        source_file_id: uuid.UUID | None = None,
+        origin: str | None = None,
     ) -> FileDTO:
         """
         Adds a file record
@@ -217,6 +219,10 @@ class FileRepository:
             type (str | None): Optional file-type tag
             folder (str | None): Optional group label for files uploaded
                 together
+            source_file_id (uuid.UUID | None): The root media this file derives
+                from, or `None` when it is itself a root
+            origin (str | None): How the file came to be (`upload`,
+                `generated`, `fixed`, `converted`, `subtitle`, or `clip`)
 
         Returns:
             The created `FileDTO`
@@ -231,6 +237,8 @@ class FileRepository:
                 path=path,
                 type=type,
                 folder=folder,
+                source_file_id=source_file_id,
+                origin=origin,
             )
             self.session.add(file)
             await self.session.flush()

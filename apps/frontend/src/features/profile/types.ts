@@ -2,6 +2,9 @@
  * @packageDocumentation Profile / dashboard feature types.
  */
 
+/** How a file came to be, from the server's `origin` tag. */
+export type FileOrigin = "upload" | "generated" | "fixed" | "converted" | "subtitle" | "clip";
+
 /** A profile file (`/profiles/files`). */
 export type ProfileFile = {
     id: string;
@@ -9,6 +12,10 @@ export type ProfileFile = {
     url: string;
     type: string | null;
     folder?: string | null;
+    /** The root media this file derives from, or null when it is a root. */
+    source_file_id?: string | null;
+    /** How the file was produced, driving its variant label. */
+    origin?: FileOrigin | null;
     created_at?: string | null;
 };
 

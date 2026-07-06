@@ -127,11 +127,15 @@ class SaveSubtitlesRequest(BaseModel):
         content (str): The SRT content to store
         file_id (str | None): Existing SRT file id to overwrite, if any
         name (str | None): Optional file name for a newly created file
+        source_file_id (str | None): The video this SRT belongs to. When given
+            for a new file, the SRT is named after it, shares its folder, and
+            groups under it
     """
 
     content: str
     file_id: str | None = None
     name: str | None = None
+    source_file_id: str | None = None
 
 
 # --- Media Query-Parameters Requests (Bound via Annotated[..., Query()]) ---
