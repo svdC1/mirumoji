@@ -317,6 +317,17 @@ class ModelsResponse(BaseModel):
     models: list[str]
 
 
+class BreakdownPreviewResponse(BaseModel):
+    """
+    The rendered prompt for a breakdown template preview
+
+    Args:
+        prompt (str): The template rendered against the sample values
+    """
+
+    prompt: str
+
+
 # --- Health Responses ---
 
 

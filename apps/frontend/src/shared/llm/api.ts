@@ -87,7 +87,14 @@ export async function apiDeleteTemplate(): Promise<void> {
  * @returns {Promise<void>} Resolves when the explanation finishes.
  */
 export async function streamBreakdown(
-    req: { sentence: string; focus: string; model: string; sys_msg?: string; prompt?: string },
+    req: {
+        sentence: string;
+        focus: string;
+        model: string;
+        sys_msg?: string;
+        prompt?: string;
+        context?: string;
+    },
     handlers: {
         onFocus: (focus: EnrichedJapaneseWord | null) => void;
         onToken: (token: string) => void;
@@ -110,6 +117,26 @@ export async function streamBreakdown(
         },
         signal
     );
+}
+
+/**
+ * Renders a breakdown prompt template against sample values with no LLM call
+ * (`POST /llm/breakdown/preview`). Powers the template editor's live preview.
+ *
+ * @param {object} req The template + sample values.
+ * @returns {Promise<string>} The rendered prompt.
+ */
+export async function apiPreviewBreakdown(req: {
+    sentence: string;
+    focus?: string;
+    prompt?: string;
+    context?: string;
+}): Promise<string> {
+    const res = await apiFetch<{ prompt: string }>("llm/breakdown/preview", {
+        method: "POST",
+        body: JSON.stringify(req),
+    });
+    return res.prompt;
 }
 
 /**

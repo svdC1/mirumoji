@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { Clapperboard, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useOperationSettings } from "@/contexts/OperationSettingsContext";
 import WordDialog from "@/shared/components/WordDialog";
 import { EmptyState } from "@/shared/ui";
 import { useCues } from "./hooks/useCues";
@@ -21,6 +22,7 @@ interface DialogState {
     word: string;
     cueStart: number;
     cueEnd: number;
+    context?: string;
 }
 
 /**
@@ -56,6 +58,7 @@ export default function PlayerPage() {
     const { cues, preparing } = useCues(srt);
     const activeIdx = useActiveCue(videoEl, cues);
     const activeCue = activeIdx != null ? cues[activeIdx] : null;
+    const { settings } = useOperationSettings();
 
     const [panelCollapsed, setPanelCollapsed] = useState(false);
     const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -160,11 +163,23 @@ export default function PlayerPage() {
     };
 
     const onWordClick = (sentence: string, word: string) => {
+        // Surrounding-subtitle context around the active cue. It is always
+        // built and passed, but only a template that references {context}
+        // actually uses it, so opting in is a template choice, not a toggle.
+        const n = settings.breakdownContextWindow;
+        const context =
+            n > 0 && activeIdx != null
+                ? cues
+                      .slice(Math.max(0, activeIdx - n), activeIdx + n + 1)
+                      .map((c) => c.raw)
+                      .join("\n")
+                : undefined;
         setDialog({
             sentence,
             word,
             cueStart: activeCue?.start ?? 0,
             cueEnd: activeCue?.end ?? 0,
+            context,
         });
     };
 
@@ -223,6 +238,7 @@ export default function PlayerPage() {
                     cueEnd={dialog.cueEnd}
                     videoFile={video}
                     videoUrl={videoUrl || undefined}
+                    context={dialog.context}
                     onClose={() => setDialog(null)}
                 />
             )}

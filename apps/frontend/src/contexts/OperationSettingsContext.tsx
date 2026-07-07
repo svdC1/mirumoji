@@ -27,6 +27,11 @@ export interface OperationSettings {
     cleanAudio: boolean;
     /** Conversion opts for `convert` jobs. */
     convert: ConvertOpts;
+    /**
+     * Subtitle lines each side of the active cue sent to a word breakdown as
+     * `{context}` (only used by a template that references it).
+     */
+    breakdownContextWindow: number;
 }
 
 const STORAGE_PREFIX = "operationSettings";
@@ -40,6 +45,7 @@ export function defaultOperationSettings(): OperationSettings {
         transcribe: {},
         cleanAudio: false,
         convert: {},
+        breakdownContextWindow: 3,
     };
 }
 
@@ -57,6 +63,7 @@ function load(profileId: string | null): OperationSettings {
             transcribe: { ...base.transcribe, ...parsed.transcribe },
             cleanAudio: parsed.cleanAudio ?? base.cleanAudio,
             convert: { ...base.convert, ...parsed.convert },
+            breakdownContextWindow: parsed.breakdownContextWindow ?? base.breakdownContextWindow,
         };
     } catch {
         return base;
