@@ -67,6 +67,20 @@ mirumoji down [OPTIONS]
 | `-v`, `--volumes` / `--keep-volumes` | `--keep-volumes` | Also Delete Data Bolumes *(profiles, media, database)* |
 | `-y`, `--yes` | off | Skip Confirmation Prompt When Deleting Volumes|
 
+### `reset`
+
+Deletes Mirumoji's Local Data Folder From This Machine *(media, database, cached builds, config, logs)*. Docker Data Volumes Are Not Touched &rarr; Use `down --volumes` For Those
+
+```bash
+mirumoji reset [OPTIONS]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--keep-config` | off | Preserve The Config File *(Your LLM / Modal Keys)* |
+| `--keep-logs` | off | Preserve The Log Files |
+| `-y`, `--yes` | off | Skip The Confirmation Prompt |
+
 ### `status`
 
 Shows The Running Docker Compose Services + Their Health As A Table

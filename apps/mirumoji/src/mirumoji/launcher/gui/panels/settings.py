@@ -9,7 +9,7 @@ from pathlib import Path
 
 import flet as ft
 
-from ...core import envfile
+from ...core import envfile, storage
 from ...core.constants import (
     ADVANCED_VARS,
     IMAGE_SOURCE_VAR,
@@ -20,6 +20,7 @@ from ...core.constants import (
 from ...core.errors import EnvConfigError
 from ...core.models import Backend, EnvVar, ImageSource
 from .. import theme
+from ..runner import run_blocking
 from ..state import AppState
 
 # A 0/1 flag, so it is rendered as a checkbox rather than a text field
@@ -151,6 +152,80 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         envfile.write(state.env_path, state.env)
         state.notify(f"Saved To {state.env_path}", "success")
 
+    reset_btn = theme.PrimaryActionButton(
+        "Delete Data",
+        on_click=lambda e: on_reset(e),
+        icon=ft.Icons.DELETE_FOREVER,
+    )
+
+    def on_reset_done(steps: list[storage.ResetStep]) -> None:
+        reset_btn.set_loading(False)
+        page.update()
+        failed = [s.label for s in steps if s.status == "failed"]
+        if failed:
+            state.notify(
+                f"In Use, Not Removed  ↦  {', '.join(failed)}. Stop The App "
+                "Or Server And Retry",
+                "danger",
+            )
+        else:
+            state.notify("Fresh Start Complete", "success")
+
+    def on_reset_error(exc: Exception) -> None:
+        reset_btn.set_loading(False)
+        page.update()
+        state.notify(f"Reset Failed  ↦  {exc}", "danger")
+
+    def on_reset(_: ft.Event[ft.Button]) -> None:
+        # Fresh options per open, so a prior choice never lingers
+        keep_config_cb = ft.Checkbox(
+            label="Keep Config (Your Keys)", value=False
+        )
+        keep_logs_cb = ft.Checkbox(label="Keep Logs", value=False)
+
+        def do_reset() -> None:
+            page.pop_dialog()
+            reset_btn.set_loading(True)
+            page.update()
+            run_blocking(
+                page,
+                lambda: storage.reset_storage(
+                    keep_config=bool(keep_config_cb.value),
+                    keep_logs=bool(keep_logs_cb.value),
+                ),
+                on_reset_done,
+                on_error=on_reset_error,
+            )
+
+        page.show_dialog(
+            ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Delete All Data"),
+                content=ft.Column(
+                    tight=True,
+                    controls=[
+                        ft.Text(
+                            "Permanently Deletes Mirumoji's Local Data Folder "
+                            "(Media, Database, Cache, Config, Logs). Docker "
+                            "Volumes Are Not Affected.",
+                            color=theme.INK_MUTED,
+                        ),
+                        ft.Container(height=6),
+                        keep_config_cb,
+                        keep_logs_cb,
+                    ],
+                ),
+                actions=[
+                    ft.TextButton(
+                        "Cancel", on_click=lambda _: page.pop_dialog()
+                    ),
+                    ft.TextButton(
+                        "Delete Everything", on_click=lambda _: do_reset()
+                    ),
+                ],
+            )
+        )
+
     return ft.Column(
         expand=True,
         scroll=ft.ScrollMode.AUTO,
@@ -201,8 +276,10 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                         on_click=on_import,
                         icon=ft.Icons.IMPORT_EXPORT,
                     ),
+                    reset_btn,
                 ],
                 spacing=16,
+                wrap=True,
             ),
         ],
     )

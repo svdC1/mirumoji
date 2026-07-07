@@ -23,6 +23,7 @@ from .commands import (
     logs,
     pull,
     render,
+    reset,
     status,
     up,
 )
@@ -49,6 +50,7 @@ def _configure() -> None:
 
 app.command("up")(up)
 app.command("down")(down)
+app.command("reset")(reset)
 app.command("status")(status)
 app.command("logs")(logs)
 app.command("build")(build)
