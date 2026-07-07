@@ -31,7 +31,7 @@ export type { BadgeProps, BadgeTone } from "./Badge";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 export { Skeleton } from "./Skeleton";
-export { Tooltip } from "./Tooltip";
+export { Tooltip, InfoTip } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
 export { AudioPlayer } from "./AudioPlayer";
 export type { AudioPlayerProps } from "./AudioPlayer";

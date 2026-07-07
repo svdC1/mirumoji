@@ -327,12 +327,7 @@ export const ExamplesSection = ({
                             )}
                         </div>
                         {ex.translations.length > 0 && (
-                            <Tooltip
-                                label={ex.translations[0]}
-                                wide
-                                align="right"
-                                className="mt-1.5 shrink-0"
-                            >
+                            <Tooltip label={ex.translations[0]} wide className="mt-1.5 shrink-0">
                                 <button
                                     type="button"
                                     aria-label="Show translation"

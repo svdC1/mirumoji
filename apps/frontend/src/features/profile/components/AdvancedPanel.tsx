@@ -13,7 +13,7 @@ import {
     useOperationSettings,
     type OperationSettings,
 } from "@/contexts/OperationSettingsContext";
-import { Button, Card, Input, Label, TextArea, Toggle, Tooltip, cn } from "@/shared/ui";
+import { Button, Card, InfoTip, Input, Label, TextArea, Toggle, cn } from "@/shared/ui";
 import type { ConvertOpts, TranscribeOpts } from "@/shared/jobs/types";
 
 type SubTab = "transcription" | "conversion";
@@ -24,17 +24,6 @@ const SPINNER_OFF =
     "[&::-webkit-inner-spin-button]:appearance-none " +
     "[&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none";
 
-/** A small "?" trigger that reveals an explanation tooltip. */
-function InfoDot({ info }: { info: string }) {
-    return (
-        <Tooltip label={info} wide>
-            <span className="grid h-4 w-4 cursor-help place-items-center rounded-full border border-ink/30 text-2xs leading-none text-ink-faint transition-colors hover:border-shu/60 hover:text-shu">
-                ?
-            </span>
-        </Tooltip>
-    );
-}
-
 /** A label row with an info tooltip in place of a descriptive hint. */
 function InfoLabel({ label, info, htmlFor }: { label: string; info: string; htmlFor?: string }) {
     return (
@@ -42,7 +31,7 @@ function InfoLabel({ label, info, htmlFor }: { label: string; info: string; html
             <Label htmlFor={htmlFor} className="mb-0">
                 {label}
             </Label>
-            <InfoDot info={info} />
+            <InfoTip content={info} wide />
         </div>
     );
 }
@@ -98,7 +87,7 @@ function ToggleRow({
         <div className="flex items-center gap-2.5">
             <Toggle checked={checked} onChange={onChange} label={label} />
             <span className="text-sm text-ink-muted">{label}</span>
-            <InfoDot info={info} />
+            <InfoTip content={info} wide />
         </div>
     );
 }
