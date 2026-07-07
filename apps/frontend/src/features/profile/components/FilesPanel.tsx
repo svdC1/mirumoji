@@ -25,6 +25,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useTasks } from "@/contexts/TaskContext";
+import { usePlayer } from "@/contexts/PlayerContext";
 import { Button, Card, Checkbox, EmptyState, IconButton, Popover, cn } from "@/shared/ui";
 import { staticUrl } from "@/shared/format/files";
 import { toastApiError } from "@/shared/api/errors";
@@ -62,6 +63,17 @@ function KindIcon({ file, className }: { file: ProfileFile; className?: string }
 export function FilesPanel() {
     const { profileId } = useProfile();
     const tasks = useTasks();
+    const {
+        videoFileId,
+        srtFileId,
+        setVideo,
+        setVideoUrl,
+        setVideoFileName,
+        setVideoFileId,
+        setSrt,
+        setSrtFileName,
+        setSrtFileId,
+    } = usePlayer();
     const { data, isLoading } = useSWR<ProfileFile[]>(profileId ? SWR_KEY : null, listFiles, {
         revalidateOnFocus: false,
         keepPreviousData: true,
@@ -135,6 +147,29 @@ export function FilesPanel() {
 
     const clearSelection = () => setSelected(new Set());
 
+    // A file deleted here may be the one loaded in the player. Clear only the
+    // matching slice so the player stops driving a file the server no longer
+    // has: a loaded video would otherwise 404 and misread as an undecodable
+    // container (the "Convert To Play" prompt), and a loaded subtitle would
+    // silently linger on screen. This does not touch the player's own error
+    // detection, which still handles genuinely unplayable or missing sources.
+    // Cleared silently, since the delete happens on this panel (the "File
+    // Deleted" toast already acknowledges it) and the player falls back to its
+    // empty state on its own.
+    const evictFromPlayer = (id: string) => {
+        if (videoFileId === id) {
+            setVideo(null);
+            setVideoUrl(null);
+            setVideoFileName(null);
+            setVideoFileId(null);
+        }
+        if (srtFileId === id) {
+            setSrt(null);
+            setSrtFileName(null);
+            setSrtFileId(null);
+        }
+    };
+
     // Deleting a file cascades its dependent jobs away server-side. The server
     // returns those job ids, so they are pruned from the task tray immediately
     // (which polls only while a job is active) and the Tasks tab is refreshed.
@@ -143,6 +178,7 @@ export function FilesPanel() {
         try {
             const res = await deleteFile(id);
             toast.success("File Deleted");
+            evictFromPlayer(id);
             setSelected((prev) => {
                 const next = new Set(prev);
                 next.delete(id);
@@ -163,12 +199,14 @@ export function FilesPanel() {
         if (ids.length === 0) return;
         const results = await Promise.allSettled(ids.map((id) => deleteFile(id)));
         const ok = results.filter((r) => r.status === "fulfilled").length;
-        // Prune the tray of every job cascaded away by the successful deletes.
-        for (const r of results) {
+        // Prune the tray of every job cascaded away by the successful deletes,
+        // and evict any deleted file that was loaded in the player.
+        results.forEach((r, i) => {
             if (r.status === "fulfilled") {
+                evictFromPlayer(ids[i]);
                 r.value.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
             }
-        }
+        });
         clearSelection();
         if (ok > 0) toast.success(`Deleted ${ok} File(s)`);
         if (ok < ids.length) toast.error(`${ids.length - ok} File(s) Could Not Be Deleted`);

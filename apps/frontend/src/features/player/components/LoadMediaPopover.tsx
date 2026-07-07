@@ -31,7 +31,7 @@ const ORIGIN_LABEL: Record<string, string> = {
 };
 
 const rowBtn =
-    "flex w-full items-center gap-1.5 rounded bg-surface-2 px-2 py-1.5 text-left text-sm text-ink-muted transition-colors hover:text-shu";
+    "flex w-full items-center gap-1.5 rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu";
 
 /**
  * A single loadable file row: a kind icon, the file's real name, and an origin
@@ -91,6 +91,9 @@ export function LoadMediaPopover({ className }: { className?: string }) {
     const groups = buildFileGroups(files ?? []);
     const mediaGroups = groups.filter((g) => fileKind(g.head) !== "srt");
     const subtitleGroups = groups.filter((g) => fileKind(g.head) === "srt");
+    // Only reserve the left-hand toggle column when at least one row can
+    // expand. With no expandable groups the rows fill that space instead.
+    const anyExpandable = mediaGroups.some((g) => g.variants.length > 0);
 
     const toggle = (id: string) =>
         setExpanded((prev) => {
@@ -222,27 +225,30 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                                             return (
                                                 <li key={g.head.id}>
                                                     <div className="flex items-center gap-1">
-                                                        {hasVariants ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => toggle(g.head.id)}
-                                                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-faint transition-colors hover:text-ink"
-                                                                aria-label={
-                                                                    isOpen
-                                                                        ? "Hide files"
-                                                                        : "Show files"
-                                                                }
-                                                                aria-expanded={isOpen}
-                                                            >
-                                                                {isOpen ? (
-                                                                    <ChevronDown size={15} />
-                                                                ) : (
-                                                                    <ChevronRight size={15} />
-                                                                )}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="h-6 w-6 shrink-0" />
-                                                        )}
+                                                        {anyExpandable &&
+                                                            (hasVariants ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        toggle(g.head.id)
+                                                                    }
+                                                                    className="shrink-0 text-ink-faint transition-colors hover:text-ink"
+                                                                    aria-label={
+                                                                        isOpen
+                                                                            ? "Hide files"
+                                                                            : "Show files"
+                                                                    }
+                                                                    aria-expanded={isOpen}
+                                                                >
+                                                                    {isOpen ? (
+                                                                        <ChevronDown size={15} />
+                                                                    ) : (
+                                                                        <ChevronRight size={15} />
+                                                                    )}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="w-[15px] shrink-0" />
+                                                            ))}
                                                         <div className="min-w-0 flex-1">
                                                             <FileRow
                                                                 file={g.head}
@@ -266,7 +272,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                                             );
                                         })
                                     ) : (
-                                        <li className="rounded bg-surface-2 px-2 py-1.5 text-center text-sm italic text-ink-faint">
+                                        <li className="rounded bg-surface-2 px-2 py-1 text-center text-sm italic text-ink-faint">
                                             None
                                         </li>
                                     )}
