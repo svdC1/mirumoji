@@ -19,6 +19,69 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.3.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.3.0) - 2026-07-08
+
+This release organizes profile files, lets a word breakdown pull in the surrounding subtitle
+lines, adds a one-command local-data reset, and hardens the server's logging and shutdown.
+As a `v3.x` release *(see the `v0.1.0` note above)* it includes a breaking database change
+
+### Breaking Changes
+
+- `Database` &rarr; Profile files now record their lineage *(the source video from which
+  a generated subtitle or converted MP4 came)* through two new columns, added
+  without a migration. An existing install must start from a fresh database *(run
+  `mirumoji reset` first, or `mirumoji down -v` for a Docker deployment, before
+  updating)*
+
+### Added
+
+- `Frontend` &rarr; Profile files are organized by video lineage. Each source video
+  nests its derived files *(generated / fixed subtitles, a converted MP4)* beneath it
+  with readable names instead of opaque ids, grouped by folder. The player's
+  `Load Media` list is also updated to group related files
+
+- `Server` + `Frontend` &rarr; A word breakdown can include the surrounding subtitle
+  lines. A prompt template opts in with a `{context}` placeholder and
+  `{#context}…{/context}` conditional blocks. The LLM template editor shows a live
+  preview of the assembled prompt, and a control in the player toolbar sets how many
+  lines on each side *(N lines before the current sentence + N lines after it)* are sent
+
+- `Launcher` &rarr; A `mirumoji reset` command *(and a `Delete Data` button in the GUI
+  Settings)* deletes Mirumoji's local data folder, which is otherwise tucked away in a
+  hidden system directory. `--keep-config` and `--keep-logs` preserve those. Docker
+  data volumes are left to `down --volumes`
+
+- `Launcher` &rarr; The LLM batch concurrency and a Modal container keep-warm window
+  are configurable through new environment variables and Settings fields
+
+### Changed
+
+- `Server` &rarr; Logging was reworked so the server console stays clean, every log
+  line carries a per-request id, and upload progress shows a themed bar
+
+- `Server` &rarr; The previously untyped JSON endpoints *(the profile deletes and the
+  provider / model / health routes)* now return typed models, so they are documented
+  in the API schema
+
+- `Frontend` &rarr; Info tooltips are a single shared component that stays on-screen on
+  mobile and can hold richer content
+
+### Fixed
+
+- `Frontend` &rarr; Deleting a file that is open in the player now clears it, so a
+  deleted video no longer looks like an unplayable format and a deleted subtitle no
+  longer lingers
+
+- `Server + Frontend` &rarr; Deleting several files at once is safe *(previously, the database ran into a race-condition where deleting multiple files at once would try to wipe already-deleted jobs shared by them, stopping the deletion)*. The frontend now clears completed jobs related to already-deleted files from the task tray
+
+- `Server` &rarr; On shutdown, the server releases its log file and stops any running
+  `FFMPEG` process, so nothing is left holding a file open and the local data folder
+  can be removed *(notably on Windows)*
+
+- `Frontend` &rarr; The local CA can be downloaded over `HTTPS`. The service worker was
+  catching the request and serving the app *(which rendered its 404 page)*, so the
+  certificate could previously only be fetched over `HTTP`
+
 ## [`3.2.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.2.0) - 2026-07-04
 
 This release turns the dictionary into a full study hub *(kanji stroke-order animations,
