@@ -15,13 +15,18 @@ It's Async-First &rarr; Routers are `async def` and blocking work is wrapped in 
 
     - [`Dependencies`](dependencies.md) &rarr; Dependency-Injection Helpers
 
+    - [`Middleware`](middleware.md) &rarr; Per-Request Logging Context
+
+    - [`Progress`](progress.md) &rarr; Themed Upload Progress Bars
+
     - [`Media`](media.md) &rarr; Media File Handling
 
     - [`Jobs`](jobs.md) &rarr; In-Process Async Job Queue + Worker That Backs The
       Single + Batch Operations
 
-    - `Database` &rarr; [`SQLAlchemy Models`](db/models.md) +
-      [`Repos`](db/repos.md) &rarr; Data-Access / Persistence Layer
+    - `Database` &rarr; The [`Engine + Unit Of Work`](db/index.md) with its
+      [`SQLAlchemy Models`](db/models.md) and [`Repos`](db/repos.md) &rarr;
+      Data-Access / Persistence Layer
 
 
     - `Models` &rarr; `Pydantic` Schemas

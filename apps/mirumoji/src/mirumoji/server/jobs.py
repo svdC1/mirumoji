@@ -93,8 +93,8 @@ class JobQueueManager:
 
         - On shutdown, `stop` attempts to fail any job still left running
 
-       - On startup, `start` fails any job still left `running` because of a
-         server crash and re-queues any `queued` job
+        - On startup, `start` fails any job still left `running` because of a
+          server crash and re-queues any `queued` job
 
     info: Concurrency
         - One worker runs jobs sequentially, so 2 or more heavy, local GPU/CPU

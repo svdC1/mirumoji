@@ -3,7 +3,6 @@ Defines helpers to modify the Docker Compose template at
 `mirumoji/docker/compose/compose.yaml` according to user input
 
 info: Additional Information
-
     - A single annotated template ships in the package
       (`mirumoji/docker/compose/compose.yaml`)
 
