@@ -56,11 +56,15 @@ export default defineConfig({
                 ],
             },
             workbox: {
-                // Keep the SPA navigation fallback from swallowing API calls or
-                // the mkdocs site served under /docs on the Pages build, and
-                // never cache /api responses. The /docs match allows a missing
-                // trailing slash (/docs as well as /docs/...)
-                navigateFallbackDenylist: [/^\/api\//, /\/docs(?:\/|$)/],
+                // Keep the SPA navigation fallback from swallowing requests for
+                // paths nginx serves directly: API calls, the mkdocs site under
+                // /docs on the Pages build, and the local CA download. Without
+                // the CA entry, navigating to /mirumoji-ca.crt on the HTTPS
+                // origin (where the service worker runs) falls back to
+                // index.html and lands on the app's 404, while plain HTTP works
+                // because no service worker runs on an insecure origin. The
+                // /docs match allows a missing trailing slash (/docs and /docs/)
+                navigateFallbackDenylist: [/^\/api\//, /\/docs(?:\/|$)/, /^\/mirumoji-ca\.crt$/],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
