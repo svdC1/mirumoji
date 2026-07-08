@@ -1,64 +1,59 @@
 /**
  * @packageDocumentation A popover to load a video + subtitles, either from the
- * device or from the active profile's stored files.
+ * device or from the active profile's stored files. Profile media is grouped by
+ * lineage, so a video's derived files (subtitles, a converted MP4) sit right
+ * under it, and every row loads on its own.
  */
 
 import { useRef, useState } from "react";
 import useSWR from "swr";
-import { FolderOpen } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, FolderOpen, Play } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiFetch } from "@/shared/api/client";
 import { toastApiError } from "@/shared/api/errors";
-import {
-    getFileExtension,
-    inferFileType,
-    staticUrl,
-    truncateFilename,
-} from "@/shared/format/files";
+import { inferFileType, staticUrl } from "@/shared/format/files";
+import { buildFileGroups, fileKind } from "@/features/profile/grouping";
 import { IconButton, Popover, Button, cn } from "@/shared/ui";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import type { ProfileFile } from "@/features/profile/types";
 
-function isVideo(name: string): boolean {
+function isVideoName(name: string): boolean {
     return inferFileType(name) === "video";
 }
 
-function isSrt(name: string): boolean {
-    return getFileExtension(name).toLowerCase() === "srt";
-}
+/** Short badges naming what each derived file is, keyed by its origin. */
+const ORIGIN_LABEL: Record<string, string> = {
+    generated: "Generated",
+    fixed: "Fixed",
+    subtitle: "Saved",
+    converted: "Converted",
+};
 
-function FileList({
-    title,
-    files,
-    onSelect,
-}: {
-    title: string;
-    files: ProfileFile[];
-    onSelect: (f: ProfileFile) => void;
-}) {
+const rowBtn =
+    "flex w-full items-center gap-1.5 rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu";
+
+/**
+ * A single loadable file row: a kind icon, the file's real name, and an origin
+ * badge. Clicking it loads exactly this file, never a sibling.
+ *
+ * @param {{ file: ProfileFile; onLoad: (f: ProfileFile) => void }} props The
+ *   file to show and the loader to call on click.
+ * @returns {JSX.Element} The row button.
+ */
+function FileRow({ file, onLoad }: { file: ProfileFile; onLoad: (f: ProfileFile) => void }) {
+    const Icon = fileKind(file) === "srt" ? FileText : Play;
+    const label = ORIGIN_LABEL[file.origin ?? ""];
     return (
-        <div>
-            <h4 className="mb-1 text-2xs uppercase tracking-wide text-ink-faint">{title}</h4>
-            <ul className="max-h-28 space-y-1 overflow-y-auto">
-                {files.length > 0 ? (
-                    files.map((f) => (
-                        <li key={f.id}>
-                            <button
-                                onClick={() => onSelect(f)}
-                                className="w-full rounded bg-surface-2 px-2 py-1 text-left text-sm text-ink-muted transition-colors hover:text-shu"
-                            >
-                                {truncateFilename(f.name, 8, 12)}
-                            </button>
-                        </li>
-                    ))
-                ) : (
-                    <li className="rounded bg-surface-2 px-2 py-1 text-center text-sm italic text-ink-faint">
-                        None
-                    </li>
-                )}
-            </ul>
-        </div>
+        <button onClick={() => onLoad(file)} className={rowBtn} title={file.name}>
+            <Icon size={13} className="shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{file.name}</span>
+            {label && (
+                <span className="shrink-0 rounded-full bg-ink/10 px-1.5 py-0.5 text-2xs text-ink-faint">
+                    {label}
+                </span>
+            )}
+        </button>
     );
 }
 
@@ -70,6 +65,7 @@ function FileList({
  */
 export function LoadMediaPopover({ className }: { className?: string }) {
     const [open, setOpen] = useState(false);
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const videoInputRef = useRef<HTMLInputElement | null>(null);
     const srtInputRef = useRef<HTMLInputElement | null>(null);
     const {
@@ -90,8 +86,56 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         { revalidateOnFocus: false, keepPreviousData: true }
     );
 
-    const videoFiles = (files ?? []).filter((f) => isVideo(f.name));
-    const subtitleFiles = (files ?? []).filter((f) => isSrt(f.name));
+    // Group by lineage. Playable media (video / audio heads) become the primary
+    // list; standalone or orphaned subtitles are offered separately.
+    const groups = buildFileGroups(files ?? []);
+    const mediaGroups = groups.filter((g) => fileKind(g.head) !== "srt");
+    const subtitleGroups = groups.filter((g) => fileKind(g.head) === "srt");
+    // Only reserve the left-hand toggle column when at least one row can
+    // expand. With no expandable groups the rows fill that space instead.
+    const anyExpandable = mediaGroups.some((g) => g.variants.length > 0);
+
+    const toggle = (id: string) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+
+    const loadVideo = (file: ProfileFile) => {
+        // Load every video the same way and let the player try to play it. A
+        // container this browser can't decode (e.g. .mkv on iOS) is caught
+        // there and offered for conversion. videoFileId is always set, so the
+        // toolbar's by-reference actions stay enabled even when it won't play.
+        setVideo(null);
+        setVideoUrl(staticUrl(file.url));
+        setVideoFileName(file.name);
+        setVideoFileId(file.id);
+        setTimestamp(null);
+    };
+
+    const loadSrt = async (file: ProfileFile) => {
+        try {
+            const res = await fetch(staticUrl(file.url));
+            const text = await res.text();
+            const srtFile = new File([text], file.name, { type: "application/x-subrip" });
+            setSrt(srtFile);
+            setSrtFileName(file.name);
+            setSrtFileId(file.id);
+        } catch (err) {
+            toastApiError(err);
+            toast.error("Could Not Load Subtitle File");
+        }
+    };
+
+    // Load one file on its own. Subtitles fill the SRT slot, everything else
+    // (source video, converted MP4, audio) the video slot. Every row loads
+    // exactly the file it names, never a sibling.
+    const loadFile = (file: ProfileFile) => {
+        if (fileKind(file) === "srt") void loadSrt(file);
+        else loadVideo(file);
+    };
 
     const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -99,7 +143,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         // The input has no `accept` (an iOS/.mkv workaround), so it accepts any
         // file. Reject non-video picks here so Generate SRT / Convert never run
         // FFmpeg/Whisper over a text or other unrelated file.
-        if (!isVideo(file.name)) {
+        if (!isVideoName(file.name)) {
             toast.error("Please Select A Video File");
             e.target.value = "";
             return;
@@ -107,8 +151,8 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         setVideoUrl(null);
         setVideo(file);
         setVideoFileName(file.name);
-        setVideoFileId(null); // device file isn't a profile record
-        setTimestamp(null); // a new video starts from the beginning
+        setVideoFileId(null);
+        setTimestamp(null);
     };
 
     const onPickSrt = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,33 +160,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         if (!file) return;
         setSrt(file);
         setSrtFileName(file.name);
-        setSrtFileId(null); // device file isn't a profile record
-    };
-
-    const selectProfileFile = async (file: ProfileFile) => {
-        if (isVideo(file.name)) {
-            // Load every video the same way and let the player try to play it.
-            // A container this browser can't decode (e.g. .mkv on iOS) is caught
-            // there and offered for conversion. videoFileId is always set, so the
-            // toolbar's by-reference actions stay enabled even when it won't play.
-            setVideo(null);
-            setVideoUrl(staticUrl(file.url));
-            setVideoFileName(file.name);
-            setVideoFileId(file.id); // track the profile file for in-place ops
-            setTimestamp(null); // a new video starts from the beginning
-        } else if (isSrt(file.name)) {
-            try {
-                const res = await fetch(staticUrl(file.url));
-                const text = await res.text();
-                const srtFile = new File([text], file.name, { type: "application/x-subrip" });
-                setSrt(srtFile);
-                setSrtFileName(file.name);
-                setSrtFileId(file.id); // track the profile file for in-place fixes
-            } catch (err) {
-                toastApiError(err);
-                toast.error("Could Not Load Subtitle File");
-            }
-        }
+        setSrtFileId(null);
     };
 
     return (
@@ -150,7 +168,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
             <IconButton label="Load media" active={open} onClick={() => setOpen((v) => !v)}>
                 <FolderOpen size={18} />
             </IconButton>
-            <Popover open={open} onClose={() => setOpen(false)} className="w-60 p-4 sm:w-72">
+            <Popover open={open} onClose={() => setOpen(false)} className="w-64 p-4 sm:w-72">
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <h4 className="text-2xs uppercase tracking-wide text-ink-faint">
@@ -195,16 +213,86 @@ export function LoadMediaPopover({ className }: { className?: string }) {
 
                     {profileId && (
                         <div className="space-y-3 border-t border-ink/10 pt-3">
-                            <FileList
-                                title="Profile videos"
-                                files={videoFiles}
-                                onSelect={selectProfileFile}
-                            />
-                            <FileList
-                                title="Profile subtitles"
-                                files={subtitleFiles}
-                                onSelect={selectProfileFile}
-                            />
+                            <div>
+                                <h4 className="mb-1 text-2xs uppercase tracking-wide text-ink-faint">
+                                    Profile media
+                                </h4>
+                                <ul className="max-h-52 space-y-1 overflow-y-auto">
+                                    {mediaGroups.length > 0 ? (
+                                        mediaGroups.map((g) => {
+                                            const isOpen = expanded.has(g.head.id);
+                                            const hasVariants = g.variants.length > 0;
+                                            return (
+                                                <li key={g.head.id}>
+                                                    <div className="flex items-center gap-1">
+                                                        {anyExpandable &&
+                                                            (hasVariants ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        toggle(g.head.id)
+                                                                    }
+                                                                    className="shrink-0 text-ink-faint transition-colors hover:text-ink"
+                                                                    aria-label={
+                                                                        isOpen
+                                                                            ? "Hide files"
+                                                                            : "Show files"
+                                                                    }
+                                                                    aria-expanded={isOpen}
+                                                                >
+                                                                    {isOpen ? (
+                                                                        <ChevronDown size={15} />
+                                                                    ) : (
+                                                                        <ChevronRight size={15} />
+                                                                    )}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="w-[15px] shrink-0" />
+                                                            ))}
+                                                        <div className="min-w-0 flex-1">
+                                                            <FileRow
+                                                                file={g.head}
+                                                                onLoad={loadFile}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {isOpen && hasVariants && (
+                                                        <ul className="ml-3 mt-1 space-y-1 border-l border-ink/10 pl-2">
+                                                            {g.variants.map((v) => (
+                                                                <li key={v.id}>
+                                                                    <FileRow
+                                                                        file={v}
+                                                                        onLoad={loadFile}
+                                                                    />
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </li>
+                                            );
+                                        })
+                                    ) : (
+                                        <li className="rounded bg-surface-2 px-2 py-1 text-center text-sm italic text-ink-faint">
+                                            None
+                                        </li>
+                                    )}
+                                </ul>
+                            </div>
+
+                            {subtitleGroups.length > 0 && (
+                                <div>
+                                    <h4 className="mb-1 text-2xs uppercase tracking-wide text-ink-faint">
+                                        Other subtitles
+                                    </h4>
+                                    <ul className="max-h-28 space-y-1 overflow-y-auto">
+                                        {subtitleGroups.map((g) => (
+                                            <li key={g.head.id}>
+                                                <FileRow file={g.head} onLoad={loadFile} />
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

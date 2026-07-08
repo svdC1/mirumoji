@@ -5,9 +5,9 @@ This section will teach you how to get mirumoji running with the `Desktop Launch
 
 !!! note "The Desktop Launcher Isn't The App"
     - The main Mirumoji application runs via [`Docker Compose`](https://docs.docker.com/compose/)
-    
+
     - The `Desktop Launcher` is just a friendly front door to it which automatically runs all the Docker commands,checks if the external dependencies needed by Mirumoji are installed in your machine, and helps you manage the main application more easily
-    
+
     - You still need [`Docker`](https://docs.docker.com/desktop/) to be installed and running
 
 ## Getting The Launcher
@@ -25,7 +25,7 @@ Pick The One That Fits You
     - No Dependencies Required
 
 === "PyPI"
-    
+
     Install the [`mirumoji`](https://pypi.org/project/mirumoji/) python package
 
     ```bash
@@ -45,7 +45,7 @@ Pick The One That Fits You
 
     === "Windows"
         Open the unzipped folder and run `Mirumoji.exe`
-    
+
     === "MacOS"
         Open `Mirumoji.app`
 
@@ -55,7 +55,7 @@ Pick The One That Fits You
             - Right-Click App &rarr; `Open`
 
             - Alternatively, run `xattr -dr com.apple.quarantine Mirumoji.app` in the terminal
-    
+
     === "Linux"
         Make the executable runnable and start it
         ```bash
@@ -83,7 +83,7 @@ The `Desktop Launcher` Has 4 Panels
 | --- | --- |
 | **Dashboard** | Start / Stop / Build Images / Watch Status |
 | **Environment** | Run Dependency Checks *(Same as `mirumoji doctor`)* |
-| **Settings** | Choose The Transcription Backend / Image Source, Set LLM / Modal API Keys + Advanced Overrides |
+| **Settings** | Choose The Transcription Backend / Image Source, Set LLM / Modal API Keys + Advanced Overrides, Delete All Local Data |
 | **Logs** | Stream + Filter The Docker Compose Application's Logs |
 
 ### Typical First Run

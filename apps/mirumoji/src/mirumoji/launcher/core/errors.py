@@ -7,10 +7,15 @@ tip: Usage
     without parsing strings
 """
 
+from ...exceptions import MirumojiLauncherError
 
-class LauncherError(Exception):
+
+class LauncherError(MirumojiLauncherError):
     """
     Base class for all launcher errors
+
+    Roots under `MirumojiLauncherError` (and so under `MirumojiError`), so the
+    whole launcher error tree is part of the package hierarchy
     """
 
 

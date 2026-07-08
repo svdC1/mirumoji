@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
@@ -435,21 +436,81 @@ def available_models(provider: LLMProvider) -> list[str]:
 # --- Prompt Builders ---
 
 
-def default_breakdown_prompt(sentence: str, focus: str) -> tuple[str, str]:
+DEFAULT_BREAKDOWN_TEMPLATE = "{sentence}. Explain usage of word : {focus}"
+"""
+The prompt template used for a word breakdown when no custom one is given
+
+Rendered through `render_breakdown_prompt`, so it follows the same placeholder
+rules as a user's template
+"""
+
+_BLOCK_RE = re.compile(r"\{#(\w+)\}(.*?)\{/\1\}", re.DOTALL)
+"""
+Matches a conditional block `{#name}...{/name}`
+
+Group 1 captures the placeholder name and group 2 the inner content. The `\1`
+back-reference forces the closing `{/name}` to match the opening name, and the
+non-greedy `.*?` under `DOTALL` keeps each block (including multi-line ones)
+bound to its own closing tag rather than swallowing later blocks
+"""
+
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+"""
+Matches a single `{name}` placeholder, capturing the name in group 1
+"""
+
+
+def render_breakdown_prompt(
+    template: str,
+    values: dict[str, str],
+) -> str:
     """
-    Build the (system, prompt) pair for the default word-nuance breakdown
+    Render a breakdown prompt template against a set of named values
+
+    info: Template Values
+        - `{name}` is replaced by `values[name]`
+
+        - An unknown name is left untouched
+
+        - A name whose value is empty renders as empty
+
+    info: Conditional Blocks
+        - `{#name}...{/name}` is a conditional block
+
+        - The inner content is kept only when `values[name]` is non-empty
+          (after stripping), and removed entirely otherwise
+
+        - This lets a template frame optional values (such as subtitle context)
+          without leaving dangling labels when they are absent
+
+    info: Safety
+        - Rendering never raises on a malformed template
+
+        - Unknown placeholders and unmatched braces are left as literal
+          text, so a user's prompt is always used rather than being
+          silently discarded
 
     Args:
-        sentence (str): Full Japanese sentence
-        focus (str): Target word to explain in context
+        template (str): The prompt template
+        values (dict[str, str]): Named values to substitute. A missing key is
+            treated as an empty value
 
     Returns:
-        Tuple of the system message and the user prompt
+        The rendered prompt
     """
-    return (
-        get_settings().breakdown_sys_msg,
-        f"{sentence}. Explain usage of word : {focus}",
-    )
+
+    def _resolve_block(match: re.Match[str]) -> str:
+        name, inner = match.group(1), match.group(2)
+        if name not in values:
+            return match.group(0)
+        return inner if values[name].strip() else ""
+
+    def _resolve_placeholder(match: re.Match[str]) -> str:
+        name = match.group(1)
+        return values[name] if name in values else match.group(0)
+
+    rendered = _BLOCK_RE.sub(_resolve_block, template)
+    return _PLACEHOLDER_RE.sub(_resolve_placeholder, rendered)
 
 
 def sentence_breakdown_prompt(sentence: str) -> tuple[str, str]:
@@ -466,36 +527,6 @@ def sentence_breakdown_prompt(sentence: str) -> tuple[str, str]:
         get_settings().breakdown_sys_msg,
         f"Sentence : {sentence}. Word: None, explain the sentence.",
     )
-
-
-def custom_breakdown_prompt(
-    sentence: str,
-    focus: str,
-    system_message: str,
-    prompt_template: str,
-) -> tuple[str, str]:
-    """
-    Build the (system, prompt) pair for a profile's custom breakdown template
-
-    Args:
-        sentence (str): Full Japanese sentence
-        focus (str): Target word to explain in context
-        system_message (str): Custom system message
-        prompt_template (str): Template using `{0}` = sentence, `{1}` = focus
-
-    Returns:
-        Tuple of the system message and the formatted user prompt
-
-    Raises:
-        LLMRequestError: If the template cannot be formatted
-    """
-    try:
-        prompt = prompt_template.format(sentence, focus)
-    except (IndexError, KeyError, ValueError) as e:
-        raise LLMRequestError(
-            f"Invalid custom prompt template: {e}",
-        ) from e
-    return system_message, prompt
 
 
 def sse_format(chunks: Iterable[str]) -> Iterator[str]:

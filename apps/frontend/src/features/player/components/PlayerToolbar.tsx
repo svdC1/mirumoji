@@ -5,19 +5,78 @@
  * loads each result back into the player when it finishes.
  */
 
-import { Sparkles, FileText, Clapperboard, RotateCcw, MoreHorizontal } from "lucide-react";
+import {
+    Sparkles,
+    FileText,
+    Clapperboard,
+    RotateCcw,
+    MoreHorizontal,
+    Minus,
+    Plus,
+    Wand2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { apiGetTemplate } from "@/shared/llm/api";
 import { ApiError, toastApiError } from "@/shared/api/errors";
 import type { SubmitJobRequest } from "@/shared/jobs/types";
-import { Button, IconButton, Popover, cn } from "@/shared/ui";
+import { Button, IconButton, InfoTip, Popover, cn } from "@/shared/ui";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useOperationSettings } from "@/contexts/OperationSettingsContext";
 import { LoadMediaPopover } from "./LoadMediaPopover";
 import { SubtitleStylePopover } from "./SubtitleStylePopover";
+
+/**
+ * The subtitle-context control: how many subtitle lines each side of a clicked
+ * line are sent to a word breakdown as {context}. Persisted per profile, and
+ * placed in the toolbar's breakdown popover (desktop) / the actions menu
+ * (mobile) so it can be tuned while watching.
+ *
+ * @returns {JSX.Element} The control.
+ */
+function ContextControl() {
+    const { settings, replace } = useOperationSettings();
+    const n = settings.breakdownContextWindow;
+    const set = (value: number) =>
+        replace({ ...settings, breakdownContextWindow: Math.min(20, Math.max(0, value)) });
+    const btn =
+        "grid h-6 w-6 place-items-center rounded text-ink-muted transition-colors " +
+        "hover:bg-ink/5 hover:text-ink disabled:pointer-events-none disabled:opacity-40";
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-ink">Subtitle Context</span>
+                <InfoTip
+                    content="How many nearby subtitle lines to send with a word lookup, so the model sees the surrounding scene."
+                    wide
+                />
+            </div>
+            <div className="flex items-center gap-0.5 rounded-control bg-surface-2 px-1 py-0.5">
+                <button
+                    type="button"
+                    className={btn}
+                    aria-label="Fewer context lines"
+                    onClick={() => set(n - 1)}
+                    disabled={n <= 0}
+                >
+                    <Minus size={14} />
+                </button>
+                <span className="w-5 text-center text-sm tabular-nums text-ink">{n}</span>
+                <button
+                    type="button"
+                    className={btn}
+                    aria-label="More context lines"
+                    onClick={() => set(n + 1)}
+                    disabled={n >= 20}
+                >
+                    <Plus size={14} />
+                </button>
+            </div>
+        </div>
+    );
+}
 
 /**
  * The PlayerToolbar component.
@@ -63,6 +122,7 @@ export function PlayerToolbar() {
     // Desktop -> Keeps every control inline
     const isMobile = useIsMobile();
     const [moreOpen, setMoreOpen] = useState(false);
+    const [llmOpen, setLlmOpen] = useState(false);
 
     // A profile video is operated on by reference (no re-upload); a device
     // video is uploaded first. Either way the tray tracks it and loads the
@@ -229,9 +289,13 @@ export function PlayerToolbar() {
                         open={moreOpen}
                         onClose={() => setMoreOpen(false)}
                         align="right"
-                        className="w-56 p-2"
+                        className="w-64 p-3"
                     >
-                        <div className="flex flex-col gap-1.5">{actionButtons}</div>
+                        <div className="flex flex-col gap-2">
+                            <ContextControl />
+                            <div className="h-px bg-ink/10" />
+                            <div className="flex flex-col gap-1.5">{actionButtons}</div>
+                        </div>
                     </Popover>
                 </div>
 
@@ -252,7 +316,29 @@ export function PlayerToolbar() {
 
             {actionButtons}
 
-            <div className="ml-auto flex items-center gap-1.5">{resetButton}</div>
+            <div className="ml-auto flex items-center gap-1.5">
+                <div className="relative">
+                    <IconButton
+                        label="Breakdown settings"
+                        active={llmOpen}
+                        onClick={() => setLlmOpen((v) => !v)}
+                    >
+                        <Wand2 size={18} />
+                    </IconButton>
+                    <Popover
+                        open={llmOpen}
+                        onClose={() => setLlmOpen(false)}
+                        align="right"
+                        className="w-64 p-4"
+                    >
+                        <h4 className="mb-2 text-2xs uppercase tracking-wide text-ink-faint">
+                            Word Breakdown
+                        </h4>
+                        <ContextControl />
+                    </Popover>
+                </div>
+                {resetButton}
+            </div>
         </div>
     );
 }

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "3.2.0"
+version = "3.3.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "Self-Hostable Japanese Language Immersion Tool"
@@ -46,7 +46,6 @@ license-files = ["LICENSE*", "LICENCE*"]
 dependencies = [
     "typer",
     "rich",
-    "tqdm>=4.67,<5",
     "python-dotenv",
     "platformdirs",
     "pyyaml"
@@ -100,7 +99,6 @@ dev = [
     "httpx",
     "pip-tools",
     "types-PyYAML",
-    "types-tqdm",
     "types-aiofiles",
     "mkdocs",
     "mkdocs-material",

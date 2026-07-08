@@ -2,6 +2,9 @@
  * @packageDocumentation Profile / dashboard feature types.
  */
 
+/** How a file came to be, from the server's `origin` tag. */
+export type FileOrigin = "upload" | "generated" | "fixed" | "converted" | "subtitle" | "clip";
+
 /** A profile file (`/profiles/files`). */
 export type ProfileFile = {
     id: string;
@@ -9,6 +12,10 @@ export type ProfileFile = {
     url: string;
     type: string | null;
     folder?: string | null;
+    /** The root media this file derives from, or null when it is a root. */
+    source_file_id?: string | null;
+    /** How the file was produced, driving its variant label. */
+    origin?: FileOrigin | null;
     created_at?: string | null;
 };
 
@@ -25,4 +32,15 @@ export type ProfileTranscript = {
 /** Response from the Anki export endpoint. */
 export interface AnkiExportResponse {
     anki_deck_url: string;
+}
+
+/**
+ * Response from deleting a profile file. `deleted_job_ids` lists the jobs
+ * removed alongside it (a batch parent covers its children), so the caller can
+ * prune them from the task tray.
+ */
+export interface FileDeleteResponse {
+    success: boolean;
+    message: string;
+    deleted_job_ids: string[];
 }

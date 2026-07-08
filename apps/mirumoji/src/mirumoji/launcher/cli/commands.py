@@ -17,7 +17,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from ...paths import HOST_CONFIG_FILE
-from ..core import checks, envfile, host, lifecycle, process, repo
+from ..core import checks, envfile, host, lifecycle, process, repo, storage
 from ..core.compose import RESOLVED_COMPOSE_PATH, write_compose
 from ..core.constants import (
     CONFIG_KEYS,
@@ -342,6 +342,74 @@ def down(
     )
 
     console.print("✓ Stopped", style="success")
+
+
+def reset(
+    keep_config: Annotated[
+        bool,
+        typer.Option(
+            "--keep-config",
+            help="Preserve The Config File (Your LLM / Modal Keys)",
+        ),
+    ] = False,
+    keep_logs: Annotated[
+        bool,
+        typer.Option("--keep-logs", help="Preserve The Log Files"),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip Confirmation Prompts"),
+    ] = False,
+) -> None:
+    """
+    Deletes Mirumoji's Local Data Folder From This Machine
+
+    Removes media, the database, cached builds, and (unless kept) the config
+    and logs. Docker data volumes are not touched, use `down --volumes` for
+    those
+    """
+    if not yes:
+        kept = [
+            name
+            for name, keep in (("Config", keep_config), ("Logs", keep_logs))
+            if keep
+        ]
+        note = f" (Keeping {', '.join(kept)})" if kept else ""
+        confirmed = typer.confirm(
+            "This Will Permanently Delete Mirumoji's Local Data Folder"
+            f"{note}. Continue?",
+            default=False,
+        )
+        if not confirmed:
+            console.print("Aborted", style="muted")
+            raise typer.Exit(code=0)
+
+    steps = storage.reset_storage(
+        keep_config=keep_config,
+        keep_logs=keep_logs,
+    )
+
+    failures = 0
+    for step in steps:
+        if step.status == "removed":
+            console.print(f"✓ Removed {step.label}", style="success")
+        elif step.status == "absent":
+            console.print(f"- {step.label} (Nothing To Remove)", style="muted")
+        else:
+            failures += 1
+            console.print(
+                f"✗ {step.label} In Use ({step.detail})",
+                style="warning",
+            )
+
+    if failures:
+        console.print(
+            f"⚠ {failures} Item(s) Left In Place. Stop The App Or Server "
+            "And Retry",
+            style="warning",
+        )
+    else:
+        console.print("✓ Fresh Start Complete", style="success")
 
 
 def up(

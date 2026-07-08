@@ -1,8 +1,9 @@
 /**
  * @packageDocumentation The Files tab: the batch hub. An Upload dropdown adds
  * files or a folder (tracked in the Tasks tray); files list in collapsible
- * folder trays; and an Options dropdown runs a batch, deletes, or clears the
- * current selection.
+ * folder trays, and within each folder every source video nests its derived
+ * variants (generated / fixed SRTs, converted MP4) under it; and an Options
+ * dropdown runs a batch, deletes, or clears the current selection.
  */
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +13,10 @@ import {
     ChevronRight,
     Download,
     FileIcon,
+    FileText,
+    Film,
     FolderUp,
+    Music,
     Play,
     Trash2,
     Upload,
@@ -21,16 +25,35 @@ import {
 import { toast } from "react-hot-toast";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useTasks } from "@/contexts/TaskContext";
+import { usePlayer } from "@/contexts/PlayerContext";
 import { Button, Card, Checkbox, EmptyState, IconButton, Popover, cn } from "@/shared/ui";
-import { staticUrl, truncateFilename } from "@/shared/format/files";
+import { staticUrl } from "@/shared/format/files";
 import { toastApiError } from "@/shared/api/errors";
 import { listFiles, deleteFile } from "../api";
-import type { ProfileFile } from "../types";
+import { buildFileGroups, fileKind, type VideoGroup } from "../grouping";
+import type { FileOrigin, ProfileFile } from "../types";
 import { NoProfile, PanelLoading } from "./panelStates";
 import { BatchDialog } from "./BatchDialog";
 
 const SWR_KEY = "profiles/files";
 const UNGROUPED = "__ungrouped__";
+
+/** The short label shown on a derived variant's row. */
+const ORIGIN_LABEL: Partial<Record<FileOrigin, string>> = {
+    generated: "Generated",
+    fixed: "Fixed",
+    converted: "Converted",
+    subtitle: "Saved",
+    clip: "Clip",
+};
+
+/** The lucide icon for a file's media class. */
+function KindIcon({ file, className }: { file: ProfileFile; className?: string }) {
+    const kind = fileKind(file);
+    const Icon =
+        kind === "video" ? Film : kind === "audio" ? Music : kind === "srt" ? FileText : FileIcon;
+    return <Icon size={16} className={className} />;
+}
 
 /**
  * The FilesPanel component.
@@ -40,6 +63,17 @@ const UNGROUPED = "__ungrouped__";
 export function FilesPanel() {
     const { profileId } = useProfile();
     const tasks = useTasks();
+    const {
+        videoFileId,
+        srtFileId,
+        setVideo,
+        setVideoUrl,
+        setVideoFileName,
+        setVideoFileId,
+        setSrt,
+        setSrtFileName,
+        setSrtFileId,
+    } = usePlayer();
     const { data, isLoading } = useSWR<ProfileFile[]>(profileId ? SWR_KEY : null, listFiles, {
         revalidateOnFocus: false,
         keepPreviousData: true,
@@ -66,17 +100,20 @@ export function FilesPanel() {
     }, []);
 
     const groups = useMemo(() => {
-        const map = new Map<string, ProfileFile[]>();
+        const byFolder = new Map<string, ProfileFile[]>();
         for (const f of data ?? []) {
             const k = f.folder || UNGROUPED;
-            const list = map.get(k);
+            const list = byFolder.get(k);
             if (list) list.push(f);
-            else map.set(k, [f]);
+            else byFolder.set(k, [f]);
         }
-        return {
-            named: [...map.entries()].filter(([k]) => k !== UNGROUPED),
-            ungrouped: map.get(UNGROUPED),
-        };
+        const named = [...byFolder.entries()]
+            .filter(([k]) => k !== UNGROUPED)
+            .map(([k, fs]) => [k, buildFileGroups(fs)] as const);
+        const ungrouped = byFolder.has(UNGROUPED)
+            ? buildFileGroups(byFolder.get(UNGROUPED) as ProfileFile[])
+            : undefined;
+        return { named, ungrouped };
     }, [data]);
 
     if (!profileId) return <NoProfile what="manage your files" />;
@@ -89,7 +126,7 @@ export function FilesPanel() {
             return next;
         });
 
-    const toggleGroup = (files: ProfileFile[]) =>
+    const toggleMany = (files: ProfileFile[]) =>
         setSelected((prev) => {
             const next = new Set(prev);
             const all = files.every((f) => next.has(f.id));
@@ -100,28 +137,54 @@ export function FilesPanel() {
             return next;
         });
 
-    const toggleCollapse = (title: string) =>
+    const toggleCollapse = (key: string) =>
         setCollapsed((prev) => {
             const next = new Set(prev);
-            if (next.has(title)) next.delete(title);
-            else next.add(title);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
             return next;
         });
 
     const clearSelection = () => setSelected(new Set());
 
-    // Deleting a file cascades its dependent jobs away server-side, so the
-    // Tasks tab is refreshed alongside the file list.
+    // A file deleted here may be the one loaded in the player. Clear only the
+    // matching slice so the player stops driving a file the server no longer
+    // has: a loaded video would otherwise 404 and misread as an undecodable
+    // container (the "Convert To Play" prompt), and a loaded subtitle would
+    // silently linger on screen. This does not touch the player's own error
+    // detection, which still handles genuinely unplayable or missing sources.
+    // Cleared silently, since the delete happens on this panel (the "File
+    // Deleted" toast already acknowledges it) and the player falls back to its
+    // empty state on its own.
+    const evictFromPlayer = (id: string) => {
+        if (videoFileId === id) {
+            setVideo(null);
+            setVideoUrl(null);
+            setVideoFileName(null);
+            setVideoFileId(null);
+        }
+        if (srtFileId === id) {
+            setSrt(null);
+            setSrtFileName(null);
+            setSrtFileId(null);
+        }
+    };
+
+    // Deleting a file cascades its dependent jobs away server-side. The server
+    // returns those job ids, so they are pruned from the task tray immediately
+    // (which polls only while a job is active) and the Tasks tab is refreshed.
     const onDelete = async (id: string) => {
         setDeleting(id);
         try {
-            await deleteFile(id);
+            const res = await deleteFile(id);
             toast.success("File Deleted");
+            evictFromPlayer(id);
             setSelected((prev) => {
                 const next = new Set(prev);
                 next.delete(id);
                 return next;
             });
+            res.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
             mutate(SWR_KEY);
             mutate("jobs/history");
         } catch (e) {
@@ -136,6 +199,14 @@ export function FilesPanel() {
         if (ids.length === 0) return;
         const results = await Promise.allSettled(ids.map((id) => deleteFile(id)));
         const ok = results.filter((r) => r.status === "fulfilled").length;
+        // Prune the tray of every job cascaded away by the successful deletes,
+        // and evict any deleted file that was loaded in the player.
+        results.forEach((r, i) => {
+            if (r.status === "fulfilled") {
+                evictFromPlayer(ids[i]);
+                r.value.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
+            }
+        });
         clearSelection();
         if (ok > 0) toast.success(`Deleted ${ok} File(s)`);
         if (ok < ids.length) toast.error(`${ids.length - ok} File(s) Could Not Be Deleted`);
@@ -166,40 +237,92 @@ export function FilesPanel() {
         void runUpload(files, folder);
     };
 
-    const fileCard = (file: ProfileFile) => (
-        <Card key={file.id} className="flex items-center gap-2.5 p-3">
-            <Checkbox
-                checked={selected.has(file.id)}
-                onChange={() => toggleFile(file.id)}
-                label={`Select ${file.name}`}
-            />
-            <FileIcon size={16} className="shrink-0 text-ink-faint" />
-            <span className="min-w-0 flex-1 text-sm text-ink" title={file.name}>
-                {truncateFilename(file.name, 6, 6)}
-            </span>
-            <a href={staticUrl(file.url)} download={file.name}>
-                <IconButton label="Download" size="sm">
-                    <Download size={16} />
+    /** One file as a row: checkbox, type icon, name, its label, and actions. */
+    const fileRow = (file: ProfileFile, variant: boolean) => {
+        const label = variant ? ORIGIN_LABEL[file.origin ?? "upload"] : undefined;
+        return (
+            <div key={file.id} className="flex items-center gap-2.5 py-1.5">
+                <Checkbox
+                    checked={selected.has(file.id)}
+                    onChange={() => toggleFile(file.id)}
+                    label={`Select ${file.name}`}
+                />
+                <KindIcon file={file} className="shrink-0 text-ink-faint" />
+                <span
+                    className={cn(
+                        "min-w-0 flex-1 truncate text-sm",
+                        variant ? "text-ink-muted" : "text-ink"
+                    )}
+                    title={file.name}
+                >
+                    {file.name}
+                </span>
+                {label && (
+                    <span className="shrink-0 rounded-full bg-ink/10 px-1.5 py-0.5 text-2xs text-ink-muted">
+                        {label}
+                    </span>
+                )}
+                <a href={staticUrl(file.url)} download={file.name}>
+                    <IconButton label="Download" size="sm">
+                        <Download size={16} />
+                    </IconButton>
+                </a>
+                <IconButton
+                    label="Delete"
+                    size="sm"
+                    onClick={() => onDelete(file.id)}
+                    disabled={deleting === file.id}
+                    className="hover:text-danger"
+                >
+                    <Trash2 size={16} />
                 </IconButton>
-            </a>
-            <IconButton
-                label="Delete"
-                size="sm"
-                onClick={() => onDelete(file.id)}
-                disabled={deleting === file.id}
-                className="hover:text-danger"
-            >
-                <Trash2 size={16} />
-            </IconButton>
-        </Card>
-    );
+            </div>
+        );
+    };
 
-    const fileGrid = (files: ProfileFile[]) => (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{files.map(fileCard)}</div>
+    /** A source file with its variants nested under a collapsible rail. */
+    const videoGroup = (group: VideoGroup) => {
+        const { head, variants } = group;
+        const key = `grp:${head.id}`;
+        const open = !collapsed.has(key);
+        return (
+            <Card key={head.id} className="px-3 py-1.5">
+                <div className="flex items-center gap-1">
+                    {variants.length > 0 ? (
+                        <button
+                            type="button"
+                            onClick={() => toggleCollapse(key)}
+                            className="shrink-0 text-ink-faint transition-colors hover:text-ink"
+                            aria-label={open ? "Hide variants" : "Show variants"}
+                        >
+                            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                    ) : (
+                        <span className="w-4 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">{fileRow(head, false)}</div>
+                    {variants.length > 0 && (
+                        <span className="shrink-0 rounded-full bg-ink/10 px-1.5 py-0.5 text-2xs text-ink-muted">
+                            {variants.length}
+                        </span>
+                    )}
+                </div>
+                {open && variants.length > 0 && (
+                    <div className="ml-2 border-l border-ink/10 pl-3">
+                        {variants.map((v) => fileRow(v, true))}
+                    </div>
+                )}
+            </Card>
+        );
+    };
+
+    const groupList = (vgroups: VideoGroup[]) => (
+        <div className="space-y-2">{vgroups.map(videoGroup)}</div>
     );
 
     /** A folder as a contained tray with a Shu spine and a collapsible body. */
-    const renderTray = (title: string, files: ProfileFile[], spine: string) => {
+    const renderTray = (title: string, vgroups: VideoGroup[], spine: string) => {
+        const files = vgroups.flatMap((g) => [g.head, ...g.variants]);
         const open = !collapsed.has(title);
         return (
             <div
@@ -211,7 +334,7 @@ export function FilesPanel() {
                     <div className="flex items-center gap-2.5 px-3 py-2.5">
                         <Checkbox
                             checked={files.every((f) => selected.has(f.id))}
-                            onChange={() => toggleGroup(files)}
+                            onChange={() => toggleMany(files)}
                             label={`Select all in ${title}`}
                         />
                         <button
@@ -228,7 +351,7 @@ export function FilesPanel() {
                             </span>
                         </button>
                     </div>
-                    {open && <div className="px-3 pb-3">{fileGrid(files)}</div>}
+                    {open && <div className="px-3 pb-3">{groupList(vgroups)}</div>}
                 </div>
             </div>
         );
@@ -364,11 +487,11 @@ export function FilesPanel() {
                 />
             ) : (
                 <div className="space-y-4">
-                    {groups.named.map(([name, files]) => renderTray(name, files, "bg-shu"))}
+                    {groups.named.map(([name, vgroups]) => renderTray(name, vgroups, "bg-shu"))}
                     {groups.ungrouped &&
                         (groups.named.length > 0
                             ? renderTray("Ungrouped", groups.ungrouped, "bg-ink/20")
-                            : fileGrid(groups.ungrouped))}
+                            : groupList(groups.ungrouped))}
                 </div>
             )}
 

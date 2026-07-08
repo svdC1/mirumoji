@@ -32,51 +32,51 @@ The exact URL (with your IP filled in) is printed by `mirumoji up` and shown in 
 
 ## Install It Per Device
 
-### Windows
+=== "Windows"
 
-- Download the certificate, double-click it, and choose `Install Certificate`
+    - Download the certificate, double-click it, and choose `Install Certificate`
 
-- Select `Local Machine` &rarr; `Place all certificates in the following store` &rarr; `Trusted Root Certification Authorities`
+    - Select `Local Machine` &rarr; `Place all certificates in the following store` &rarr; `Trusted Root Certification Authorities`
 
-- Restart the browser
+    - Restart the browser
 
-### macOS
+=== "macOS"
 
-- Download the certificate and double-click it to add it to `Keychain Access`
+    - Download the certificate and double-click it to add it to `Keychain Access`
 
-- In `Keychain Access`, find `Mirumoji Local CA`
+    - In `Keychain Access`, find `Mirumoji Local CA`
 
-- Open it, expand `Trust`, and set `When using this certificate` to `Always Trust`
+    - Open it, expand `Trust`, and set `When using this certificate` to `Always Trust`
 
-- Restart the browser
+    - Restart the browser
 
-### iOS / iPadOS
+=== "iOS / iPadOS"
 
-- Open the certificate URL in `Safari` and allow the configuration profile download
+    - Open the certificate URL in `Safari` and allow the configuration profile download
 
-- Go to `Settings` &rarr; `General` &rarr; `VPN & Device Management`
+    - Go to `Settings` &rarr; `General` &rarr; `VPN & Device Management`
 
-- Select the `Mirumoji Local CA` profile and install it
+    - Select the `Mirumoji Local CA` profile and install it
 
-- Go to `Settings` &rarr; `General` &rarr; `About` &rarr; `Certificate Trust Settings`
+    - Go to `Settings` &rarr; `General` &rarr; `About` &rarr; `Certificate Trust Settings`
 
-- Enable `Full Trust` for `Mirumoji Local CA` *(Without this step iOS doesn't trust it)*
+    - Enable `Full Trust` for `Mirumoji Local CA` *(Without this step iOS doesn't trust it)*
 
-- Re-open the site in Safari and use `Share` &rarr; `Add to Home Screen`
+    - Re-open the site in Safari and use `Share` &rarr; `Add to Home Screen`
 
-### Android
+=== "Android"
 
-- Download the certificate
+    - Download the certificate
 
-- Go to `Settings` &rarr; `Security & privacy` &rarr; `More security settings` &rarr; `Install from device storage` &rarr; `CA certificate` *(Naming varies slightly by vendor)* and pick the downloaded file
+    - Go to `Settings` &rarr; `Security & privacy` &rarr; `More security settings` &rarr; `Install from device storage` &rarr; `CA certificate` *(Naming varies slightly by vendor)* and pick the downloaded file
 
-- Re-open the site in Chrome and use `Install App` from the menu
+    - Re-open the site in Chrome and use `Install App` from the menu
 
-### Firefox (Any Platform)
+=== "Firefox (Any Platform)"
 
-- Firefox keeps its own certificate store
+    - Firefox keeps its own certificate store
 
-- Go to `Settings` &rarr; `Privacy & Security` &rarr; `Certificates` &rarr; `View Certificates` &rarr; `Authorities` &rarr; `Import`, pick the file, and check `Trust this CA to identify websites`
+    - Go to `Settings` &rarr; `Privacy & Security` &rarr; `Certificates` &rarr; `View Certificates` &rarr; `Authorities` &rarr; `Import`, pick the file, and check `Trust this CA to identify websites`
 
 ## Verify
 

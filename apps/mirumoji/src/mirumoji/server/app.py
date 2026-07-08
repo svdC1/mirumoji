@@ -27,12 +27,13 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..exceptions import MirumojiServerError
-from ..log import setup_logging
+from ..log import takeover_logging, teardown_logging
 from ..paths import HOST_LOG_PATH
 from . import media
 from .config import get_settings
 from .db import get_engine, init_db
 from .jobs import HANDLERS, JobQueueManager
+from .middleware import LoggingMiddleware
 from .processing.processor import Processor
 from .routers.dict import dict_router
 from .routers.health import health_router
@@ -51,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     Manages the API's lifecycle
 
     info: Startup Operations
-        - Logging Configuration
+        - Logging Configuration (During App Creation)
 
         - Database + Media Storage Initialisation
 
@@ -66,20 +67,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
         - Clears Temporary Media
 
+        - Tears Down The Logging Setup
     Args:
       app (FastAPI): The API object
 
     Yields:
         Control back to the running application
     """
-
-    # Create Log Directory + Register Handlers
-    setup_logging(
-        log_file="backend.log",
-        console=True,
-        level=get_settings().logging_level,
-    )
-    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH / 'backend.log'}'")
 
     # Create / Initialise Database
     await init_db()
@@ -128,6 +122,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
         )
 
     LOGGER.info("Shut Down Complete")
+
+    # Close the log handlers last, so nothing above loses its output. This
+    # releases the log file, which lives inside the storage directory, so that
+    # directory can be deleted after the server stops (an open handle would
+    # otherwise block removing it on Windows)
+    teardown_logging()
 
 
 async def mirumoji_exception_handler(
@@ -203,6 +203,8 @@ def create_app() -> FastAPI:
     operations
 
     info: Operations Performed
+        - Takes over root logging configuration
+
         - App Construction
 
         - Static File Mounting
@@ -216,6 +218,16 @@ def create_app() -> FastAPI:
     Returns:
       FastAPI: The fully-configured application
     """
+    # Take over logging in the factory, so that it takes effect
+    # before uvicorn emits its first line (the lifespan runs too late for that)
+    takeover_logging(
+        log_file="backend.log",
+        console=True,
+        level=get_settings().logging_level,
+    )
+
+    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH / 'backend.log'}'")
+
     app = FastAPI(
         title="Mirumoji",
         description="Japanese sentence breakdown, audio processing and LLM.",
@@ -233,10 +245,12 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Binds The Request Context Before Any Other Middleware Runs
+    app.add_middleware(LoggingMiddleware)
 
     app.add_exception_handler(
         MirumojiServerError,

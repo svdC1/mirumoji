@@ -38,15 +38,13 @@ class MirumojiServerError(MirumojiError):
         self.details = details
 
 
-class MirumojiCLIError(MirumojiError):
+class MirumojiLauncherError(MirumojiError):
     """
-    The base exception for all errors raised by mirumoji's CLI
-    """
+    The base exception for all errors raised by mirumoji's launcher
 
-
-class MirumojiGUIError(MirumojiError):
-    """
-    The base exception for all errors raised by mirumoji's GUI
+    Covers the shared launcher core (`LauncherError`) plus
+    the CLI and GUI front-ends, so a caller can catch every launcher failure
+    with a single package-level type
     """
 
 

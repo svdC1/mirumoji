@@ -46,8 +46,11 @@ class BreakdownRequest(BaseModel):
         focus (str | None): The word to explain in context
         model (str): Model selector in `provider:model` form
         sys_msg (str | None): Optional custom system message
-        prompt (str | None): Optional custom prompt template
-            (`{0}` = sentence, `{1}` = focus)
+        prompt (str | None): Optional prompt template, rendered server-side.
+            Supports the `{sentence}`, `{focus}`, and `{context}` placeholders
+            and `{#name}...{/name}` conditional blocks
+        context (str | None): Optional surrounding text (such as neighbouring
+            subtitle lines) exposed to the template as `{context}`
     """
 
     sentence: str
@@ -55,6 +58,29 @@ class BreakdownRequest(BaseModel):
     model: str
     sys_msg: str | None = None
     prompt: str | None = None
+    context: str | None = None
+
+
+class BreakdownPreviewRequest(BaseModel):
+    """
+    Request for the `/llm/breakdown/preview` endpoint
+
+    Renders a breakdown prompt template against sample values without calling
+    an LLM, so the template editor can show the assembled prompt live
+
+    Args:
+        sentence (str): Sample sentence for `{sentence}`
+        focus (str | None): Sample focus word for `{focus}`
+        prompt (str | None): The prompt template to render. Falls back to the
+            default template when omitted
+        context (str | None): Sample context for `{context}` and its
+            conditional block
+    """
+
+    sentence: str
+    focus: str | None = None
+    prompt: str | None = None
+    context: str | None = None
 
 
 class ExplainSentenceRequest(BaseModel):
@@ -127,11 +153,15 @@ class SaveSubtitlesRequest(BaseModel):
         content (str): The SRT content to store
         file_id (str | None): Existing SRT file id to overwrite, if any
         name (str | None): Optional file name for a newly created file
+        source_file_id (str | None): The video this SRT belongs to. When given
+            for a new file, the SRT is named after it, shares its folder, and
+            groups under it
     """
 
     content: str
     file_id: str | None = None
     name: str | None = None
+    source_file_id: str | None = None
 
 
 # --- Media Query-Parameters Requests (Bound via Annotated[..., Query()]) ---

@@ -1,9 +1,9 @@
 """
-Deines the Mirumoji Database layer
+Defines the Mirumoji Database layer
 
 Configures the SQLAlchemy AsyncEngine + Session Factory lazily so that
 importing the package has no side effects and tests can point elsewhere.
-In addition, defines the  `UnitOfWork` that bundles the entity repositories
+In addition, defines the `UnitOfWork` that bundles the entity repositories
 behind a single transaction boundary
 """
 

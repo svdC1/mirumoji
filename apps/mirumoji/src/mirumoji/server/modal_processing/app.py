@@ -95,15 +95,19 @@ def setup_modal() -> ModalRuntime:
     app = modal.App("mirumoji-gpu", image=mirumoji_image)
 
     # Register Jobs
+    # `scaledown_window` Keeps An Idle Container Warm So
+    # Back-To-Back Jobs In Continuous Use Skip The Cold Start
     convert = app.function(
         gpu=settings.modal_gpu,
         timeout=600,
+        scaledown_window=settings.modal_scaledown_window,
         include_source=True,
     )(video_conversion_job)
 
     transcribe = app.function(
         gpu=settings.modal_gpu,
         timeout=600,
+        scaledown_window=settings.modal_scaledown_window,
         include_source=True,
     )(transcribe_job)
 

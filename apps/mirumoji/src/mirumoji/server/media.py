@@ -34,10 +34,10 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import Request, UploadFile
-from tqdm.auto import tqdm
 
 from ..exceptions import InvalidMediaPathError, StorageError, UploadError
 from ..paths import HOST_MEDIA_PATH
+from .progress import transfer_bar
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,20 +49,19 @@ PROFILES_PATH: Path = BASE_PATH / "profiles"
 async def save_upload_file(
     request: Request,
     output_path: str | os.PathLike[str],
-    tqdm_description: str | None = None,
+    description: str | None = None,
 ) -> Path:
     """
     Saves a `FastAPI.Request.stream` to the file system by reading and writing
-    the streamed chunks to `output_path` while logging the progress to a `TQDM`
-    progress bar with `tqdm_description` as its message
+    the streamed chunks to `output_path` while reporting the progress on a
+    themed transfer bar with `description` as its label
 
     Args:
         request (Request): The `FastAPI.Request` object
         output_path (str | os.PathLike[str]): File path in which to save the
             stream
-        tqdm_description (str | None): Optional description for the `TQDM`
-            progress bar. When `None`, defaults to
-            `f"Saving File To {output_path}"`
+        description (str | None): Optional label for the progress bar. When
+            `None`, defaults to `f"Saving File To {output_path}"`
 
     Returns:
         `output_path`, if the file was written successfully
@@ -73,17 +72,17 @@ async def save_upload_file(
 
     output = Path(output_path).resolve()
 
-    if tqdm_description is None:
-        tqdm_description = f"Saving File To {output}"
+    if description is None:
+        description = f"Saving File To {output}"
 
     try:
         total_content = 0
 
-        with tqdm(unit="B", unit_scale=True, desc=tqdm_description) as p:
+        with transfer_bar(description) as advance:
             async with aiofiles.open(output, "wb+") as f:
                 async for chunk in request.stream():
                     await f.write(chunk)
-                    p.update(len(chunk))
+                    advance(len(chunk))
                     total_content += len(chunk)
 
         LOGGER.info(f"Saved {total_content} Bytes To {output}")

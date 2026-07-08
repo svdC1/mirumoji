@@ -3,16 +3,105 @@ Defines functions that run `FFMPEG` in a subprocess to perform various
 media operations
 """
 
+import contextlib
 import logging
 import os
 import shutil
 import subprocess
+import threading
+from functools import lru_cache
 from pathlib import Path
 
 from ...exceptions import FFmpegError, MissingFFmpegError, MissingFFprobeError
 from ..constants import CONVERSION_PRESETS, DEFAULT_CONVERSION_PRESET
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _ProcessRegistry:
+    """
+    Tracks the live FFMPEG subprocesses so they can be terminated on shutdown
+
+    question: Why
+        - FFMPEG runs through `run_command`'s blocking `subprocess` call inside
+          an `asyncio.to_thread`, and a thread cannot be interrupted by the job
+          worker's cancellation
+
+        - So a conversion still running when the server stops would keep its
+          FFMPEG process (and the executor thread waiting on it) alive, holding
+          the media file open and blocking process exit
+
+        - Registering each process lets shutdown terminate them, which unblocks
+          the waiting thread
+
+    Attributes:
+        procs (set[subprocess.Popen]): The currently-running processes
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.procs: set[subprocess.Popen[str]] = set()
+
+    def add(self, proc: subprocess.Popen[str]) -> None:
+        """
+        Registers a running process
+
+        Args:
+            proc (subprocess.Popen[str]): The process to track
+        """
+        with self._lock:
+            self.procs.add(proc)
+
+    def discard(self, proc: subprocess.Popen[str]) -> None:
+        """
+        Unregisters a process that has finished
+
+        Args:
+            proc (subprocess.Popen[str]): The process to stop tracking
+        """
+        with self._lock:
+            self.procs.discard(proc)
+
+    def terminate_all(self) -> None:
+        """
+        Terminates every registered process, hard-killing any straggler
+
+        Sends a terminate to each process, waits briefly, then kills whatever
+        has not exited. The blocked `run_command` threads return as their
+        process dies
+        """
+        with self._lock:
+            procs = list(self.procs)
+        for proc in procs:
+            with contextlib.suppress(Exception):
+                proc.terminate()
+        for proc in procs:
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                with contextlib.suppress(Exception):
+                    proc.kill()
+
+
+@lru_cache(maxsize=1)
+def _registry() -> _ProcessRegistry:
+    """
+    Returns the process registry, built once on first use
+
+    Returns:
+        The process-wide `_ProcessRegistry`
+    """
+    return _ProcessRegistry()
+
+
+def terminate_running_commands() -> None:
+    """
+    Terminates any FFMPEG subprocess still running
+
+    Call on server shutdown so an in-flight conversion does not outlive the
+    server and keep the media file (and the process) alive
+    """
+    _registry().terminate_all()
 
 
 def _resolve_preset(preset: str) -> dict[str, tuple[str, str]]:
@@ -97,7 +186,11 @@ def run_command(
     cwd: str | os.PathLike[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """
-    Wraps `subprocess.run` in order to log errors and results
+    Runs a command in a subprocess, logging its errors and results
+
+    Uses `subprocess.Popen` and registers the live process so that it can be
+    terminated on shutdown. A plain `subprocess.run` would block this thread
+    inside its own `wait`, out of reach of the shutdown path
 
     Args:
         command (list[str]): The CMD list of the command to be executed
@@ -117,33 +210,41 @@ def run_command(
 
     LOGGER.debug(f"Running Command: {' '.join(command)}")
 
+    # Redirect `stdout` and `stderr` to `subprocess.PIPE`
+    registry = _registry()
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        cwd=cwd,
+    )
+    registry.add(process)
     try:
-        # Redirect `stdout` and `stderr` to `subprocess.PIPE`
-        result = subprocess.run(
-            command,
-            check=check,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            cwd=cwd,
+        stdout, stderr = process.communicate()
+    finally:
+        registry.discard(process)
+
+    returncode = process.returncode
+    result = subprocess.CompletedProcess(command, returncode, stdout, stderr)
+
+    if check and returncode != 0:
+        LOGGER.error(f"Command Failed - Exit Code: {returncode}")
+        LOGGER.error(f"STDOUT: '{stdout}'")
+        LOGGER.error(f"STDERR: '{stderr}'")
+        raise subprocess.CalledProcessError(
+            returncode, command, output=stdout, stderr=stderr
         )
 
-        # Warn error if check=False
-        if result.returncode != 0:
-            LOGGER.warning(
-                f"Command Failure Suppressed - Exit Code: {result.returncode}"
-            )
+    # Warn error if check=False
+    if returncode != 0:
+        LOGGER.warning(f"Command Failure Suppressed - Exit Code: {returncode}")
 
-        LOGGER.debug(f"STDOUT: '{result.stdout}'")
-        LOGGER.debug(f"STDERR: '{result.stderr}'")
+    LOGGER.debug(f"STDOUT: '{stdout}'")
+    LOGGER.debug(f"STDERR: '{stderr}'")
 
-        return result
-
-    except subprocess.CalledProcessError as e:
-        LOGGER.error(f"Command Failed - Exit Code: {e.returncode}")
-        LOGGER.error(f"STDOUT: '{e.stdout}'")
-        LOGGER.error(f"STDERR: '{e.stderr}'")
-        raise
+    return result
 
 
 def to_wav(

@@ -206,6 +206,8 @@ class FileRepository:
         path: str,
         type: str | None = None,
         folder: str | None = None,
+        source_file_id: uuid.UUID | None = None,
+        origin: str | None = None,
     ) -> FileDTO:
         """
         Adds a file record
@@ -217,6 +219,10 @@ class FileRepository:
             type (str | None): Optional file-type tag
             folder (str | None): Optional group label for files uploaded
                 together
+            source_file_id (uuid.UUID | None): The root media this file derives
+                from, or `None` when it is itself a root
+            origin (str | None): How the file came to be (`upload`,
+                `generated`, `fixed`, `converted`, `subtitle`, or `clip`)
 
         Returns:
             The created `FileDTO`
@@ -231,6 +237,8 @@ class FileRepository:
                 path=path,
                 type=type,
                 folder=folder,
+                source_file_id=source_file_id,
+                origin=origin,
             )
             self.session.add(file)
             await self.session.flush()
@@ -959,19 +967,20 @@ class JobRepository:
         """
         Deletes a job (cascading to its children)
 
+        info: Idempotent
+            A job that is already gone (e.g. removed as another file's
+            cascade in the same sweep) is a no-op rather than an error,
+            so a multi-file delete never fails on a shared batch parent
+
         Args:
             job_id (uuid.UUID): The job id
 
         Raises:
-            RecordNotFoundError: If the job does not exist
             DatabaseError: If the deletion fails
         """
         job = await self.session.get(Job, job_id)
         if job is None:
-            raise RecordNotFoundError(
-                f"Job '{job_id}' Not Found",
-                details={"job_id": str(job_id)},
-            )
+            return
         try:
             await self.session.delete(job)
         except Exception as e:

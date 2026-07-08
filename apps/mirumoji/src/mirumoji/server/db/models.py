@@ -154,6 +154,14 @@ class File(Base):
         type (str | None): Optional file-type tag
         folder (str | None): Optional group label for files uploaded together
             (e.g. a picked directory's name), used to group the file list
+        source_file_id (uuid.UUID | None): The root media this file derives
+            from (a generated / fixed SRT or a converted MP4 points at its
+            source video). NULL means the file is itself a root. ON DELETE SET
+            NULL, so deleting a source orphans its derivatives rather than
+            removing them
+        origin (str | None): How the file came to be (`upload`, `generated`,
+            `fixed`, `converted`, `subtitle`, or `clip`), used for the UI's
+            variant label
         created_at (datetime): UTC creation timestamp
     """
 
@@ -187,6 +195,18 @@ class File(Base):
 
     folder: Mapped[str | None] = mapped_column(
         String(500),
+        nullable=True,
+    )
+
+    source_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("files.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    origin: Mapped[str | None] = mapped_column(
+        String(50),
         nullable=True,
     )
 
@@ -491,6 +511,10 @@ class FileDTO(SafeORMModel):
         path (str): Media-relative path to the file
         type (str | None): Optional file-type tag
         folder (str | None): Optional group label for files uploaded together
+        source_file_id (uuid.UUID | None): The root media this file derives
+            from, or NULL when it is itself a root
+        origin (str | None): How the file came to be (`upload`, `generated`,
+            `fixed`, `converted`, `subtitle`, or `clip`)
         created_at (datetime): UTC creation timestamp
     """
 
@@ -501,6 +525,8 @@ class FileDTO(SafeORMModel):
     path: str
     type: str | None
     folder: str | None = None
+    source_file_id: uuid.UUID | None = None
+    origin: str | None = None
     created_at: datetime
 
 

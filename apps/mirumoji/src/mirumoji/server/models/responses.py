@@ -6,6 +6,22 @@ from typing import Any
 
 from pydantic import BaseModel
 
+# --- Common Responses ---
+
+
+class MessageResponse(BaseModel):
+    """
+    Generic success envelope for endpoints that only confirm an action
+
+    Args:
+        success (bool): Whether the action succeeded
+        message (str): A short human-readable confirmation
+    """
+
+    success: bool
+    message: str
+
+
 # --- Profile Responses ---
 
 
@@ -66,6 +82,19 @@ class ClipResponse(BaseModel):
     breakdown: dict[str, Any]
 
 
+class FileDeleteResponse(MessageResponse):
+    """
+    Confirmation for deleting a profile file, plus what it cascaded
+
+    Args:
+        deleted_job_ids (list[str]): Ids of the jobs removed alongside the file
+            (a batch parent covers its children), so the client can prune them
+            from the task tray
+    """
+
+    deleted_job_ids: list[str] = []
+
+
 class ProfileFileResponse(BaseModel):
     """
     Response representing a profile file
@@ -76,6 +105,10 @@ class ProfileFileResponse(BaseModel):
         url (str): Media URL serving the file
         type (str | None): Optional file-type tag
         folder (str | None): Optional group label for files uploaded together
+        source_file_id (str | None): Id of the root media this file derives
+            from (its source video), or `None` when it is itself a root
+        origin (str | None): How the file came to be (`upload`, `generated`,
+            `fixed`, `converted`, `subtitle`, or `clip`)
         created_at (str | None): ISO-8601 creation timestamp
     """
 
@@ -84,6 +117,8 @@ class ProfileFileResponse(BaseModel):
     url: str
     type: str | None = None
     folder: str | None = None
+    source_file_id: str | None = None
+    origin: str | None = None
     created_at: str | None = None
 
 
@@ -241,3 +276,90 @@ class BatchResult(JobResult):
     failed: int
     cancelled: int
     children: list[str]
+
+
+# --- LLM Responses ---
+
+
+class ProviderStatusResponse(BaseModel):
+    """
+    Availability of a single LLM provider
+
+    Args:
+        provider (str): The provider id (`openai`, `anthropic`, `gemini`,
+            `local`)
+        available (bool): Whether the provider is usable in this deployment
+    """
+
+    provider: str
+    available: bool
+
+
+class ProvidersResponse(BaseModel):
+    """
+    Availability of every known LLM provider
+
+    Args:
+        providers (list[ProviderStatusResponse]): One entry per provider
+    """
+
+    providers: list[ProviderStatusResponse]
+
+
+class ModelsResponse(BaseModel):
+    """
+    The models offered by a configured LLM provider
+
+    Args:
+        models (list[str]): The available model ids
+    """
+
+    models: list[str]
+
+
+class BreakdownPreviewResponse(BaseModel):
+    """
+    The rendered prompt for a breakdown template preview
+
+    Args:
+        prompt (str): The template rendered against the sample values
+    """
+
+    prompt: str
+
+
+# --- Health Responses ---
+
+
+class HealthStatusResponse(BaseModel):
+    """
+    Minimal liveness confirmation
+
+    Args:
+        status (str): `ok` while the server is running
+    """
+
+    status: str
+
+
+class SystemInfoResponse(BaseModel):
+    """
+    Basic information about the system running the server
+
+    Args:
+        time (str): Server time in ISO-8601, suffixed with `Z`
+        hostname (str): The host name
+        platform (str): A terse platform description
+        python (str): The Python version
+        cpu_cores (int | None): Logical CPU count, or `None` when unknown
+        gpu_available (bool): Whether a CUDA GPU is available to transcription
+        gpu_name (str): The GPU name, or empty when none
+    """
+
+    time: str
+    hostname: str
+    platform: str
+    python: str
+    cpu_cores: int | None = None
+    gpu_available: bool
+    gpu_name: str

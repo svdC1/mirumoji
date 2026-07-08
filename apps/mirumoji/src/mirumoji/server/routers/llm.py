@@ -8,7 +8,7 @@ Attributes:
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Body, Query
 from fastapi.responses import StreamingResponse
@@ -16,9 +16,16 @@ from fastapi.responses import StreamingResponse
 from ...exceptions import InvalidModelStringError, LLMRequestError
 from ..config import get_settings
 from ..models.requests import (
+    BreakdownPreviewRequest,
     BreakdownRequest,
     ChatRequest,
     ExplainSentenceRequest,
+)
+from ..models.responses import (
+    BreakdownPreviewResponse,
+    ModelsResponse,
+    ProvidersResponse,
+    ProviderStatusResponse,
 )
 from ..processing import llm, text
 
@@ -26,22 +33,24 @@ LOGGER = logging.getLogger(__name__)
 llm_router = APIRouter(prefix="/llm")
 
 
-@llm_router.get("/providers")
-async def list_providers() -> dict[str, Any]:
+@llm_router.get("/providers", response_model=ProvidersResponse)
+async def list_providers() -> ProvidersResponse:
     """
     Reports which LLM providers are usable in this deployment
 
     Returns:
-        Mapping with a `providers` list of `{"provider", "available"}` entries,
-            used by the frontend to populate the model picker
+        A `providers` list of `{"provider", "available"}` entries, used by the
+            frontend to populate the model picker
     """
-    return {"providers": llm.provider_status()}
+    return ProvidersResponse(
+        providers=[ProviderStatusResponse(**p) for p in llm.provider_status()]
+    )
 
 
-@llm_router.get("/models")
+@llm_router.get("/models", response_model=ModelsResponse)
 async def list_models(
     provider: Annotated[str, Query()],
-) -> dict[str, list[str]]:
+) -> ModelsResponse:
     """
     Lists the available models for a configured LLM provider
 
@@ -68,7 +77,7 @@ async def list_models(
             details={"provider": provider},
         ) from e
     models = await asyncio.to_thread(llm.available_models, prov)
-    return {"models": models}
+    return ModelsResponse(models=models)
 
 
 @llm_router.post("/breakdown")
@@ -81,8 +90,10 @@ async def breakdown(
     The focus word (its stitched token + dictionary data) is emitted once as a
     `focus` event, then the LLM explanation streams as `data:` frames
 
-    `sys_msg` and `prompt` are independently optional and fall back to the
-    default breakdown system message and prompt
+    `sys_msg` and `prompt` are independently optional. `sys_msg` falls back to
+    the default breakdown system message, and `prompt` to the default template.
+    The template is rendered server-side with the `sentence`, `focus`, and
+    `context` values (see `render_breakdown_prompt`)
 
     Args:
         req (BreakdownRequest): The breakdown request
@@ -94,24 +105,18 @@ async def breakdown(
     Raises:
         InvalidModelStringError: If the model selector is malformed
         LLMProviderUnavailableError: If the requested provider isn't configured
-        LLMRequestError: If the prompt template is invalid
     """
     client, model = llm.client_for_model(req.model)
-    focus = req.focus or ""
 
-    if req.prompt is not None:
-        system, prompt = llm.custom_breakdown_prompt(
-            req.sentence,
-            focus,
-            req.sys_msg or get_settings().breakdown_sys_msg,
-            req.prompt,
-        )
-    else:
-        default_system, prompt = llm.default_breakdown_prompt(
-            req.sentence,
-            focus,
-        )
-        system = req.sys_msg or default_system
+    prompt = llm.render_breakdown_prompt(
+        req.prompt or llm.DEFAULT_BREAKDOWN_TEMPLATE,
+        {
+            "sentence": req.sentence,
+            "focus": req.focus or "",
+            "context": req.context or "",
+        },
+    )
+    system = req.sys_msg or get_settings().breakdown_sys_msg
 
     focus_json: str | None = None
     if req.focus:
@@ -124,6 +129,33 @@ async def breakdown(
         llm.sse_breakdown(focus_json, chunks),
         media_type="text/event-stream",
     )
+
+
+@llm_router.post("/breakdown/preview", response_model=BreakdownPreviewResponse)
+async def breakdown_preview(
+    req: Annotated[BreakdownPreviewRequest, Body()],
+) -> BreakdownPreviewResponse:
+    """
+    Renders a breakdown prompt template against sample values, no LLM call
+
+    Powers the template editor's live preview, so a user sees the assembled
+    prompt (and how a `{#context}` block appears or vanishes) as they type
+
+    Args:
+        req (BreakdownPreviewRequest): The template and sample values
+
+    Returns:
+        The rendered prompt
+    """
+    prompt = llm.render_breakdown_prompt(
+        req.prompt or llm.DEFAULT_BREAKDOWN_TEMPLATE,
+        {
+            "sentence": req.sentence,
+            "focus": req.focus or "",
+            "context": req.context or "",
+        },
+    )
+    return BreakdownPreviewResponse(prompt=prompt)
 
 
 @llm_router.post("/explain_sentence")

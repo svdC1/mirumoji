@@ -13,8 +13,9 @@ import asyncio
 import json
 import logging
 import uuid
+from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -34,13 +35,16 @@ from fastapi import Path as FPath
 from ...exceptions import RecordNotFoundError
 from .. import media
 from ..db import UnitOfWork
+from ..db.models import FileDTO
 from ..dependencies import ensure_profile_exists, get_job_manager
 from ..jobs import JobQueueManager
 from ..models.requests import LlmTemplateRequest, SaveSubtitlesRequest
 from ..models.responses import (
     AnkiExportResponse,
     ClipResponse,
+    FileDeleteResponse,
     LlmTemplateResponse,
+    MessageResponse,
     ProfileFileResponse,
     ProfileTranscriptResponse,
     SaveClipResponse,
@@ -53,6 +57,42 @@ profile_router = APIRouter(
     prefix="/profiles",
     dependencies=[Depends(ensure_profile_exists)],
 )
+
+
+@lru_cache(maxsize=1)
+def _file_delete_lock() -> asyncio.Lock:
+    """
+    Returns the process-wide lock serializing file deletions
+
+    Built once on first use (bound to the running loop then) rather than at
+    import. File deletes cascade shared batch-parent jobs away, so running them
+    one at a time avoids concurrent transactions colliding on the same rows
+    """
+    return asyncio.Lock()
+
+
+def _file_response(file: FileDTO) -> ProfileFileResponse:
+    """
+    Maps a stored file record to its API response, including its lineage
+
+    Args:
+        file (FileDTO): The stored file
+
+    Returns:
+        The `ProfileFileResponse`
+    """
+    return ProfileFileResponse(
+        id=str(file.id),
+        name=file.name,
+        url=f"/media/{Path(file.path).as_posix()}",
+        type=file.type,
+        folder=file.folder,
+        source_file_id=(
+            str(file.source_file_id) if file.source_file_id else None
+        ),
+        origin=file.origin,
+        created_at=file.created_at.isoformat() if file.created_at else None,
+    )
 
 
 # --- LLM Template ---
@@ -131,10 +171,14 @@ async def upsert_template(
     )
 
 
-@profile_router.delete("/template", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/template",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_template(
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes the active profile's LLM template
 
@@ -152,7 +196,7 @@ async def delete_template(
         await uow.templates.delete(profile_id)
         await uow.commit()
     LOGGER.info(f"Deleted LLM Template For Profile '{profile_id}'")
-    return {"success": True, "message": "Template deleted successfully."}
+    return MessageResponse(success=True, message="Template Deleted")
 
 
 # --- Clips ---
@@ -232,6 +276,7 @@ async def save_clip(
                 name=webm_loc.name,
                 path=str(rel_path),
                 type="clip",
+                origin="clip",
             )
             clip_rec = await uow.clips.add(
                 profile_id=profile_id,
@@ -294,11 +339,15 @@ async def list_clips(
     ]
 
 
-@profile_router.delete("/clips/{clip_id}", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/clips/{clip_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_clip(
     clip_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes one of the active profile's saved clips and its file
 
@@ -328,7 +377,7 @@ async def delete_clip(
         await uow.commit()
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted Clip '{clip_id}' For Profile '{profile_id}'")
-    return {"success": True, "message": "Clip Deleted Successfully"}
+    return MessageResponse(success=True, message="Clip Deleted")
 
 
 # --- Files ---
@@ -396,20 +445,14 @@ async def upload_file(
             path=str(rel),
             type=file_type,
             folder=folder,
+            origin="upload",
         )
         await uow.commit()
 
     LOGGER.info(
         f"Uploaded File '{rec.id}' ('{rec.name}') For Profile '{profile_id}'"
     )
-    return ProfileFileResponse(
-        id=str(rec.id),
-        name=rec.name,
-        url=f"/media/{rel.as_posix()}",
-        type=rec.type,
-        folder=rec.folder,
-        created_at=rec.created_at.isoformat() if rec.created_at else None,
-    )
+    return _file_response(rec)
 
 
 @profile_router.get("/files", response_model=list[ProfileFileResponse])
@@ -430,25 +473,19 @@ async def list_files(
     """
     async with UnitOfWork() as uow:
         files = await uow.files.list_for_profile(profile_id)
-    return [
-        ProfileFileResponse(
-            id=str(f.id),
-            name=f.name,
-            url=f"/media/{Path(f.path).as_posix()}",
-            type=f.type,
-            folder=f.folder,
-            created_at=f.created_at.isoformat() if f.created_at else None,
-        )
-        for f in files
-    ]
+    return [_file_response(f) for f in files]
 
 
-@profile_router.delete("/files/{file_id}", status_code=status.HTTP_200_OK)
+@profile_router.delete(
+    "/files/{file_id}",
+    response_model=FileDeleteResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_file(
     file_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
     manager: Annotated[JobQueueManager, Depends(get_job_manager)],
-) -> dict[str, Any]:
+) -> FileDeleteResponse:
     """
     Deletes one of the active profile's files
 
@@ -460,13 +497,22 @@ async def delete_file(
         - Deleting a file also cascades (via foreign keys) to any transcripts
           or clips that reference it
 
+    warning: Serialized
+        - Selecting several files that share a batch parent job and deleting
+          them at once would otherwise run concurrent transactions that both
+          delete that shared parent, colliding on SQLite's single writer
+
+        - The critical section is held under a process-wide lock so the deletes
+          run one at a time, and `JobRepository.delete` is idempotent for the
+          shared parent
+
     Args:
         file_id (uuid.UUID): Id of the file to delete
         profile_id (str): Validated profile id
         manager (JobQueueManager): The job worker
 
     Returns:
-        A confirmation payload
+        A confirmation payload plus the ids of the jobs deleted with the file
 
     Raises:
         HTTPException: If a job still being run by the worker uses this file
@@ -475,7 +521,7 @@ async def delete_file(
         StorageError: If deleting the file fails
         DatabaseError: If the deletion fails
     """
-    async with UnitOfWork() as uow:
+    async with _file_delete_lock(), UnitOfWork() as uow:
         file = await uow.files.get(file_id)
         if file.profile_id != profile_id:
             raise RecordNotFoundError(
@@ -494,7 +540,11 @@ async def delete_file(
         await uow.commit()
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
-    return {"success": True, "message": "File deleted successfully."}
+    return FileDeleteResponse(
+        success=True,
+        message="File Deleted",
+        deleted_job_ids=[str(job_id) for job_id in dependent],
+    )
 
 
 @profile_router.post("/subtitles", response_model=ProfileFileResponse)
@@ -532,22 +582,26 @@ async def save_subtitles(
             existing = None
 
     if existing is not None:
-        # Overwrite in place (write_file appends, so clear it first).
+        # Overwrite in place (write_file appends, so clear it first). The
+        # existing record's name, folder, and lineage are preserved as-is.
         await media.delete_file(existing.path)
         await media.write_file(existing.path, req.content)
-        created = (
-            existing.created_at.isoformat() if existing.created_at else None
-        )
         LOGGER.info(
             f"Overwrote SRT File '{existing.id}' For Profile '{profile_id}'"
         )
-        return ProfileFileResponse(
-            id=str(existing.id),
-            name=existing.name,
-            url=f"/media/{Path(existing.path).as_posix()}",
-            type=existing.type,
-            created_at=created,
-        )
+        return _file_response(existing)
+
+    # Resolve the source media this SRT belongs to (the loaded video), so the
+    # saved SRT is named after it, shares its folder, and groups under it
+    source = None
+    if req.source_file_id:
+        try:
+            async with UnitOfWork() as uow:
+                candidate = await uow.files.get(uuid.UUID(req.source_file_id))
+            if candidate.profile_id == profile_id:
+                source = candidate
+        except (ValueError, RecordNotFoundError):
+            source = None
 
     # Create a new SRT file under the profile.
     op_id = uuid.uuid4().hex
@@ -556,25 +610,23 @@ async def save_subtitles(
     rel_srt = media.get_relative_path(srt_loc)
     await media.write_file(rel_srt, req.content)
 
+    default_name = f"{Path(source.name).stem}.srt" if source else srt_loc.name
     async with UnitOfWork() as uow:
         file_rec = await uow.files.add(
             profile_id=profile_id,
-            name=req.name or srt_loc.name,
+            name=req.name or default_name,
             path=str(rel_srt),
             type="srt",
+            folder=source.folder if source else None,
+            source_file_id=(
+                (source.source_file_id or source.id) if source else None
+            ),
+            origin="subtitle",
         )
         await uow.commit()
 
     LOGGER.info(f"Saved SRT File '{file_rec.id}' For Profile '{profile_id}'")
-    return ProfileFileResponse(
-        id=str(file_rec.id),
-        name=file_rec.name,
-        url=f"/media/{rel_srt.as_posix()}",
-        type="srt",
-        created_at=(
-            file_rec.created_at.isoformat() if file_rec.created_at else None
-        ),
-    )
+    return _file_response(file_rec)
 
 
 # --- Transcripts ---
@@ -619,13 +671,14 @@ async def list_transcripts(
 
 @profile_router.delete(
     "/transcripts/{transcript_id}",
+    response_model=MessageResponse,
     status_code=status.HTTP_200_OK,
 )
 async def delete_transcript(
     transcript_id: Annotated[uuid.UUID, FPath()],
     profile_id: Annotated[str, Depends(ensure_profile_exists)],
     manager: Annotated[JobQueueManager, Depends(get_job_manager)],
-) -> dict[str, Any]:
+) -> MessageResponse:
     """
     Deletes one of the active profile's transcripts
 
@@ -669,7 +722,7 @@ async def delete_transcript(
     LOGGER.info(
         f"Deleted Transcript '{transcript_id}' For Profile '{profile_id}'"
     )
-    return {"success": True, "message": "Transcript deleted successfully."}
+    return MessageResponse(success=True, message="Transcript Deleted")
 
 
 # --- Anki Export ---

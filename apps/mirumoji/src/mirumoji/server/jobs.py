@@ -32,7 +32,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from ..exceptions import MirumojiServerError, RecordNotFoundError
 from . import media
 from .config import get_settings
-from .constants import MAX_LLM_CONCURRENCY
 from .db import UnitOfWork
 from .models.requests import (
     ConvertVideoRequest,
@@ -50,7 +49,7 @@ from .processing import audio, llm
 from .processing.subtitles import sanitize_srt
 
 if TYPE_CHECKING:
-    from .db.models import JobDTO
+    from .db.models import FileDTO, JobDTO
     from .processing.processor import Processor
 
     _JobHandler: TypeAlias = Callable[
@@ -94,8 +93,8 @@ class JobQueueManager:
 
         - On shutdown, `stop` attempts to fail any job still left running
 
-       - On startup, `start` fails any job still left `running` because of a
-         server crash and re-queues any `queued` job
+        - On startup, `start` fails any job still left `running` because of a
+          server crash and re-queues any `queued` job
 
     info: Concurrency
         - One worker runs jobs sequentially, so 2 or more heavy, local GPU/CPU
@@ -489,6 +488,12 @@ class JobQueueManager:
                 await self._worker_task
             self._worker_task = None
 
+            # Cancelling the worker leaves any FFMPEG subprocess it was running
+            # alive in a detached thread, since a thread cannot be interrupted.
+            # Terminate it so an in-flight conversion does not outlive the
+            # server and keep the media file (and process) alive
+            await asyncio.to_thread(audio.terminate_running_commands)
+
         self.queue = None
 
         LOGGER.info("Job Worker Stopped")
@@ -632,36 +637,66 @@ async def _filter_audio(
     return cleaned, tmp
 
 
+def _derived_srt_name(source_name: str, origin: str) -> str:
+    """
+    Builds a readable SRT display name from its source file's name
+
+    info: SRT File Names
+        - A generated SRT takes the source's stem (`ep1.mkv` -> `ep1.srt`)
+
+        - A fixed SRT appends a marker (`ep1.srt` -> `ep1 (fixed).srt`),
+          stripping an existing marker first so re-fixing never stacks it
+
+    Args:
+        source_name (str): The input file's display name
+        origin (str): `generated` or `fixed`
+
+    Returns:
+        The derived SRT display name
+    """
+    stem = Path(source_name).stem.removesuffix(" (fixed)")
+    return f"{stem} (fixed).srt" if origin == "fixed" else f"{stem}.srt"
+
+
 async def _persist_srt(
     profile_id: str,
     content: str,
     *,
-    suffix: str = "",
+    source: FileDTO,
+    origin: str,
 ) -> SrtResult:
     """
     Writes a `.SRT` from `content` in a profile's subtitle directory,
-    persisting the file reference in the database
+    persisting the file reference linked to its source media
+
+    The storage `path` stays op-id based (traversal-safe); the display `name`,
+    `folder`, and root `source_file_id` are inherited from `source` so the SRT
+    is readable and grouped under its video
 
     Args:
         profile_id (str): Owning profile id
         content (str): The SRT content to store
-        suffix (str): Optional file-name suffix (e.g. `_fixed`)
+        source (FileDTO): The input file (the source video for a generated SRT,
+            or the SRT being fixed), used to derive the name, folder, and the
+            root source lineage
+        origin (str): `generated` or `fixed`
 
     Returns:
         The new SRT file's id, media URL, and content
     """
     op_id = uuid.uuid4().hex
-    srt_loc = media.get_profile_dir(profile_id, "subtitles") / (
-        f"{op_id}{suffix}.srt"
-    )
+    srt_loc = media.get_profile_dir(profile_id, "subtitles") / f"{op_id}.srt"
     rel_srt = media.get_relative_path(srt_loc)
     await media.write_file(rel_srt, content)
     async with UnitOfWork() as uow:
         rec = await uow.files.add(
             profile_id=profile_id,
-            name=srt_loc.name,
+            name=_derived_srt_name(source.name, origin),
             path=str(rel_srt),
             type="srt",
+            folder=source.folder,
+            source_file_id=source.source_file_id or source.id,
+            origin=origin,
         )
         await uow.commit()
     return SrtResult(
@@ -720,16 +755,22 @@ def _converted_out_path(profile_id: str, source_name: str) -> Path:
 
 async def _persist_converted(
     profile_id: str,
-    name: str,
     rel_out: Path,
+    *,
+    source: FileDTO,
 ) -> ConvertResult:
     """
-    Persists an already-written converted MP4 as a profile file in the database
+    Persists an already-written converted MP4 as a profile file linked to its
+    source video
+
+    The display `name`, `folder`, and root `source_file_id` are inherited from
+    `source` so the MP4 is readable and grouped under its video
 
     Args:
         profile_id (str): Owning profile id
-        name (str): The MP4's display name
         rel_out (Path): The MP4's media-relative path
+        source (FileDTO): The source video, used to derive the name, folder,
+            and the root source lineage
 
     Returns:
         The new MP4 file's id and media URL
@@ -737,9 +778,12 @@ async def _persist_converted(
     async with UnitOfWork() as uow:
         rec = await uow.files.add(
             profile_id=profile_id,
-            name=name,
+            name=f"{Path(source.name).stem}.mp4",
             path=str(rel_out),
             type="mp4",
+            folder=source.folder,
+            source_file_id=source.source_file_id or source.id,
+            origin="converted",
         )
         await uow.commit()
     return ConvertResult(
@@ -768,7 +812,9 @@ async def _generate_srt(
     Returns:
         The new SRT file's id, media URL, and content
     """
-    src = await _file_path(uuid.UUID(params["file_id"]))
+    async with UnitOfWork() as uow:
+        source = await uow.files.get(uuid.UUID(params["file_id"]))
+    src = media.BASE_PATH / source.path
     opts = GenerateSrtRequest.model_validate(params.get("opts") or {})
     audio_path, tmp = await _extract_audio(src)
     try:
@@ -777,7 +823,9 @@ async def _generate_srt(
             output_format="srt",
             w_transcribe_args=opts.model_dump(exclude_none=True),
         )
-        return await _persist_srt(profile_id, srt_content)
+        return await _persist_srt(
+            profile_id, srt_content, source=source, origin="generated"
+        )
     finally:
         await _clean_temp(tmp)
 
@@ -837,17 +885,17 @@ async def _convert(
         The new MP4 file's id and media URL
     """
     async with UnitOfWork() as uow:
-        file_rec = await uow.files.get(uuid.UUID(params["file_id"]))
-    src = media.BASE_PATH / file_rec.path
+        source = await uow.files.get(uuid.UUID(params["file_id"]))
+    src = media.BASE_PATH / source.path
     opts = ConvertVideoRequest.model_validate(params.get("opts") or {})
-    out_loc = _converted_out_path(profile_id, file_rec.name)
+    out_loc = _converted_out_path(profile_id, source.name)
     rel_out = media.get_relative_path(out_loc)
     await processor.convert_to_mp4(
         src,
         out_loc,
         to_mp4_kwargs=opts.model_dump(exclude_none=True),
     )
-    return await _persist_converted(profile_id, out_loc.name, rel_out)
+    return await _persist_converted(profile_id, rel_out, source=source)
 
 
 async def _fix_srt(
@@ -867,7 +915,9 @@ async def _fix_srt(
     Returns:
         The new SRT file's id, media URL, and content
     """
-    src = await _file_path(uuid.UUID(params["file_id"]))
+    async with UnitOfWork() as uow:
+        source = await uow.files.get(uuid.UUID(params["file_id"]))
+    src = media.BASE_PATH / source.path
     raw = await asyncio.to_thread(_read_text_best_effort, src)
     client, model = llm.client_for_model(params["model"])
     system = params.get("sys_msg") or get_settings().srt_sys_msg
@@ -878,7 +928,7 @@ async def _fix_srt(
         model=model,
     )
     fixed = sanitize_srt(fixed)
-    return await _persist_srt(profile_id, fixed, suffix="_fixed")
+    return await _persist_srt(profile_id, fixed, source=source, origin="fixed")
 
 
 # --- Single-Op Handlers ---
@@ -1326,7 +1376,11 @@ async def _store_modal_srt(
         await tally.record("failed")
         return
     try:
-        result = await _persist_srt(job.profile_id, outcome)
+        async with UnitOfWork() as uow:
+            source = await uow.files.get(uuid.UUID(child.params["file_id"]))
+        result = await _persist_srt(
+            job.profile_id, outcome, source=source, origin="generated"
+        )
     except Exception:
         LOGGER.exception(f"Batch Child '{child.id}' Persist Failed")
         await _fail_child(
@@ -1417,10 +1471,10 @@ async def _store_modal_convert(
         return
     try:
         rel_out = media.get_relative_path(outcome)
+        async with UnitOfWork() as uow:
+            source = await uow.files.get(uuid.UUID(child.params["file_id"]))
         result = await _persist_converted(
-            job.profile_id,
-            outcome.name,
-            rel_out,
+            job.profile_id, rel_out, source=source
         )
     except Exception:
         LOGGER.exception(f"Batch Child '{child.id}' Persist Failed")
@@ -1744,8 +1798,8 @@ async def batch_fix_srt_handler(
     Runs a batch of `fix_srt` operations, one child job per file
 
     LLM SRT-fixing is provider-agnostic and I/O-bound, so the files run through
-    the bounded-concurrency runner on every backend, capped by
-    `MAX_LLM_CONCURRENCY`
+    the bounded-concurrency runner on every backend, capped by the configured
+    `max_llm_concurrency`
 
     Args:
         job (JobDTO): The batch parent job (its children hold the file ids)
@@ -1756,7 +1810,11 @@ async def batch_fix_srt_handler(
     """
     children = await _load_children(job.id)
     return await _run_bounded_batch(
-        job, children, processor, _fix_srt, MAX_LLM_CONCURRENCY
+        job,
+        children,
+        processor,
+        _fix_srt,
+        get_settings().max_llm_concurrency,
     )
 
 

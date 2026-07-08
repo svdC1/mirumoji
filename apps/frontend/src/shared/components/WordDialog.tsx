@@ -54,14 +54,12 @@ export interface WordDialogProps {
     cueEnd: number;
     videoFile: File | null;
     videoUrl?: string;
+    /** Surrounding subtitle lines, exposed to the template as {context}. */
+    context?: string;
 }
 
 // Cache breakdown responses for already-clicked words.
 const breakdownCache = new Map<string, BreakdownResponse>();
-
-// A profile template's prompt uses {sentence}/{focus}; the API expects {0}/{1}.
-const toApiPrompt = (prompt: string): string =>
-    prompt.replace(/{sentence}/g, "{0}").replace(/{focus}/g, "{1}");
 
 type MainTab = "llm" | "dict";
 type SectionKey = "entry" | "names" | "kanji" | "examples" | "grammar";
@@ -120,8 +118,9 @@ export default function WordDialog({
     cueEnd,
     videoFile,
     videoUrl,
+    context,
 }: WordDialogProps) {
-    const key = `${sentence}__${word}`;
+    const key = `${sentence}__${word}__${context ?? ""}`;
     const cached = breakdownCache.get(key);
     const [focus, setFocus] = useState<EnrichedJapaneseWord | null>(cached?.focus ?? null);
     const [explanation, setExplanation] = useState<string>(cached?.explanation ?? "");
@@ -208,8 +207,6 @@ export default function WordDialog({
         }
         setNoModel(false);
 
-        const useCustomPrompt =
-            template.prompt.includes("{sentence}") && template.prompt.includes("{focus}");
         let focusWord: EnrichedJapaneseWord | null = null;
         let text = "";
         setStreaming(true);
@@ -220,7 +217,8 @@ export default function WordDialog({
                     focus: word,
                     model: template.model,
                     sys_msg: template.sys_msg || undefined,
-                    prompt: useCustomPrompt ? toApiPrompt(template.prompt) : undefined,
+                    prompt: template.prompt || undefined,
+                    context: context || undefined,
                 },
                 {
                     onFocus: (f) => {
