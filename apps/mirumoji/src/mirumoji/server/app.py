@@ -34,6 +34,7 @@ from .config import get_settings
 from .db import get_engine, init_db
 from .jobs import HANDLERS, JobQueueManager
 from .middleware import LoggingMiddleware
+from .processing import text
 from .processing.processor import Processor
 from .routers.dict import dict_router
 from .routers.health import health_router
@@ -44,6 +45,39 @@ from .routers.profile import profile_router
 LOGGER = logging.getLogger(__name__)
 
 # --- Lifespan + Handlers ---
+
+
+async def _warm_up() -> None:
+    """
+    Warms and integrity-checks the Japanese tokenizer and dictionary
+
+    question: Why
+        - Loads the `UniDic` / `Kotobase` dictionaries at startup so the first
+          request does not pay the cold load
+
+        - Either dependency failing disables only its own endpoints (a `503`),
+          so each check warns and lets startup continue rather than aborting
+          the whole server
+
+    info: Degraded Operation
+        - A `fugashi` failure disables tokenization (the subtitle side panel
+          and the text analyzer)
+
+        - A `kotobase` failure disables dictionary lookups (the word and kanji
+          views)
+    """
+    checks = (
+        ("Tokenizer", "Subtitle Tokenization", text.ensure_fugashi),
+        ("Dictionary", "Dictionary Lookups", text.ensure_kotobase),
+    )
+    for name, feature, check in checks:
+        try:
+            await asyncio.to_thread(check)
+            LOGGER.info(f"{name} Ready")
+        except Exception as e:
+            LOGGER.warning(
+                f"{name} Unavailable, {feature} Disabled Until Fixed: {e}"
+            )
 
 
 @asynccontextmanager
@@ -60,12 +94,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
         - Lifespan-Scoped `JobQueueManager` Initialisation
 
+        - Kotobase + Fugashi Warm Up + Integrity Check
+
     info: Shutdown Operations
         - Stops the Async Job Queue Task, marking any running jobs as failed
 
         - Disposes the Database Engine
 
         - Clears Temporary Media
+
+        - Stops The Modal App If It Exists (`modal` Backend Only)
 
         - Tears Down The Logging Setup
     Args:
@@ -95,6 +133,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     LOGGER.info(f"Registered {len(HANDLERS)} Handlers To Job Manager")
 
     await app.state.job_manager.start()
+
+    # Warm + integrity-check the tokenizer and dictionary so the cold UniDic /
+    # Kotobase load happens now, not on the user's first subtitle load. Each
+    # check warns and continues so a broken language dependency degrades only
+    # its own endpoints instead of aborting startup
+    await _warm_up()
 
     LOGGER.info("Configuration Complete")
 
