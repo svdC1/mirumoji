@@ -5,6 +5,8 @@ Attributes:
   health_router (APIRouter): The FastAPI Router Object
 """
 
+import asyncio
+
 from fastapi import APIRouter
 
 from ..config import get_system_info
@@ -30,7 +32,12 @@ async def gpu_check() -> SystemInfoResponse:
     Collects information about the system running the API, including OS, GPUs,
     Python Version , etc
 
+    info: Off The Event Loop
+        `get_system_info` shells out to `nvidia-smi`, so it runs in a thread to
+        avoid blocking the event loop while it waits
+
     Returns:
         Information about the system running the API
     """
-    return SystemInfoResponse(**get_system_info())
+    info = await asyncio.to_thread(get_system_info)
+    return SystemInfoResponse(**info)
