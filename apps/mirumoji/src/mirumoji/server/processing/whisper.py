@@ -115,9 +115,9 @@ def _is_transient_download_error(exc: BaseException) -> bool:
     return False
 
 
-def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
+def load_model() -> WhisperModel:
     """
-    Loads a `faster_whisper.WhisperModel` object
+    Loads a `faster_whisper.WhisperModel` object with `DEFAULT_MODEL_OPTS`
 
     info: Model Download
         - For the the `local` transcription backend, the first load pulls the
@@ -130,10 +130,6 @@ def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
           continues rather than restarting
 
         - Permanent failures are raised immediately
-
-    Args:
-        w_model_args (dict | None): Additional arguments for
-            `WhisperModel`. Overrides the ones set in `DEFAULT_MODEL_OPTS`
 
     Returns:
         A loaded `WhisperModel` object
@@ -150,15 +146,12 @@ def load_model(w_model_args: dict[str, Any] | None = None) -> WhisperModel:
             "(faster-whisper) to be installed",
         ) from e
 
-    opts = copy.deepcopy(DEFAULT_MODEL_OPTS)
-    if w_model_args:
-        opts.update(w_model_args)
-    model_name = opts["model_size_or_path"]
+    model_name = DEFAULT_MODEL_OPTS["model_size_or_path"]
 
     last_error: BaseException | None = None
     for attempt in range(1, MODEL_DOWNLOAD_RETRIES + 1):
         try:
-            return WhisperModel(**opts)
+            return WhisperModel(**DEFAULT_MODEL_OPTS)
         except Exception as e:
             if not _is_transient_download_error(e):
                 raise WhisperUnavailableError(

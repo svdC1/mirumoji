@@ -121,7 +121,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
             f"Failed To Delete Temporary Media At '{media.TEMP_PATH}'"
         )
 
-    LOGGER.info("Shut Down Complete")
+    # Remove Deployed Modal App When Using The Modal Backend
+    # No-Op Otherwise
+    await app.state.processor.stop_modal_app()
 
     # Close the log handlers last, so nothing above loses its output. This
     # releases the log file, which lives inside the storage directory, so that

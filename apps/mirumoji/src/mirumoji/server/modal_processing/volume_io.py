@@ -13,7 +13,7 @@ tip: Additional Information
       transfer bar, so neither side ever loads a whole multi-GB media file
       into memory
 
-    - See the `modal_processing.app` module for more information on this
+    - See the `modal_processing.worker` module for more information on this
 """
 
 from __future__ import annotations
