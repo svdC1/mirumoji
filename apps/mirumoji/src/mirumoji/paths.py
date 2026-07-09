@@ -12,35 +12,31 @@ from pathlib import Path
 
 from platformdirs import PlatformDirs
 
-from . import __version__
-
 HOST_STORAGE = PlatformDirs(
     appname="mirumoji",
     appauthor=False,
-    version=__version__,
     ensure_exists=False,
 )
 r"""
 Filesystem locations used by the server
 
 All user-writable paths derive from `platformdirs` and are keyed by the app's
-name and its version so that the entire library shares the same storage
-paths
-
+name only. Keeping them unversioned means data, config, and logs survive a
+version upgrade instead of being orphaned under a per-version subfolder
 
 tip: Storage Paths
     === "Windows"
         ```text
-        user_data_path = %LOCALAPPDATA%\mirumoji\{version}\
-        user_cache_path = %LOCALAPPDATA%\mirumoji\{version}\Cache\
-        user_logs_path = %LOCALAPPDATA%\mirumoji\{version}\Logs\
+        user_data_path = %LOCALAPPDATA%\mirumoji\
+        user_cache_path = %LOCALAPPDATA%\mirumoji\Cache\
+        user_logs_path = %LOCALAPPDATA%\mirumoji\Logs\
         ```
 
     === "MacOS"
         ```text
-        user_data_path = ~/Library/Application Support/mirumoji/{version}/
-        user_cache_path = ~/Library/Caches/mirumoji/{version}/
-        user_logs_path = ~/Library/Logs/mirumoji/{version}/
+        user_data_path = ~/Library/Application Support/mirumoji/
+        user_cache_path = ~/Library/Caches/mirumoji/
+        user_logs_path = ~/Library/Logs/mirumoji/
         ```
 
     === "Linux / Unix"
@@ -49,9 +45,9 @@ tip: Storage Paths
         # platformdirs adheres to the $XDG_DATA_HOME env variables for these
         # The following are the defaults when they are not set
 
-        user_data_path = ~/.local/share/mirumoji/{version}/
-        user_cache_path = ~/.cache/mirumoji/{version}/
-        user_logs_path = ~/.local/state/log/mirumoji/{version}/
+        user_data_path = ~/.local/share/mirumoji/
+        user_cache_path = ~/.cache/mirumoji/
+        user_logs_path = ~/.local/state/mirumoji/log/
         ```
 
 info: Directory Creation

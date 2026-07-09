@@ -71,26 +71,26 @@ def _remove(label: str, *paths: Path) -> ResetStep:
 
 def _prune_empty(*directories: Path) -> None:
     """
-    Removes each directory and its app-folder parent when left empty
+    Removes each directory and any empty parents up to the Mirumoji app folder
 
-    Clears the now-empty version and app folders so the storage directory is
-    actually gone rather than an empty shell. Only ever removes empty
-    directories, so a sibling (such as another version) is preserved
-
-    info: No Deduplication
-        A shared parent is attempted on every pass rather than once, since a
-        parent only becomes empty after its last child is pruned
+    Walks upward from each target clearing empty directories, and stops after
+    removing the `mirumoji` folder so a shared system root (such as
+    `%LOCALAPPDATA%` or `~/.local/share`) is never touched. Only empty
+    directories are removed, so a target the user chose to keep is preserved
 
     Args:
-        *directories (Path): The version directories to prune upward from
+        *directories (Path): The storage directories to prune upward from
     """
     for directory in directories:
-        for candidate in (directory, directory.parent):
+        candidate = directory
+        while candidate.is_dir() and not any(candidate.iterdir()):
             try:
-                if candidate.is_dir() and not any(candidate.iterdir()):
-                    candidate.rmdir()
+                candidate.rmdir()
             except OSError:
-                pass
+                break
+            if candidate.name == "mirumoji":
+                break
+            candidate = candidate.parent
 
 
 def reset_storage(

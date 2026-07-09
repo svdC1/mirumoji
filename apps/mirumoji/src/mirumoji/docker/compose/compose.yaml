@@ -59,10 +59,9 @@ services:
       - MIRUMOJI_SRT_DEFAULT_SYS_MSG=${MIRUMOJI_SRT_DEFAULT_SYS_MSG:-}
       - MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG=${MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG:-}
     volumes:
-      # Mounted at the parent of the versioned platformdirs paths so that data and
-      # logs survive version bumps.
-      #
-      # The server resolves its storage via platformdirs (see mirumoji/paths.py)
+      # The server resolves its storage via platformdirs (see mirumoji/paths.py),
+      # which is unversioned, so these mounts persist data and logs across
+      # version upgrades
       - data:/root/.local/share/mirumoji
       - logs:/root/.local/state/mirumoji
     networks:
