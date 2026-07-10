@@ -19,6 +19,7 @@ import shutil
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from http import HTTPStatus
+from time import perf_counter
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -112,6 +113,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     Yields:
         Control back to the running application
     """
+    _init_start = perf_counter()
+
+    LOGGER.info("Configuration Started")
 
     # Create / Initialise Database
     await init_db()
@@ -140,10 +144,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     # its own endpoints instead of aborting startup
     await _warm_up()
 
-    LOGGER.info("Configuration Complete")
+    _init_end = perf_counter()
+
+    LOGGER.info(
+        f"Configuration Complete In {(_init_end - _init_start) * 1000:.3f}ms"
+    )
 
     yield
 
+    _teardown_start = perf_counter()
     # Stop Job Queue Worker
     # Needs to run before disposing the engine since `stop` marks running jobs
     # failed in the database
@@ -168,6 +177,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     # Remove Deployed Modal App When Using The Modal Backend
     # No-Op Otherwise
     await app.state.processor.stop_modal_app()
+
+    _teardown_end = perf_counter()
+
+    LOGGER.info(
+        f"Teardown Complete In "
+        f"{(_teardown_end - _teardown_start) * 1000:.3f}ms"
+    )
 
     # Close the log handlers last, so nothing above loses its output. This
     # releases the log file, which lives inside the storage directory, so that
@@ -272,6 +288,10 @@ def create_app() -> FastAPI:
         level=get_settings().logging_level,
     )
 
+    _build_start = perf_counter()
+
+    LOGGER.info("App Build Started")
+
     LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH / 'backend.log'}'")
 
     app = FastAPI(
@@ -312,5 +332,11 @@ def create_app() -> FastAPI:
     app.include_router(llm_router)
     app.include_router(profile_router)
     app.include_router(jobs_router)
+
+    _build_end = perf_counter()
+
+    LOGGER.info(
+        f"App Build Complete In {(_build_end - _build_start) * 1000:.3f}ms"
+    )
 
     return app
