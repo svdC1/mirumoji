@@ -36,7 +36,7 @@ export default function App() {
             {/* Desktop pages clear the rail with `pl-16`; on mobile the rail is
                 a drawer (no reserved width), but content clears the floating
                 menu button with top padding. */}
-            <div className={immersive ? "" : "pt-14 lg:pl-16 lg:pt-0"}>
+            <div className={immersive ? "" : "pt-[var(--top-bar-h)] lg:pl-16 lg:pt-0"}>
                 <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/player" element={<PlayerPage />} />

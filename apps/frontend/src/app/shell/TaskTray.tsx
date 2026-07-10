@@ -140,7 +140,7 @@ export function TaskTray() {
         jobs.filter((j) => isActive(j.status)).length;
 
     return (
-        <div className="fixed bottom-4 right-4 z-40 print:hidden">
+        <div className="fixed bottom-[calc(1rem_+_var(--sab))] right-[calc(1rem_+_var(--sar))] z-40 print:hidden">
             {open ? (
                 <div className="flex max-h-[60vh] w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-card bg-surface shadow-lift ring-1 ring-ink/10 backdrop-blur">
                     <header className="flex items-center justify-between border-b border-ink/10 px-3 py-2">

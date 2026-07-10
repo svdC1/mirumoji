@@ -265,8 +265,11 @@ export function PlayerToolbar() {
         </>
     );
 
+    // Per-side padding folds in the safe-area insets (0 on any non-notched
+    // device, so identical to py-2 pl-16 pr-3 there). The left padding still
+    // reserves room for the immersive floating menu button.
     const toolbarClasses =
-        "relative z-30 flex items-center gap-1.5 border-b border-ink/10 bg-surface/80 py-2 pl-16 pr-3 backdrop-blur";
+        "relative z-30 flex items-center gap-1.5 border-b border-ink/10 bg-surface/80 pb-2 pl-[calc(4rem_+_var(--sal))] pr-[calc(0.75rem_+_var(--sar))] pt-[calc(0.5rem_+_var(--sat))] backdrop-blur";
 
     // Mobile
     // Compact Bar -> view controls + a "More" menu holding the SRT actions

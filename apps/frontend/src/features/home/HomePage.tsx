@@ -53,7 +53,7 @@ export default function HomePage() {
     );
 
     return (
-        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] lg:min-h-dvh w-full max-w-5xl px-4 py-10">
+        <div className="mx-auto min-h-[var(--content-h)] lg:min-h-dvh w-full max-w-5xl px-[calc(1rem_+_var(--safe-x))] py-10">
             <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <span

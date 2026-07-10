@@ -134,7 +134,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
             {/* Mobile top bar — non-immersive routes. Holds the menu button (and
                 brand) so it fills the top strip instead of floating over content. */}
             {!immersive && (
-                <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-2 border-b border-ink/10 bg-surface/80 px-3 backdrop-blur lg:hidden">
+                <header className="fixed inset-x-0 top-0 z-40 flex min-h-[var(--top-bar-h)] items-center gap-2 border-b border-ink/10 bg-surface/80 pl-[calc(0.75rem_+_var(--sal))] pr-[calc(0.75rem_+_var(--sar))] pt-[var(--sat)] backdrop-blur lg:hidden">
                     <IconButton label="Open menu" onClick={() => setOpen(true)}>
                         <Menu size={20} />
                     </IconButton>
@@ -155,7 +155,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                 <IconButton
                     label="Open menu"
                     onClick={() => setOpen(true)}
-                    className="fixed left-3 top-2 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
+                    className="fixed left-[calc(0.75rem_+_var(--sal))] top-[calc(0.5rem_+_var(--sat))] z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
                 >
                     <Menu size={20} />
                 </IconButton>
@@ -175,7 +175,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                         open ? "translate-x-0 shadow-lift" : "-translate-x-full"
                     )}
                 >
-                    <div className="flex h-full flex-col">
+                    <div className="flex h-full flex-col pt-[var(--sat)] pl-[var(--sal)]">
                         <div className="flex justify-end px-2 pt-2">
                             <IconButton label="Close menu" onClick={() => setOpen(false)}>
                                 <X size={18} />
