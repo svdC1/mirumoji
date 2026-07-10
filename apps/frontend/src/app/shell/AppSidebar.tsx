@@ -155,7 +155,7 @@ export function AppSidebar({ immersive }: { immersive: boolean }) {
                 <IconButton
                     label="Open menu"
                     onClick={() => setOpen(true)}
-                    className="fixed left-3 top-3 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
+                    className="fixed left-3 top-2 z-50 bg-surface/70 opacity-60 backdrop-blur transition-opacity hover:opacity-100"
                 >
                     <Menu size={20} />
                 </IconButton>

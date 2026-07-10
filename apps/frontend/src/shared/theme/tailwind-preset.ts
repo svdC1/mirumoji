@@ -8,11 +8,19 @@
  */
 import type { Config } from "tailwindcss";
 
+import { LAND_SCREEN } from "./breakpoints";
+
 const c = (v: string) => `rgb(var(${v}) / <alpha-value>)`;
 
 const preset: Partial<Config> = {
     theme: {
         extend: {
+            screens: {
+                // Additive named screen: a landscape phone. Only the player's
+                // subtitle-panel layout opts into it (`land:` alongside the
+                // existing `lg:` rail classes), so no other breakpoint changes.
+                land: { raw: LAND_SCREEN },
+            },
             colors: {
                 bg: c("--bg"),
                 surface: {

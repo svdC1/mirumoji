@@ -187,7 +187,9 @@ export default function PlayerPage() {
         <div className="flex h-dvh flex-col bg-bg text-ink">
             <PlayerToolbar />
 
-            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            {/* Video + subtitle rail. Side-by-side when there is horizontal
+                room: desktop (`lg:`) or a landscape phone (`land:`). */}
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row land:flex-row">
                 {hasMedia && !unplayable ? (
                     <div className="relative min-h-0 min-w-0 flex-1">
                         <VideoStage
