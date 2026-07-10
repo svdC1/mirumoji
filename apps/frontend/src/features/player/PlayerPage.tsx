@@ -222,11 +222,11 @@ export default function PlayerPage() {
                     <div className="flex flex-1 items-center justify-center">
                         <EmptyState
                             icon={<Clapperboard size={32} />}
-                            title={unplayable ? "Convert To Play" : "Load a video to begin"}
+                            title={unplayable ? "Convert To Play" : "Load A Video To Begin"}
                             description={
                                 unplayable
-                                    ? "This browser can't play this video format. Use To MP4 in the toolbar to convert it, and it will load here automatically."
-                                    : "Use the Load button in the toolbar to open a video and subtitles from your device or profile."
+                                    ? "This browser can't play this video format. Use To MP4 in the toolbar to convert it, and it will load here automatically"
+                                    : "Use the Load button in the toolbar to open a video and subtitles from your device or profile"
                             }
                         />
                     </div>
