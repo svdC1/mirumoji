@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiDictQuery, apiSearchEnglish, isEmptyDict } from "@/shared/dict/api";
+import { kanjiRoute, wordRoute } from "@/shared/dict/routes";
 import { EmptyState, Skeleton, cn } from "@/shared/ui";
 import { DictTabs, JMEntryRow, JMNEntryRow, KanjiRow } from "@/shared/components/DictDisplays";
 import StrokeOrder from "@/shared/components/StrokeOrder";
@@ -189,9 +190,8 @@ export default function SearchResults() {
         };
     }, [q, mode]);
 
-    const openWord = (word: string) => navigate(`/dictionary/word/${encodeURIComponent(word)}`);
-    const openKanji = (literal: string) =>
-        navigate(`/dictionary/kanji/${encodeURIComponent(literal)}`);
+    const openWord = (word: string) => navigate(wordRoute(word));
+    const openKanji = (literal: string) => navigate(kanjiRoute(literal));
 
     if (!q) {
         return <Landing onWord={openWord} onKanji={openKanji} />;

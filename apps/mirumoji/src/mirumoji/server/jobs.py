@@ -733,23 +733,25 @@ async def _persist_transcript(
     return TranscribeResult(transcript_id=str(rec.id), transcript=text)
 
 
-def _converted_out_path(profile_id: str, source_name: str) -> Path:
+def _converted_out_path(profile_id: str) -> Path:
     """
     Builds the destination path for a converted MP4
 
-    The output is named after the original upload rather than its op-id storage
-    path, so that the client sees a recognisable file name
+    The on-disk file is named from a plain op-id, like every other stored
+    artifact, so the media URL path stays ASCII even when the source upload has
+    a non-ASCII display name. The human-readable name is kept on the file
+    record instead (see `_persist_converted`), so the client still sees a
+    recognisable name
 
     Args:
         profile_id (str): Owning profile id
-        source_name (str): The source file's display name
 
     Returns:
         The absolute destination path under the profile's converted folder
     """
     op_id = uuid.uuid4().hex
     return media.get_profile_dir(profile_id, "converted") / (
-        f"{Path(source_name).stem}_{op_id}_converted.mp4"
+        f"{op_id}_converted.mp4"
     )
 
 
@@ -888,7 +890,7 @@ async def _convert(
         source = await uow.files.get(uuid.UUID(params["file_id"]))
     src = media.BASE_PATH / source.path
     opts = ConvertVideoRequest.model_validate(params.get("opts") or {})
-    out_loc = _converted_out_path(profile_id, source.name)
+    out_loc = _converted_out_path(profile_id)
     rel_out = media.get_relative_path(out_loc)
     await processor.convert_to_mp4(
         src,
@@ -1678,7 +1680,7 @@ async def _run_modal_convert_batch(
                     uuid.UUID(child.params["file_id"]),
                 )
             src = media.BASE_PATH / file_rec.path
-            out_loc = _converted_out_path(job.profile_id, file_rec.name)
+            out_loc = _converted_out_path(job.profile_id)
         except MirumojiServerError as exc:
             await _fail_child(
                 child.id,

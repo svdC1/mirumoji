@@ -51,12 +51,34 @@ async def get_profile_id_from_header(
     """
     Extracts the `X-Profile-ID` header, returning `None` when it's not present
 
+    info: ASCII Only
+        - The profile id is a segment of every media file's URL path
+          (`/media/profiles/<profile_id>/...`)
+
+        - A Modal-hosted deploy rejects any request whose URL path contains
+          non-ASCII bytes, so a non-ASCII profile id is rejected here before it
+          can be persisted and used as a storage path
+
+        - The frontend also gates the profile-name input, this is the
+          server-side backstop
+
     Args:
         x_profile_id (str | None): The `X-Profile-ID` Header
 
     Returns:
         The Header value, or `None` when absent
+
+    Raises:
+        HTTPException: 400 when the header is present but not ASCII
     """
+    if x_profile_id is not None and not x_profile_id.isascii():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "X-Profile-ID Must Contain Only ASCII Characters. Rename The "
+                "Profile Using ASCII Characters"
+            ),
+        )
     return x_profile_id
 
 

@@ -44,8 +44,8 @@ export default function App() {
                     <Route path="/text" element={<TextPage />} />
                     <Route path="/dictionary" element={<DictionaryPage />}>
                         <Route index element={<SearchResults />} />
-                        <Route path="word/:term" element={<WordView />} />
-                        <Route path="kanji/:char" element={<KanjiView />} />
+                        <Route path="word" element={<WordView />} />
+                        <Route path="kanji" element={<KanjiView />} />
                         <Route path="radicals" element={<RadicalSearch />} />
                     </Route>
                     <Route path="/dashboard" element={<DashboardPage />} />

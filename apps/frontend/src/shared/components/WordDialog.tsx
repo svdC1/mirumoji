@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { apiDictQuery, apiTokenize, isEmptyDict } from "@/shared/dict/api";
+import { wordRoute } from "@/shared/dict/routes";
 import { useBundleSettings } from "@/contexts/BundleSettingsContext";
 import { apiGetTemplate, streamBreakdown } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
@@ -387,10 +388,11 @@ export default function WordDialog({
 
     // Words in examples and cross-references open their entry in the
     // Dictionary hub in a new tab, so playback never stops. BASE_URL keeps
-    // the link working under a non-root deployment base
+    // the link working under a non-root deployment base, so the route helper's
+    // leading slash is dropped to sit after it
     const openInDict = (target: string) =>
         window.open(
-            `${import.meta.env.BASE_URL}dictionary/word/${encodeURIComponent(target)}`,
+            `${import.meta.env.BASE_URL}${wordRoute(target).slice(1)}`,
             "_blank",
             "noreferrer"
         );
@@ -519,7 +521,7 @@ export default function WordDialog({
                                     />
                                 </h2>
                                 <Link
-                                    to={`/dictionary/word/${encodeURIComponent(word)}`}
+                                    to={wordRoute(word)}
                                     target="_blank"
                                     rel="noreferrer"
                                     aria-label="Open in Dictionary"

@@ -17,6 +17,7 @@ import {
 } from "react-router-dom";
 import { ChevronRight, Search } from "lucide-react";
 import { Tooltip, cn } from "@/shared/ui";
+import { kanjiRoute, wordRoute } from "@/shared/dict/routes";
 
 type SearchMode = "jp" | "en" | "radicals";
 
@@ -47,13 +48,15 @@ export default function DictionaryPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
-    const wordMatch = useMatch("/dictionary/word/:term");
-    const kanjiMatch = useMatch("/dictionary/kanji/:char");
+    const wordMatch = useMatch("/dictionary/word");
+    const kanjiMatch = useMatch("/dictionary/kanji");
     const radicalsMatch = useMatch("/dictionary/radicals");
     const trail = (location.state ?? {}) as DictionaryTrailState;
 
     const urlQuery = searchParams.get("q") ?? "";
-    const routeTerm = wordMatch?.params.term ?? "";
+    // The routed kanji/word value now travels in the query string (see
+    // `shared/dict/routes`) so the URL path stays ASCII for a Modal-hosted host
+    const routeTerm = wordMatch ? (searchParams.get("term") ?? "") : "";
     const mode: SearchMode = radicalsMatch
         ? "radicals"
         : searchParams.get("mode") === "en"
@@ -85,7 +88,7 @@ export default function DictionaryPage() {
             // Wildcards match many words, so they land on the results list
             navigate(`/dictionary?q=${encodeURIComponent(q)}&mode=jp`);
         } else {
-            navigate(`/dictionary/word/${encodeURIComponent(q)}`);
+            navigate(wordRoute(q));
         }
     };
 
@@ -99,7 +102,7 @@ export default function DictionaryPage() {
         if (trail.fromWord) {
             crumbs.push({
                 label: trail.fromWord,
-                to: `/dictionary/word/${encodeURIComponent(trail.fromWord)}`,
+                to: wordRoute(trail.fromWord),
                 ja: true,
             });
         }
@@ -110,12 +113,12 @@ export default function DictionaryPage() {
                 to: `/dictionary/radicals?picked=${encodeURIComponent(trail.fromRadicals)}${matchParam}`,
             });
         }
-        crumbs.push({ label: kanjiMatch.params.char ?? "", ja: true });
+        crumbs.push({ label: searchParams.get("char") ?? "", ja: true });
     } else if (wordMatch) {
         if (trail.fromKanji) {
             crumbs.push({
                 label: trail.fromKanji,
-                to: `/dictionary/kanji/${encodeURIComponent(trail.fromKanji)}`,
+                to: kanjiRoute(trail.fromKanji),
                 ja: true,
             });
         }

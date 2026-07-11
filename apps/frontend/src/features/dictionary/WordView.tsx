@@ -6,8 +6,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiDictQuery, isEmptyDict } from "@/shared/dict/api";
+import { kanjiRoute, wordRoute } from "@/shared/dict/routes";
 import { toastApiError } from "@/shared/api/errors";
 import { Badge, EmptyState, Skeleton } from "@/shared/ui";
 import {
@@ -27,7 +28,8 @@ import type { KotobaseData } from "@/shared/dict/types";
  * @returns {JSX.Element} The word entry view.
  */
 export default function WordView() {
-    const { term = "" } = useParams();
+    const [searchParams] = useSearchParams();
+    const term = searchParams.get("term") ?? "";
     const navigate = useNavigate();
     const [data, setData] = useState<KotobaseData | null | undefined>(undefined);
     const [tab, setTab] = useState("Entries");
@@ -71,7 +73,7 @@ export default function WordView() {
     // The ruby annotation already shows the reading, so the italic reading
     // beside the headword only appears when no furigana is known
     const showReading = !!reading && data.furigana.length === 0;
-    const openWord = (word: string) => navigate(`/dictionary/word/${encodeURIComponent(word)}`);
+    const openWord = (word: string) => navigate(wordRoute(word));
 
     const tabs: string[] = [];
     if (data.jmentries.length > 0) tabs.push("Entries");
@@ -122,7 +124,7 @@ export default function WordView() {
                             kanji={kanji}
                             isLast={i === data.kanji.length - 1}
                             onKanjiClick={(literal) =>
-                                navigate(`/dictionary/kanji/${encodeURIComponent(literal)}`, {
+                                navigate(kanjiRoute(literal), {
                                     state: { fromWord: term },
                                 })
                             }

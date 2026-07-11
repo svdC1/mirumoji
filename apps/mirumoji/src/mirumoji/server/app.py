@@ -122,7 +122,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
     # Create Media Directory If It Doesn't Exist
     media.init_storage()
-    LOGGER.info(f"Serving '{media.BASE_PATH}' At '/media'")
 
     # Intialise Application-Scoped Stateful Processor
     app.state.processor = Processor()
@@ -307,6 +306,8 @@ def create_app() -> FastAPI:
         StaticFiles(directory=media.BASE_PATH, check_dir=False),
         name="media",
     )
+
+    LOGGER.info(f"Serving '{media.BASE_PATH}' At '/media'")
 
     app.add_middleware(
         CORSMiddleware,

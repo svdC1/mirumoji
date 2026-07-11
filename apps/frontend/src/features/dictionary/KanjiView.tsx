@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Volume2 } from "lucide-react";
 import {
     apiKanji,
@@ -15,6 +15,7 @@ import {
     apiKanjiWords,
     dictAudioClipUrl,
 } from "@/shared/dict/api";
+import { wordRoute } from "@/shared/dict/routes";
 import { Badge, EmptyState, Skeleton, cn } from "@/shared/ui";
 import { DictTabs, ExamplesSection, JMEntryRow } from "@/shared/components/DictDisplays";
 import StrokeOrder from "@/shared/components/StrokeOrder";
@@ -40,7 +41,8 @@ function ReadingRow({ label, readings }: { label: string; readings: string[] }) 
  * @returns {JSX.Element} The kanji detail view.
  */
 export default function KanjiView() {
-    const { char = "" } = useParams();
+    const [searchParams] = useSearchParams();
+    const char = searchParams.get("char") ?? "";
     const navigate = useNavigate();
     const [info, setInfo] = useState<KanjiInfo | null | undefined>(undefined);
     const [audio, setAudio] = useState<KanjiAudio | null>(null);
@@ -201,7 +203,7 @@ export default function KanjiView() {
                                     key={i}
                                     entry={entry}
                                     onSelect={(word) =>
-                                        navigate(`/dictionary/word/${encodeURIComponent(word)}`, {
+                                        navigate(wordRoute(word), {
                                             state: { fromKanji: char },
                                         })
                                     }
@@ -211,7 +213,7 @@ export default function KanjiView() {
                             <ExamplesSection
                                 examples={sentences}
                                 onWordClick={(_, word) =>
-                                    navigate(`/dictionary/word/${encodeURIComponent(word)}`, {
+                                    navigate(wordRoute(word), {
                                         state: { fromKanji: char },
                                     })
                                 }
