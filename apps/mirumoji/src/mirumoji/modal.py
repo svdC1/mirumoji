@@ -24,8 +24,11 @@ info: Ownership
     own app, keep it current, and never create a duplicate
 
 info: Import Cost
-    `modal` is imported lazily inside each function so that importing this
-    module (which the launcher does on every command) stays cheap
+    - `modal` is only imported lazily inside each function so that importing
+      this module (which the `launcher` does on every command) stays cheap
+
+    - `modal` is a core dependency of the package so importing it here would
+      be safe otherwise
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ import logging
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .exceptions import ModalError
@@ -74,7 +78,7 @@ def managed_tags(version: str) -> dict[str, str]:
 
 def ensure_authenticated() -> None:
     """
-    Ensures Modal API credentials are present in the environment
+    Ensures that the `Modal` API credentials are present in the environment
 
     Raises:
         ModalError: If either `MODAL_TOKEN_ID` or `MODAL_TOKEN_SECRET` is unset
@@ -88,12 +92,15 @@ def ensure_authenticated() -> None:
 
 def deployed_tags(name: str) -> dict[str, str] | None:
     """
-    Returns the tags of a deployed Modal app, or `None` when it is not deployed
+    Returns the tags of a deployed  Modal` app, or `None` when it is not
+    deployed
 
     info: Untagged Apps
-        A deployed app whose tags cannot be read is reported as an empty
-        mapping rather than `None`, so callers can still tell it apart from an
-        app that is absent
+        - A deployed app whose tags cannot be read is reported as an empty
+          mapping rather than `None`
+
+        - This way, callers can tell a non-tagged app apart from one that
+          doesn't exist
 
     Args:
         name (str): The deployed app name
@@ -117,7 +124,7 @@ def deployed_tags(name: str) -> dict[str, str] | None:
 
 def is_deployed(name: str) -> bool:
     """
-    Reports whether a Modal app is currently deployed
+    Reports whether a `Modal` app under `name` is currently deployed
 
     Args:
         name (str): The deployed app name
@@ -128,18 +135,34 @@ def is_deployed(name: str) -> bool:
     return deployed_tags(name) is not None
 
 
-def ensure_deployed(app: modal.App, name: str, *, version: str) -> None:
+def ensure_deployed(
+    app: modal.App,
+    name: str,
+    *,
+    version: str,
+    force: bool = False,
+) -> None:
     """
-    Deploys a Modal `app` under `name` unless the current `version` is already
-    live
+    Deploys a Modal `app` under `name` unless an app of the same name
+    containing the `managed_tags(version)` is already deployed
 
     info: Idempotent + Tracked
         - Looks the app up first and returns early when a Mirumoji-managed app
           of the same version is already deployed
 
-        - Otherwise deploys in place (Modal updates an app of the same name
-          rather than creating a duplicate) and tags it for ownership, so a
-          package upgrade transparently rolls the deployed app forward
+        - If there's no app deployed under `name`, or that app doesn't have the
+          `managed_tags(__version__)` tags, the app is deployed with those tags
+          set
+
+        - Redeploys happen in place (Modal updates an app of the same `name`
+          rather than creating a duplicate), so a package upgrade transparently
+          rolls the deployed app forward
+
+    info: Force
+        - When `force=True`, the app is always redeployed
+
+        - This is needed to roll out a code or image change without a version
+          bump during development
 
     info: Blocking
         Performs network I/O, so a caller on the event loop should run it in a
@@ -149,6 +172,7 @@ def ensure_deployed(app: modal.App, name: str, *, version: str) -> None:
         app (modal.App): The locally-defined app to deploy
         name (str): The deployed app name
         version (str): The package version being deployed
+        force (bool): Redeploy even when the same version is already live
 
     Raises:
         ModalError: If credentials are missing or the deploy fails
@@ -156,7 +180,8 @@ def ensure_deployed(app: modal.App, name: str, *, version: str) -> None:
     ensure_authenticated()
     tags = deployed_tags(name)
     if (
-        tags is not None
+        not force
+        and tags is not None
         and tags.get(MANAGED_BY_KEY) == MANAGED_BY_VALUE
         and tags.get(VERSION_KEY) == version
     ):
@@ -176,11 +201,12 @@ def ensure_deployed(app: modal.App, name: str, *, version: str) -> None:
 
 def stop(name: str) -> None:
     """
-    Stops a deployed app, removing it from the workspace
+    Stops a deployed `Modal` app under `name`, removing it from the workspace
 
     info: CLI-Backed
         - Modal's Python SDK exposes no public call to stop an app, so this
-          shells out to `modal app stop` via subprocess
+          shells out to the modal's CLI `modal app stop` via a subprocess
+          call
 
         - Stopping is one-way, so a stopped app is redeployed
           rather than restarted
@@ -212,4 +238,197 @@ def stop(name: str) -> None:
     if result.returncode != 0:
         LOGGER.warning(
             f"Could Not Stop Modal App '{name}': {result.stderr.strip()}"
+        )
+
+
+def web_url(app_name: str, function_name: str) -> str | None:
+    """
+    Returns the public URL of a web function deployed to `Modal`
+
+    info: Blocking
+        Performs network I/O, so a caller on the event loop should run it in a
+        thread
+
+    Args:
+        app_name (str): The deployed app's name
+        function_name (str): The web function's name within the app
+
+    Returns:
+        The function's web URL, or `None` when the app or function is absent or
+            the URL cannot be read
+    """
+    import modal
+    from modal.exception import NotFoundError
+
+    try:
+        function = modal.Function.from_name(app_name, function_name)
+        return function.get_web_url()
+    except NotFoundError as e:
+        LOGGER.warning(
+            f"Could Not Get URL Of Web Function '{function_name}' For App "
+            f"'{app_name}' : {e}"
+        )
+        return None
+    except Exception as e:
+        LOGGER.warning(
+            f"Could Not Read Web URL Of Web Function '{function_name}' "
+            f"For '{app_name}': {e}"
+        )
+        return None
+
+
+def dashboard_url(name: str) -> str | None:
+    """
+    Returns the `Modal` dashboard URL of a deployed app
+
+    Args:
+        name (str): The deployed app name
+
+    Returns:
+        The app's dashboard URL, or `None` when it is absent or the URL cannot
+            be read
+    """
+    import modal
+    from modal.exception import NotFoundError
+
+    try:
+        app = modal.App.lookup(name, create_if_missing=False)
+        return app.get_dashboard_url()
+    except NotFoundError as e:
+        LOGGER.warning(f"Could Not Get Dashboard URL For App '{name}' : {e}")
+        return None
+    except Exception as e:
+        LOGGER.warning(f"Could Not Read Dashboard URL For App '{name}': {e}")
+        return None
+
+
+def ensure_volume(name: str) -> None:
+    """
+    Creates a named `modal.Volume` if it does not already exist
+
+    Creation is idempotent, so this is safe to call on every deploy
+
+    info: Name-Tracked
+        The `Modal` SDK exposes no tags for volumes, so a Mirumoji-managed
+        volume is tracked by its reserved name
+
+    info: Blocking
+        Performs network I/O, so a caller on the event loop should run it in a
+        thread
+
+    Args:
+        name (str): The volume name
+
+    Raises:
+        ModalError: If credentials are missing or the volume cannot be created
+    """
+    import modal
+
+    ensure_authenticated()
+    try:
+        modal.Volume.from_name(name, create_if_missing=True)
+    except Exception as e:
+        raise ModalError(f"Failed To Ensure Volume '{name}': {e}") from e
+
+
+def volume_exists(name: str) -> bool:
+    """
+    Reports whether a named `modal.Volume` exists
+
+    Args:
+        name (str): The volume name
+
+    Returns:
+        `True` when a volume of that name exists
+    """
+    import modal
+    from modal.exception import NotFoundError
+
+    try:
+        modal.Volume.from_name(name, create_if_missing=False).hydrate()
+        return True
+    except NotFoundError:
+        return False
+
+
+def delete_volume(name: str) -> None:
+    """
+    Deletes a named `modal.Volume` and everything it holds
+
+    Tolerates missing volumes
+
+    info: Destructive + One-Way
+        - Deleting a volume erases its data and cannot be undone
+
+        - The volume's app must be stopped first, since Modal refuses to delete
+          a volume that a running app still mounts
+
+    info: Blocking
+        Performs network I/O, so a caller on the event loop should run it in a
+        thread
+
+    Args:
+        name (str): The volume name to delete
+
+    Raises:
+        ModalError: If the deletion fails
+    """
+    import modal
+
+    try:
+        modal.Volume.objects.delete(name, allow_missing=True)
+    except Exception as e:
+        raise ModalError(f"Failed To Delete Volume '{name}': {e}") from e
+
+
+def download_volume(name: str, destination: Path) -> None:
+    """
+    Downloads every file in a named `modal.Volume` into a local directory
+
+    info: CLI-Backed
+        The `Modal` SDK exposes no bulk recursive download, so this shells out
+        to `modal volume get`, which downloads the whole volume tree in one
+        pass (mirroring how `stop` shells out for an app stop)
+
+    info: Overwrites
+        Passes `--force`, so re-downloading into a populated directory
+        overwrites the existing copies rather than failing
+
+    info: Blocking
+        Performs network I/O and can take a while for a large volume, so a
+        caller on the event loop should run it in a thread
+
+    Args:
+        name (str): The volume name to download
+        destination (Path): The local directory to download the volume into
+
+    Raises:
+        ModalError: If credentials are missing, the volume is absent, or the
+            download fails
+    """
+    ensure_authenticated()
+    LOGGER.info(f"Downloading Modal Volume '{name}' To '{destination}'")
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "modal",
+                "volume",
+                "get",
+                name,
+                "/",
+                str(destination),
+                "--force",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ModalError(f"Failed To Download Volume '{name}': {e}") from e
+    if result.returncode != 0:
+        raise ModalError(
+            f"Failed To Download Volume '{name}': {result.stderr.strip()}"
         )

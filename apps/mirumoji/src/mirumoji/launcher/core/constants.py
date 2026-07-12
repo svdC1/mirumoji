@@ -6,6 +6,7 @@ info: Deterministic Data
     - Docker Image References
     - Docker Compose Identifiers
     - Environment Variables Used By The Server
+    - Environment Variables Used By The Modal Host Option
 """
 
 from .models import Backend, EnvVar, ImageSource
@@ -223,6 +224,55 @@ sensible defaults and don't require custom values in most cases
 """
 
 
+MODAL_HOST_VARS: tuple[EnvVar, ...] = (
+    EnvVar(
+        "MIRUMOJI_WEB_PASSWORD",
+        secret=True,
+        description=(
+            "Login Password For The Modal-Hosted App (Generated On First "
+            "Deploy When Unset)"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_HOST_MAX_CONCURRENT_REQUESTS",
+        default="100",
+        description=(
+            "How Many Requests The Modal-Hosted App Container Serves At Once"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_HOST_CPU",
+        default="2",
+        description=(
+            "CPU Cores Reserved For The Always-Warm Modal-Hosted Web "
+            "Container (Higher Is Faster But Costs More)"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_HOST_MEMORY",
+        default="4096",
+        description=(
+            "Memory In MiB Reserved For The Always-Warm Modal-Hosted Web "
+            "Container (Higher Avoids Restarts But Costs More)"
+        ),
+    ),
+)
+"""
+Environment variables specific to the Modal-hosted deploy
+
+The login username is always `mirumoji`, only the password is configurable
+
+info: GPU Tasks In Modal-Hosted App
+    - The app deployed by `mirumoji modal deploy` uses the same
+      offload worker (a second, GPU-enabled modal app) that the
+      server's `modal` transcription backend uses
+
+    - This means that all of the Modal-related environment variables
+      in `MODAL_VARS` and `ADVANCED_VARS` also apply to the modal-hosted
+      deploy app
+"""
+
+
 # Set Automatically By The Launcher (Not User-Supplied)
 HOST_LAN_IP_VAR = "HOST_LAN_IP"
 """
@@ -248,10 +298,15 @@ ignores it
 
 # --- Managed Config Surface ---
 
-CONFIG_ENV_VARS: tuple[EnvVar, ...] = (*LLM_VARS, *MODAL_VARS, *ADVANCED_VARS)
+CONFIG_ENV_VARS: tuple[EnvVar, ...] = (
+    *LLM_VARS,
+    *MODAL_VARS,
+    *ADVANCED_VARS,
+    *MODAL_HOST_VARS,
+)
 """
 Every user-facing environment variable that the launcher manages in the config
-file (LLM Providers + Modal + Advanced Overrides)
+file (LLM Providers + Modal + Advanced Overrides + Hosted Deploy)
 """
 
 # Deployment keys are also env vars and are managed by the launcher,
