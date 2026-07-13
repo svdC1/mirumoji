@@ -35,8 +35,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -46,6 +49,48 @@ if TYPE_CHECKING:
     import modal
 
 LOGGER = logging.getLogger(__name__)
+
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+"""
+Suppresses the transient console window a console-less GUI process would
+otherwise flash when spawning the `modal` CLI on Windows (a no-op elsewhere),
+matching `launcher.core.process`
+"""
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+"""
+Matches the ANSI colour escape codes the `modal` CLI writes to its output
+"""
+
+_BOX_DRAWING = "".join(chr(code) for code in range(0x2500, 0x2580))
+"""
+Every character in Unicode's Box Drawing block, so the borders `Rich` frames
+the `modal` CLI's error panels with can be stripped whatever style it uses
+"""
+
+
+def _clean_subprocess_error(stderr: str) -> str:
+    """
+    Distils the `modal` CLI's noisy error output down to one readable line
+
+    The `modal` CLI frames errors with `Rich`, so its stderr carries ANSI
+    colour codes and box-drawing borders. This strips both and returns the last
+    line that still has content, which is where the CLI puts the actual error
+
+    Args:
+        stderr (str): The captured subprocess stderr
+
+    Returns:
+        The concise error line, or a generic fallback when none is found
+    """
+    plain = _ANSI_RE.sub("", stderr)
+    content = []
+    for line in plain.splitlines():
+        stripped = line.strip(_BOX_DRAWING + " ")
+        if stripped:
+            content.append(stripped)
+    return content[-1] if content else "Unknown Error"
+
 
 MANAGED_BY_KEY = "managed-by"
 """
@@ -90,6 +135,55 @@ def ensure_authenticated() -> None:
         )
 
 
+_CREDENTIAL_KEYS = ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+"""
+The environment variables the `Modal` SDK and CLI authenticate from
+"""
+
+
+@contextmanager
+def modal_credentials(env: dict[str, str]) -> Iterator[None]:
+    """
+    Exports the Modal credentials for the duration of a block, restoring the
+    previous process environment on exit
+
+    info: Credentials Only
+        - The `Modal` SDK and the `modal` CLI subprocesses (`stop`, volume
+          download) authenticate from `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`
+          in the environment, so only those are exported
+
+        - The rest of the managed config reaches a deploy through the
+          container's inline `Secret`, not the local process, so it never
+          needs to touch `os.environ`
+
+    info: Restored On Exit
+        - A long-running process (the GUI) would otherwise accumulate config in
+          `os.environ`, which `envfile.overlay_environ` then leaks back into a
+          later config resolution, so a value cleared in the UI could still
+          reach the next deploy
+
+        - Restoring keeps the environment clean between commands
+
+    Args:
+        env (dict[str, str]): The resolved managed configuration values
+
+    Yields:
+        None, with the credentials exported for the duration of the block
+    """
+    saved = {key: os.environ.get(key) for key in _CREDENTIAL_KEYS}
+    for key in _CREDENTIAL_KEYS:
+        if env.get(key):
+            os.environ[key] = env[key]
+    try:
+        yield
+    finally:
+        for key, previous in saved.items():
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
+
+
 def deployed_tags(name: str) -> dict[str, str] | None:
     """
     Returns the tags of a deployed  Modal` app, or `None` when it is not
@@ -108,6 +202,9 @@ def deployed_tags(name: str) -> dict[str, str] | None:
     Returns:
         The app's tag mapping, `{}` when it has none readable, or `None` when
             no app of that name is deployed
+
+    Raises:
+        ModalError: If the workspace cannot be reached to look the app up
     """
     import modal
     from modal.exception import NotFoundError
@@ -116,23 +213,12 @@ def deployed_tags(name: str) -> dict[str, str] | None:
         app = modal.App.lookup(name, create_if_missing=False)
     except NotFoundError:
         return None
+    except Exception as e:
+        raise ModalError(f"Could Not Look Up Modal App '{name}': {e}") from e
     try:
         return app.get_tags()
     except Exception:
         return {}
-
-
-def is_deployed(name: str) -> bool:
-    """
-    Reports whether a `Modal` app under `name` is currently deployed
-
-    Args:
-        name (str): The deployed app name
-
-    Returns:
-        `True` if an app with that name is deployed
-    """
-    return deployed_tags(name) is not None
 
 
 def ensure_deployed(
@@ -199,7 +285,7 @@ def ensure_deployed(
     LOGGER.info(f"Deployed Modal App '{name}'")
 
 
-def stop(name: str) -> None:
+def stop(name: str) -> str | None:
     """
     Stops a deployed `Modal` app under `name`, removing it from the workspace
 
@@ -212,8 +298,10 @@ def stop(name: str) -> None:
           rather than restarted
 
     info: Best Effort
-        Tolerates a missing app and a failed stop, so it never blocks a caller
-        such as server shutdown
+        - Never raises, so a server caller (shutdown) can ignore the return
+
+        - The failure reason is both logged and returned, so a CLI / GUI caller
+          can surface it to the user instead of reporting a false success
 
     info: Blocking
         Performs network I/O, so a caller on the event loop should run it in a
@@ -221,6 +309,9 @@ def stop(name: str) -> None:
 
     Args:
         name (str): The deployed app name to stop
+
+    Returns:
+        A short error message when the stop failed, or `None` on success
     """
 
     LOGGER.info(f"Stopping Modal App '{name}'")
@@ -229,16 +320,22 @@ def stop(name: str) -> None:
             [sys.executable, "-m", "modal", "app", "stop", name, "-y"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
             check=False,
+            creationflags=_NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError) as e:
-        LOGGER.warning(f"Could Not Stop Modal App '{name}': {e}")
-        return
+        message = f"Could Not Stop Modal App '{name}': {e}"
+        LOGGER.warning(message)
+        return message
     if result.returncode != 0:
-        LOGGER.warning(
-            f"Could Not Stop Modal App '{name}': {result.stderr.strip()}"
-        )
+        detail = _clean_subprocess_error(result.stderr)
+        message = f"Could Not Stop Modal App '{name}': {detail}"
+        LOGGER.warning(message)
+        return message
+    return None
 
 
 def web_url(app_name: str, function_name: str) -> str | None:
@@ -340,6 +437,9 @@ def volume_exists(name: str) -> bool:
 
     Returns:
         `True` when a volume of that name exists
+
+    Raises:
+        ModalError: If the workspace cannot be reached to check the volume
     """
     import modal
     from modal.exception import NotFoundError
@@ -349,6 +449,8 @@ def volume_exists(name: str) -> bool:
         return True
     except NotFoundError:
         return False
+    except Exception as e:
+        raise ModalError(f"Could Not Check Volume '{name}': {e}") from e
 
 
 def delete_volume(name: str) -> None:
@@ -407,6 +509,13 @@ def download_volume(name: str, destination: Path) -> None:
             download fails
     """
     ensure_authenticated()
+    # Guard the common case with a clean message instead of the modal CLI's
+    # noisy "volume not found" stderr
+    if not volume_exists(name):
+        raise ModalError(
+            f"The Data Volume '{name}' Does Not Exist. Deploy The Host App "
+            "First To Create It"
+        )
     LOGGER.info(f"Downloading Modal Volume '{name}' To '{destination}'")
     try:
         destination.mkdir(parents=True, exist_ok=True)
@@ -424,11 +533,13 @@ def download_volume(name: str, destination: Path) -> None:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
+            creationflags=_NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError) as e:
         raise ModalError(f"Failed To Download Volume '{name}': {e}") from e
     if result.returncode != 0:
-        raise ModalError(
-            f"Failed To Download Volume '{name}': {result.stderr.strip()}"
-        )
+        detail = _clean_subprocess_error(result.stderr)
+        raise ModalError(f"Failed To Download Volume '{name}': {detail}")

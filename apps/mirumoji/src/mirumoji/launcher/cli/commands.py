@@ -629,7 +629,7 @@ def config_show(
             "--json",
             help=(
                 "Print Output As A JSON String (Always Shows Secret Values "
-                "Unsmasked)"
+                "Unmasked)"
             ),
         ),
     ] = False,
@@ -1046,9 +1046,6 @@ def modal_deploy(
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # Expose The Resolved Managed Config To The Modal SDK For This Process
-    os.environ.update(env)
-
     # The Host Runs As A Modal-Backend Server So That Transcription Offloads
     # To The GPU Worker Rather Than Needing A GPU On At All Times
     env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
@@ -1062,22 +1059,22 @@ def modal_deploy(
         if var.default
     }
 
-    # Deploy
-    try:
-        with console.status(
-            "[muted]Deploying The Host App[/]",
-            spinner="dots",
-            spinner_style="accent",
-        ):
-            modal_host.ensure_host_deployed(env, host_config, force=force)
-    except ModalError as exc:
-        raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc
+    # The Modal Credentials Are Exported Only For The Deploy Calls, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        try:
+            with console.status(
+                "[muted]Deploying The Host App[/]",
+                spinner="dots",
+                spinner_style="accent",
+            ):
+                modal_host.ensure_host_deployed(env, host_config, force=force)
+        except ModalError as exc:
+            raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc
 
-    # Get The Live App URL From Modal
-    url = modal_lifecycle.web_url(HOST_APP_NAME, WEB_FUNCTION_NAME)
-
-    # Get The Live App Modal Dashboard URL
-    dashboard = modal_lifecycle.dashboard_url(HOST_APP_NAME)
+        # Get The Live App URL + Modal Dashboard URL
+        url = modal_lifecycle.web_url(HOST_APP_NAME, WEB_FUNCTION_NAME)
+        dashboard = modal_lifecycle.dashboard_url(HOST_APP_NAME)
 
     table = Table(
         title="✓ Mirumoji Is Hosted",
@@ -1117,26 +1114,33 @@ def modal_status() -> None:
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # Expose The Resolved Managed Config To The Modal SDK For This Process
-    os.environ.update(env)
+    # The Modal Credentials Are Exported Only For The Status Calls, Then The
+    # Process Environment Is Restored
+    try:
+        with modal_lifecycle.modal_credentials(env):
+            # Verify App Is Deployed
+            is_deployed = False
+            deployed_version = "Unknown"
+            tags = modal_lifecycle.deployed_tags(HOST_APP_NAME)
+            if tags is not None:
+                is_deployed = True
+                deployed_version = tags.get(
+                    modal_lifecycle.VERSION_KEY, "Unknown"
+                )
 
-    # Verify App Is Deployed
-    is_deployed = False
-    deployed_version = "Unknown"
-    tags = modal_lifecycle.deployed_tags(HOST_APP_NAME)
-    if tags is not None:
-        is_deployed = True
-        deployed_version = tags.get(modal_lifecycle.VERSION_KEY, "Unknown")
+            # Verify Volume Exists
+            volume_exists = modal_lifecycle.volume_exists(DATA_VOLUME_NAME)
 
-    # Verify Volume Exists
-    volume_exists = modal_lifecycle.volume_exists(DATA_VOLUME_NAME)
-
-    # Get Live App URL + Dashboard URL If App Is Deployed
-    live_url = None
-    dashboard_url = None
-    if is_deployed:
-        live_url = modal_lifecycle.web_url(HOST_APP_NAME, WEB_FUNCTION_NAME)
-        dashboard_url = modal_lifecycle.dashboard_url(HOST_APP_NAME)
+            # Get Live App URL + Dashboard URL If App Is Deployed
+            live_url = None
+            dashboard_url = None
+            if is_deployed:
+                live_url = modal_lifecycle.web_url(
+                    HOST_APP_NAME, WEB_FUNCTION_NAME
+                )
+                dashboard_url = modal_lifecycle.dashboard_url(HOST_APP_NAME)
+    except ModalError as exc:
+        raise fail(f"Could Not Query The Deployment  ↦  {exc}") from exc
 
     # Print Result
     table = Table(
@@ -1209,9 +1213,6 @@ def modal_down(
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # Expose The Resolved Managed Config To The Modal SDK For This Process
-    os.environ.update(env)
-
     if volume and not yes:
         confirmed = typer.confirm(
             "This Will Permanently Delete The Hosted Profiles, Media, And "
@@ -1222,26 +1223,31 @@ def modal_down(
             console.print("Aborted", style="muted")
             raise typer.Exit(code=0)
 
-    with console.status(
-        "[muted]Stopping The Host App[/]",
-        spinner="dots",
-        spinner_style="accent",
-    ):
-        modal_lifecycle.stop(HOST_APP_NAME)
+    # The Modal Credentials Are Exported Only For The Teardown Calls, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        with console.status(
+            "[muted]Stopping The Host App[/]",
+            spinner="dots",
+            spinner_style="accent",
+        ):
+            stop_error = modal_lifecycle.stop(HOST_APP_NAME)
+        if stop_error:
+            raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
         console.print("✓ Stopped The Host App", style="success")
 
-    if volume:
-        try:
-            with console.status(
-                "[muted]Deleting The Data Volume[/]",
-                spinner="dots",
-                spinner_style="accent",
-            ):
-                modal_lifecycle.delete_volume(DATA_VOLUME_NAME)
-                console.print("✓ Deleted The Data Volume", style="success")
+        if volume:
+            try:
+                with console.status(
+                    "[muted]Deleting The Data Volume[/]",
+                    spinner="dots",
+                    spinner_style="accent",
+                ):
+                    modal_lifecycle.delete_volume(DATA_VOLUME_NAME)
+                    console.print("✓ Deleted The Data Volume", style="success")
 
-        except ModalError as exc:
-            raise fail(f"Failed To Delete Volume  ↦  {exc}") from exc
+            except ModalError as exc:
+                raise fail(f"Failed To Delete Volume  ↦  {exc}") from exc
 
 
 def modal_download_data(
@@ -1266,18 +1272,18 @@ def modal_download_data(
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # Expose The Resolved Managed Config To The Modal SDK For This Process
-    os.environ.update(env)
-
-    try:
-        with console.status(
-            "[muted]Downloading The Data Volume[/]",
-            spinner="dots",
-            spinner_style="accent",
-        ):
-            modal_lifecycle.download_volume(DATA_VOLUME_NAME, destination)
-    except ModalError as exc:
-        raise fail(f"Failed To Download The Data  ↦  {exc}") from exc
+    # The Modal Credentials Are Exported Only For The Download Call, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        try:
+            with console.status(
+                "[muted]Downloading The Data Volume[/]",
+                spinner="dots",
+                spinner_style="accent",
+            ):
+                modal_lifecycle.download_volume(DATA_VOLUME_NAME, destination)
+        except ModalError as exc:
+            raise fail(f"Failed To Download The Data  ↦  {exc}") from exc
 
     console.print(
         f"✓ Downloaded The Data Volume To '{destination}'",
