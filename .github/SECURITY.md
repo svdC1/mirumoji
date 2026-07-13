@@ -8,8 +8,8 @@ Security fixes are applied to the latest `3.x` release line
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| `3.3.x`  | :white_check_mark: |
-| `< 3.3.0`  | :x:                |
+| `3.4.x`  | :white_check_mark: |
+| `< 3.4.0`  | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -38,5 +38,5 @@ Please include:
 Mirumoji is self-hosted and runs on the user's own machine. The server's CORS
 policy is intentionally open for local use. Take care before exposing an
 instance to an untrusted network. See
-[`Sharing Outside Your Local Network`](https://svdc1.github.io/mirumoji/docs/Sharing-Outside-Local-Network)
+[`Sharing Outside Your Network`](https://svdc1.github.io/mirumoji/docs/guides/sharing/)
 in the documentation.

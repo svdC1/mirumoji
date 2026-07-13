@@ -19,6 +19,84 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.4.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.4.0) - 2026-07-13
+
+This release adds a one-command private full-host deploy to `Modal`, reworks the Modal GPU offload
+into a warm, reusable worker that skips the per-job cold start, warms the tokenizer and dictionary at
+startup, and takes the frontend edge-to-edge on notched phones. As a `v3.x` release *(see the
+`v0.1.0` note above)* it includes two breaking changes, listed first
+
+### Breaking Changes
+
+- `REST API` &rarr; The Kanji dictionary endpoints now carry the Kanji as a query parameter instead
+  of a path segment *(`/dict/kanji/{literal}` &rarr; `/dict/kanji?literal=...`, and likewise for
+  `/strokes`, `/audio`, and `/audio/clip`)*. A Kanji literal is always non-ASCII, and a Modal-hosted
+  deploy rejects any request whose URL path holds non-ASCII bytes, so the glyph is kept out of the
+  path. Clients of these endpoints need to adopt the query-parameter form
+
+- `Launcher` &rarr; The local data folder *(managed config, logs, cached builds, and any non-Docker
+  data)* is no longer keyed by the app version. Earlier versions stored it under a per-version
+  subfolder, so every upgrade silently started from an empty folder and orphaned the previous
+  install's data, despite the compose comment promising data survived version bumps. From `3.4.0` the
+  folder is unversioned, so future upgrades keep your data, but the one-time move to `3.4.0` does not
+  read a pre-`3.4.0` versioned folder. Re-enter your keys, or import the old file with
+  `mirumoji config import <path>`. The old data is left in place, not deleted, and Docker data volumes
+  are unaffected
+
+### Added
+
+- `Launcher` &rarr; `mirumoji modal deploy` hosts the `entire` app *(the FastAPI server and the built
+  React frontend)* privately on your own [`Modal`](https://modal.com) account, with no local Docker.
+  It runs as a single always-warm CPU container gated by a browser login *(`HTTP Basic Auth`)*, keeps
+  its database and media in a persistent Modal volume, and offloads GPU transcription to the same
+  worker the local `modal` backend uses. `modal status`, `modal down`, and `modal download-data`
+  inspect, tear down, and back it up. The deploy image is composed from the published backend and
+  frontend images, so no new artifact ships. See the new [`Modal Host Setup`](../setup/modal-host.md)
+  guide
+
+- `Launcher` &rarr; `mirumoji config show` gained `--raw` *(reveal masked secret values, for reading a
+  generated web password)* and `--json` *(export the config)*
+
+### Changed
+
+- `Server` &rarr; The Modal GPU offload now runs a single deployed, warm worker that loads the
+  multi-GB Whisper model once per container and stays warm for the scaledown window, instead of
+  spinning up an ephemeral app per job that reloaded the model every time. Back-to-back jobs skip the
+  cold start, while the worker still scales to zero when idle, so an idle GPU never costs you. The
+  server auto-deploys it on first use *(tracked by ownership tags so it is never duplicated and rolls
+  forward on upgrade)* and stops it on shutdown
+
+- `Server` &rarr; The Japanese tokenizer *(`fugashi` / `UniDic`)* and the dictionary *(`kotobase`)*
+  are warmed during startup, so the first tokenization and lookup are fast instead of paying a
+  one-time cold load. Each warm-up runs in a thread and only warns on failure, so a broken language
+  dependency degrades only its own endpoints while transcription and file management keep working
+
+- `Frontend` &rarr; The app goes edge-to-edge on notched phones *(filling the letterbox bars via
+  `viewport-fit=cover`)* while respecting safe-area insets across both headers, the drawer, the hover
+  rail, the floating button, the player toolbar, and the task tray. Every inset resolves to zero on a
+  non-notched display, so desktop and portrait layouts are unchanged
+
+### Fixed
+
+- `Server` &rarr; The `/health/system` probe runs off the event loop. It shells out to `nvidia-smi`
+  *(up to a 5s timeout)*, which previously blocked every other request while it waited
+
+- `Frontend` &rarr; The player adapts to a phone held in landscape, reusing the desktop side-by-side
+  subtitle rail instead of stacking the panel below the video and splitting the short height in half.
+  The subtitle-style popover is also bounded to the viewport with an internal scroll so it no longer
+  runs off a short landscape screen
+
+- `Server` + `Frontend` &rarr; Non-ASCII characters are kept out of URL paths and profile ids. The
+  frontend gates profile names to ASCII and the server rejects a non-ASCII `X-Profile-ID` header with
+  a `400`, so a profile named with Japanese or other Unicode text no longer produces invalid URLs or
+  ids *(which also lets the whole app run on a Modal-hosted deploy)*
+
+- `Launcher` &rarr; `mirumoji reset` prunes the `mirumoji` folder in every `platformdirs` root *(the
+  cache, config, state, and log locations)*, so a reset cleans up uniformly on Linux, macOS, and
+  Windows and leaves nothing orphaned
+
+---
+
 ## [`3.3.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.3.0) - 2026-07-08
 
 This release organizes profile files, lets a word breakdown pull in the surrounding subtitle
