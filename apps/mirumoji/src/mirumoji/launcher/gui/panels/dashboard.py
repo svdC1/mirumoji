@@ -174,8 +174,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         begin("Starting Mirumoji", up_btn)
 
         def up_done(ip: str) -> None:
-            terminal.append_log("Local  ↦  https://localhost")
-            terminal.append_log(f"LAN    ↦  https://{ip}")
+            terminal.append_link("Local", "https://localhost")
+            terminal.append_link("LAN", f"https://{ip}")
             terminal.append_log(
                 f"Trust Other Devices ↦ Install "
                 f"http://{ip}/mirumoji-ca.crt Once Per Device "

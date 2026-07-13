@@ -605,6 +605,21 @@ class TerminalSurface(ft.Container):
         row = ft.Text(spans=spans, size=13, font_family=MONO, selectable=True)
         if layer_id is not None:
             self._layer_rows[layer_id] = row
+        self._push(row, text)
+
+    def _push(self, row: ft.Text, text: str) -> None:
+        """
+        Appends a prepared row and its raw text, culling the oldest block when
+        the buffer overshoots its cap
+
+        Keeps `_lines` parallel to `list_view.controls` (so the whole buffer
+        can be copied) and drops any collapsed layer rows that fall out of the
+        window
+
+        Args:
+            row (ft.Text): The prepared row control to append
+            text (str): The row's raw text, for the copy buffer
+        """
         self.list_view.controls.append(row)
         self._lines.append(text)
 
@@ -617,10 +632,34 @@ class TerminalSurface(ft.Container):
             del self.list_view.controls[:_CULL_BATCH]
             del self._lines[:_CULL_BATCH]
             self._layer_rows = {
-                lid: row
-                for lid, row in self._layer_rows.items()
-                if id(row) not in culled
+                lid: layer_row
+                for lid, layer_row in self._layer_rows.items()
+                if id(layer_row) not in culled
             }
+
+    def append_link(self, label: str, url: str) -> None:
+        """
+        Appends a log line whose URL is a clickable link
+
+        Renders inline like `append_log` (dimmed `label  ↦  url`), but the URL
+        opens in the system browser on click via `ft.TextSpan`'s native URL
+        handling, so a URL shown in the output is a real link rather than raw
+        text. Shares `append_log`'s buffer + culling through `_push`
+
+        Args:
+            label (str): The dimmed label shown before the URL
+            url (str): The URL to show and open
+        """
+        spans = [
+            ft.TextSpan(f"{label}  ↦  ", ft.TextStyle(color=INK_FAINT)),
+            ft.TextSpan(
+                url,
+                ft.TextStyle(color=AI, decoration=ft.TextDecoration.UNDERLINE),
+                url=url,
+            ),
+        ]
+        row = ft.Text(spans=spans, size=13, font_family=MONO, selectable=True)
+        self._push(row, f"{label}  ↦  {url}")
 
     def clear(self) -> None:
         """
