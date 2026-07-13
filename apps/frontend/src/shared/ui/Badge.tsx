@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Small inline status and label pill.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 

@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Form field primitives (Input, Select, Label, and Field).
+ */
+
 import React from "react";
 import { cn } from "./cn";
 import { controlClasses } from "./control";

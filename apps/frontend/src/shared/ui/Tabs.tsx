@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Tabbed control that collapses to a menu on mobile.
+ */
+
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "./cn";

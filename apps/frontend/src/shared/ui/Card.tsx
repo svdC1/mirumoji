@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Padded surface container.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 

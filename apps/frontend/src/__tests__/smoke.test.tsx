@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Smoke test — verifies the Vitest + jsdom harness is wired correctly.
  * Does NOT render the full app (that requires a running backend).
  * Real component tests will be added in 3.x.

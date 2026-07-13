@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Hover and press tooltips (Tooltip and InfoTip) rendered in a portal.
+ */
+
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "./cn";

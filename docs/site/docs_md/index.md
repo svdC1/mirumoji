@@ -100,7 +100,7 @@ manages the docker compose application for you</figcaption>
     Two capabilities are `optional` and entirely under your control. Everything else (your media, profiles, clips, and database) stays in your machine
 
     - `Transcription Backend` &rarr; Run [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) on your  local NVIDIA GPU or offload it to [`Modal`](https://modal.com) Cloud GPUs (CPU-Only Setup). See [`Using a GPU`](guides/gpu.md)
-    
+
     - `LLM`  &rarr; Provide an `OpenAI`, `Anthropic`, `Gemini`, or `Custom
       OpenAI-Compatible` key to unlock AI sentence breakdowns + subtitle refinement. Without a key, those
       features are hidden
@@ -126,8 +126,9 @@ manages the docker compose application for you</figcaption>
     Run The Docker Compose Commands Yourself, No Launcher
     *(More Configuration)*
 
-- :material-book-open-variant: **[CLI Reference](cli.md)**
+- :material-cloud-outline: **[Modal Host Setup](setup/modal-host.md)**
 
-    Every `mirumoji` Command Explained
+    Deploy The Whole App Privately To Your `Modal` Account
+    *(Access From Anywhere, No Local Docker)*
 
 </div>

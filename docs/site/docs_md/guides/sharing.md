@@ -19,9 +19,12 @@ This guide covers making it available on external networks so that you can acces
 
 - For a personal immersion tool, a `private overlay network` is both simpler and far safer
 
-| Approach | Best for | Exposure |
+- `Tailscale` and `Cloudflare Tunnel` expose the instance running `on your machine`. The [`Modal Host`](#modal-host-private-full-deploy) is different &rarr; it runs a separate private copy of Mirumoji `in the cloud`, so your machine doesn't have to stay on at all
+
+| Approach | Best For | Exposure |
 | --- | --- | --- |
 | [`Tailscale`](#tailscale-private-access) *(recommended)* | Just You + Your Own Devices | `None` &rarr; Private Encrypted Network, No Open Ports |
+| [`Modal Host`](#modal-host-private-full-deploy) | Access From Anywhere Without Keeping A Machine On | A Private Cloud Deploy, Gated By A Login |
 | [`Cloudflare Tunnel`](#cloudflare-tunnel-public-sharing) | Sharing With Other People | Public Hostname, Gated By Identity-Based Access |
 
 ---
@@ -79,6 +82,36 @@ It's `free` for personal use and runs on every platform
     - You can then reach Mirumoji at `https://<machine-name>.<tailnet>.ts.net` with a trusted certificate
 
     - Flags vary slightly by Tailscale version. See the [`Tailscale Serve Docs`](https://tailscale.com/kb/1242/tailscale-serve)
+
+---
+
+## Modal Host (Private Full Deploy)
+
+Instead of exposing the instance on your machine, [`mirumoji modal deploy`](../setup/modal-host.md) runs a `separate`, private copy of the whole app on your own [`Modal`](https://modal.com) account. Your machine does not have to stay on, and there is nothing to tunnel
+
+See the [`Modal Host Setup Guide`](../setup/modal-host.md) for the full walkthrough. This section covers `only` how its access model compares to the options here
+
+The deployed app is gated by `HTTP Basic Auth` *(a browser login prompt)*, the same mechanism that this guide cautions against for `Zrok`. That caution still holds for a public tunnel, but the Modal host is a bit more reliable
+
+???+ question "Why Basic Auth Is Used Here"
+    The main reason is that it's the only way to gate a mirumoji instance running in the cloud without   implementing auth tooling (login page, cookies / session store) to an application that was mainly
+    built to run as a *self-hosted* tool
+
+???+ info "How It Works"
+    - A `401` response with a `WWW-Authenticate: Basic` header makes the browser show its own login prompt
+
+    - Once you log in, the browser attaches the credentials to `every` later request automatically *(the page, the assets, the API, and the uploads)*
+
+    - So one gate covers the whole app with no login page, cookie, or session store, which is why the server and frontend need no changes
+
+??? question "Why It's More Reliable"
+    - `mirumoji modal deploy` can automatically generate a strong password for you *(`--generate-password`)*, which removes that specific footgun
+
+    - `Credentials Are Always Encrypted` &rarr; Modal serves everything over HTTPS with a real, publicly trusted certificate, so the login is never sent in the clear *(the `Zrok` caution was about a shared password being the only gate on a public URL)*
+
+
+!!! tip "Identity-Based Access Instead"
+    If you would rather log in with `Google` / `GitHub` / `Email Codes`, the same upgrade applies as with a tunnel &rarr; Put [`Cloudflare Access`](#cloudflare-tunnel-public-sharing) in front of the Modal URL. For non-browser clients, Modal's own proxy tokens are also an option
 
 ---
 

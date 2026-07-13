@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Button primitive with variants, sizes, and a loading state.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 import { Spinner } from "./Spinner";

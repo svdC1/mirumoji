@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Tailwind preset that surfaces the "Sumi & Shu" design tokens
  * (see tokens.css) as named utilities, e.g. `bg-bg`, `text-ink-muted`,
  * `border-ink/10`, `bg-shu/20`, `font-display`, `rounded-card`.

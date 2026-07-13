@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Dismissible floating panel anchored to a trigger.
+ */
+
 import React, { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "./cn";

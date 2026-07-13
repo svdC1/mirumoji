@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Minimal loading indicator.
+ */
+
 import { cn } from "./cn";
 
 /**

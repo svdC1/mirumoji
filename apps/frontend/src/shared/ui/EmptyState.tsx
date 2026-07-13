@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Placeholder shown when there is no content.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 

@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Modal overlay rendered in a portal.
+ */
+
 import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";

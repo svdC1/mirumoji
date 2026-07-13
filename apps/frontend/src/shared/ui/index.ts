@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Exposes the Mirumoji UI primitives ("Sumi & Shu" design system).
  */
 export { cn } from "./cn";

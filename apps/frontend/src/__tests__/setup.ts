@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Global Vitest + jsdom test setup that stubs the browser APIs jsdom lacks.
+ */
+
 // Global test setup for Vitest + jsdom
 import "@testing-library/jest-dom";
 
