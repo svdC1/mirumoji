@@ -41,8 +41,8 @@ jobs:
             - name: Install Frontend Dependencies
               run: cd apps/frontend && npm ci
 
-            - name: Build Frontend For GitHub Pages
-              run: cd apps/frontend && npm run build -- --base=/${{ github.event.repository.name }}/
+            - name: Build Frontend For GitHub Pages (backend-free demo)
+              run: cd apps/frontend && npm run build:demo -- --base=/${{ github.event.repository.name }}/
 
             - name: Copy 404.html To dist
               run: cp apps/frontend/404.html apps/frontend/dist/404.html

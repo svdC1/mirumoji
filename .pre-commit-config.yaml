@@ -1,3 +1,9 @@
+# The demo commits machine-generated fixtures and a sample video under
+# src/demo/generated. It is committed output (already prettier-ignored), so
+# every hygiene hook skips it. The assets also exceed the large-file limit
+# on purpose, and the generator writes JSON without a trailing newline
+exclude: ^apps/frontend/src/demo/generated/
+
 repos:
     # --- General File Hygiene ---
     - repo: https://github.com/pre-commit/pre-commit-hooks

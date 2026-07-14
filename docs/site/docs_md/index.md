@@ -8,7 +8,7 @@ subtitle generation, clip saving, and Anki export. All running locally in Docker
 with optional cloud GPU and LLM features
 
 [Get Started](setup/index.md){ .md-button .md-button--primary }
-[Try the Live Preview](https://svdc1.github.io/mirumoji){ .md-button .md-button--primary }
+[Try the Demo](https://svdc1.github.io/mirumoji){ .md-button .md-button--primary }
 
 
 ---

@@ -19,7 +19,7 @@ starting from **`v3.0.0`**
 
 ---
 
-## [`3.4.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.4.0) - 2026-07-13
+## [`3.4.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.4.0) - 2026-07-14
 
 This release adds a one-command private full-host deploy to `Modal`, reworks the Modal GPU offload
 into a warm, reusable worker that skips the per-job cold start, warms the tokenizer and dictionary at
@@ -56,6 +56,12 @@ startup, and takes the frontend edge-to-edge on notched phones. As a `v3.x` rele
 
 - `Launcher` &rarr; `mirumoji config show` gained `--raw` *(reveal masked secret values, for reading a
   generated web password)* and `--json` *(export the config)*
+
+- `Frontend` &rarr; A backend-free `live demo` now runs at the docs site root. A build-time
+  `--mode demo` swaps the network layer for committed fixtures captured from a real session, so a
+  pre-loaded sample episode *(the player, tokenized subtitles, and word breakdowns)* and a curated
+  dictionary slice work with no server. Off-rails input *(upload, free search, profile switch)* is
+  gated, and dictionary links outside the captured set are disabled
 
 ### Changed
 
