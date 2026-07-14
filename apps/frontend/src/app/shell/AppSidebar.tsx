@@ -18,7 +18,7 @@ import {
     Menu,
     X,
 } from "lucide-react";
-import { ProfileChip } from "./ProfileChip";
+import { ProfileChip } from "@/app/shell/ProfileChip";
 import { cn, IconButton } from "@/shared/ui";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 

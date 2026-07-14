@@ -43,7 +43,7 @@ import {
     JmdictEntryDisplay,
     JmnedictEntryDisplay,
     KanjiCard,
-} from "./DictDisplays";
+} from "@/shared/components/DictDisplays";
 import FuriganaText from "./FuriganaText";
 import { ExplanationSkeleton } from "./ExplanationSkeleton";
 

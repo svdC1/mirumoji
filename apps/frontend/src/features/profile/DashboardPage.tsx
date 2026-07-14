@@ -6,13 +6,13 @@
 import { useState } from "react";
 import { Tabs } from "@/shared/ui";
 import { tabs } from "./constants";
-import { ProfilePanel } from "./components/ProfilePanel";
-import { FilesPanel } from "./components/FilesPanel";
-import { TranscriptsPanel } from "./components/TranscriptsPanel";
-import { ClipsPanel } from "./components/ClipsPanel";
-import { TasksPanel } from "./components/TasksPanel";
-import { LlmTemplatePanel } from "./components/LlmTemplatePanel";
-import { AdvancedPanel } from "./components/AdvancedPanel";
+import { ProfilePanel } from "@/features/profile/components/ProfilePanel";
+import { FilesPanel } from "@/features/profile/components/FilesPanel";
+import { TranscriptsPanel } from "@/features/profile/components/TranscriptsPanel";
+import { ClipsPanel } from "@/features/profile/components/ClipsPanel";
+import { TasksPanel } from "@/features/profile/components/TasksPanel";
+import { LlmTemplatePanel } from "@/features/profile/components/LlmTemplatePanel";
+import { AdvancedPanel } from "@/features/profile/components/AdvancedPanel";
 
 /**
  * The DashboardPage component.

@@ -25,7 +25,7 @@ import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useTasks } from "@/contexts/TaskContext";
 import { useOperationSettings } from "@/contexts/OperationSettingsContext";
-import { LoadMediaPopover } from "./LoadMediaPopover";
+import { LoadMediaPopover } from "@/features/player/components/LoadMediaPopover";
 import { SubtitleStylePopover } from "./SubtitleStylePopover";
 
 /**
