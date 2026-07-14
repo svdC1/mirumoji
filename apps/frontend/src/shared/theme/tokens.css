@@ -29,6 +29,19 @@
     /* Radii */
     --radius-card: 0.625rem; /* 10px */
     --radius-control: 0.5rem; /* 8px */
+
+    /* Safe-area insets + shell dimensions. Every inset is 0 unless the device
+       is notched and viewport-fit=cover is set, so the shell dimensions below
+       stay exactly 3.5rem / (100dvh - 3.5rem) on every non-notched device. */
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+    /* Symmetric horizontal notch inset, so centered page content clears a
+       landscape notch on either side while staying centered. 0 when unnotched */
+    --safe-x: max(var(--sal), var(--sar));
+    --top-bar-h: calc(3.5rem + var(--sat));
+    --content-h: calc(100dvh - var(--top-bar-h));
 }
 
 /* Base element styling */

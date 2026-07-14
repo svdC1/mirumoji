@@ -11,6 +11,8 @@
 
     - Clicking through the browser's `connection is not private` warning is enough to `use` Mirumoji, but not enough for the browser to allow the service worker, so the app stays non-installable until the `CA` is trusted
 
+    - This step only applies to the `local` frontend Mirumoji serves over your LAN. A [`Modal Host`](../setup/modal-host.md) deploy is served over HTTPS with a publicly trusted certificate, so it installs as a PWA with no CA step at all
+
 ## Get The Certificate
 
 The `CA` certificate is served by your Mirumoji instance at
@@ -89,6 +91,8 @@ The exact URL (with your IP filled in) is printed by `mirumoji up` and shown in 
 If you would rather not install a `CA` on your devices, any setup that puts a `publicly trusted` certificate in front of Mirumoji achieves the same result
 
 - [`Tailscale Serve`](sharing.md#tailscale-private-access) &rarr; A trusted certificate via your private tailnet name, no ports opened
+
+- [`Modal Host`](../setup/modal-host.md) &rarr; A full private deploy on `Modal`, served with a publicly trusted certificate, so there is no CA to install *(and no local frontend to run at all)*
 
 - A reverse proxy you already run *(`Caddy`, `Traefik`, `Nginx Proxy Manager`)* with a real domain and a `Let's Encrypt` certificate
 

@@ -15,7 +15,7 @@ info: Modal Paths
     - When using the `modal` transcription backend, the server uploads input
       files to (and downloads processed files from) an ephemeral per-job
       volume shared between it and the `Modal` container running the job
-      (See `modal_processing.app`)
+      (See `modal_processing.worker`)
 
     - Both the server and the container pass the in-volume paths in which
       they've stored files so that the server's media handling
@@ -194,7 +194,7 @@ def get_relative_path(full_path: str | os.PathLike[str]) -> Path:
         - This is done so that the in-volume layout of `media_files` mirrors
           the `HOST_MEDIA_PATH` directory
 
-        - See `modal_processing.app` for more information on this
+        - See `modal_processing.worker` for more information on this
 
     Args:
         full_path (str | os.PathLike[str]): Absolute path inside the media

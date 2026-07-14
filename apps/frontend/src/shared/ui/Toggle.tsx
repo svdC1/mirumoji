@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Switch control.
+ */
+
 import { cn } from "./cn";
 
 export interface ToggleProps {

@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Dismissible floating panel anchored to a trigger.
+ */
+
 import React, { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "./cn";
@@ -44,9 +48,12 @@ export function Popover({ open, onClose, children, className, align = "left" }: 
                     exit={{ opacity: 0, y: -4, scale: 0.98 }}
                     transition={{ duration: 0.12 }}
                     className={cn(
-                        // `max-w` keeps the panel within the viewport on small
-                        // screens so it can never push the page horizontally.
-                        "absolute z-50 mt-2 max-w-[calc(100vw-1rem)] rounded-card border border-ink/10 bg-surface shadow-lift",
+                        // `max-w` keeps the panel within the viewport width so
+                        // it can never push the page horizontally. `max-h`
+                        // bounds it to the viewport height (minus room for the
+                        // toolbar it anchors under) and scrolls, so a tall
+                        // popover stays reachable on a short landscape screen.
+                        "absolute z-50 mt-2 max-h-[calc(100dvh-5rem)] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-card border border-ink/10 bg-surface shadow-lift",
                         align === "right" ? "right-0" : "left-0",
                         className
                     )}

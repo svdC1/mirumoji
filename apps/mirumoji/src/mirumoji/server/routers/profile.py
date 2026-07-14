@@ -432,8 +432,11 @@ async def upload_file(
     uploads_dir = media.get_profile_dir(profile_id, "uploads")
     # The client filename is kept only for display
     # The on-disk path is server-generated so a crafted name can't escape the
-    # uploads directory
-    dest = uploads_dir / f"{op_id}{Path(file_name).suffix}"
+    # uploads directory, and the extension is dropped unless it is ASCII so the
+    # media URL path never contains non-ASCII bytes (a Modal-hosted deploy
+    # rejects those)
+    suffix = Path(file_name).suffix
+    dest = uploads_dir / f"{op_id}{suffix if suffix.isascii() else ''}"
     rel = media.get_relative_path(dest)
 
     await media.save_upload_file(request, dest)

@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { RAIL_SCREEN } from "@/shared/theme/breakpoints";
 
 /**
  * Subscribes to a media query and returns whether it currently matches,
@@ -37,4 +38,14 @@ export function useMediaQuery(query: string): boolean {
  */
 export function useIsMobile(): boolean {
     return useMediaQuery("(max-width: 1023px)");
+}
+
+/**
+ * Whether the subtitle panel should render as a side rail rather than stacked:
+ * a desktop-width viewport, or a landscape phone (short height). Matches the
+ * `lg:`/`land:` rail classes so the JS-driven dock icons stay in sync with the
+ * CSS layout. See `RAIL_SCREEN` in the shared breakpoints.
+ */
+export function useIsSubtitleRail(): boolean {
+    return useMediaQuery(RAIL_SCREEN);
 }

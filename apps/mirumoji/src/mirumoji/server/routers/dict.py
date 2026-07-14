@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, status
 from fastapi.responses import Response
 
 from ..models.jpdict import (
@@ -153,9 +153,14 @@ async def analyze(
 
 # --- Kanji Study ---
 
+# The Kanji literal is a query parameter, not a path segment. A literal is
+# always non-ASCII, and a Modal-hosted deploy rejects any request whose URL
+# path holds non-ASCII bytes (its edge decodes the path as ASCII), so the glyph
+# is kept out of the path. Query strings are unaffected
 
-@dict_router.get("/kanji/{literal}", response_model=KanjiInfo)
-async def kanji(literal: Annotated[str, Path()]) -> KanjiInfo:
+
+@dict_router.get("/kanji", response_model=KanjiInfo)
+async def kanji(literal: Annotated[str, Query()]) -> KanjiInfo:
     """
     Fetches the full profile of a single Kanji
 
@@ -178,8 +183,8 @@ async def kanji(literal: Annotated[str, Path()]) -> KanjiInfo:
     return info
 
 
-@dict_router.get("/kanji/{literal}/strokes")
-async def kanji_strokes(literal: Annotated[str, Path()]) -> Response:
+@dict_router.get("/kanji/strokes")
+async def kanji_strokes(literal: Annotated[str, Query()]) -> Response:
     """
     Fetches a Kanji's stroke-order diagram as an SVG document (`KanjiVG`)
 
@@ -205,8 +210,8 @@ async def kanji_strokes(literal: Annotated[str, Path()]) -> Response:
     return Response(content=svg, media_type="image/svg+xml")
 
 
-@dict_router.get("/kanji/{literal}/audio", response_model=KanjiAudio)
-async def kanji_audio(literal: Annotated[str, Path()]) -> KanjiAudio:
+@dict_router.get("/kanji/audio", response_model=KanjiAudio)
+async def kanji_audio(literal: Annotated[str, Query()]) -> KanjiAudio:
     """
     Lists the pronunciation clips available for a Kanji (`Kanji Alive`)
 
@@ -225,9 +230,9 @@ async def kanji_audio(literal: Annotated[str, Path()]) -> KanjiAudio:
     return await asyncio.to_thread(text.get_kanji_audio, literal)
 
 
-@dict_router.get("/kanji/{literal}/audio/clip")
+@dict_router.get("/kanji/audio/clip")
 async def kanji_audio_clip(
-    literal: Annotated[str, Path()],
+    literal: Annotated[str, Query()],
     clip: Annotated[str, Query()],
 ) -> Response:
     """
@@ -258,9 +263,9 @@ async def kanji_audio_clip(
     )
 
 
-@dict_router.get("/kanji/{literal}/words", response_model=list[JMEntry])
+@dict_router.get("/kanji/words", response_model=list[JMEntry])
 async def kanji_words(
-    literal: Annotated[str, Path()],
+    literal: Annotated[str, Query()],
     limit: Annotated[int, Query(ge=1)] = 50,
 ) -> list[JMEntry]:
     """
@@ -279,9 +284,9 @@ async def kanji_words(
     return await asyncio.to_thread(text.get_words_with_kanji, literal, limit)
 
 
-@dict_router.get("/kanji/{literal}/sentences", response_model=list[Example])
+@dict_router.get("/kanji/sentences", response_model=list[Example])
 async def kanji_sentences(
-    literal: Annotated[str, Path()],
+    literal: Annotated[str, Query()],
     limit: Annotated[int, Query(ge=1)] = 10,
 ) -> list[Example]:
     """

@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Exposes the Mirumoji UI primitives ("Sumi & Shu" design system).
  */
 export { cn } from "./cn";
@@ -11,6 +12,8 @@ export { Card } from "./Card";
 export type { CardProps } from "./Card";
 export { Tabs } from "./Tabs";
 export type { TabItem, TabsProps } from "./Tabs";
+export { Segmented } from "./Segmented";
+export type { SegmentedProps, SegmentedOption } from "./Segmented";
 export { Toggle } from "./Toggle";
 export type { ToggleProps } from "./Toggle";
 export { Checkbox } from "./Checkbox";

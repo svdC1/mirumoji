@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Compact, optionally interactive tag.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 

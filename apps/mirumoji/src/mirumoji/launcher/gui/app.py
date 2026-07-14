@@ -15,7 +15,7 @@ from ...log import setup_logging
 from ...paths import _package_path
 from ..core import envfile
 from . import theme
-from .panels import dashboard, environment, logs, settings
+from .panels import dashboard, environment, logs, modal_host, settings
 from .state import AppState
 
 LOGGER = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ _DESTINATIONS = [
     (ft.Icons.FACT_CHECK_OUTLINED, "Environment"),
     (ft.Icons.SETTINGS_OUTLINED, "Settings"),
     (ft.Icons.ARTICLE_OUTLINED, "Logs"),
+    (ft.Icons.CLOUD_OUTLINED, "Modal Host"),
 ]
 
 
@@ -104,8 +105,10 @@ def _page_main(page: ft.Page) -> None:
                 panels[1] = environment.build(page, state)
             elif index == 2:
                 panels[2] = settings.build(page, state)
-            else:
+            elif index == 3:
                 panels[3] = logs.build(page, state)
+            else:
+                panels[4] = modal_host.build(page, state)
         # The Dashboard pills reflect the persisted deployment choice, which
         # Settings can change. Re-read it from the config each time it's shown
         if index == 0 and state.sync_dashboard is not None:

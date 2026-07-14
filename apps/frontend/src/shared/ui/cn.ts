@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Tiny classNames joiner — filters out falsy values and joins with spaces.
  * Avoids pulling in a dependency for the common conditional-class pattern.
  */

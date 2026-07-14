@@ -89,8 +89,8 @@ You can also setup Mirumoji [`Manually`](https://svdc1.github.io/mirumoji/docs/s
     <td>What Changed Between Versions</td>
   </tr>
   <tr>
-    <td><b><a href="https://svdc1.github.io/mirumoji/">Live Preview</a></b></td>
-    <td>Test The Frontend (No Backend Running)</td>
+    <td><b><a href="https://svdc1.github.io/mirumoji/">Demo</a></b></td>
+    <td>Test A Limited Preview</td>
   </tr>
 </table>
 

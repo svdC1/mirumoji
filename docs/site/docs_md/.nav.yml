@@ -6,6 +6,7 @@ nav:
       - CLI Setup: setup/cli.md
       - GUI Setup: setup/gui.md
       - Manual Setup: setup/manual.md
+      - Modal Host Setup: setup/modal-host.md
   - CLI Reference: cli.md
   - Guides:
       - Installing the App: guides/pwa.md

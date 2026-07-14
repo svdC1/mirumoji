@@ -6,8 +6,12 @@
 
 import { ApiError } from "./errors";
 
-/** Single source of truth for the API base (dev server proxies `/api`). */
-export const API_BASE = "/api";
+/**
+ * Single source of truth for the API base. Overridable at build time via
+ * `VITE_API_BASE` (defaults to `/api`, which the dev server proxies), for
+ * deployments that serve the API from a different path or host.
+ */
+export const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
 
 /**
  * Parses a server error body into a message + optional machine code/details,

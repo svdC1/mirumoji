@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Checkbox control.
+ */
+
 import { Check } from "lucide-react";
 import { cn } from "./cn";
 

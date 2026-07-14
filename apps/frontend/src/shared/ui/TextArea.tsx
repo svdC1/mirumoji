@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Text area with optional auto-grow.
+ */
+
 import React, { useCallback, useEffect, useRef } from "react";
 import { cn } from "./cn";
 import { controlClasses } from "./control";

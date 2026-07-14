@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Pulsing loading placeholder.
+ */
+
 import { cn } from "./cn";
 
 /**

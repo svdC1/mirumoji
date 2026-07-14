@@ -1,4 +1,5 @@
 /**
+ * @packageDocumentation
  * Shared base classes for form controls (input / select / textarea), so they
  * all share the same surface, border, focus ring, and disabled treatment.
  */

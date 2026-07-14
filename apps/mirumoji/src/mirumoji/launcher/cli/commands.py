@@ -5,8 +5,10 @@ Each CLI command uses `Typer` and `Rich` to expose the `shared` core's
 functionality in a user-friendly way
 """
 
+import json
 import logging
 import os
+import secrets
 from pathlib import Path
 from typing import Annotated
 
@@ -15,7 +17,10 @@ from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.text import Text
 
+from ... import modal as modal_lifecycle
+from ...exceptions import ModalError
 from ...paths import HOST_CONFIG_FILE
 from ..core import checks, envfile, host, lifecycle, process, repo, storage
 from ..core.compose import RESOLVED_COMPOSE_PATH, write_compose
@@ -23,6 +28,7 @@ from ..core.constants import (
     CONFIG_KEYS,
     HOST_LAN_IP_VAR,
     LLM_VARS,
+    MODAL_HOST_VARS,
     MODAL_VARS,
     TRANSCRIBE_BACKEND_VAR,
     deployment_choices,
@@ -31,11 +37,19 @@ from ..core.constants import (
 from ..core.errors import EnvConfigError, LauncherError
 from ..core.models import Backend, CheckResult, CheckStatus, ImageSource
 from ..core.status import parse_status
+from ..modal.constants import (
+    DATA_VOLUME_NAME,
+    HOST_APP_NAME,
+    WEB_FUNCTION_NAME,
+    WEB_PASSWORD_ENV,
+    WEB_USERNAME,
+)
 from ._common import (
     _validate_dependencies,
     fail,
     require_env,
     resolve_backend,
+    resolve_managed_config,
     resolve_source,
     stream_command,
     stream_logs,
@@ -174,11 +188,19 @@ def logs(
     ] = None,
     follow: Annotated[
         bool,
-        typer.Option("--follow", "-f", help="Follow New Output"),
+        typer.Option(
+            "--follow",
+            "-f",
+            help="Follow New Output",
+        ),
     ] = False,
     tail: Annotated[
         int | None,
-        typer.Option("--tail", help="Show Only The Last N Lines"),
+        typer.Option(
+            "--tail",
+            "-t",
+            help="Show Only The Last N Lines",
+        ),
     ] = None,
 ) -> None:
     """
@@ -315,7 +337,11 @@ def down(
     ] = False,
     yes: Annotated[
         bool,
-        typer.Option("--yes", "-y", help="Skip Confirmation Prompts"),
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip Confirmation Prompts",
+        ),
     ] = False,
 ) -> None:
     """
@@ -349,16 +375,25 @@ def reset(
         bool,
         typer.Option(
             "--keep-config",
+            "-kc",
             help="Preserve The Config File (Your LLM / Modal Keys)",
         ),
     ] = False,
     keep_logs: Annotated[
         bool,
-        typer.Option("--keep-logs", help="Preserve The Log Files"),
+        typer.Option(
+            "--keep-logs",
+            "-kl",
+            help="Preserve The Log Files",
+        ),
     ] = False,
     yes: Annotated[
         bool,
-        typer.Option("--yes", "-y", help="Skip Confirmation Prompts"),
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip Confirmation Prompts",
+        ),
     ] = False,
 ) -> None:
     """
@@ -552,7 +587,9 @@ def up(
 
 # Variables That Have Their Values Masked When Displaying Config
 _SECRET_NAMES = frozenset(
-    var.name for var in (*LLM_VARS, *MODAL_VARS) if var.secret
+    var.name
+    for var in (*LLM_VARS, *MODAL_VARS, *MODAL_HOST_VARS)
+    if var.secret
 )
 
 
@@ -578,9 +615,30 @@ def config_import(
     )
 
 
-def config_show() -> None:
+def config_show(
+    raw: Annotated[
+        bool,
+        typer.Option(
+            "--raw",
+            help="Show Secret Values Unmasked (Tokens, Passwords)",
+        ),
+    ] = False,
+    output_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help=(
+                "Print Output As A JSON String (Always Shows Secret Values "
+                "Unmasked)"
+            ),
+        ),
+    ] = False,
+) -> None:
     """
     Shows The Launcher's Managed Configuration, Masking Secret Values
+
+    Pass `--raw` to reveal the secret values in full, for copying a generated
+    password or auditing a key
     """
     values = envfile.read(HOST_CONFIG_FILE)
     if not values:
@@ -588,20 +646,39 @@ def config_show() -> None:
             f"No Configuration Set Yet  ↦  {HOST_CONFIG_FILE}", style="muted"
         )
         return
+
+    if output_json:
+        console.print(json.dumps(values))
+        return
+
+    caption = (
+        Text(
+            "Secret Values Are Shown, Keep This Output Private",
+            style="warning",
+        )
+        if raw
+        else None
+    )
+
     table = Table(
         title="Mirumoji Configuration",
         title_style="heading",
         border_style="info",
+        caption=caption,
+        show_lines=True,
     )
     table.add_column("Variable", style="info")
-    table.add_column("Value", style="ink")
+    table.add_column(
+        "Value",
+        style="ink",
+        overflow="fold",
+        max_width=60,
+    )
     for key, value in values.items():
-        shown = f"{value[0:3]}•••" if key in _SECRET_NAMES and value else value
+        masked = key in _SECRET_NAMES and value and not raw
+        shown = f"{value[0:3]}•••" if masked else value
         table.add_row(key, shown)
     console.print(Padding(table, (1, 0, 0, 0)))
-    console.print(
-        f"Configuration Being Stored At  ↦  {HOST_CONFIG_FILE}", style="muted"
-    )
 
 
 def config_path() -> None:
@@ -703,8 +780,7 @@ def dev_up(
     ] = True,
 ) -> None:
     """
-    Launches the Mirumoji Docker Compose Application For Development Using
-    Images Built With `dev build`
+    Launches the Mirumoji Docker Compose Application For Development
 
     Builds the `Mirumoji` images locally from a mirumoji repo clone at an
     arbitrary path without updating it
@@ -833,4 +909,383 @@ def dev_server(
         port=port,
         reload=reload,
         factory=True,
+    )
+
+
+# --- Modal Host Sub-App ---
+
+
+def modal_deploy(
+    gen_password: Annotated[
+        bool,
+        typer.Option(
+            "--generate-password",
+            "-gp",
+            help=(
+                "Generate A Secure Password For The Deployed App And Save It "
+                "To The Managed Config When MIRUMOJI_WEB_PASSWORD Is Not Set"
+            ),
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Redeploy Even If The Same Version Is Already Live",
+        ),
+    ] = False,
+) -> None:
+    """
+    Deploys A Fully Functional Mirumoji App To Your Modal Account
+
+    Deploys a `Modal` web function running a FastAPI app serving both the
+    `modal` transcribe backend and the built frontend
+
+    The app is accessible at the printed URL and gated by `HTTP Basic Auth`
+    with `mirumoji` as the username and the `MIRUMOJI_WEB_PASSWORD` managed
+    config variable as the password
+
+    info: `--generate-password` (`-gp`)
+        - When this flag is passed, a unique password is generated and stored
+          in the managed config under `MIRUMOJI_WEB_PASSWORD`
+
+        - When this flag is passed and `MIRUMOJI_WEB_PASSWORD` already exists
+          as a variable in the managed config (`mirumoji config show`), or as
+          an environment variable in the current shell, the already-existent
+          value is used and no new password is created
+
+        - When this flag is not passed and the `MIRUMOJI_WEB_PASSWORD` variable
+          doesn't exist in either the managed config or the current shell, this
+          command displays an error message
+
+        - The `MIRUMOJI_WEB_PASSWORD` set in the managed config has preference
+          over the one set in the current shell and is the one that will be
+          used when both are set
+
+    info: Idempotent Deployment
+        - Re-running this command rolls the app forward only on version bumps
+          without ever creating duplicates
+
+        - Pass `--force` (`-f`) to always redeploy the app
+
+    info: Distinction From The Mirumoji `modal-offload` App
+        - When running mirumoji locally with the `modal` transcribe backend
+          set up, the server automatically creates and manages a different
+          `Modal` app called `mirumoji-offload`
+
+        - `mirumoji-offload` is configured using your mirumoji-managed
+          configuration variables (`MIRUMOJI_MODAL_SCALEDOWN_WINDOW`,
+          `MIRUMOJI_MODAL_GPU`, `MODAL_FORCE_BUILD`, `MODAL_TOKEN_ID`,
+          `MODAL_TOKEN_SECRET`, `MIRUMOJI_MODAL_IMAGE`), is always GPU-enabled,
+          and always scales down to 0 when there's no GPU-task running
+
+        - The `Modal` app that this command deploys (`mirumoji-host`)
+          runs the server with the `modal` transcribe backend and serves
+          the frontend in a single `Modal` `CPU-Only` container that only
+          scales down when the app is stopped (`mirumoji modal down`)
+
+        - The server running in the `mirumoji-host` app will automatically
+          create a `mirumoji-offload` app (or use an already live one) with
+          your mirumoji-managed configuration whenever you request a task
+          that needs a GPU, which means that both apps will exist
+          simultaneously
+
+        - This separation exists because letting a GPU-enabled container sit
+          idly can incur expensive idle-GPU charges. Separating the cheap
+          CPU-only operations (running in `mirumoji-host`) from the expensive
+          operations that require a GPU (`mirumoji-offload`) avoids these
+          extra unnecessary charges because `mirumoji-offload` always scales
+          to 0 (meaning it is never running unless an active GPU task needs
+          it), while `mirumoji-host` keeps running at all times to make the
+          app accessible (for watching videos, Japanese-tokenization,
+          dictionary-lookups, etc...)
+
+    info: App Configuration
+        All of your mirumoji-managed configuration (`mirumoji config`),
+        such as LLM keys and `modal-offload` configuration (scaledown window,
+        which GPU is used), is passed to the container running `mirumoji-host`
+        as a `Modal Secret`, so this is like running the local `modal`
+        transcribe backend, with the only difference being that everything
+        (including what would normally run locally) will be running in Modal
+
+    info: App Data
+         - Unlike the local `mirumoji up`, which keeps your data as local
+           Docker volumes, the data you upload or generate while using the
+           hosted app (your media files and the mirumoji database) is kept
+           inside an automatically created, or reused, `Modal` volume
+
+        - You can download this data at any time with `mirumoji modal
+          download-data`
+
+        - You can also delete the entire volume at any time with
+          `mirumoji modal down -v`
+    """
+    from ..modal import host as modal_host
+
+    # Get All Variables From The Managed Config File, Falling Back To The
+    # Process' Environment For Missing Values
+    env = resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Define The Password That Will Be Used To Gate The App
+    password = env.get(WEB_PASSWORD_ENV)
+
+    if password is None:
+        if not gen_password:
+            raise fail(
+                "No Password  ↦  Set A Password To Gate The App With "
+                "`mirumoji config set MIRUMOJI_WEB_PASSWORD ***` Or Pass "
+                "`--generate-password` To Create A New One Automatically"
+            )
+        else:
+            password = secrets.token_urlsafe(12)
+            envfile.set_value(HOST_CONFIG_FILE, WEB_PASSWORD_ENV, password)
+            console.print("✓ Generated A Login Password", style="success")
+            env[WEB_PASSWORD_ENV] = password
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    # The Host Runs As A Modal-Backend Server So That Transcription Offloads
+    # To The GPU Worker Rather Than Needing A GPU On At All Times
+    env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
+
+    # The Host Reservations (CPU, Memory, Concurrency) Size The Modal Function
+    # Itself, So They Are Resolved Separately And Each Falls Back To Its
+    # Managed Config Default When Unset (The Defaulted Host Vars Size It)
+    host_config = {
+        var.name: env.get(var.name) or var.default
+        for var in MODAL_HOST_VARS
+        if var.default
+    }
+
+    # The Modal Credentials Are Exported Only For The Deploy Calls, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        try:
+            with console.status(
+                "[muted]Deploying The Host App[/]",
+                spinner="dots",
+                spinner_style="accent",
+            ):
+                modal_host.ensure_host_deployed(env, host_config, force=force)
+        except ModalError as exc:
+            raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc
+
+        # Get The Live App URL + Modal Dashboard URL
+        url = modal_lifecycle.web_url(HOST_APP_NAME, WEB_FUNCTION_NAME)
+        dashboard = modal_lifecycle.dashboard_url(HOST_APP_NAME)
+
+    table = Table(
+        title="✓ Mirumoji Is Hosted",
+        border_style="success",
+        title_style="heading",
+    )
+    table.add_column("Field", style="ink", no_wrap=True)
+    table.add_column("Value", style="info")
+    table.add_row("URL", url or "Run `mirumoji modal status`")
+    table.add_row("Username", WEB_USERNAME)
+    table.add_row("Password", password)
+    if dashboard:
+        table.add_row("Dashboard", dashboard)
+    console.print(Padding(table, (1, 0, 0, 0)))
+    console.print(
+        Panel(
+            Syntax("mirumoji modal down", "bash"),
+            title="Stop The Hosted App",
+            border_style="accent",
+        )
+    )
+
+
+def modal_status() -> None:
+    """
+    Shows The Status Of The Modal-Hosted App + Its Data Volume
+
+    info: `mirumoji-offload`
+        The GPU-offload worker `Modal` app is owned by the server (deployed on
+        the first GPU call and torn down in its lifespan), so it is not shown
+        or managed here
+    """
+    # Get All Variables From The Managed Config File, Falling Back To The
+    # Process' Environment For Missing Values
+    env = resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    # The Modal Credentials Are Exported Only For The Status Calls, Then The
+    # Process Environment Is Restored
+    try:
+        with modal_lifecycle.modal_credentials(env):
+            # Verify App Is Deployed
+            is_deployed = False
+            deployed_version = "Unknown"
+            tags = modal_lifecycle.deployed_tags(HOST_APP_NAME)
+            if tags is not None:
+                is_deployed = True
+                deployed_version = tags.get(
+                    modal_lifecycle.VERSION_KEY, "Unknown"
+                )
+
+            # Verify Volume Exists
+            volume_exists = modal_lifecycle.volume_exists(DATA_VOLUME_NAME)
+
+            # Get Live App URL + Dashboard URL If App Is Deployed
+            live_url = None
+            dashboard_url = None
+            if is_deployed:
+                live_url = modal_lifecycle.web_url(
+                    HOST_APP_NAME, WEB_FUNCTION_NAME
+                )
+                dashboard_url = modal_lifecycle.dashboard_url(HOST_APP_NAME)
+    except ModalError as exc:
+        raise fail(f"Could Not Query The Deployment  ↦  {exc}") from exc
+
+    # Print Result
+    table = Table(
+        title="Mirumoji Modal Deployment",
+        title_style="heading",
+        border_style="info",
+    )
+    table.add_column("Resource", style="ink", no_wrap=True)
+    table.add_column("State", no_wrap=True)
+    table.add_column("Detail", style="muted")
+    if not is_deployed:
+        table.add_row("Host App", "[muted]Not Deployed[/]", HOST_APP_NAME)
+    else:
+        table.add_row(
+            "Host App",
+            "[success]Deployed[/]",
+            f"{HOST_APP_NAME} (v{deployed_version})",
+        )
+    table.add_row(
+        "Data Volume",
+        "[success]Present[/]" if volume_exists else "[muted]Absent[/]",
+        DATA_VOLUME_NAME,
+    )
+
+    if live_url is not None:
+        table.add_row("URL", f"[info]{live_url}[/]", "")
+    if dashboard_url is not None:
+        table.add_row("Dashboard", f"[info]{dashboard_url}[/]", "")
+
+    console.print(Padding(table, (1, 0, 0, 0)))
+
+
+def modal_down(
+    volume: Annotated[
+        bool,
+        typer.Option(
+            "--volume/--keep-volume",
+            "-v",
+            help="Also Delete The Data Volume (Profiles, Media, Database)",
+        ),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip Confirmation Prompts",
+        ),
+    ] = False,
+) -> None:
+    """
+    Stops the Modal-Hosted App And Optionally Deletes Its Data Volume
+
+    info: Offload Worker
+        The GPU-offload worker is owned by the server and stopped by it
+        during shutdown
+
+    info: Volume Deletion
+        - The data volume is only deleted when `--volume` is passed, and only
+          after the host app has been stopped since Modal refuses to delete a
+          volume mounted on a deployed app
+
+        - Deleting it permanently erases the hosted profiles, media, and
+          database
+    """
+    # Get All Variables From The Managed Config File, Falling Back To The
+    # Process' Environment For Missing Values
+    env = resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    if volume and not yes:
+        confirmed = typer.confirm(
+            "This Will Permanently Delete The Hosted Profiles, Media, And "
+            "Database. Continue?",
+            default=False,
+        )
+        if not confirmed:
+            console.print("Aborted", style="muted")
+            raise typer.Exit(code=0)
+
+    # The Modal Credentials Are Exported Only For The Teardown Calls, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        with console.status(
+            "[muted]Stopping The Host App[/]",
+            spinner="dots",
+            spinner_style="accent",
+        ):
+            stop_error = modal_lifecycle.stop(HOST_APP_NAME)
+        if stop_error:
+            raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
+        console.print("✓ Stopped The Host App", style="success")
+
+        if volume:
+            try:
+                with console.status(
+                    "[muted]Deleting The Data Volume[/]",
+                    spinner="dots",
+                    spinner_style="accent",
+                ):
+                    modal_lifecycle.delete_volume(DATA_VOLUME_NAME)
+                    console.print("✓ Deleted The Data Volume", style="success")
+
+            except ModalError as exc:
+                raise fail(f"Failed To Delete Volume  ↦  {exc}") from exc
+
+
+def modal_download_data(
+    destination: Annotated[
+        Path,
+        typer.Argument(
+            help="Local Directory To Download The Hosted Data Into",
+        ),
+    ] = Path("mirumoji-data"),
+) -> None:
+    """
+    Downloads The Modal-Hosted App's Data Volume To A Local Directory
+
+    Downloads everything in the `mirumoji-data` volume (the media you uploaded
+    and the mirumoji database) so it can be backed up or inspected locally.
+    Re-downloading into the same directory overwrites the existing copies
+    """
+    # Get All Variables From The Managed Config File, Falling Back To The
+    # Process' Environment For Missing Values
+    env = resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    # The Modal Credentials Are Exported Only For The Download Call, Then The
+    # Process Environment Is Restored
+    with modal_lifecycle.modal_credentials(env):
+        try:
+            with console.status(
+                "[muted]Downloading The Data Volume[/]",
+                spinner="dots",
+                spinner_style="accent",
+            ):
+                modal_lifecycle.download_volume(DATA_VOLUME_NAME, destination)
+        except ModalError as exc:
+            raise fail(f"Failed To Download The Data  ↦  {exc}") from exc
+
+    console.print(
+        f"✓ Downloaded The Data Volume To '{destination}'",
+        style="success",
     )

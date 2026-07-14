@@ -13,7 +13,7 @@ import {
     useOperationSettings,
     type OperationSettings,
 } from "@/contexts/OperationSettingsContext";
-import { Button, Card, InfoTip, Input, Label, TextArea, Toggle, cn } from "@/shared/ui";
+import { Button, Card, InfoTip, Input, Label, Segmented, TextArea, Toggle } from "@/shared/ui";
 import type { ConvertOpts, TranscribeOpts } from "@/shared/jobs/types";
 
 type SubTab = "transcription" | "conversion";
@@ -132,28 +132,16 @@ export function AdvancedPanel() {
 
     const t = draft.transcribe;
 
-    const segBtn = (active: boolean) =>
-        cn(
-            "flex-1 rounded-control px-3 py-1.5 text-sm font-medium transition-colors",
-            active ? "bg-shu/15 text-shu" : "text-ink-muted hover:text-ink"
-        );
-
     return (
         <Card className="space-y-5 p-6">
-            <div className="flex gap-1 rounded-control bg-surface-2 p-1">
-                <button
-                    className={segBtn(subTab === "transcription")}
-                    onClick={() => setSubTab("transcription")}
-                >
-                    Transcription
-                </button>
-                <button
-                    className={segBtn(subTab === "conversion")}
-                    onClick={() => setSubTab("conversion")}
-                >
-                    Conversion
-                </button>
-            </div>
+            <Segmented
+                options={[
+                    { value: "transcription", label: "Transcription" },
+                    { value: "conversion", label: "Conversion" },
+                ]}
+                value={subTab}
+                onChange={setSubTab}
+            />
 
             {subTab === "transcription" ? (
                 <>
@@ -280,18 +268,14 @@ export function AdvancedPanel() {
                             label="Quality Preset"
                             info="Encoder speed against output quality, default is Balanced"
                         />
-                        <div className="flex gap-1 rounded-control bg-surface-2 p-1">
-                            {(["performance", "balanced", "quality"] as const).map((p) => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    className={segBtn((draft.convert.preset ?? "balanced") === p)}
-                                    onClick={() => setC({ preset: p })}
-                                >
-                                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                                </button>
-                            ))}
-                        </div>
+                        <Segmented
+                            options={(["performance", "balanced", "quality"] as const).map((p) => ({
+                                value: p,
+                                label: p.charAt(0).toUpperCase() + p.slice(1),
+                            }))}
+                            value={draft.convert.preset ?? "balanced"}
+                            onChange={(preset) => setC({ preset })}
+                        />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>

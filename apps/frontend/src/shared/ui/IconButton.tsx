@@ -1,3 +1,7 @@
+/**
+ * @packageDocumentation Icon-only button with an accessible label.
+ */
+
 import React from "react";
 import { cn } from "./cn";
 

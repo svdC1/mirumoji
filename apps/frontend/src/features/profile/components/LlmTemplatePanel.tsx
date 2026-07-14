@@ -19,7 +19,7 @@ import {
     formatModel,
 } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
-import { Button, Field, InfoTip, Label, TextArea, Card, Toggle, cn } from "@/shared/ui";
+import { Button, Field, InfoTip, Label, TextArea, Card, Toggle, Segmented } from "@/shared/ui";
 import type { LlmTemplate, ProviderStatus } from "@/shared/llm/types";
 import {
     defaultSysMsg,
@@ -194,25 +194,16 @@ export function LlmTemplatePanel() {
         }
     };
 
-    const segBtn = (active: boolean) =>
-        cn(
-            "flex-1 rounded-control px-3 py-1.5 text-sm font-medium transition-colors",
-            active ? "bg-shu/15 text-shu" : "text-ink-muted hover:text-ink"
-        );
-
     return (
         <Card className="space-y-5 p-6">
-            <div className="flex gap-1 rounded-control bg-surface-2 p-1">
-                <button
-                    className={segBtn(subTab === "breakdown")}
-                    onClick={() => setSubTab("breakdown")}
-                >
-                    Word Breakdown
-                </button>
-                <button className={segBtn(subTab === "srt")} onClick={() => setSubTab("srt")}>
-                    Subtitle Fix
-                </button>
-            </div>
+            <Segmented
+                options={[
+                    { value: "breakdown", label: "Word Breakdown" },
+                    { value: "srt", label: "Subtitle Fix" },
+                ]}
+                value={subTab}
+                onChange={setSubTab}
+            />
 
             {subTab === "breakdown" ? (
                 <>
@@ -303,7 +294,7 @@ export function LlmTemplatePanel() {
                                 <Toggle
                                     checked={previewWithContext}
                                     onChange={setPreviewWithContext}
-                                    label="Preview with context"
+                                    label="Preview With Context"
                                 />
                                 <span>With Context</span>
                             </div>

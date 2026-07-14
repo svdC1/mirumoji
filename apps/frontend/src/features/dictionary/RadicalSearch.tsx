@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiByRadicals, apiRadicals } from "@/shared/dict/api";
+import { kanjiRoute } from "@/shared/dict/routes";
 import { EmptyState, Skeleton, cn } from "@/shared/ui";
 import type { KanjiInfo, RadicalInfo } from "@/shared/dict/types";
 
@@ -179,7 +180,7 @@ export default function RadicalSearch() {
                                 lang="ja"
                                 title={k.meanings.join(", ")}
                                 onClick={() =>
-                                    navigate(`/dictionary/kanji/${encodeURIComponent(k.literal)}`, {
+                                    navigate(kanjiRoute(k.literal), {
                                         state: {
                                             fromRadicals: picked.join(""),
                                             fromRadicalsMatch: match,

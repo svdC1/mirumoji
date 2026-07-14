@@ -94,7 +94,8 @@ export function isEmptyDict(data: KotobaseData): boolean {
  * @returns {Promise<KanjiInfo>} The kanji profile.
  */
 export async function apiKanji(literal: string): Promise<KanjiInfo> {
-    return apiFetch<KanjiInfo>(`dict/kanji/${encodeURIComponent(literal)}`, { method: "GET" });
+    const params = new URLSearchParams({ literal });
+    return apiFetch<KanjiInfo>(`dict/kanji?${params.toString()}`, { method: "GET" });
 }
 
 /**
@@ -105,7 +106,8 @@ export async function apiKanji(literal: string): Promise<KanjiInfo> {
  * @returns {Promise<string>} The SVG markup.
  */
 export async function apiKanjiStrokes(literal: string): Promise<string> {
-    const blob = await apiFetch<Blob>(`dict/kanji/${encodeURIComponent(literal)}/strokes`, {
+    const params = new URLSearchParams({ literal });
+    const blob = await apiFetch<Blob>(`dict/kanji/strokes?${params.toString()}`, {
         method: "GET",
     });
     return blob.text();
@@ -118,7 +120,8 @@ export async function apiKanjiStrokes(literal: string): Promise<string> {
  * @returns {Promise<KanjiAudio>} The clip listing (empty without the audio pack).
  */
 export async function apiKanjiAudio(literal: string): Promise<KanjiAudio> {
-    return apiFetch<KanjiAudio>(`dict/kanji/${encodeURIComponent(literal)}/audio`, {
+    const params = new URLSearchParams({ literal });
+    return apiFetch<KanjiAudio>(`dict/kanji/audio?${params.toString()}`, {
         method: "GET",
     });
 }
@@ -132,8 +135,8 @@ export async function apiKanjiAudio(literal: string): Promise<KanjiAudio> {
  * @returns {string} The clip URL.
  */
 export function dictAudioClipUrl(literal: string, clip: string): string {
-    const params = new URLSearchParams({ clip });
-    return `/api/dict/kanji/${encodeURIComponent(literal)}/audio/clip?${params.toString()}`;
+    const params = new URLSearchParams({ literal, clip });
+    return `/api/dict/kanji/audio/clip?${params.toString()}`;
 }
 
 /**
@@ -144,11 +147,8 @@ export function dictAudioClipUrl(literal: string, clip: string): string {
  * @returns {Promise<JMEntry[]>} The matching entries.
  */
 export async function apiKanjiWords(literal: string, limit = 50): Promise<JMEntry[]> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    return apiFetch<JMEntry[]>(
-        `dict/kanji/${encodeURIComponent(literal)}/words?${params.toString()}`,
-        { method: "GET" }
-    );
+    const params = new URLSearchParams({ literal, limit: String(limit) });
+    return apiFetch<JMEntry[]>(`dict/kanji/words?${params.toString()}`, { method: "GET" });
 }
 
 /**
@@ -159,11 +159,8 @@ export async function apiKanjiWords(literal: string, limit = 50): Promise<JMEntr
  * @returns {Promise<Example[]>} The matching sentences with translations.
  */
 export async function apiKanjiSentences(literal: string, limit = 10): Promise<Example[]> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    return apiFetch<Example[]>(
-        `dict/kanji/${encodeURIComponent(literal)}/sentences?${params.toString()}`,
-        { method: "GET" }
-    );
+    const params = new URLSearchParams({ literal, limit: String(limit) });
+    return apiFetch<Example[]>(`dict/kanji/sentences?${params.toString()}`, { method: "GET" });
 }
 
 /**

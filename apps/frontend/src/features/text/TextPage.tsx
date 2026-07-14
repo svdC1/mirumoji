@@ -50,7 +50,7 @@ export default function TextPage() {
     };
 
     return (
-        <div className="mx-auto min-h-[calc(100dvh_-_3.5rem)] lg:min-h-dvh w-full max-w-4xl px-4 py-8">
+        <div className="mx-auto min-h-[var(--content-h)] lg:min-h-dvh w-full max-w-4xl px-[calc(1rem_+_var(--safe-x))] py-8">
             <h1 className="mb-6 font-display text-3xl text-ink">Text Analyzer</h1>
 
             {reading ? (

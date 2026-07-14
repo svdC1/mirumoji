@@ -21,6 +21,10 @@ from .commands import (
     down,
     gui,
     logs,
+    modal_deploy,
+    modal_down,
+    modal_download_data,
+    modal_status,
     pull,
     render,
     reset,
@@ -80,6 +84,17 @@ dev_app = typer.Typer(
 dev_app.command("server")(dev_server)
 dev_app.command("up")(dev_up)
 app.add_typer(dev_app, name="dev")
+
+# Modal Host Subcommands (`mirumoji modal ...`)
+modal_app = typer.Typer(
+    no_args_is_help=True,
+    help="Deploy And Manage The Modal-Hosted Mirumoji App",
+)
+modal_app.command("deploy")(modal_deploy)
+modal_app.command("status")(modal_status)
+modal_app.command("down")(modal_down)
+modal_app.command("download-data")(modal_download_data)
+app.add_typer(modal_app, name="modal")
 
 
 if __name__ == "__main__":

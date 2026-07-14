@@ -138,7 +138,7 @@ def run_flet_build(platform: str) -> None:
     Raises:
         SystemExit: Re-raised with flet's exit code when the build fails
     """
-    from flet_cli.cli import main as flet_main
+    from flet_cli.cli import main as flet_main  # type: ignore[import-untyped]
 
     # An explicit `x.y.z` build version keeps the VERSIONINFO resource valid;
     # the rest of the metadata (product / company / copyright / description) is
@@ -177,16 +177,14 @@ def main(platform: str) -> None:
         console.print(
             f"Wrote Temporary GUI Entry To {MAIN_FILE}",
             style="info",
-            )
+        )
 
         stage_assets()
 
         PYPROJECT.write_text(
             original_pyproject + bundle_deps_block(platform), encoding="utf-8"
         )
-        console.print(
-            f"Added Bundle Dependencies {BUNDLE_DEPS}", style="info"
-        )
+        console.print(f"Added Bundle Dependencies {BUNDLE_DEPS}", style="info")
 
         console.print(f"Running Flet Build For {platform}...", style="accent")
         run_flet_build(platform)

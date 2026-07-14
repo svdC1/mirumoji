@@ -69,28 +69,51 @@ def _remove(label: str, *paths: Path) -> ResetStep:
     return ResetStep(label, "removed")
 
 
-def _prune_empty(*directories: Path) -> None:
+def _mirumoji_root(path: Path) -> Path:
     """
-    Removes each directory and its app-folder parent when left empty
+    Resolves a `platformdirs` path to the `mirumoji` app folder it belongs to
 
-    Clears the now-empty version and app folders so the storage directory is
-    actually gone rather than an empty shell. Only ever removes empty
-    directories, so a sibling (such as another version) is preserved
-
-    info: No Deduplication
-        A shared parent is attempted on every pass rather than once, since a
-        parent only becomes empty after its last child is pruned
+    Returns the path itself when it is already the `mirumoji` folder, otherwise
+    its nearest `mirumoji`-named ancestor. This maps a nested platform subdir
+    (the Windows `Cache` / `Logs` folders, or the Linux `log` subdir of the
+    state folder) back to the app folder that should be pruned, while leaving
+    the shared system root above it untouched
 
     Args:
-        *directories (Path): The version directories to prune upward from
+        path (Path): A `platformdirs` directory (data, config, cache, state, or
+            log)
+
+    Returns:
+        The `mirumoji` app folder for `path`, or `path` itself when it has no
+            `mirumoji` ancestor
+    """
+    candidate = path
+    while candidate.name != "mirumoji" and candidate.parent != candidate:
+        candidate = candidate.parent
+    return candidate
+
+
+def _prune_empty(*directories: Path) -> None:
+    """
+    Removes each `mirumoji` app folder that is now empty
+
+    info: App Folders Only
+        - Every argument is a `mirumoji`-named folder (see `_mirumoji_root`),
+          so removal never reaches a shared system root such as
+          `%LOCALAPPDATA%`, `~/Library/Caches`, or `~/.local/state`
+
+        - A folder the user chose to keep (its config file or logs still
+          present) is left in place because it is not empty
+
+    Args:
+        *directories (Path): The `mirumoji` app folders to remove when empty
     """
     for directory in directories:
-        for candidate in (directory, directory.parent):
+        if directory.is_dir() and not any(directory.iterdir()):
             try:
-                if candidate.is_dir() and not any(candidate.iterdir()):
-                    candidate.rmdir()
-            except OSError:
-                pass
+                directory.rmdir()
+            except OSError as exc:
+                LOGGER.warning(f"Could Not Remove {directory}: {exc}")
 
 
 def reset_storage(
@@ -141,11 +164,23 @@ def reset_storage(
         teardown_logging()
         steps.append(_remove("Logs", HOST_LOG_PATH))
 
+    # Prune the now-empty `mirumoji` app folder in every platformdirs root. On
+    # Windows these collapse to one folder, on macOS / Linux they are several,
+    # and the state folder is only reachable through its `log` subdir, so each
+    # root is mapped to its `mirumoji` folder and de-duplicated before pruning
     _prune_empty(
-        HOST_STORAGE.user_data_path,
-        HOST_STORAGE.user_cache_path,
-        HOST_STORAGE.user_log_path,
-        HOST_STORAGE.user_config_path,
+        *sorted(
+            {
+                _mirumoji_root(path)
+                for path in (
+                    HOST_STORAGE.user_data_path,
+                    HOST_STORAGE.user_config_path,
+                    HOST_STORAGE.user_cache_path,
+                    HOST_STORAGE.user_state_path,
+                    HOST_STORAGE.user_log_path,
+                )
+            }
+        )
     )
 
     return steps

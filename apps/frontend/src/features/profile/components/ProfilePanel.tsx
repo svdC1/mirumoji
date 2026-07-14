@@ -17,8 +17,17 @@ export function ProfilePanel() {
     const { profileId, setProfileId } = useProfile();
     const [draft, setDraft] = useState(profileId ?? "");
 
-    const save = () => setProfileId(draft.trim() || null);
-    const dirty = draft.trim() !== (profileId ?? "");
+    // The profile name travels in the `X-Profile-ID` request header, which can
+    // only carry ASCII, and a Modal-hosted deploy rejects a non-ASCII header
+    // outright, so the name is held to ASCII here with a clear reason
+    const trimmed = draft.trim();
+    const nonAscii = [...trimmed].some((ch) => ch.charCodeAt(0) > 127);
+    const dirty = trimmed !== (profileId ?? "");
+
+    const save = () => {
+        if (nonAscii) return;
+        setProfileId(trimmed || null);
+    };
 
     return (
         <Card className="max-w-none space-y-5 p-6">
@@ -53,13 +62,19 @@ export function ProfilePanel() {
                     id="dash-profile"
                     value={draft}
                     placeholder="e.g. Tanaka"
+                    aria-invalid={nonAscii}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && save()}
                 />
+                {nonAscii && (
+                    <p className="mt-1.5 text-2xs text-shu">
+                        Use ASCII Only (No Japanese Or Accents)
+                    </p>
+                )}
             </div>
 
             <div className="flex gap-2">
-                <Button onClick={save} disabled={!dirty}>
+                <Button onClick={save} disabled={!dirty || nonAscii}>
                     Save
                 </Button>
                 {profileId && (

@@ -28,12 +28,16 @@ surfaces of the project
     !!! info "GUI"
         A `Flet` Desktop GUI that orchestrate the `Docker Compose Application`
 
+    !!! info "Modal"
+        Deploys a full, private Mirumoji instance to the user's `Modal` account (`mirumoji modal deploy`)
+
 ???+ abstract Top-Level Modules
-    Three Top-Level Modules Sit Alongside Those Sub-Packages
+    Four Top-Level Modules Sit Alongside Those Sub-Packages
 
     - [`Paths`](paths.md) &rarr; Resolved Host / Storage Paths Shared Across The Package
     - [`Exceptions`](exceptions.md) &rarr; Package's Exception Hierarchy
     - [`Log`](log.md) &rarr; Centralized Logging Setup Shared By The Server, Launcher, And GUI
+    - [`Modal`](modal.md) &rarr; Shared, App-Agnostic Deploy Lifecycle For The Modal Offload Worker And The Host App
 
 These pages are generated from the source docstrings with
 [`mkdocstrings`](https://mkdocstrings.github.io/)

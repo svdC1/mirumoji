@@ -1,6 +1,6 @@
 {
     "name": "mirumoji-ui",
-    "version": "3.3.0",
+    "version": "3.4.0",
     "private": true,
     "type": "module",
     "engines": {
@@ -9,7 +9,9 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
+        "build:demo": "vite build --mode demo",
         "preview": "vite preview",
+        "preview:demo": "vite preview --mode demo",
         "test": "vitest",
         "docs:generate": "typedoc --options typedoc.json",
         "lint": "eslint src",

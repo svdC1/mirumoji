@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mirumoji"
-version = "3.3.0"
+version = "3.4.0"
 authors = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 maintainers = [{ name = "svdc", email = "svdc1mail@gmail.com" }]
 description = "Self-Hostable Japanese Language Immersion Tool"
@@ -43,12 +43,16 @@ license-files = ["LICENSE*", "LICENCE*"]
 # --- Dependencies ---
 
 # Base Install - CLI Only
+# `Modal` ships in the base install because the CLI's
+# `modal` commands deploy and manage a hosted app +
+# offload worker
 dependencies = [
     "typer",
     "rich",
     "python-dotenv",
     "platformdirs",
-    "pyyaml"
+    "pyyaml",
+    "modal>=1.4.3,<2"
 ]
 
 [project.optional-dependencies]
@@ -66,7 +70,6 @@ server = [
     "srt>=3.5.3,<4",
     "python-multipart>=0.0.32,<0.1",
     "aiofiles>=25.1,<26",
-    "modal>=1.4.3,<2",
     "genanki>=0.13.1,<0.14",
     "aiosqlite>=0.22.1,<0.23",
     "openai>=2.41,<3",

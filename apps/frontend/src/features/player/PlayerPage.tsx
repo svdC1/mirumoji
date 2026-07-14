@@ -10,7 +10,7 @@ import { toast } from "react-hot-toast";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useOperationSettings } from "@/contexts/OperationSettingsContext";
 import WordDialog from "@/shared/components/WordDialog";
-import { EmptyState } from "@/shared/ui";
+import { EmptyState, cn } from "@/shared/ui";
 import { useCues } from "./hooks/useCues";
 import { useActiveCue } from "./hooks/useActiveCue";
 import { VideoStage } from "./components/VideoStage";
@@ -187,9 +187,20 @@ export default function PlayerPage() {
         <div className="flex h-dvh flex-col bg-bg text-ink">
             <PlayerToolbar />
 
-            <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            {/* Video + subtitle rail. Side-by-side when there is horizontal
+                room: desktop (`lg:`) or a landscape phone (`land:`). */}
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row land:flex-row">
                 {hasMedia && !unplayable ? (
-                    <div className="relative min-h-0 min-w-0 flex-1">
+                    <div
+                        className={cn(
+                            "relative min-h-0 min-w-0 flex-1",
+                            // Inset the video off the notch only when the panel
+                            // is open in landscape. A full-width video pillarboxes
+                            // and its own side bars already cover the notch, but a
+                            // narrowed video fills to the edge and needs the gap.
+                            !panelCollapsed && "land:pl-[var(--sal)]"
+                        )}
+                    >
                         <VideoStage
                             onVideoEl={setVideoEl}
                             blobUrl={blobUrl}
@@ -211,11 +222,11 @@ export default function PlayerPage() {
                     <div className="flex flex-1 items-center justify-center">
                         <EmptyState
                             icon={<Clapperboard size={32} />}
-                            title={unplayable ? "Convert To Play" : "Load a video to begin"}
+                            title={unplayable ? "Convert To Play" : "Load A Video To Begin"}
                             description={
                                 unplayable
-                                    ? "This browser can't play this video format. Use To MP4 in the toolbar to convert it, and it will load here automatically."
-                                    : "Use the Load button in the toolbar to open a video and subtitles from your device or profile."
+                                    ? "This browser can't play this video format. Use To MP4 in the toolbar to convert it, and it will load here automatically"
+                                    : "Use the Load button in the toolbar to open a video and subtitles from your device or profile"
                             }
                         />
                     </div>

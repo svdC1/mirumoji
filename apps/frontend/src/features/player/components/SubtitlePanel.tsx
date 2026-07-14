@@ -13,7 +13,7 @@ import {
     Search,
 } from "lucide-react";
 import { Input, IconButton, EmptyState, cn } from "@/shared/ui";
-import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { useIsSubtitleRail } from "@/shared/hooks/useMediaQuery";
 import { formatClock } from "@/shared/format/time";
 import type { Cue } from "../types";
 
@@ -41,11 +41,12 @@ export function SubtitlePanel({
     const [query, setQuery] = useState("");
     const activeRef = useRef<HTMLButtonElement | null>(null);
 
-    // The panel docks to the right on desktop and the bottom on mobile, so the
-    // collapse/expand affordances point the matching direction.
-    const isMobile = useIsMobile();
-    const ExpandIcon = isMobile ? PanelBottomOpen : PanelRightOpen;
-    const CollapseIcon = isMobile ? PanelBottomClose : PanelRightClose;
+    // The panel docks to the side as a rail (desktop or landscape phone) or to
+    // the bottom when stacked (portrait), so the collapse/expand affordances
+    // point the matching direction.
+    const isRail = useIsSubtitleRail();
+    const ExpandIcon = isRail ? PanelRightOpen : PanelBottomOpen;
+    const CollapseIcon = isRail ? PanelRightClose : PanelBottomClose;
 
     // Keep original indices so the active highlight + seek survive filtering.
     const rows = useMemo(() => {
@@ -62,22 +63,24 @@ export function SubtitlePanel({
     }, [activeIdx, collapsed]);
 
     if (collapsed) {
-        // Mobile: a slim full-width bar below the video. Desktop: a vertical rail.
+        // Stacked (portrait): a slim full-width bar below the video. Rail
+        // (desktop / landscape phone): a thin vertical rail.
         return (
-            <div className="flex w-full shrink-0 items-center gap-2 border-t border-ink/10 bg-surface px-3 py-2 lg:h-full lg:w-11 lg:flex-col lg:border-l lg:border-t-0 lg:px-0 lg:py-3">
+            <div className="flex w-full shrink-0 items-center gap-2 border-t border-ink/10 bg-surface px-3 py-2 lg:h-full lg:w-11 lg:flex-col lg:border-l lg:border-t-0 lg:px-0 lg:py-3 land:h-full land:w-11 land:flex-col land:border-l land:border-t-0 land:px-0 land:py-3">
                 <IconButton label="Show Subtitles" onClick={onToggle}>
                     <ExpandIcon size={18} />
                 </IconButton>
-                <span className="text-2xs uppercase tracking-widest text-ink-faint lg:mt-3 lg:[writing-mode:vertical-rl]">
+                <span className="text-2xs uppercase tracking-widest text-ink-faint lg:mt-3 lg:[writing-mode:vertical-rl] land:mt-3 land:[writing-mode:vertical-rl]">
                     Subtitles
                 </span>
             </div>
         );
     }
 
-    // Mobile: full-width, fills the space below the video. Desktop: a fixed rail.
+    // Stacked (portrait): full-width, fills the space below the video. Rail
+    // (desktop / landscape phone): a fixed side rail.
     return (
-        <aside className="flex min-h-0 w-full flex-1 flex-col border-t border-ink/10 bg-surface lg:h-full lg:w-80 lg:flex-none lg:border-l lg:border-t-0 xl:w-96">
+        <aside className="flex min-h-0 w-full flex-1 flex-col border-t border-ink/10 bg-surface lg:h-full lg:w-80 lg:flex-none lg:border-l lg:border-t-0 xl:w-96 land:h-full land:w-80 land:flex-none land:border-l land:border-t-0">
             <div className="flex items-center gap-2 border-b border-ink/10 px-3 py-2.5">
                 <h2 className="flex-1 font-display text-sm text-ink">Subtitles</h2>
                 <span className="text-2xs text-ink-faint">{cues.length} Cues</span>

@@ -14,6 +14,7 @@ from ...core.constants import (
     ADVANCED_VARS,
     IMAGE_SOURCE_VAR,
     LLM_VARS,
+    MODAL_HOST_VARS,
     MODAL_VARS,
     TRANSCRIBE_BACKEND_VAR,
 )
@@ -91,7 +92,13 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     modal_text_vars = tuple(v for v in MODAL_VARS if v.name != _FORCE_BUILD)
     modal_inputs, modal_fields = _input_fields(modal_text_vars, state.env)
     advanced_inputs, advanced_fields = _input_fields(ADVANCED_VARS, state.env)
-    fields = {**llm_fields, **modal_fields, **advanced_fields}
+    host_inputs, host_fields = _input_fields(MODAL_HOST_VARS, state.env)
+    fields = {
+        **llm_fields,
+        **modal_fields,
+        **advanced_fields,
+        **host_fields,
+    }
 
     force_build_var = next(v for v in MODAL_VARS if v.name == _FORCE_BUILD)
     force_build_cb = ft.Checkbox(
@@ -255,6 +262,11 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                 *modal_inputs,
                 force_build_row,
                 subtitle="Required Only For The Modal Transcription Backend",
+            ),
+            theme.Section(
+                "Modal Host",
+                *host_inputs,
+                subtitle=("Used Only When Hosting The Full App On Modal"),
             ),
             theme.Section(
                 "Advanced",

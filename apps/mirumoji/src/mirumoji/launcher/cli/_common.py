@@ -596,3 +596,26 @@ def require_env(backend: Backend, env_path: Path) -> None:
             f"Missing Required Variables  ↦  [{names}]. "
             "Set Them With `mirumoji config set <KEY> <VALUE>`"
         )
+
+
+def resolve_managed_config(env_path: Path) -> dict[str, str]:
+    """
+    Resolves the managed config, overlaying it with the process' environment
+
+    Reads the managed `.env` and overlays the process environment
+    (see `envfile.overlay_environ`), keeping only the non-empty managed
+    config keys
+
+    info: Usage
+        This is both the configuration injected into a Modal-hosted container
+        and the source of the Modal credentials that the Modal-hosted deploy
+        authenticates with
+
+    Args:
+        env_path (Path): The managed config file to read
+
+    Returns:
+        The resolved non-empty managed configuration values
+    """
+    merged = envfile.overlay_environ(envfile.read(env_path), _ALL_ENV_VARS)
+    return {name: merged[name] for name in _ALL_ENV_VARS if merged.get(name)}

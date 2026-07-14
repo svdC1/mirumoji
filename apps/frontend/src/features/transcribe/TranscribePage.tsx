@@ -231,7 +231,7 @@ export default function TranscribePage() {
         );
 
     return (
-        <div className="flex h-[calc(100dvh_-_3.5rem)] flex-col bg-bg text-ink lg:h-dvh">
+        <div className="flex h-[var(--content-h)] flex-col bg-bg text-ink lg:h-dvh">
             <div className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
                     {messages.length === 0 ? (
@@ -263,7 +263,7 @@ export default function TranscribePage() {
             )}
 
             <div className="select-none border-t border-ink/10 bg-surface/60 backdrop-blur">
-                <div className="mx-auto max-w-3xl space-y-3 p-4">
+                <div className="mx-auto max-w-3xl space-y-3 p-4 pb-[calc(1rem_+_var(--sab))]">
                     {previewUrl && <AudioPlayer src={previewUrl} />}
 
                     <div className="flex gap-2">

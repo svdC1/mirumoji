@@ -1,6 +1,6 @@
 # Setup
 
-There Are `3 Ways` To Get Mirumoji Running
+There Are `4 Ways` To Get Mirumoji Running
 
 Pick The One That Fits You
 
@@ -20,16 +20,20 @@ Pick The One That Fits You
 
     Run The Docker Compose Commands Yourself, No Launcher &rarr; `More Configuration`
 
+- :material-cloud-outline: **[Modal Host Setup](modal-host.md)**
+
+    Deploy The Whole App Privately To Your `Modal` Account, No Local Docker &rarr; `Access From Anywhere`
+
 </div>
 
 ## Prerequisites
 
 | Requirement | Needed for | Notes |
 | --- | --- | --- |
-| **Docker** + **Compose V2** | All Setups | Download The Cross-Platform [`Docker Desktop`](https://docs.docker.com/desktop/) *(Or [`Docker Engine`](https://docs.docker.com/engine/install/) + [`Compose Plugin`](https://docs.docker.com/compose/install/linux/) On Linux)* |
+| **Docker** + **Compose V2** | Local Setups *(GUI / CLI / Manual)* | Download The Cross-Platform [`Docker Desktop`](https://docs.docker.com/desktop/) *(Or [`Docker Engine`](https://docs.docker.com/engine/install/) + [`Compose Plugin`](https://docs.docker.com/compose/install/linux/) On Linux)* |
 | **Python 3.10+** | CLI Setup | Only To Install The [`mirumoji`](https://pypi.org/project/mirumoji/#description) Launcher From PyPI. |
 | **NVIDIA GPU + [`Container Toolkit`](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)** | `Local` Transcription Backend | Lets The Backend Run [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) on your GPU. |
-| **A [`Modal`](https://modal.com) Account** | `Modal` Transcription Backend | To Offload Transcription To Cloud GPUs For CPU-Only Setups |
+| **A [`Modal`](https://modal.com) Account** | `Modal` Backend Or [`Modal Host`](modal-host.md) | To Offload Transcription To Cloud GPUs, Or To Host The Whole App |
 
 !!! tip "Check Your Machine"
     With the `CLI` installed, run `mirumoji doctor` to see which dependencies
@@ -43,9 +47,9 @@ Mirumoji lets you choose in what `GPU` that work runs
 
 === "Modal"
     - Offloads the work to **[`Modal`](https://modal.com)** cloud GPU containers
-    
+
     - Your machine does `not` need a GPU to run this backend
-    
+
     - Requires a Modal account's API Tokens &rarr; `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`
 
     ```bash
@@ -57,7 +61,7 @@ Mirumoji lets you choose in what `GPU` that work runs
 
 === "Local"
     - Runs the work on `your` NVIDIA GPU  via the Container Toolkit
-    
+
     - No Cloud Account Needed
 
     ```bash
@@ -68,7 +72,7 @@ Mirumoji lets you choose in what `GPU` that work runs
 ???+ tip "Configuration"
     - The Launcher (CLI + GUI) remembers your choice in its [`Managed Config File`](cli.md#configuration),
       so you only need to set it once
-    
+
     - `Modal` is the default because it works on any machine
 
     - See [`Using a GPU`](../guides/gpu.md) for a full walkthrough of both backends
@@ -104,7 +108,7 @@ Once the Docker Compose Application is running, the frontend is served over HTTP
 !!! warning "Self-Signed Certificate"
     - The frontend generates a self-signed certificate for your LAN IP at startup,
       so your browser will show a one-time "not private" warning
-    
-    - That's expected on a local network and poses no security risk. You can safely continue past it.
-    
-    - To reach Mirumoji from `outside` your network, see [`Sharing Outside Your Network`](../guides/sharing.md).
+
+    - That's expected on a local network and poses no security risk. You can safely continue past it
+
+    - To reach Mirumoji from `outside` your network, see [`Sharing Outside Your Network`](../guides/sharing.md)

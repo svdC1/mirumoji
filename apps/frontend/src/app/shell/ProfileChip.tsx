@@ -30,8 +30,15 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
         if (open) setDraft(profileId ?? "");
     }, [open, profileId]);
 
+    // The profile name travels in the `X-Profile-ID` request header, which can
+    // only carry ASCII, and a Modal-hosted deploy rejects a non-ASCII header
+    // outright, so the name is held to ASCII here with a clear reason
+    const trimmed = draft.trim();
+    const nonAscii = [...trimmed].some((ch) => ch.charCodeAt(0) > 127);
+
     const save = () => {
-        setProfileId(draft.trim() || null);
+        if (nonAscii) return;
+        setProfileId(trimmed || null);
         setOpen(false);
     };
 
@@ -83,9 +90,15 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                             value={draft}
                             autoFocus
                             placeholder="e.g. Tanaka"
+                            aria-invalid={nonAscii}
                             onChange={(e) => setDraft(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && save()}
                         />
+                        {nonAscii && (
+                            <p className="mt-1.5 text-2xs text-shu">
+                                Use ASCII Only (No Japanese Or Accents)
+                            </p>
+                        )}
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                         {profileId && (
@@ -102,7 +115,9 @@ export function ProfileChip({ expanded }: ProfileChipProps) {
                         <Button variant="secondary" onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={save}>Save</Button>
+                        <Button onClick={save} disabled={nonAscii}>
+                            Save
+                        </Button>
                     </div>
                 </div>
             </Dialog>
