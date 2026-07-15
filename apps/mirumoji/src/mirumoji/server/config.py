@@ -20,6 +20,7 @@ from typing import Any, Literal
 
 from dotenv import load_dotenv
 
+from .. import __version__
 from ..exceptions import ModalError, WhisperUnavailableError
 from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
@@ -118,7 +119,7 @@ def get_settings() -> Settings:
         modal_gpu=os.environ.get("MIRUMOJI_MODAL_GPU", "A10G"),
         modal_image=os.environ.get(
             "MIRUMOJI_MODAL_IMAGE",
-            "docker.io/svdc1/mirumoji-modal-gpu:latest",
+            f"docker.io/svdc1/mirumoji-modal-gpu:{__version__}",
         ),
         modal_scaledown_window=_env_int(
             "MIRUMOJI_MODAL_SCALEDOWN_WINDOW",

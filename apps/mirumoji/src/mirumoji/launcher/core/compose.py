@@ -69,14 +69,16 @@ Transcription Backend To Store The Faster Whisper Model Weights
 """
 
 
-def _backend_image(backend: Backend, source: ImageSource) -> str:
+def _backend_image(backend: Backend, source: ImageSource, version: str) -> str:
     """
     Determines which backend image reference to use based on a `backend` +
-    `source` pair
+    `source` pair, filling the published tag from `version`
 
     Args:
         backend (Backend): The chosen transcription backend
         source (ImageSource): Pull vs local build
+        version (str): The published image version to pull (ignored for a local
+            build, which uses the fixed local tags)
 
     Returns:
         The image reference to set on the backend service
@@ -86,23 +88,26 @@ def _backend_image(backend: Backend, source: ImageSource) -> str:
             return BACKEND_GPU_LOCAL_IMAGE
         return BACKEND_CPU_LOCAL_IMAGE
     if backend is Backend.LOCAL:
-        return BACKEND_GPU_IMAGE
-    return BACKEND_CPU_IMAGE
+        return BACKEND_GPU_IMAGE.format(version=version)
+    return BACKEND_CPU_IMAGE.format(version=version)
 
 
-def _frontend_image(source: ImageSource) -> str:
+def _frontend_image(source: ImageSource, version: str) -> str:
     """
-    Determines which frontend image reference to use for a given image `source`
+    Determines which frontend image reference to use for a given image
+    `source`, filling the published tag from `version`
 
     Args:
         source (ImageSource): Pull vs local build
+        version (str): The published image version to pull (ignored for a local
+            build, which uses the fixed local tag)
 
     Returns:
         The image reference to set on the frontend service
     """
     if source is ImageSource.BUILD:
         return FRONTEND_LOCAL_IMAGE
-    return FRONTEND_IMAGE
+    return FRONTEND_IMAGE.format(version=version)
 
 
 def load_template() -> dict[str, Any]:
@@ -124,6 +129,7 @@ def transform(
     template: dict[str, Any],
     backend: Backend,
     source: ImageSource,
+    version: str,
 ) -> dict[str, Any]:
     """
     Edits the `template` returned by `load_template` in place according to the
@@ -140,17 +146,18 @@ def transform(
         template (dict[str, Any]): The parsed packaged compose template
         backend (Backend): The chosen transcription backend
         source (ImageSource): Pull vs local build
+        version (str): The published image version to pull
 
     Returns:
         The same template dict, now resolved
     """
     services: dict[str, Any] = template["services"]
     # Set Frontend Image Reference
-    services[FRONTEND_SERVICE]["image"] = _frontend_image(source)
+    services[FRONTEND_SERVICE]["image"] = _frontend_image(source, version)
 
     backend_svc: dict[str, Any] = services[BACKEND_SERVICE]
     # Set Backend Image Reference
-    backend_svc["image"] = _backend_image(backend, source)
+    backend_svc["image"] = _backend_image(backend, source, version)
 
     if backend is Backend.LOCAL:
         # Attatch GPU Capability
@@ -178,6 +185,7 @@ def write_compose(
     backend: Backend,
     source: ImageSource,
     *,
+    version: str,
     out_path: Path = RESOLVED_COMPOSE_PATH,
 ) -> Path:
     """
@@ -186,6 +194,7 @@ def write_compose(
     Args:
         backend (Backend): The chosen mirumoji transcription backend
         source (ImageSource): Pull vs local build
+        version (str): The published image version to pull
         out_path (Path): Where to write the resolved file
 
     Returns:
@@ -194,7 +203,7 @@ def write_compose(
     Raises:
         FileNotFoundError: If the packaged template is missing
     """
-    resolved = transform(load_template(), backend, source)
+    resolved = transform(load_template(), backend, source, version)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(

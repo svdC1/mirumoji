@@ -12,8 +12,8 @@ from typing import TypeAlias, cast
 
 import flet as ft
 
+from ...core import checks, envfile, lifecycle, repo
 from ...core import compose as compose_core
-from ...core import envfile, lifecycle, repo
 from ...core.compose import RESOLVED_COMPOSE_PATH
 from ...core.constants import (
     CONFIG_ENV_VARS,
@@ -107,10 +107,15 @@ def _up_flow(state: AppState) -> Generator[str, None, str]:
     ip = get_host_lan_ip()
     os.environ[HOST_LAN_IP_VAR] = ip
     os.environ[TRANSCRIBE_BACKEND_VAR] = state.backend.value
+    version = envfile.resolve_version(state.env_path)
     if state.source is ImageSource.BUILD:
         repo_path = yield from repo.ensure_repo()
         yield from lifecycle.build_images(repo_path, state.backend)
-    compose_file = compose_core.write_compose(state.backend, state.source)
+    else:
+        checks.require_published_version(version)
+    compose_file = compose_core.write_compose(
+        state.backend, state.source, version=version
+    )
     if state.source is ImageSource.PULL:
         yield from lifecycle.pull(compose_file, env_file=state.env_path)
     yield from lifecycle.up(compose_file, env_file=state.env_path)
@@ -144,7 +149,11 @@ def _pull_flow(state: AppState) -> Generator[str, None, int]:
     Returns:
         The compose exit code
     """
-    compose_file = compose_core.write_compose(state.backend, ImageSource.PULL)
+    version = envfile.resolve_version(state.env_path)
+    checks.require_published_version(version)
+    compose_file = compose_core.write_compose(
+        state.backend, ImageSource.PULL, version=version
+    )
     return (yield from lifecycle.pull(compose_file, env_file=state.env_path))
 
 

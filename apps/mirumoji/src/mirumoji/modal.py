@@ -140,6 +140,12 @@ _CREDENTIAL_KEYS = ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
 The environment variables the `Modal` SDK and CLI authenticate from
 """
 
+_FORCE_BUILD_KEY = "MODAL_FORCE_BUILD"
+"""
+The environment variable the `Modal` SDK reads at deploy time to rebuild a
+cached image instead of reusing it
+"""
+
 
 @contextmanager
 def modal_credentials(env: dict[str, str]) -> Iterator[None]:
@@ -147,10 +153,14 @@ def modal_credentials(env: dict[str, str]) -> Iterator[None]:
     Exports the Modal credentials for the duration of a block, restoring the
     previous process environment on exit
 
-    info: Credentials Only
+    info: Exported Keys
         - The `Modal` SDK and the `modal` CLI subprocesses (`stop`, volume
           download) authenticate from `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`
-          in the environment, so only those are exported
+          in the environment, so those are exported
+
+        - `MODAL_FORCE_BUILD` is exported too, but only when explicitly
+          enabled, since the SDK reads it from the local process at
+          `app.deploy()` to rebuild a cached image instead of reusing it
 
         - The rest of the managed config reaches a deploy through the
           container's inline `Secret`, not the local process, so it never
@@ -170,10 +180,15 @@ def modal_credentials(env: dict[str, str]) -> Iterator[None]:
     Yields:
         None, with the credentials exported for the duration of the block
     """
-    saved = {key: os.environ.get(key) for key in _CREDENTIAL_KEYS}
+    keys = (*_CREDENTIAL_KEYS, _FORCE_BUILD_KEY)
+    saved = {key: os.environ.get(key) for key in keys}
     for key in _CREDENTIAL_KEYS:
         if env.get(key):
             os.environ[key] = env[key]
+    # Export MODAL_FORCE_BUILD only when set to "1", so the managed default
+    # "0" never forces a rebuild
+    if env.get(_FORCE_BUILD_KEY) == "1":
+        os.environ[_FORCE_BUILD_KEY] = "1"
     try:
         yield
     finally:

@@ -77,10 +77,10 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-def _host_image() -> modal.Image:
+def _host_image(version: str) -> modal.Image:
     """
     Composes the `Modal` host's image from the published backend and frontend
-    images
+    images at `version`
 
     Starts from the CPU backend image (the server stack plus the UniDic and
     Kotobase data) and copies the already-published frontend build in, so the
@@ -91,12 +91,16 @@ def _host_image() -> modal.Image:
         (which platformdirs places under the state dir on Linux) land on the
         persistent volume rather than ephemeral container storage
 
+    Args:
+        version (str): The published image version to compose from
+
     Returns:
         The composed host image
     """
-    copy = f"COPY --from={FRONTEND_IMAGE} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
+    frontend = FRONTEND_IMAGE.format(version=version)
+    copy = f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
     return (
-        modal.Image.from_registry(BACKEND_CPU_IMAGE)
+        modal.Image.from_registry(BACKEND_CPU_IMAGE.format(version=version))
         .dockerfile_commands(copy)
         .env({"XDG_STATE_HOME": STATE_MOUNT})
     )
@@ -127,6 +131,8 @@ def web() -> FastAPI:
 def build_host_app(
     env: dict[str, str],
     host_config: dict[str, str],
+    *,
+    version: str,
 ) -> modal.App:
     """
     Builds the deployable `Modal` host app with the user's config injected
@@ -175,6 +181,7 @@ def build_host_app(
         host_config (dict[str, str]): The resolved host reservations (CPU
             cores, memory in MiB, and max concurrent requests), each already
             defaulted by the caller, that size the web container
+        version (str): The published image version to compose from
 
     Returns:
         The configured `mirumoji-host` app with `web` registered
@@ -182,7 +189,7 @@ def build_host_app(
     Raises:
         ModalError: If a host reservation in `host_config` is not a number
     """
-    app = modal.App(HOST_APP_NAME, image=_host_image())
+    app = modal.App(HOST_APP_NAME, image=_host_image(version))
     volume = modal.Volume.from_name(DATA_VOLUME_NAME, create_if_missing=True)
     secret = modal.Secret.from_dict(dict(env))
 
@@ -210,6 +217,7 @@ def ensure_host_deployed(
     env: dict[str, str],
     host_config: dict[str, str],
     *,
+    version: str,
     force: bool = False,
 ) -> None:
     """
@@ -223,6 +231,7 @@ def ensure_host_deployed(
         env (dict[str, str]): The environment to inject into the container
         host_config (dict[str, str]): The resolved host reservations sizing the
             web container (see `build_host_app`)
+        version (str): The published image version to compose from
         force (bool): Redeploy even when the same version is already live, to
             roll out a code or image change without a version bump
 
@@ -231,7 +240,7 @@ def ensure_host_deployed(
     """
     ensure_volume(DATA_VOLUME_NAME)
     ensure_deployed(
-        build_host_app(env, host_config),
+        build_host_app(env, host_config, version=version),
         HOST_APP_NAME,
         version=__version__,
         force=force,

@@ -19,6 +19,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from ... import __version__
 from ... import modal as modal_lifecycle
 from ...exceptions import ModalError
 from ...paths import HOST_CONFIG_FILE
@@ -48,6 +49,7 @@ from ._common import (
     _validate_dependencies,
     fail,
     require_env,
+    require_published_version,
     resolve_backend,
     resolve_managed_config,
     resolve_source,
@@ -238,6 +240,13 @@ def pull(
             help="Transcription Backend (Defaults To The Saved Config)",
         ),
     ] = None,
+    version: Annotated[
+        str | None,
+        typer.Option(
+            "--version",
+            help="Use This Published Version (Defaults To The Installed One)",
+        ),
+    ] = None,
 ) -> None:
     """
     Pulls the Mirumoji images from Docker Hub
@@ -253,9 +262,22 @@ def pull(
         - Value Stored in Config, If Present
 
         - Default Value (`MODAL`)
+
+    info: Version Resolution Order
+        The version value is resolved in the following order
+
+        - Value Passed To --version, If Present
+
+        - MIRUMOJI_VERSION Stored In Config, If Present
+
+        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+
+        - Default Value (The Installed Package Version)
     """
     backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
-    compose_file = write_compose(backend, ImageSource.PULL)
+    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
+    require_published_version(version)
+    compose_file = write_compose(backend, ImageSource.PULL, version=version)
     stream_command(
         gen=lifecycle.pull(compose_file),
         identifier="Docker",
@@ -299,6 +321,13 @@ def render(
             help="Reference Local Build Tags (--build) Or Docker Hub (--pull)",
         ),
     ] = False,
+    version: Annotated[
+        str,
+        typer.Option(
+            "--version",
+            help="Pin The Image Version (Defaults To The Installed One)",
+        ),
+    ] = __version__,
     output: Annotated[
         Path,
         typer.Option(
@@ -317,7 +346,9 @@ def render(
     """
     source = ImageSource.BUILD if build else ImageSource.PULL
     try:
-        written = write_compose(transcribe, source, out_path=output)
+        written = write_compose(
+            transcribe, source, version=version, out_path=output
+        )
     except FileNotFoundError as exc:
         raise fail(f"Compose Template Not Found  ↦  {exc}") from exc
     console.print(
@@ -472,6 +503,13 @@ def up(
             help="Run Detached (--detach) Or In The Foreground",
         ),
     ] = True,
+    version: Annotated[
+        str | None,
+        typer.Option(
+            "--version",
+            help="Use This Published Version (Defaults To The Installed One)",
+        ),
+    ] = None,
 ) -> None:
     """
     Launches the Mirumoji Docker Compose Application
@@ -498,6 +536,17 @@ def up(
 
         - Default Value (`PULL`)
 
+    info: Version Resolution Order
+        The version value is resolved in the following order
+
+        - Value Passed To --version, If Present
+
+        - MIRUMOJI_VERSION Stored In Config, If Present
+
+        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+
+        - Default Value (The Installed Package Version)
+
     info: Steps
         - Resolves the backend / image source according to the order of
           precedence listed above
@@ -520,9 +569,12 @@ def up(
 
     backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
     source = resolve_source(build, HOST_CONFIG_FILE)
+    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
 
     _validate_dependencies(backend, source)
     require_env(backend, HOST_CONFIG_FILE)
+    if source is ImageSource.PULL:
+        require_published_version(version)
 
     ip = host.get_host_lan_ip()
     os.environ[HOST_LAN_IP_VAR] = ip
@@ -548,7 +600,7 @@ def up(
 
         console.print("✓ Images Built", style="success")
 
-    compose_file = write_compose(backend, source)
+    compose_file = write_compose(backend, source, version=version)
 
     # No explicit pull here. `docker compose up` already pulls any missing
     # image and reuses cached ones, so a normal `up` doesn't need to hit
@@ -841,7 +893,8 @@ def dev_up(
 
     console.print("✓ Images Built", style="success")
 
-    compose_file = write_compose(backend, source)
+    # BUILD uses the fixed local image tags, so the version is irrelevant here
+    compose_file = write_compose(backend, source, version=__version__)
 
     stream_command(
         gen=lifecycle.up(
@@ -935,6 +988,13 @@ def modal_deploy(
             help="Redeploy Even If The Same Version Is Already Live",
         ),
     ] = False,
+    version: Annotated[
+        str | None,
+        typer.Option(
+            "--version",
+            help="Use This Published Version (Defaults To The Installed One)",
+        ),
+    ] = None,
 ) -> None:
     """
     Deploys A Fully Functional Mirumoji App To Your Modal Account
@@ -968,6 +1028,17 @@ def modal_deploy(
           without ever creating duplicates
 
         - Pass `--force` (`-f`) to always redeploy the app
+
+    info: Version Resolution Order
+        The version value is resolved in the following order
+
+        - Value Passed To --version, If Present
+
+        - MIRUMOJI_VERSION Stored In Config, If Present
+
+        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+
+        - Default Value (The Installed Package Version)
 
     info: Distinction From The Mirumoji `modal-offload` App
         - When running mirumoji locally with the `modal` transcribe backend
@@ -1059,6 +1130,9 @@ def modal_deploy(
         if var.default
     }
 
+    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
+    require_published_version(version)
+
     # The Modal Credentials Are Exported Only For The Deploy Calls, Then The
     # Process Environment Is Restored
     with modal_lifecycle.modal_credentials(env):
@@ -1068,7 +1142,9 @@ def modal_deploy(
                 spinner="dots",
                 spinner_style="accent",
             ):
-                modal_host.ensure_host_deployed(env, host_config, force=force)
+                modal_host.ensure_host_deployed(
+                    env, host_config, version=version, force=force
+                )
         except ModalError as exc:
             raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc
 
