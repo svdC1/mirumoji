@@ -25,71 +25,86 @@ function demoAssets(): Plugin {
     };
 }
 
-// The service worker is disabled in demo mode: its `/api` NetworkOnly rule and
-// navigation-fallback denylist are written for the root `/api`, not the
-// base-prefixed `/mirumoji/api`, and offline is not a demo goal.
-const pwa = VitePWA({
-    // Auto-update the service worker in the background -> no "reload?" prompt
-    registerType: "autoUpdate",
-    // public/ assets that should be precached alongside the build output
-    includeAssets: ["favicon.ico", "icons/icon-192.png", "icons/icon-512.png"],
-    // scope / start_url are left to the plugin so they track Vite's `base`
-    // (`/` self-hosted, `/mirumoji/` on Pages). Icon/screenshot srcs are
-    // relative so they resolve against the manifest URL under either base
-    manifest: {
-        name: "Mirumoji",
-        short_name: "Mirumoji",
-        description: "Japanese Immersion Toolkit",
-        theme_color: "#15120F",
-        background_color: "#15120F",
-        display: "standalone",
-        icons: [
-            { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-            { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-            {
-                src: "icons/icon-512.png",
-                sizes: "512x512",
-                type: "image/png",
-                purpose: "maskable",
-            },
-        ],
-        screenshots: [
-            {
-                src: "screenshots/desktop_screenshot.png",
-                sizes: "2869x1435",
-                type: "image/png",
-                form_factor: "wide",
-            },
-            {
-                src: "screenshots/mobile_screenshot.png",
-                sizes: "1290x2796",
-                type: "image/png",
-            },
-        ],
-    },
-    workbox: {
-        // Keep the SPA navigation fallback from swallowing requests for
-        // paths nginx serves directly: API calls, the mkdocs site under
-        // /docs on the Pages build, and the local CA download. Without
-        // the CA entry, navigating to /mirumoji-ca.crt on the HTTPS
-        // origin (where the service worker runs) falls back to
-        // index.html and lands on the app's 404, while plain HTTP works
-        // because no service worker runs on an insecure origin. The
-        // /docs match allows a missing trailing slash (/docs and /docs/)
-        navigateFallbackDenylist: [/^\/api\//, /\/docs(?:\/|$)/, /^\/mirumoji-ca\.crt$/],
-        runtimeCaching: [
-            {
-                urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
-                handler: "NetworkOnly",
-            },
-        ],
-    },
-});
+/**
+ * The PWA plugin, enabled in both the real and demo builds so the demo is
+ * installable too. useCredentials makes the manifest and icon fetches carry
+ * credentials, which the Modal host Basic Auth requires and same-origin deploys
+ * ignore. The /api matchers are base-agnostic so they hold under the root / and
+ * the Pages /mirumoji/ base.
+ */
+function makePwa(demo: boolean): Plugin[] {
+    return VitePWA({
+        // Auto-update the service worker in the background -> no "reload?" prompt
+        registerType: "autoUpdate",
+        // Send credentials with the manifest + icon fetches so they pass the
+        // Modal host Basic Auth (harmless same-origin on nginx / Pages)
+        useCredentials: true,
+        // public/ assets that should be precached alongside the build output
+        includeAssets: ["favicon.ico", "icons/icon-192.png", "icons/icon-512.png"],
+        // scope / start_url are left to the plugin so they track Vite's `base`
+        // (`/` self-hosted, `/mirumoji/` on Pages). Icon/screenshot srcs are
+        // relative so they resolve against the manifest URL under either base
+        manifest: {
+            name: "Mirumoji",
+            short_name: "Mirumoji",
+            description: "Japanese Immersion Toolkit",
+            theme_color: "#15120F",
+            background_color: "#15120F",
+            display: "standalone",
+            icons: [
+                { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+                { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+                {
+                    src: "icons/icon-512.png",
+                    sizes: "512x512",
+                    type: "image/png",
+                    purpose: "maskable",
+                },
+            ],
+            screenshots: [
+                {
+                    src: "screenshots/desktop_screenshot.png",
+                    sizes: "2869x1435",
+                    type: "image/png",
+                    form_factor: "wide",
+                },
+                {
+                    src: "screenshots/mobile_screenshot.png",
+                    sizes: "1290x2796",
+                    type: "image/png",
+                },
+            ],
+        },
+        workbox: {
+            // Never precache the demo's static /api/* fixtures. The sample mp4
+            // exceeds the precache size cap anyway, and they are runtime-cached
+            // below.
+            globIgnores: demo ? ["api/**"] : [],
+            // Keep the SPA navigation fallback from swallowing requests for paths
+            // served directly: API calls, the mkdocs site under /docs on the
+            // Pages build, and the local CA download. The /api and /docs matchers
+            // are unanchored so they also hold under the /mirumoji/ base.
+            navigateFallbackDenylist: [/\/api\//, /\/docs(?:\/|$)/, /^\/mirumoji-ca\.crt$/],
+            runtimeCaching: [
+                {
+                    // Base-agnostic: matches /api/ and /mirumoji/api/
+                    urlPattern: ({ url }) => url.pathname.includes("/api/"),
+                    // The demo /api/* are committed static fixtures, so cache
+                    // them. The real app /api is a live backend, never cached.
+                    handler: demo ? "CacheFirst" : "NetworkOnly",
+                },
+            ],
+        },
+    });
+}
 
 export default defineConfig(({ mode }) => {
     const demo = mode === "demo";
     return {
-        plugins: [react(), ...(demo ? [demoAssets()] : [pwa])],
+        // The PWA plugin runs before demoAssets so the service worker is
+        // generated before the demo /api fixtures are copied into dist, keeping
+        // them out of the precache manifest.
+        plugins: [react(), makePwa(demo), ...(demo ? [demoAssets()] : [])],
         resolve: {
             // In demo mode, the network layer and a few components are swapped
             // for fixture-backed variants under src/demo/. The `@real/*` channel
