@@ -64,6 +64,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </SWRConfig>
         <Toaster
             position="top-center"
+            // Clear the notch on standalone iOS PWAs (viewport-fit=cover +
+            // black-translucent status bar draw under it). --sat is 0 off-notch.
+            containerStyle={{ top: "calc(var(--sat) + 1rem)" }}
             toastOptions={{
                 duration: 4000,
                 // "Sumi & Shu" surface + hairline + washi ink, so toasts blend
