@@ -13,8 +13,11 @@ full report
 import logging
 import platform
 import shutil
+import urllib.error
+import urllib.request
 from importlib.util import find_spec
 
+from ... import __version__
 from . import process
 from .constants import _GPU_PROBE_IMAGE
 from .errors import DependencyError
@@ -285,3 +288,71 @@ def validate_deploy(
         results.append(nvidia_gpu())
         results.append(nvidia_toolkit())
     return results
+
+
+_DOCKERHUB_TAGS_URL = (
+    "https://hub.docker.com/v2/repositories/svdc1/mirumoji/tags/{tag}"
+)
+"""
+Template for the Docker Hub tags API endpoint, formatted with a `{tag}` to
+check whether a published image tag exists
+"""
+
+
+def version_published(version: str, *, timeout: float = 10.0) -> bool:
+    """
+    Reports whether the published Mirumoji images exist for a `version`
+
+    Queries the Docker Hub tags API for `frontend-{version}`. Every image
+    (frontend, backend, offload) is published together per release, so the
+    frontend tag is a reliable proxy for the whole set
+
+    Args:
+        version (str): The image version to check
+        timeout (float): The request timeout in seconds
+
+    Returns:
+        `True` when the tag exists, `False` on a 404
+
+    Raises:
+        DependencyError: If Docker Hub could not be reached
+    """
+    url = _DOCKERHUB_TAGS_URL.format(tag=f"frontend-{version}")
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            status: int = response.status
+            return status == 200
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        raise DependencyError(
+            f"Could Not Verify Version {version} On Docker Hub  ↦  {exc}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise DependencyError(
+            f"Could Not Reach Docker Hub To Verify Version {version}  ↦  "
+            f"{exc.reason}"
+        ) from exc
+
+
+def require_published_version(version: str) -> None:
+    """
+    Raises when a pinned `version` has no published Mirumoji images
+
+    Skips the installed package version, which a release always publishes, so
+    only an explicitly pinned custom version pays the Docker Hub round-trip
+
+    Args:
+        version (str): The resolved image version
+
+    Raises:
+        DependencyError: If the version has no published images, or Docker Hub
+            could not be reached
+    """
+    if version == __version__:
+        return
+    if not version_published(version):
+        raise DependencyError(
+            f"Version {version} Has No Published Images  ↦  See The Available "
+            "Tags At https://hub.docker.com/r/svdc1/mirumoji/tags"
+        )

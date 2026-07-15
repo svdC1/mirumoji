@@ -14,7 +14,7 @@ import flet as ft
 
 from .... import modal as modal_lifecycle
 from ....exceptions import ModalError
-from ...core import envfile
+from ...core import checks, envfile
 from ...core.constants import (
     CONFIG_ENV_VARS,
     MODAL_HOST_VARS,
@@ -203,8 +203,12 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             # loop startup. The `modal_lifecycle` helpers import it lazily too
             from ...modal import host as host_deploy
 
+            version = envfile.resolve_version(state.env_path)
+            checks.require_published_version(version)
             with modal_lifecycle.modal_credentials(env):
-                host_deploy.ensure_host_deployed(env, host_config)
+                host_deploy.ensure_host_deployed(
+                    env, host_config, version=version
+                )
                 return {
                     "url": modal_lifecycle.web_url(
                         HOST_APP_NAME, WEB_FUNCTION_NAME

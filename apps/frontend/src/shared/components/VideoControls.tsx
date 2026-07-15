@@ -10,8 +10,14 @@ import { useEffect, useState } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { formatClock } from "@/shared/format/time";
 import { cn } from "@/shared/ui";
+import { isIOS } from "@/shared/platform";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+// iOS Safari makes HTMLMediaElement.volume read-only (hardware buttons own it),
+// so the volume slider is a dead control there. Hide it and keep the mute
+// toggle, which video.muted still honors. Constant per session, so read once.
+const IS_IOS = isIOS();
 
 export interface VideoControlsProps {
     video: HTMLVideoElement | null;
@@ -123,22 +129,24 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
                     >
                         {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
-                    <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step="0.05"
-                        value={muted ? 0 : volume}
-                        onChange={(e) => {
-                            video.muted = false;
-                            video.volume = Number(e.target.value);
-                        }}
-                        aria-label="Volume"
-                        className={cn(rangeBase, "w-20")}
-                        style={{
-                            background: `linear-gradient(to right, rgb(var(--ink)) ${volPct}%, rgb(var(--ink) / 0.25) ${volPct}%)`,
-                        }}
-                    />
+                    {!IS_IOS && (
+                        <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step="0.05"
+                            value={muted ? 0 : volume}
+                            onChange={(e) => {
+                                video.muted = false;
+                                video.volume = Number(e.target.value);
+                            }}
+                            aria-label="Volume"
+                            className={cn(rangeBase, "w-20")}
+                            style={{
+                                background: `linear-gradient(to right, rgb(var(--ink)) ${volPct}%, rgb(var(--ink) / 0.25) ${volPct}%)`,
+                            }}
+                        />
+                    )}
 
                     <span className="text-xs tabular-nums text-ink-muted">
                         {formatClock(current)} / {formatClock(duration)}

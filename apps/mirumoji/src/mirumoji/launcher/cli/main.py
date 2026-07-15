@@ -4,8 +4,11 @@ Defines the `Mirumoji` CLI application built with `Typer` and `Rich`
 This is the single entry point for the package (`mirumoji`)
 """
 
+from typing import Annotated
+
 import typer
 
+from ... import __version__
 from ...log import setup_logging
 from .commands import (
     build,
@@ -40,14 +43,40 @@ app = typer.Typer(
 )
 
 
+def _version_callback(value: bool) -> None:
+    """
+    Prints the installed package version and exits when `--version` is passed
+
+    Args:
+        value (bool): Whether the `--version` flag was set
+    """
+    if value:
+        typer.echo(f"mirumoji {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def _configure() -> None:
+def _configure(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show The Installed Version And Exit",
+        ),
+    ] = False,
+) -> None:
     """
     Routes launcher logs to `launcher.log` before any command runs
 
     info: Console Off
         The console handler is disabled so diagnostic records never mix into a
         command's `Rich` output, which is the launcher's user-facing surface
+
+    Args:
+        version (bool): Print the version and exit (handled eagerly by the
+            callback before any command runs)
     """
     setup_logging(log_file="launcher.log", console=False)
 

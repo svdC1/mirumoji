@@ -19,6 +19,61 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.5.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.5.0) - 2026-07-15
+
+This release makes the launcher run the container images that match the
+installed version instead of always pulling `latest`, so an install runs the
+images built for it and any published version can be pinned. It also makes the
+live demo installable as a PWA, adds an in-app cache reset, and fixes a set of
+mobile, caching, and Modal deploy issues. It has no breaking changes
+
+### Added
+
+- `Launcher` &rarr; From this release on, the launcher pulls and composes the
+  `<version>`-tagged images matching the installed package rather than `latest`,
+  so a `pip install mirumoji==X` (for `X >= 3.5.0`) runs the images built for `X`
+  and the launcher never drifts onto an incompatible `latest`. A `MIRUMOJI_VERSION`
+  config variable and a `--version` flag on `up` / `pull` / `render` /
+  `modal deploy` pin any published version, checked against Docker Hub first so a
+  version with no published images fails early with a clear message *(older,
+  pre-3.5.0 installs still pull `latest`, since the version-pinning code only
+  ships from here on)*
+
+- `Launcher` &rarr; `mirumoji --version` prints the installed version
+
+- `Frontend` &rarr; The live demo is now an installable PWA, so a visitor can add
+  it to their home screen and see how the app behaves once installed. The app
+  also gained a `Reset App Data` action *(Dashboard &rarr; Advanced)* that
+  unregisters the service worker and clears its caches, to recover from a stale
+  cached build
+
+### Fixed
+
+- `Launcher` &rarr; `MODAL_FORCE_BUILD` had no effect on `mirumoji modal deploy`.
+  The Modal SDK reads it from the local process environment when it builds the
+  derived host image, but the deploy exported only the Modal tokens, so setting
+  the variable never forced a rebuild and the host stayed on a stale cached image.
+  It is now exported for the deploy, so `mirumoji config set MODAL_FORCE_BUILD 1`
+  rebuilds the host image
+
+- `Frontend` &rarr; Toasts were rendered under the notch on notched phones. They
+  now inset off the safe area and clear it
+
+- `Frontend` &rarr; The player's volume slider did nothing on iOS, where the media
+  volume is read-only and owned by the hardware buttons, so it looked broken. It
+  is now hidden on iOS, leaving the mute toggle, which still works
+
+- `Frontend` &rarr; The PWA could not be installed behind the Modal host's HTTP
+  Basic Auth. The manifest link was fetched without credentials, so it and its
+  icons returned 401 and the browser saw no installable manifest, leaving no app
+  icon or install prompt. The manifest is now requested with credentials
+
+- `Frontend` &rarr; A new build could be hidden behind a stale cached shell.
+  Neither Nginx nor the Modal host set `Cache-Control`, so `index.html`, the
+  service worker, and the manifest could be served stale from the HTTP cache,
+  pinning old hashed assets. They are now served `no-cache` *(with hashed assets
+  marked immutable)*, so a new version is picked up on the next load
+
 ## [`3.4.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.4.0) - 2026-07-14
 
 This release adds a one-command private full-host deploy to `Modal`, reworks the Modal GPU offload

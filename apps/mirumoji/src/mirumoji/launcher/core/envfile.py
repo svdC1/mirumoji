@@ -15,7 +15,8 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from .constants import IMAGE_SOURCE_VAR, TRANSCRIBE_BACKEND_VAR
+from ... import __version__
+from .constants import IMAGE_SOURCE_VAR, TRANSCRIBE_BACKEND_VAR, VERSION_VAR
 from .errors import EnvConfigError
 from .models import Backend, EnvVar, ImageSource
 
@@ -228,3 +229,30 @@ def read_deployment(
     backend = Backend(raw_backend) if raw_backend in _BACKEND_VALUES else None
     source = ImageSource(raw_source) if raw_source in _SOURCE_VALUES else None
     return backend, source
+
+
+def resolve_version(env_path: Path, flag: str | None = None) -> str:
+    """
+    Resolves the published image version the launcher pulls and composes with
+
+    info: Order of Precedence
+        The value is considered in the following order
+
+        - The `flag` passed to a command (`--version`)
+
+        - The persisted `MIRUMOJI_VERSION`, overlaid with the process
+          environment
+
+        - The installed package version
+
+    Args:
+        env_path (Path): The managed config file to read
+        flag (str | None): An explicit override (the CLI `--version`)
+
+    Returns:
+        The version that fills the `{version}` in the image references
+    """
+    if flag:
+        return flag
+    values = overlay_environ(read(env_path), [VERSION_VAR])
+    return values.get(VERSION_VAR) or __version__

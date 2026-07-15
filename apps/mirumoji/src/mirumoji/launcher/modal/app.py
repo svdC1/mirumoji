@@ -47,6 +47,25 @@ def _is_within(root: Path, path: Path) -> bool:
         return False
 
 
+def _cache_control(full_path: str) -> str:
+    """
+    Chooses a Cache-Control value for a served frontend file
+
+    Content-hashed build assets under `assets/` never change and are cached
+    permanently, while the shell, service worker, and manifest revalidate so a
+    new deploy is picked up instead of a stale copy
+
+    Args:
+        full_path (str): The requested path below the app root
+
+    Returns:
+        The Cache-Control header value
+    """
+    if full_path.startswith("assets/"):
+        return "public, max-age=31536000, immutable"
+    return "no-cache"
+
+
 def create_host_app(frontend_dir: Path) -> FastAPI:
     """
     Builds the FastAPI application server by the `mirumoji-host` Modal app
@@ -176,8 +195,14 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
             and candidate.is_file()
             and _is_within(frontend_dir, candidate)
         ):
-            return FileResponse(candidate)
-        return FileResponse(index_file)
+            return FileResponse(
+                candidate,
+                headers={"Cache-Control": _cache_control(full_path)},
+            )
+        return FileResponse(
+            index_file,
+            headers={"Cache-Control": "no-cache"},
+        )
 
     # CORS stays permissive to match the server (the host is single-origin, so
     # it is a no-op for the browser). Basic Auth is added last so it wraps

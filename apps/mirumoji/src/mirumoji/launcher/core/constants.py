@@ -43,19 +43,20 @@ Identifier for the backend service in the `Mirumoji` Docker Compose application
 
 # --- Docker Image References ---
 
-FRONTEND_IMAGE = "svdc1/mirumoji:frontend-latest"
+FRONTEND_IMAGE = "svdc1/mirumoji:frontend-{version}"
 """
-Docker Hub Identifier of the latest `Mirumoji` frontend image
+String template for a Docker Hub Identifier of the `Mirumoji`
+frontend image
 """
-BACKEND_CPU_IMAGE = "svdc1/mirumoji:backend-cpu-latest"
+BACKEND_CPU_IMAGE = "svdc1/mirumoji:backend-cpu-{version}"
 """
-Docker Hub Identifier of the latest `Mirumoji` backend image for the `modal`
-transcription backend
+String template for a Docker Hub Identifier of the `Mirumoji` backend image for
+the `modal` transcription backend
 """
-BACKEND_GPU_IMAGE = "svdc1/mirumoji:backend-gpu-latest"
+BACKEND_GPU_IMAGE = "svdc1/mirumoji:backend-gpu-{version}"
 """
-Docker Hub Identifier of the latest `Mirumoji` backend image for the `local`
-transcription backend
+String template for Docker Hub Identifier of the `Mirumoji` backend image
+for the `local` transcription backend
 """
 
 # Tags Assigned To Images Built Locally
@@ -295,6 +296,15 @@ Launcher-Only. The compose template never references it, and the server
 ignores it
 """
 
+VERSION_VAR = "MIRUMOJI_VERSION"
+"""
+Pins the published image version the launcher pulls (and composes the Modal
+host from), defaulting to the installed package version
+
+Launcher-Only. It fills the `{version}` in the image references above and is
+never passed to the server or a container
+"""
+
 
 # --- Managed Config Surface ---
 
@@ -318,7 +328,9 @@ _DEPLOYMENT_CHOICES: dict[str, tuple[str, ...]] = {
 }
 
 CONFIG_KEYS: frozenset[str] = frozenset(
-    [v.name for v in CONFIG_ENV_VARS] + list(_DEPLOYMENT_CHOICES)
+    [v.name for v in CONFIG_ENV_VARS]
+    + list(_DEPLOYMENT_CHOICES)
+    + [VERSION_VAR]
 )
 """
 Every environment variable key that the launcher accepts in the managed config

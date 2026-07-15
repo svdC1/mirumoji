@@ -598,6 +598,26 @@ def require_env(backend: Backend, env_path: Path) -> None:
         )
 
 
+def require_published_version(version: str) -> None:
+    """
+    Aborts a CLI command when a pinned `version` has no published images
+
+    A thin wrapper over `checks.require_published_version` that maps its
+    `DependencyError` to a clean `Typer` exit
+
+    Args:
+        version (str): The resolved image version
+
+    Raises:
+        typer.Exit: If the version has no published images or Docker Hub could
+            not be reached
+    """
+    try:
+        checks.require_published_version(version)
+    except LauncherError as exc:
+        raise fail(str(exc)) from exc
+
+
 def resolve_managed_config(env_path: Path) -> dict[str, str]:
     """
     Resolves the managed config, overlaying it with the process' environment

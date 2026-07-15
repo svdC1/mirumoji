@@ -15,8 +15,9 @@ import {
 } from "@/contexts/OperationSettingsContext";
 import { Button, Card, InfoTip, Input, Label, Segmented, TextArea, Toggle } from "@/shared/ui";
 import type { ConvertOpts, TranscribeOpts } from "@/shared/jobs/types";
+import { AppDataPanel } from "./AppDataPanel";
 
-type SubTab = "transcription" | "conversion";
+type SubTab = "transcription" | "conversion" | "app-data";
 
 // Hides the native number-input spin buttons (the white up/down arrows).
 const SPINNER_OFF =
@@ -138,6 +139,7 @@ export function AdvancedPanel() {
                 options={[
                     { value: "transcription", label: "Transcription" },
                     { value: "conversion", label: "Conversion" },
+                    { value: "app-data", label: "App Data" },
                 ]}
                 value={subTab}
                 onChange={setSubTab}
@@ -260,7 +262,7 @@ export function AdvancedPanel() {
                         />
                     </div>
                 </>
-            ) : (
+            ) : subTab === "conversion" ? (
                 <>
                     <p className="text-sm text-ink-muted">MP4 Conversion Output Settings</p>
                     <div>
@@ -301,16 +303,20 @@ export function AdvancedPanel() {
                         </div>
                     </div>
                 </>
+            ) : (
+                <AppDataPanel />
             )}
 
-            <div className="flex gap-2 border-t border-ink/10 pt-4">
-                <Button onClick={onSave} disabled={!dirty}>
-                    Save
-                </Button>
-                <Button variant="secondary" onClick={onReset}>
-                    Reset<span className="hidden sm:inline">{" To Default"}</span>
-                </Button>
-            </div>
+            {subTab !== "app-data" && (
+                <div className="flex gap-2 border-t border-ink/10 pt-4">
+                    <Button onClick={onSave} disabled={!dirty}>
+                        Save
+                    </Button>
+                    <Button variant="secondary" onClick={onReset}>
+                        Reset<span className="hidden sm:inline">{" To Default"}</span>
+                    </Button>
+                </div>
+            )}
         </Card>
     );
 }
