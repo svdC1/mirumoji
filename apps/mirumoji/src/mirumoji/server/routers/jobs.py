@@ -25,7 +25,11 @@ from fastapi import (
 
 from ..db import UnitOfWork
 from ..db.models import JobDTO
-from ..dependencies import ensure_profile_exists, get_job_manager
+from ..dependencies import (
+    ensure_profile_exists,
+    get_job_manager,
+    get_profile_id_optional,
+)
 from ..jobs import JobQueueManager
 from ..models.requests import SubmitBatchRequest, SubmitJobRequest
 from ..models.responses import JobResponse
@@ -198,22 +202,31 @@ async def submit_batch(
 
 @jobs_router.get("", response_model=list[JobResponse])
 async def list_jobs(
-    profile_id: Annotated[str, Depends(ensure_profile_exists)],
+    profile_id: Annotated[str | None, Depends(get_profile_id_optional)],
     active: Annotated[bool, Query()] = False,
 ) -> list[JobResponse]:
     """
     Lists the active profile's top-level jobs (batch children are excluded)
 
+    info: Profile Optional
+        A poll that arrives without `X-Profile-ID` (a service-worker replay,
+        which cannot inject the app header) returns an empty list rather than a
+        `400`, so it does not surface as a spurious error
+
     Args:
-        profile_id (str): Validated profile id
+        profile_id (str | None): Validated profile id, or `None` when the
+            header is absent
         active (bool): Restrict to `queued` / `running` jobs
 
     Returns:
-        The profile's jobs, newest first
+        The profile's jobs, newest first, or an empty list when no profile is
+        set
 
     Raises:
         DatabaseError: If the query fails
     """
+    if profile_id is None:
+        return []
     async with UnitOfWork() as uow:
         jobs = await uow.jobs.list_for_profile(profile_id, active_only=active)
     return [_to_response(j) for j in jobs]
