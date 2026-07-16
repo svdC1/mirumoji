@@ -80,13 +80,20 @@ Once you log in, the whole app loads and works exactly like a local install, wit
 
     - A `401` makes the browser show its own prompt and then attach the credentials to `every` later request *(the page, the assets, the API, the uploads)* automatically
 
-    - That gates the whole app without a login page, cookies, or any change to the server or frontend, which keeps the app itself free of auth for its *primary* use as a self-hosted tool
+    - That gates the whole app without a login page or any change to the server or frontend, which keeps `Mirumoji` free of auth for its *primary* use as a self-hosted tool
+
+    - After the first login the host sets a persistent, `HttpOnly` cookie and accepts it in place of the prompt, so an installed `iOS` `PWA` *(which drops the `Basic Auth` credential cache whenever it is closed)* does not re-prompt for the password on every reopen. Changing `MIRUMOJI_WEB_PASSWORD` invalidates it
 
     - See [`Sharing Outside Your Network`](../guides/sharing.md#modal-host-private-full-deploy) for how this compares to the other sharing options and how to add identity-based access if you need it
 
 ## Your Data
 
 Unlike a local install *(which keeps your data in local Docker volumes)*, the hosted app stores your media and database in the `mirumoji-data` [`Modal Volume`](https://modal.com/docs/guide/volumes), created automatically on the first deploy
+
+???+ question "How It Stays Fast And Durable"
+    - The host does not read and write directly on the volume, whose network layer is slow for the many small, random reads that video playback and the database make. It operates on the container's local disk and mirrors every change to the volume in the background
+
+    - `Modal` commits the volume as the app runs and on shutdown, and the host restores it into the container on every start, so your data survives a redeploy, a stop, or a spot preemption
 
 === "Back It Up"
     Download everything in the volume to a local folder at any time

@@ -19,6 +19,62 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.5.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.5.1) - 2026-07-16
+
+This release fixes several issues with the `Modal`-hosted deploy. It moves media serving and the
+database off the volume's slow network layer so hosted video plays smoothly,
+makes shutdown and spot preemption exit cleanly, completes the `PWA` install
+behind the host login on `iOS`, and stops the installed app from re-prompting for
+the password. It also fixes a previously uncaught clip-recording hang on `iOS`.
+It has no breaking changes
+
+### Fixed
+
+- `Launcher` &rarr; Besides an overall poor application performance when hosting on `Modal`,
+  video playback stalled and clip recording failed. The `Modal` host served media and ran
+  the database directly off the persistent volume's `FUSE` layer, whose per-request random
+  reads take seconds, so every seek re-buffered and the browser recorder
+  *(which captures live playback)* had no continuous stream to record.
+  The host now reads and writes user data on the container's local disk and mirrors changes
+  to the volume in the background, keeping media and database I/O off the slow layer while
+  `Modal` still persists the data
+
+- `Launcher` &rarr; The `Modal` host could overrun `Modal`'s shutdown grace and be
+  force-killed *(logging `Runner has been shutting down for too long`)* when a stop
+  or a spot preemption stranded an in-flight volume read on a background thread. A
+  watchdog *(a daemon thread started at shutdown that terminates the process if it doesn't
+  exit in less than 10 seconds)* now exits the container cleanly within the grace window,
+  so a stop or preemption releases promptly
+
+- `Launcher` &rarr; The `Modal` host wrote its request log to the persistent volume
+  on every request, growing it unbounded and adding a volume write to the hot
+  path. It now logs to standard output, which `Modal` captures, so nothing is
+  written to the volume. `Modal` persists logs natively through the `Stopped Apps`
+  interface, so writing to a log file would be redundant and decrease performance
+
+- `Frontend` &rarr; The installed `PWA` icon did not render on `iOS` and the app was
+  not installable behind the host login. `iOS` fetches the manifest, its icons, and
+  the `apple-touch-icon` as install subresources without the login, so behind
+  `HTTP Basic Auth` they returned `401`. The host now serves exactly those public
+  install files without auth, while the shell, the hashed assets, and the API stay
+  gated
+
+- `Frontend` &rarr; An installed `iOS` `PWA` re-prompted for the host password on
+  every reopen, since `iOS` drops the `Basic Auth` credential cache when the app is
+  suspended. A passed login now sets a persistent, `HttpOnly` cookie that the host
+  accepts in place of the credentials, so a reopened app authenticates silently
+  *(rotating the password invalidates it)*
+
+- `Frontend` &rarr; Saving a clip on `iOS` could hang on `Recording` from a fresh
+  player. The recorder's audio pipeline needs its `AudioContext` resumed inside a
+  user gesture, but fetching the word explanation first spent it, leaving the audio
+  track dead. The save now resumes the context on the tap, and the recorder can no
+  longer hang indefinitely
+
+- `Server` &rarr; `GET /api/jobs` returned `400` for a poll that arrived without an
+  `X-Profile-ID` header *(a service-worker replay the app cannot attach the header
+  to)*. It now returns an empty list, so the errors stop
+
 ## [`3.5.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.5.0) - 2026-07-15
 
 This release makes the launcher run the container images that match the

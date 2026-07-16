@@ -26,10 +26,11 @@ info: Compute
     - It also always scales to zero, preventing unexpected idle-GPU costs
 
 info: Persistence
-    - A named `modal.Volume` is mounted at the container's `platformdirs` data
-      path (where the mirumoji server keeps all user data) on every startup,
-      so the database and media persist exactly as the Docker `data` volume
-      does
+    - A named `modal.Volume` is mounted at `DATA_MOUNT`, a path separate from
+      the server's data path. The server reads and writes user data on the
+      container's local disk, and a background task (see `launcher.modal.app`)
+      mirrors it to the volume, keeping media and database I/O off the slow
+      volume FUSE layer while `Modal`'s volume commits still persist it durably
 
     - `mirumoji modal deploy` creates that volume in the user's `Modal`
       workspace when it doesn't exist, and `mirumoji modal stop -v` allows
@@ -68,7 +69,6 @@ from .constants import (
     HOST_CPU_VAR,
     HOST_MAX_CONCURRENT_REQUESTS_VAR,
     HOST_MEMORY_VAR,
-    STATE_MOUNT,
 )
 
 if TYPE_CHECKING:
@@ -86,11 +86,6 @@ def _host_image(version: str) -> modal.Image:
     Kotobase data) and copies the already-published frontend build in, so the
     deploy needs no new artifact
 
-    info: Log Persistence
-        Sets `XDG_STATE_HOME` under the volume mount so the server's logs
-        (which platformdirs places under the state dir on Linux) land on the
-        persistent volume rather than ephemeral container storage
-
     Args:
         version (str): The published image version to compose from
 
@@ -99,11 +94,9 @@ def _host_image(version: str) -> modal.Image:
     """
     frontend = FRONTEND_IMAGE.format(version=version)
     copy = f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
-    return (
-        modal.Image.from_registry(BACKEND_CPU_IMAGE.format(version=version))
-        .dockerfile_commands(copy)
-        .env({"XDG_STATE_HOME": STATE_MOUNT})
-    )
+    return modal.Image.from_registry(
+        BACKEND_CPU_IMAGE.format(version=version)
+    ).dockerfile_commands(copy)
 
 
 def web() -> FastAPI:
@@ -169,8 +162,8 @@ def build_host_app(
           transcription is never cut off and the in-process job queue runs
 
         - `max_containers=1` pins the count to one, since the server holds
-          in-process state and writes a single-writer SQLite file on the
-          volume, so it can't run as multiple replicas
+          in-process state and writes a single-writer SQLite file on local
+          disk (mirrored to the volume), so it can't run as multiple replicas
 
         - The pinned count also makes a scaledown window unnecessary, so none
           is set

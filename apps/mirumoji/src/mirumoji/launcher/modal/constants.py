@@ -6,9 +6,10 @@ info: Pre-Defined Values
       that runs the `FastAPI` application
       (`HOST_APP_NAME`, `WEB_FUNCTION_NAME`)
 
-    - The name of the persistent `Modal` volume used to store user data and the
-      location in which its mounted in the `web function's` container
-      (`DATA_VOLUME_NAME`, `DATA_MOUNT`)
+    - The name of the persistent `Modal` volume used to store user data, the
+      separate path at which it is mounted, and the local-disk path the server
+      reads and writes and the syncer mirrors to the volume
+      (`DATA_VOLUME_NAME`, `DATA_MOUNT`, `CONTAINER_CACHE`)
 
     - Where the built frontend lives inside the Docker image run by the
       `web function` and where the frontend lives inside mirumoji's published
@@ -44,26 +45,31 @@ DATA_VOLUME_NAME = "mirumoji-data"
 The persistent `modal.Volume` name backing the database and media
 """
 
-DATA_MOUNT = "/root/.local/share/mirumoji"
+DATA_MOUNT = "/opt/mirumoji/volume_mnt"
 """
-Where the persistent `Volume` mounts, matching the container's platformdirs
-`user_data_path` so the server's storage lands on the volume unchanged (the
-same path the Docker `data` volume uses)
+Where the persistent `Volume` mounts inside the container
+
+The volume is mounted in the container at this path only so that
+a background task can utilise the mount's FUSE syncing to persist
+user data from the `CONTAINER_CACHE` to the volume on file-system
+changes. Therefore, this directory is always kept in sync with
+`CONTAINER_CACHE` throughout the application's lifespan
 """
 
-STATE_MOUNT = f"{DATA_MOUNT}/state"
+CONTAINER_CACHE = "/root/.local/share/mirumoji"
 """
-Value for the container's `XDG_STATE_HOME`, kept under `DATA_MOUNT`
+Where the mirumoji user data lives inside the container, matching the
+container's platformdirs `user_data_path`
 
-question: Why
-    - On Linux, `platformdirs` places the log directory under the state dir
-      (`XDG_STATE_HOME`), which is a separate top-level path from the data dir,
-      so server logs would otherwise land on ephemeral container storage
-      instead of the mounted volume
+info: Data Handling
+    - Instead of mounting the persistent volume directly on this path,
+      a background task watches this directory and keeps the volume
+      in sync with it
 
-    - Pointing `XDG_STATE_HOME` beneath the volume mount makes the logs persist
-      on the volume alongside the database and media, using the standard XDG
-      mechanism rather than a mirumoji-specific path override
+    - This allows the application to serve files and perform database
+      operations directly on the container's NVMe, avoiding network
+      latency on file operations, which would considerably slow down
+      the application
 """
 
 FRONTEND_DIR = "/opt/mirumoji/frontend"

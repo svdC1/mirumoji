@@ -4,11 +4,37 @@
  * to a canvas-based approach (iOS Safari). Also picks a supported MIME type.
  */
 
-// Single shared audio context (created lazily-ish at module load).
-const sharedAudioCtx = new (
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-)();
+// One shared AudioContext for the canvas-fallback recording path (iOS Safari).
+// Created lazily so it is born inside a user gesture rather than suspended at
+// page load, which a later recording cannot reliably resume.
+let sharedAudioCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+    if (!sharedAudioCtx) {
+        const Ctor =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        sharedAudioCtx = new Ctor();
+    }
+    return sharedAudioCtx;
+}
+
+/**
+ * Warms the recorder's AudioContext from within a user gesture.
+ *
+ * The canvas-fallback recording path (iOS Safari) draws its audio from this
+ * shared AudioContext, which only leaves the "suspended" state when resumed
+ * during a user activation. A save-clip flow can await a breakdown stream for
+ * several seconds before recording, by which point the click's activation is
+ * spent and the context can no longer resume. Call this synchronously from the
+ * click handler so the context is already running when recording starts.
+ */
+export function warmupRecorder(): void {
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") {
+        void ctx.resume();
+    }
+}
 
 // One MediaElementAudioSourceNode per <video> (a video may only ever connect to
 // a single source node for the page's lifetime).
@@ -45,14 +71,21 @@ export async function getStream(
         throw new Error("Could not create 2D canvas context.");
     }
 
-    let sourceNode = elementSourceMap.get(videoElement);
-    if (!sourceNode) {
-        sourceNode = sharedAudioCtx.createMediaElementSource(videoElement);
-        elementSourceMap.set(videoElement, sourceNode);
-        sourceNode.connect(sharedAudioCtx.destination);
+    const audioCtx = getAudioContext();
+    // The context may still be suspended if the gesture was never warmed; try
+    // to resume it here too so the audio track produces data.
+    if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
     }
 
-    const destinationNode = sharedAudioCtx.createMediaStreamDestination();
+    let sourceNode = elementSourceMap.get(videoElement);
+    if (!sourceNode) {
+        sourceNode = audioCtx.createMediaElementSource(videoElement);
+        elementSourceMap.set(videoElement, sourceNode);
+        sourceNode.connect(audioCtx.destination);
+    }
+
+    const destinationNode = audioCtx.createMediaStreamDestination();
     sourceNode.connect(destinationNode);
 
     const videoTrack = canvas.captureStream(30).getVideoTracks()[0];
@@ -87,6 +120,16 @@ export function createRecordingPromise(
     recordingOptions: { mimeType: string; fileExtension: string }
 ): Promise<File> {
     return new Promise<File>((resolve, reject) => {
+        let settled = false;
+        const stopTracks = () => stream.getTracks().forEach((track) => track.stop());
+        // Settle exactly once. Guards against a late safety-timeout firing after
+        // a normal onstop, and against onstop never firing at all.
+        const finish = (run: () => void) => {
+            if (settled) return;
+            settled = true;
+            run();
+        };
+
         try {
             const recorder = new MediaRecorder(stream, { mimeType: recordingOptions.mimeType });
             const chunks: BlobPart[] = [];
@@ -96,30 +139,47 @@ export function createRecordingPromise(
             };
 
             recorder.onstop = () => {
-                stream.getTracks().forEach((track) => track.stop());
+                stopTracks();
                 if (chunks.length === 0) {
-                    return reject(new Error("No video data was recorded."));
+                    finish(() => reject(new Error("No video data was recorded.")));
+                    return;
                 }
                 const blob = new Blob(chunks, { type: recordingOptions.mimeType });
                 const file = new File([blob], `clip.${recordingOptions.fileExtension}`, {
                     type: recordingOptions.mimeType,
                 });
-                resolve(file);
+                finish(() => resolve(file));
             };
 
             recorder.onerror = (event: Event) => {
-                stream.getTracks().forEach((track) => track.stop());
+                stopTracks();
                 const err = (event as unknown as { error?: { name?: string } }).error;
-                reject(new Error("MediaRecorder error: " + (err?.name || "Unknown error")));
+                finish(() =>
+                    reject(new Error("MediaRecorder error: " + (err?.name || "Unknown error")))
+                );
             };
 
             recorder.start();
-            setTimeout(() => {
-                if (recorder.state === "recording") recorder.stop();
+            // Stop at the intended clip length.
+            window.setTimeout(() => {
+                try {
+                    if (recorder.state === "recording") recorder.stop();
+                } catch {
+                    // Nothing to do; the safety timeout below is the backstop.
+                }
             }, duration);
+            // Backstop: if the stream's tracks died so the recorder went inactive
+            // without ever firing onstop, settle anyway so the caller is never
+            // stuck on "Recording..." forever.
+            window.setTimeout(() => {
+                finish(() => {
+                    stopTracks();
+                    reject(new Error("Recording timed out."));
+                });
+            }, duration + 4000);
         } catch (e) {
-            stream.getTracks().forEach((track) => track.stop());
-            reject(e);
+            stopTracks();
+            finish(() => reject(e));
         }
     });
 }
