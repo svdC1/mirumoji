@@ -33,6 +33,7 @@ import { apiGetTemplate, streamBreakdown } from "@/shared/llm/api";
 import { toastApiError } from "@/shared/api/errors";
 import { toHiragana } from "@/shared/japanese/kana";
 import { createAndSaveClip } from "@/shared/clips/create";
+import { warmupRecorder } from "@/shared/clips/recorder";
 import { Badge, cn } from "@/shared/ui";
 import type { EnrichedJapaneseWord, KotobaseData, Token } from "@/shared/dict/types";
 import type { BreakdownResponse } from "@/shared/llm/types";
@@ -346,6 +347,11 @@ export default function WordDialog({
             toast.error("No Video Source Available");
             return;
         }
+        // Resume the recorder's AudioContext now, while the click gesture is
+        // still active. The breakdown fetch below can take seconds, after which
+        // the activation is spent and the iOS canvas-fallback recorder can no
+        // longer bring up its audio pipeline.
+        warmupRecorder();
         setSaving(true);
         try {
             let breakdown = breakdownCache.get(key) ?? null;
