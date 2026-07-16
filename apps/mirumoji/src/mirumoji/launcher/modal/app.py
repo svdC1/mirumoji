@@ -5,24 +5,58 @@ Builds a FastAPI application that serves the built React frontend and mounts
 the server's routers under `/api`, so a single Modal ASGI app answers both the
 `SPA` and the `API` on one origin
 
-The server's own `create_app` factory is left untouched, this reuses its
-lifespan, exception handlers, and routers by import
+info: Local-Disk Data With Background Volume Sync
+    - The persistent `modal.Volume` is not mounted on the path where the server
+      reads and writes user data. Instead the server operates on the
+      container's local disk (`CONTAINER_CACHE`) and a background task mirrors
+      every change to the volume mount (`DATA_MOUNT`)
+
+    - This keeps media serving and database access off the volume's `FUSE`
+      layer, whose per-request random reads are slow enough to stall video
+      playback, while `Modal`'s background and shutdown volume commits still
+      persist the data durably
+
+The server's own `create_app` factory is left untouched. This wraps its
+`lifespan` (never modifying it) and reuses its exception handlers and routers
+by import
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import shutil
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .auth import BasicAuthMiddleware
-from .constants import WEB_PASSWORD_ENV, WEB_USERNAME
+from .constants import (
+    CONTAINER_CACHE,
+    DATA_MOUNT,
+    WEB_PASSWORD_ENV,
+    WEB_USERNAME,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from fastapi import FastAPI
 
 LOGGER = logging.getLogger(__name__)
+
+_HOST_EXIT_BUDGET_S = 10.0
+"""
+Seconds the host waits for a clean shutdown before forcing the process to exit
+
+A stranded `FUSE` write on a non-daemon thread (the volume syncer, or `Modal`'s
+own volume commit) can keep the process alive past `Modal`'s shutdown grace, so
+a daemon watchdog forces the exit within this budget, which sits comfortably
+above a normal shutdown and below `Modal`'s grace, turning a grace-period
+`SIGKILL` into a clean exit
+"""
 
 
 def _is_within(root: Path, path: Path) -> bool:
@@ -66,6 +100,281 @@ def _cache_control(full_path: str) -> str:
     return "no-cache"
 
 
+def _remove(path: Path) -> None:
+    """
+    Removes a file or a directory tree at `path`, tolerating a missing target
+
+    Args:
+        path (Path): The path to remove
+    """
+    if path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+    elif path.exists():
+        path.unlink()
+
+
+def _dir_size(root: Path) -> int:
+    """
+    Returns the total size in bytes of every file under `root`
+
+    Used only for the warmup benchmark log, so a file vanishing mid-walk
+    or any other `OSError` is skipped rather than raised
+
+    Args:
+        root (Path): The directory to measure
+
+    Returns:
+        The summed size of every file under `root`
+    """
+    total = 0
+    for path in root.rglob("*"):
+        try:
+            if path.is_file():
+                total += path.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _shutdown_log(message: str) -> None:
+    """
+    Writes a host-shutdown message straight to stdout
+
+    question: Why Not `LOGGER`
+        - The core lifespan tears logging down as its final shutdow
+          step, so by the time the host's shutdown code runs the
+          logger has no handlers
+
+        - Writing to stdout keeps these lines in `Modal`'s captured
+          container logs
+
+    Args:
+        message (str): The message to write
+    """
+    print(f"[mirumoji-host] {message}", flush=True)
+
+
+def _arm_shutdown_watchdog() -> None:
+    """
+    Starts a daemon thread that forces the process to exit if a clean shutdown
+    overruns `_HOST_EXIT_BUDGET_S`
+
+    info: Why
+        - A `FUSE` write left running on a non-daemon worker thread can block
+          interpreter exit long enough to overrun `Modal`'s shutdown grace,
+          which then reports a `SIGKILL` failure
+
+        - A daemon thread never blocks a clean exit, so when shutdown finishes
+          in time the process exits first and the watchdog dies with it. Only a
+          genuinely stuck shutdown ever reaches the `os._exit`
+    """
+    import threading
+
+    def _force_exit() -> None:
+        time.sleep(_HOST_EXIT_BUDGET_S)
+        _shutdown_log(
+            f"[Shutdown Watcher] Shutdown Exceeded "
+            f"{_HOST_EXIT_BUDGET_S:.0f}s, Forcing Exit"
+        )
+        os._exit(0)
+
+    threading.Thread(
+        target=_force_exit,
+        name="host-exit-watchdog",
+        daemon=True,
+    ).start()
+
+
+async def _warm_cache(cache: Path, mount: Path) -> None:
+    """
+    Restores the local cache from the volume at startup
+
+    Copies the persisted user data from the volume mount into the local cache
+    so a redeployed or restarted container serves the user's existing database
+    and media. A first-ever deploy has an empty volume and copies nothing
+
+    info: Benchmark
+        Logs the restored size and elapsed time, since this bulk read off the
+        volume is the one unavoidable `FUSE` cost and dominates cold-start time
+
+    info: Fail-Closed
+        Re-raises on any copy error, so the caller aborts startup rather than
+        let the app run on a partial cache that the syncer would then mirror
+        back over the intact volume
+
+    Args:
+        cache (Path): The local cache directory to populate
+        mount (Path): The mounted volume directory to restore from
+
+    Raises:
+        OSError: If the restore copy fails
+    """
+    if not mount.exists() or not any(mount.iterdir()):
+        LOGGER.info(f"[Warm Cache] Volume '{mount}' Empty, Nothing To Warm")
+        return
+    LOGGER.info(
+        f"[Warm Cache] Warming Cache From Volume '{mount}' -> '{cache}'"
+    )
+    start = time.perf_counter()
+    await asyncio.to_thread(shutil.copytree, mount, cache, dirs_exist_ok=True)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    size_mib = _dir_size(cache) / (1024 * 1024)
+    LOGGER.info(
+        f"[Warm Cache] Warmed {size_mib:.1f}MiB Into "
+        f"Cache In {elapsed_ms:.1f}ms"
+    )
+
+
+async def _volume_syncer(cache: Path, mount: Path) -> None:
+    """
+    Long-running background task mirroring every change under `cache` to
+    `mount` for the whole application lifespan, so user data written to the
+    fast local disk is persisted to the `Modal` volume
+
+    question: Why
+        - The server reads and writes user data on `cache` (local container
+          disk) rather than on the volume mount, keeping media serving and
+          database access off the volume's slow `FUSE` layer
+
+        - This task copies additions and modifications to `mount` and removes
+          deletions from it, so `Modal`'s background and shutdown commits
+          persist the data
+
+    info: Resilience
+        - Every filesystem operation is guarded, so one failed copy or delete
+          is logged and never stops the task
+
+        - If the watcher itself errors, it is restarted after a short backoff,
+          so a transient failure does not silently end syncing
+
+        - Exits promptly on cancellation at shutdown
+
+    Args:
+        cache (Path): The local directory the server reads and writes
+        mount (Path): The mounted volume directory kept in sync with `cache`
+    """
+    # watchfiles ships as a `modal` dependency, so it is always importable in
+    # the container the host runs in
+    from watchfiles import Change, awatch
+
+    LOGGER.info(f"[Volume Syncer] Watching '{cache}' -> '{mount}'")
+    while True:
+        try:
+            async for changes in awatch(cache):
+                for change_type, src_str in changes:
+                    src = Path(src_str)
+                    try:
+                        rel = src.relative_to(cache)
+                    except ValueError:
+                        # Not under the cache, ignore
+                        continue
+                    dest = mount / rel
+                    try:
+                        if change_type is Change.deleted:
+                            await asyncio.to_thread(_remove, dest)
+                            LOGGER.info(f"[Volume Syncer] Removed '{rel}'")
+                        elif src.is_file():
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            await asyncio.to_thread(shutil.copy2, src, dest)
+                            LOGGER.info(f"[Volume Syncer] Copied '{rel}'")
+                    except Exception as e:
+                        LOGGER.error(
+                            f"[Volume Syncer] Failed To Sync "
+                            f"'{src}' -> '{dest}' : {e}"
+                        )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            LOGGER.error(f"[Volume Syncer] Watcher Failed, Restarting : {e}")
+            await asyncio.sleep(1.0)
+
+
+def _log_syncer_exit(task: asyncio.Task[None]) -> None:
+    """
+    Done-callback that surfaces an unexpected volume-syncer exit
+
+    A cancelled syncer is the normal shutdown path and is ignored. Any other
+    exit means the background mirror stopped while the app was still running,
+    which is logged so it is not silent
+
+    Args:
+        task (asyncio.Task[None]): The finished syncer task
+    """
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        LOGGER.error(f"[Volume Syncer] Exited Unexpectedly : {exc}")
+
+
+@asynccontextmanager
+async def modal_host_lifespan(host_app: FastAPI) -> AsyncIterator[None]:
+    """
+    Wraps the server's core lifespan with the host's local-disk + volume-sync
+    persistence, without modifying the core lifespan
+
+    info: Startup Steps
+        - Ensures the local cache exists
+
+        - Warms it from the volume (restoring the user's data on a
+          redeploy or restart)
+
+        - Starts the background volume syncer BEFORE the core lifespan, so
+          every file the core startup writes (the database, the media tree) is
+          mirrored to the volume
+
+        - Runs the core lifespan
+
+    info: Shutdown
+        After the core lifespan's teardown (so the database is already closed)
+
+        - A watchdog is armed at shutdown onset so a stranded `FUSE` write can
+          never keep the container alive past `Modal`'s grace
+
+        - Cancels the syncer
+
+        - `Modal`'s background and final volume commits persist everything the
+          syncer copied, so no explicit reconciliation or commit is needed
+
+    info: Core Untouched
+        The server's `lifespan` runs verbatim through `async with`, so the
+        Docker deployment that shares it is unaffected
+
+    Args:
+        host_app (FastAPI): The host application whose lifecycle is managed
+
+    Yields:
+        Control to the running application, matching the core lifespan's yield
+    """
+    from ...server.app import lifespan
+
+    LOGGER.info("[Host Lifespan] Started Host Config")
+
+    cache = Path(CONTAINER_CACHE)
+    mount = Path(DATA_MOUNT)
+    syncer: asyncio.Task[None] | None = None
+    try:
+        cache.mkdir(parents=True, exist_ok=True)
+        LOGGER.info(f"[Host Lifespan] Container Cache Ready At '{cache}'")
+        # A Failed Warmup Must Abort Startup, Never Run The App On Partial Data
+        await _warm_cache(cache, mount)
+        LOGGER.info("[Host Lifespan] Starting Volume Syncer")
+        syncer = asyncio.create_task(_volume_syncer(cache, mount))
+        syncer.add_done_callback(_log_syncer_exit)
+        async with lifespan(host_app):
+            yield
+            # Healthy Shutdown Begins Here
+            # Guard Exit Before The Syncer And
+            # Modal's Volume Commit Run Their Final FUSE Writes
+            _arm_shutdown_watchdog()
+    finally:
+        if syncer is not None:
+            syncer.cancel()
+            await asyncio.gather(syncer, return_exceptions=True)
+            _shutdown_log("[Volume Syncer] Stopped")
+        _shutdown_log("[Host Lifespan] Host Teardown Complete")
+
+
 def create_host_app(frontend_dir: Path) -> FastAPI:
     """
     Builds the FastAPI application server by the `mirumoji-host` Modal app
@@ -73,10 +382,14 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
     info: Additive
         - Does not modify or call `server.app.create_app`
 
-        - Reuses the server's `lifespan`, exception handlers, and routers by
-          import, mounting the routers under `/api` (matching the frontend's
-          relative `/api` base) and serving the built frontend as a single-page
-          app for everything else
+        - Reuses the server's exception handlers and routers by import,
+          mounting the routers under `/api` (matching the frontend's relative
+          `/api` base) and serving the built frontend as a single-page app for
+          everything else
+
+        - Wraps the server's `lifespan` in `modal_host_lifespan`, which adds
+          the local-disk + volume-sync persistence without changing the core
+          lifespan
 
     info: Access Gate
         - When `MIRUMOJI_WEB_PASSWORD` is set, the whole app is wrapped in HTTP
@@ -110,11 +423,9 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
 
     from ...exceptions import MirumojiServerError
     from ...log import takeover_logging
-    from ...paths import HOST_LOG_PATH
     from ...server import media
     from ...server.app import (
         http_exception_handler,
-        lifespan,
         mirumoji_exception_handler,
     )
     from ...server.config import get_settings
@@ -125,8 +436,9 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
     from ...server.routers.llm import llm_router
     from ...server.routers.profile import profile_router
 
+    # No FileHandler. Modal captures container stdout natively
     takeover_logging(
-        log_file="backend.log",
+        log_file=None,
         console=True,
         level=get_settings().logging_level,
     )
@@ -135,12 +447,12 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
 
     LOGGER.info("App Build Started")
 
-    LOGGER.info(f"Storing Logs At '{HOST_LOG_PATH / 'backend.log'}'")
+    LOGGER.info("Logging To Stdout (Captured By Modal)")
 
     app = FastAPI(
         title="Mirumoji",
         description="Japanese sentence breakdown, audio processing and LLM.",
-        lifespan=lifespan,
+        lifespan=modal_host_lifespan,
     )
 
     for router in (
@@ -154,7 +466,9 @@ def create_host_app(frontend_dir: Path) -> FastAPI:
 
     # The server serves user media under `media.BASE_PATH`, one level below the
     # frontend so the SPA catch-all never shadows it. `check_dir=False` because
-    # the directory is created by `media.init_storage()` in the lifespan
+    # the directory is created by `media.init_storage()` in the lifespan.
+    # `media.BASE_PATH` is on the container's local disk (`CONTAINER_CACHE`),
+    # not the volume mount, so serving media never touches the slow FUSE layer
     app.mount(
         "/api/media",
         StaticFiles(directory=media.BASE_PATH, check_dir=False),
