@@ -7,4 +7,4 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("mirumoji")
 except PackageNotFoundError:
-    __version__ = "3.5.0"
+    __version__ = "3.5.1"
