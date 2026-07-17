@@ -68,6 +68,12 @@ Every character in Unicode's Box Drawing block, so the borders `Rich` frames
 the `modal` CLI's error panels with can be stripped whatever style it uses
 """
 
+_ASCII_BORDER = "+-|"
+"""
+The ASCII characters `Rich` draws its panel borders with when it renders to a
+non-`UTF` terminal (a Windows `cp1252` console)
+"""
+
 
 def _clean_subprocess_error(stderr: str) -> str:
     """
@@ -76,6 +82,11 @@ def _clean_subprocess_error(stderr: str) -> str:
     The `modal` CLI frames errors with `Rich`, so its stderr carries ANSI
     colour codes and box-drawing borders. This strips both and returns the last
     line that still has content, which is where the CLI puts the actual error
+
+    info: ASCII Borders
+        `Rich` falls back to `+`, `-`, and `|` borders on a non-`UTF` terminal
+        (a Windows `cp1252` console), so those are stripped too. Otherwise a
+        border line would survive and be returned as the error
 
     Args:
         stderr (str): The captured subprocess stderr
@@ -86,7 +97,7 @@ def _clean_subprocess_error(stderr: str) -> str:
     plain = _ANSI_RE.sub("", stderr)
     content = []
     for line in plain.splitlines():
-        stripped = line.strip(_BOX_DRAWING + " ")
+        stripped = line.strip(_BOX_DRAWING + _ASCII_BORDER + " ")
         if stripped:
             content.append(stripped)
     return content[-1] if content else "Unknown Error"
@@ -146,6 +157,21 @@ The environment variable the `Modal` SDK reads at deploy time to rebuild a
 cached image instead of reusing it
 """
 
+_CHILD_ENCODING = {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+"""
+Forces `utf-8` on the `modal` CLI subprocesses' own standard streams
+
+question: Why
+    - On Windows, a subprocess writing to a captured (non-`TTY`) pipe encodes
+      its output with the legacy `cp1252` codec, so the CLI crashes with a
+      `UnicodeEncodeError` the moment it prints a character `cp1252` can't
+      represent (a box border, a progress glyph, or a Japanese filename),
+      aborting the command partway through
+
+    - Exporting these into the child's environment makes it encode as `utf-8`,
+      so `download-data`, `stop`, and `logs` don't crash encoding their output
+"""
+
 
 @contextmanager
 def modal_credentials(env: dict[str, str]) -> Iterator[None]:
@@ -155,12 +181,16 @@ def modal_credentials(env: dict[str, str]) -> Iterator[None]:
 
     info: Exported Keys
         - The `Modal` SDK and the `modal` CLI subprocesses (`stop`, volume
-          download) authenticate from `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`
-          in the environment, so those are exported
+          download, `logs`) authenticate from `MODAL_TOKEN_ID` /
+          `MODAL_TOKEN_SECRET` in the environment, so those are exported
 
         - `MODAL_FORCE_BUILD` is exported too, but only when explicitly
           enabled, since the SDK reads it from the local process at
           `app.deploy()` to rebuild a cached image instead of reusing it
+
+        - `PYTHONIOENCODING` / `PYTHONUTF8` are exported so the CLI
+          subprocesses encode their output as `utf-8` and don't crash on a
+          Windows `cp1252` pipe (see `_CHILD_ENCODING`)
 
         - The rest of the managed config reaches a deploy through the
           container's inline `Secret`, not the local process, so it never
@@ -180,7 +210,7 @@ def modal_credentials(env: dict[str, str]) -> Iterator[None]:
     Yields:
         None, with the credentials exported for the duration of the block
     """
-    keys = (*_CREDENTIAL_KEYS, _FORCE_BUILD_KEY)
+    keys = (*_CREDENTIAL_KEYS, _FORCE_BUILD_KEY, *_CHILD_ENCODING)
     saved = {key: os.environ.get(key) for key in keys}
     for key in _CREDENTIAL_KEYS:
         if env.get(key):
@@ -189,6 +219,9 @@ def modal_credentials(env: dict[str, str]) -> Iterator[None]:
     # "0" never forces a rebuild
     if env.get(_FORCE_BUILD_KEY) == "1":
         os.environ[_FORCE_BUILD_KEY] = "1"
+    # Force utf-8 on the CLI subprocesses so they don't crash encoding their
+    # own output on a Windows cp1252 pipe
+    os.environ.update(_CHILD_ENCODING)
     try:
         yield
     finally:
