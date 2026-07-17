@@ -25,8 +25,8 @@ info: Pre-Defined Values
 
     - Managed environment variables defining the hardware capability to request
       for the container that runs the `web function`
-      (`HOST_MAX_CONCURRENT_REQUESTS_VAR`, `HOST_CPU_VAR`,
-      `HOST_MEMORY_VAR`)
+      (`HOST_MAX_CONCURRENT_REQUESTS_VAR`, `HOST_CPU_VAR`, `HOST_MEMORY_VAR`,
+      `HOST_ON_GPU_VAR`, `MODAL_GPU_VAR`)
 """
 
 HOST_APP_NAME = "mirumoji-host"
@@ -96,6 +96,35 @@ Managed config key setting the CPU cores reserved for the web container
 HOST_MEMORY_VAR = "MIRUMOJI_HOST_MEMORY"
 """
 Managed config key setting the memory (MiB) reserved for the web container
+"""
+
+HOST_ON_GPU_VAR = "MIRUMOJI_HOST_ON_GPU"
+"""
+Managed config key toggling the single-app GPU host
+
+question: The Two Host Modes
+    - Default (`0` / unset) &rarr; the always-warm web container is `CPU-Only`
+      and offloads transcription and conversion to the separate on-demand
+      `mirumoji-offload` GPU app, so a GPU is paid for only while a job runs
+
+    - Enabled (`1`) &rarr; The web container itself runs on a GPU (the type
+      comes from `MODAL_GPU_VAR`) with the `local` whisper backend in-process,
+      so there is one app and no offload worker, at the cost of an
+      always-warm GPU
+
+question: Why A Toggle Rather Than A Second GPU Variable
+    The GPU type is already configured once by `MODAL_GPU_VAR`
+    (`MIRUMOJI_MODAL_GPU`), so this stays a simple on/off switch and never
+    competes with it
+"""
+
+MODAL_GPU_VAR = "MIRUMOJI_MODAL_GPU"
+"""
+Managed config key naming the Modal GPU type (shared with the offload worker)
+
+The GPU host reads it to size its own function when `HOST_ON_GPU_VAR` is
+enabled, so the same value drives whichever component actually holds the GPU.
+Defaults to `A10G` (the `MIRUMOJI_MODAL_GPU` config default) when unset
 """
 
 WEB_USERNAME = "mirumoji"

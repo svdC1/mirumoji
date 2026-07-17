@@ -58,7 +58,14 @@ import modal
 
 from ...exceptions import ModalError
 from ...modal import ensure_deployed, ensure_volume
-from ..core.constants import BACKEND_CPU_IMAGE, FRONTEND_IMAGE
+from ..core.constants import (
+    BACKEND_CPU_IMAGE,
+    BACKEND_GPU_IMAGE,
+    FRONTEND_IMAGE,
+    MODAL_GPU_IMAGE,
+    TRANSCRIBE_BACKEND_VAR,
+)
+from ..core.models import Backend
 from .constants import (
     DATA_MOUNT,
     DATA_VOLUME_NAME,
@@ -68,6 +75,8 @@ from .constants import (
     HOST_CPU_VAR,
     HOST_MAX_CONCURRENT_REQUESTS_VAR,
     HOST_MEMORY_VAR,
+    HOST_ON_GPU_VAR,
+    MODAL_GPU_VAR,
 )
 
 if TYPE_CHECKING:
@@ -75,27 +84,60 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+HF_CACHE_DIR = "/root/.cache/huggingface"
+"""
+Where the `faster-whisper` model cache lives in the backend images
 
-def _host_image(version: str) -> modal.Image:
+The GPU host grafts this directory from `MODAL_GPU_IMAGE` (which pre-caches the
+model) onto `BACKEND_GPU_IMAGE`, so the first transcription loads it from disk
+instead of downloading it
+"""
+
+DEFAULT_HOST_GPU = "A10G"
+"""
+The GPU a GPU host falls back to when `MODAL_GPU_VAR` is unset, matching the
+`MIRUMOJI_MODAL_GPU` managed-config default
+"""
+
+
+def _host_image(version: str, *, gpu: bool) -> modal.Image:
     """
-    Composes the `Modal` host's image from the published backend and frontend
-    images at `version`
+    Composes the `Modal` host's image from the published images at `version`
 
-    Starts from the CPU backend image (the server stack plus the UniDic and
-    Kotobase data) and copies the already-published frontend build in, so the
-    deploy needs no new artifact
+    info: CPU Host (`gpu=False`)
+        Starts from `BACKEND_CPU_IMAGE` (the server stack plus the UniDic and
+        Kotobase data) and copies the already-published frontend build in, so
+        the deploy needs no new artifact. The container has no GPU and offloads
+        transcription to the on-demand `mirumoji-offload` worker
+
+    info: GPU Host (`gpu=True`)
+        Starts from `BACKEND_GPU_IMAGE` (which adds `faster-whisper` and CUDA)
+        so the `local` whisper backend can run in-process, grafts the
+        pre-cached model from `MODAL_GPU_IMAGE` (which bakes it) so the first
+        transcription needs no download, and copies the frontend in the same
+        way. No offload worker is used in this mode
 
     Args:
         version (str): The published image version to compose from
+        gpu (bool): Compose the GPU host image when `True`, otherwise the CPU
+            one
 
     Returns:
         The composed host image
     """
     frontend = FRONTEND_IMAGE.format(version=version)
-    copy = f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
+    copy_frontend = (
+        f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
+    )
+    if not gpu:
+        return modal.Image.from_registry(
+            BACKEND_CPU_IMAGE.format(version=version)
+        ).dockerfile_commands(copy_frontend)
+    modal_gpu = MODAL_GPU_IMAGE.format(version=version)
+    copy_model = f"COPY --from={modal_gpu} {HF_CACHE_DIR} {HF_CACHE_DIR}"
     return modal.Image.from_registry(
-        BACKEND_CPU_IMAGE.format(version=version)
-    ).dockerfile_commands(copy)
+        BACKEND_GPU_IMAGE.format(version=version)
+    ).dockerfile_commands(copy_frontend, copy_model)
 
 
 def web() -> FastAPI:
@@ -129,11 +171,23 @@ def build_host_app(
     """
     Builds the deployable `Modal` host app with the user's config injected
 
+    info: Host Modes
+        - By default the web container is `CPU-Only` and runs the `modal`
+          backend, offloading transcription and conversion to the on-demand
+          `mirumoji-offload` GPU worker, so a GPU is paid for only while a job
+          runs
+
+        - When `MIRUMOJI_HOST_ON_GPU` is `1` the container runs on the GPU
+          named by `MIRUMOJI_MODAL_GPU` with the `local` whisper backend
+          in-process, so there is a single app and no offload worker, at the
+          cost of an always-warm GPU. The transcribe backend is injected here
+          so the CLI and the GUI never have to decide it
+
     info: Injected Environment
-        - `env` carries the user's relevant resolved configuration
-          (Modal Tokens + LLM Keys + Web Password + Offload Worker Config)
-          as an inline `Secret`, so the container behaves like a local server
-          on the `modal` backend with the frontend served alongside it
+        - `env` carries the user's relevant resolved configuration (Modal
+          Tokens + LLM Keys + Web Password + Modal Config) as an inline
+          `Secret`, so the container behaves like a local server with the
+          frontend served alongside it
 
         - The secret is passed inline and bundled with the deploy so that the
           user never has to manage a persistent Modal secret
@@ -181,9 +235,18 @@ def build_host_app(
     Raises:
         ModalError: If a host reservation in `host_config` is not a number
     """
-    app = modal.App(HOST_APP_NAME, image=_host_image(version))
+    # A GPU host runs the local whisper backend in-process on the GPU; the
+    # default CPU host offloads transcription to the separate worker. The
+    # backend is decided here (not by the caller) so the CLI and GUI agree
+    on_gpu = env.get(HOST_ON_GPU_VAR) == "1"
+    gpu = (env.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU) if on_gpu else None
+    backend = Backend.LOCAL if on_gpu else Backend.MODAL
+    secret_env: dict[str, str | None] = dict(env)
+    secret_env[TRANSCRIBE_BACKEND_VAR] = backend.value
+
+    app = modal.App(HOST_APP_NAME, image=_host_image(version, gpu=on_gpu))
     volume = modal.Volume.from_name(DATA_VOLUME_NAME, create_if_missing=True)
-    secret = modal.Secret.from_dict(dict(env))
+    secret = modal.Secret.from_dict(secret_env)
 
     # The caller resolves these with their managed-config defaults, so every
     # key is present, but a user could still set a non-numeric value
@@ -196,6 +259,7 @@ def build_host_app(
     app.function(
         cpu=cpu,
         memory=memory,
+        gpu=gpu,
         volumes={DATA_MOUNT: volume},
         secrets=[secret],
         min_containers=1,

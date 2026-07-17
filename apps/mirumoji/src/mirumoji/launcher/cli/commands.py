@@ -1144,12 +1144,9 @@ def modal_deploy(
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # The Host Runs As A Modal-Backend Server So That Transcription Offloads
-    # To The GPU Worker Rather Than Needing A GPU On At All Times
-    env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
-
     # The Host Reservations (CPU, Memory, Concurrency) Size The Modal Function
-    # Itself, So They Are Resolved Separately From The Container Config
+    # Itself, So They Are Resolved Separately From The Container Config. The
+    # Transcribe Backend Is Decided In build_host_app From The Host Mode
     host_config = envfile.host_config(env)
 
     version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)

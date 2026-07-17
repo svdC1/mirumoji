@@ -15,10 +15,7 @@ import flet as ft
 from .... import modal as modal_lifecycle
 from ....exceptions import ModalError
 from ...core import checks, envfile
-from ...core.constants import (
-    TRANSCRIBE_BACKEND_VAR,
-    backend_vars,
-)
+from ...core.constants import backend_vars
 from ...core.models import Backend
 from ...modal.constants import (
     DATA_VOLUME_NAME,
@@ -150,9 +147,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             password = secrets.token_urlsafe(12)
             envfile.set_value(state.env_path, WEB_PASSWORD_ENV, password)
         env[WEB_PASSWORD_ENV] = password
-        # The host offloads transcription to the GPU worker instead of needing
-        # a GPU on the always-warm web tier
-        env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
+        # The transcribe backend (modal offload or local GPU) is decided in
+        # build_host_app from the host mode, so it is not set here
         host_config = envfile.host_config(env)
         begin("Deploying The Host App", deploy_btn)
 

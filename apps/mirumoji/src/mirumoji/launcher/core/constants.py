@@ -58,6 +58,16 @@ BACKEND_GPU_IMAGE = "svdc1/mirumoji:backend-gpu-{version}"
 String template for Docker Hub Identifier of the `Mirumoji` backend image
 for the `local` transcription backend
 """
+MODAL_GPU_IMAGE = "svdc1/mirumoji-modal-gpu:{version}"
+"""
+String template for the Docker Hub Identifier of the published `Modal` GPU
+image
+
+Unlike `BACKEND_GPU_IMAGE`, this image bakes the pre-cached `faster-whisper`
+model. A GPU host grafts only that model cache from it onto the leaner
+`BACKEND_GPU_IMAGE`, so the first in-process transcription needs no download
+(see `launcher.modal.host`)
+"""
 
 # Tags Assigned To Images Built Locally
 FRONTEND_LOCAL_IMAGE = "mirumoji_frontend_local:latest"
@@ -255,6 +265,15 @@ MODAL_HOST_VARS: tuple[EnvVar, ...] = (
         description=(
             "Memory In MiB Reserved For The Always-Warm Modal-Hosted Web "
             "Container (Higher Avoids Restarts But Costs More)"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_HOST_ON_GPU",
+        default="0",
+        description=(
+            "Run The Modal-Hosted App On A GPU With Whisper In-Process (1) "
+            "Instead Of A CPU Host That Offloads To An On-Demand GPU Worker "
+            "(0). Uses MIRUMOJI_MODAL_GPU For The GPU Type"
         ),
     ),
 )
