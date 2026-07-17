@@ -23,18 +23,23 @@ def ensure_repo(
     *,
     repo_url: str = REPO_URL,
     repo_path: Path = HOST_REPO_PATH,
-    branch: str = DEFAULT_BRANCH,
+    ref: str = DEFAULT_BRANCH,
 ) -> Generator[str, None, Path]:
     """
-    Clones or updates the mirumoji GitHub repo, yielding progress lines
+    Clones or updates the mirumoji repo at `ref`, yielding progress lines
 
-    Clones `repo_url` into `repo_path` when absent, otherwise fetches and
-    fast-forwards the tracked branch. Output is yielded line by line
+    Clones `repo_url` into `repo_path` when absent, otherwise fetches tags
+    and checks `ref` out. Output is yielded line by line
+
+    info: Release Tags
+        `ref` is normally a release tag such as `v3.6.0`, so the build matches
+        the pinned image version. A tag checks out a detached `HEAD`, so no
+        branch fast-forward is attempted (tags are immutable)
 
     Args:
         repo_url (str): The repository URL to clone
         repo_path (Path): Where the checkout lives (the user-data dir)
-        branch (str): The branch to check out / pull
+        ref (str): The branch or tag to check out
 
     Yields:
         Each git output line as it is produced
@@ -43,7 +48,7 @@ def ensure_repo(
         The path to the ready checkout
 
     Raises:
-        BuildSourceError: If git is missing or the clone/update fails
+        BuildSourceError: If git is missing or the clone/checkout fails
     """
     if not git().ok:
         raise BuildSourceError(
@@ -53,24 +58,29 @@ def ensure_repo(
     try:
         if not (repo_path / ".git").is_dir():
             repo_path.parent.mkdir(parents=True, exist_ok=True)
-            yield f"Cloning '{repo_url}' Into '{repo_path}'"
+            yield f"Cloning '{repo_url}' At '{ref}' Into '{repo_path}'"
             yield from process.stream(
-                ["git", "clone", "--branch", branch, repo_url, str(repo_path)],
+                ["git", "clone", "--branch", ref, repo_url, str(repo_path)],
             )
         else:
-            yield f"Updating Checkout At '{repo_path}'"
+            yield f"Updating Checkout At '{repo_path}' To '{ref}'"
             yield from process.stream(
-                ["git", "-C", str(repo_path), "fetch", "--all", "--prune"],
+                [
+                    "git",
+                    "-C",
+                    str(repo_path),
+                    "fetch",
+                    "--all",
+                    "--tags",
+                    "--prune",
+                ],
             )
             yield from process.stream(
-                ["git", "-C", str(repo_path), "checkout", branch],
-            )
-            yield from process.stream(
-                ["git", "-C", str(repo_path), "pull", "--ff-only"],
+                ["git", "-C", str(repo_path), "checkout", "--force", ref],
             )
     except Exception as exc:
         raise BuildSourceError(
-            f"Could Not Clone The Mirumoji GitHub Repo  ↦  {exc}",
+            f"Could Not Prepare The Mirumoji Repo At '{ref}'  ↦  {exc}",
         ) from exc
 
     return repo_path

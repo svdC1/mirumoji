@@ -16,7 +16,13 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 from ... import __version__
-from .constants import IMAGE_SOURCE_VAR, TRANSCRIBE_BACKEND_VAR, VERSION_VAR
+from .constants import (
+    CONFIG_ENV_VAR_NAMES,
+    IMAGE_SOURCE_VAR,
+    IMAGE_VERSION_VAR,
+    MODAL_HOST_VARS,
+    TRANSCRIBE_BACKEND_VAR,
+)
 from .errors import EnvConfigError
 from .models import Backend, EnvVar, ImageSource
 
@@ -231,28 +237,124 @@ def read_deployment(
     return backend, source
 
 
-def resolve_version(env_path: Path, flag: str | None = None) -> str:
+def resolve_backend(flag: Backend | None, env_path: Path) -> Backend:
+    """
+    Resolves which transcription backend to use
+
+    info: Order of Precedence
+        - The explicit `flag` override, when provided
+
+        - The persisted `MIRUMOJI_TRANSCRIBE_BACKEND`
+
+        - The default (`MODAL`)
+
+    Args:
+        flag (Backend | None): An explicit backend override, or `None` to fall
+            back to the config
+        env_path (Path): The managed config file to fall back to
+
+    Returns:
+        The backend to use
+    """
+    if flag is not None:
+        return flag
+    backend, _ = read_deployment(read(env_path))
+    return backend or Backend.MODAL
+
+
+def resolve_source(flag: bool | None, env_path: Path) -> ImageSource:
+    """
+    Resolves which image source to use
+
+    info: Order of Precedence
+        - The explicit `flag` override, when provided
+
+        - The persisted `MIRUMOJI_IMAGE_SOURCE`
+
+        - The default (`PULL`)
+
+    Args:
+        flag (bool | None): `True` to build, `False` to pull, or `None` to fall
+            back to the config
+        env_path (Path): The managed config file to fall back to
+
+    Returns:
+        The image source to use
+    """
+    if flag is not None:
+        return ImageSource.BUILD if flag else ImageSource.PULL
+    _, source = read_deployment(read(env_path))
+    return source or ImageSource.PULL
+
+
+def resolve_image_version(env_path: Path, flag: str | None = None) -> str:
     """
     Resolves the published image version the launcher pulls and composes with
 
     info: Order of Precedence
         The value is considered in the following order
 
-        - The `flag` passed to a command (`--version`)
+        - The explicit `flag` override, when provided
 
-        - The persisted `MIRUMOJI_VERSION`, overlaid with the process
+        - The persisted `MIRUMOJI_IMAGE_VERSION`, overlaid with the process
           environment
 
         - The installed package version
 
     Args:
         env_path (Path): The managed config file to read
-        flag (str | None): An explicit override (the CLI `--version`)
+        flag (str | None): An explicit version override, or `None` to fall back
+            to the config
 
     Returns:
         The version that fills the `{version}` in the image references
     """
     if flag:
         return flag
-    values = overlay_environ(read(env_path), [VERSION_VAR])
-    return values.get(VERSION_VAR) or __version__
+    values = overlay_environ(read(env_path), [IMAGE_VERSION_VAR])
+    return values.get(IMAGE_VERSION_VAR) or __version__
+
+
+def resolve_managed_config(env_path: Path) -> dict[str, str]:
+    """
+    Resolves the managed config, overlaying it with the process environment
+
+    Reads the managed `.env`, overlays the process environment (see
+    `overlay_environ`), and keeps only the non-empty managed config keys
+
+    info: Usage
+        Both the CLI and the GUI build the configuration injected into a
+        Modal-hosted container (and the Modal credentials the deploy
+        authenticates with) from this, so they always agree
+
+    Args:
+        env_path (Path): The managed config file to read
+
+    Returns:
+        The resolved non-empty managed configuration values
+    """
+    merged = overlay_environ(read(env_path), CONFIG_ENV_VAR_NAMES)
+    return {
+        name: merged[name] for name in CONFIG_ENV_VAR_NAMES if merged.get(name)
+    }
+
+
+def host_config(env: Mapping[str, str]) -> dict[str, str]:
+    """
+    Resolves the Modal-host reservations (CPU, memory, concurrency) with their
+    managed-config defaults
+
+    Every defaulted `MODAL_HOST_VARS` entry is included so each sizing key is
+    always present in the deploy
+
+    Args:
+        env (Mapping[str, str]): The resolved managed configuration values
+
+    Returns:
+        Each defaulted host sizing variable and its value
+    """
+    return {
+        var.name: env.get(var.name) or var.default
+        for var in MODAL_HOST_VARS
+        if var.default
+    }

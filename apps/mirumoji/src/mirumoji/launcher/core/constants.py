@@ -296,13 +296,14 @@ Launcher-Only. The compose template never references it, and the server
 ignores it
 """
 
-VERSION_VAR = "MIRUMOJI_VERSION"
+IMAGE_VERSION_VAR = "MIRUMOJI_IMAGE_VERSION"
 """
 Pins the published image version the launcher pulls (and composes the Modal
 host from), defaulting to the installed package version
 
 Launcher-Only. It fills the `{version}` in the image references above and is
-never passed to the server or a container
+never passed to the server or a container. A deploy option (see
+`DEPLOY_OPTION_VARS`)
 """
 
 
@@ -319,18 +320,44 @@ Every user-facing environment variable that the launcher manages in the config
 file (LLM Providers + Modal + Advanced Overrides + Hosted Deploy)
 """
 
-# Deployment keys are also env vars and are managed by the launcher,
-# but they're validated against their respective enums rather than treated as
-# free-form strings
+CONFIG_ENV_VAR_NAMES: tuple[str, ...] = tuple(v.name for v in CONFIG_ENV_VARS)
+"""
+The names of every managed `CONFIG_ENV_VARS` entry
+
+The single source for the managed-config name list, shared by the CLI and the
+GUI so they overlay and inject exactly the same keys
+"""
+
+DEPLOY_OPTION_VARS: tuple[str, ...] = (
+    TRANSCRIBE_BACKEND_VAR,
+    IMAGE_SOURCE_VAR,
+    IMAGE_VERSION_VAR,
+)
+"""
+The launcher-only deploy options, chosen at deploy time and never injected into
+a running container
+
+info: Deploy Options
+    - `MIRUMOJI_TRANSCRIBE_BACKEND` picks the transcription backend (enum)
+
+    - `MIRUMOJI_IMAGE_SOURCE` picks pull-vs-build (enum)
+
+    - `MIRUMOJI_IMAGE_VERSION` pins the published image version (free-form,
+      validated against Docker Hub)
+
+Unlike `CONFIG_ENV_VARS`, these steer what and how the launcher deploys rather
+than configuring the running server
+"""
+
+# The enum-validated deploy options, checked against their allowed values in
+# `mirumoji config set` rather than treated as free-form strings
 _DEPLOYMENT_CHOICES: dict[str, tuple[str, ...]] = {
     TRANSCRIBE_BACKEND_VAR: tuple(b.value for b in Backend),
     IMAGE_SOURCE_VAR: tuple(s.value for s in ImageSource),
 }
 
 CONFIG_KEYS: frozenset[str] = frozenset(
-    [v.name for v in CONFIG_ENV_VARS]
-    + list(_DEPLOYMENT_CHOICES)
-    + [VERSION_VAR]
+    [v.name for v in CONFIG_ENV_VARS] + list(DEPLOY_OPTION_VARS)
 )
 """
 Every environment variable key that the launcher accepts in the managed config

@@ -56,7 +56,6 @@ from typing import TYPE_CHECKING
 
 import modal
 
-from ... import __version__
 from ...exceptions import ModalError
 from ...modal import ensure_deployed, ensure_volume
 from ..core.constants import BACKEND_CPU_IMAGE, FRONTEND_IMAGE
@@ -218,13 +217,13 @@ def ensure_host_deployed(
     host app if one of the same version is not already deployed
 
     Idempotent and version-tracked through `mirumoji.modal`, so it never
-    duplicates the app and rolls it forward when the package version changes
+    duplicates the app and rolls it forward when the resolved version changes
 
     Args:
         env (dict[str, str]): The environment to inject into the container
         host_config (dict[str, str]): The resolved host reservations sizing the
             web container (see `build_host_app`)
-        version (str): The published image version to compose from
+        version (str): The published image version to compose from and track
         force (bool): Redeploy even when the same version is already live, to
             roll out a code or image change without a version bump
 
@@ -235,6 +234,6 @@ def ensure_host_deployed(
     ensure_deployed(
         build_host_app(env, host_config, version=version),
         HOST_APP_NAME,
-        version=__version__,
+        version=version,
         force=force,
     )

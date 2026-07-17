@@ -16,8 +16,6 @@ from .... import modal as modal_lifecycle
 from ....exceptions import ModalError
 from ...core import checks, envfile
 from ...core.constants import (
-    CONFIG_ENV_VARS,
-    MODAL_HOST_VARS,
     TRANSCRIBE_BACKEND_VAR,
     backend_vars,
 )
@@ -42,51 +40,7 @@ _CUSTOM_BUTTON: TypeAlias = (
     theme.PrimaryActionButton | theme.SecondaryActionButton
 )
 
-# --- Constants ---
-
-_CONFIG_NAMES = [v.name for v in CONFIG_ENV_VARS]
-"""
-List containing the names of all environment variables managed by the launcher
-"""
-
 # --- Helpers ---
-
-
-def _resolve_env(state: AppState) -> dict[str, str]:
-    """
-    Resolves the managed config overlaid with the process environment
-
-    Keeps only the non-empty managed config keys, matching the `modal` CLI
-    commands so the GUI injects the same configuration into the deploy
-
-    Args:
-        state (AppState): The shared GUI state (holds the config path)
-
-    Returns:
-        The resolved non-empty managed configuration values
-    """
-    merged = envfile.overlay_environ(
-        envfile.read(state.env_path), _CONFIG_NAMES
-    )
-    return {name: merged[name] for name in _CONFIG_NAMES if merged.get(name)}
-
-
-def _host_config(env: dict[str, str]) -> dict[str, str]:
-    """
-    Resolves the host reservations (CPU, memory, concurrency) with their
-    managed-config defaults, matching the `mirumoji modal deploy` command
-
-    Args:
-        env (dict[str, str]): The resolved managed configuration values
-
-    Returns:
-        Every defaulted host variable, so each sizing key is present
-    """
-    return {
-        var.name: env.get(var.name) or var.default
-        for var in MODAL_HOST_VARS
-        if var.default
-    }
 
 
 def _missing_tokens(env: dict[str, str]) -> list[str]:
@@ -125,6 +79,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     cpu_pill = theme.StatusPill("", "info")
     memory_pill = theme.StatusPill("", "info")
     concurrency_pill = theme.StatusPill("", "info")
+    version_pill = theme.StatusPill("", "info")
 
     def _config_row(label: str, pill: ft.Container) -> ft.Row:
         """
@@ -149,12 +104,17 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         """
         Re-reads the resolved host reservations into the config pills
         """
-        host_config = _host_config(_resolve_env(state))
+        host_config = envfile.host_config(
+            envfile.resolve_managed_config(state.env_path)
+        )
         cast(ft.Text, cpu_pill.content).value = host_config[HOST_CPU_VAR]
         cast(ft.Text, memory_pill.content).value = host_config[HOST_MEMORY_VAR]
         cast(ft.Text, concurrency_pill.content).value = host_config[
             HOST_MAX_CONCURRENT_REQUESTS_VAR
         ]
+        cast(
+            ft.Text, version_pill.content
+        ).value = envfile.resolve_image_version(state.env_path)
 
     _refresh_config()
 
@@ -165,7 +125,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         Returns:
             The resolved env when ready, or `None` after notifying the user
         """
-        env = _resolve_env(state)
+        env = envfile.resolve_managed_config(state.env_path)
         missing = _missing_tokens(env)
         if missing:
             state.notify(
@@ -193,7 +153,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         # The host offloads transcription to the GPU worker instead of needing
         # a GPU on the always-warm web tier
         env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
-        host_config = _host_config(env)
+        host_config = envfile.host_config(env)
         begin("Deploying The Host App", deploy_btn)
 
         def do() -> dict[str, str | None]:
@@ -203,7 +163,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             # loop startup. The `modal_lifecycle` helpers import it lazily too
             from ...modal import host as host_deploy
 
-            version = envfile.resolve_version(state.env_path)
+            version = envfile.resolve_image_version(state.env_path)
             checks.require_published_version(version)
             with modal_lifecycle.modal_credentials(env):
                 host_deploy.ensure_host_deployed(
@@ -465,6 +425,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                         _config_row("CPU Cores", cpu_pill),
                         _config_row("Memory (MiB)", memory_pill),
                         _config_row("Max Requests", concurrency_pill),
+                        _config_row("Image Version", version_pill),
                     ],
                 ),
             ),

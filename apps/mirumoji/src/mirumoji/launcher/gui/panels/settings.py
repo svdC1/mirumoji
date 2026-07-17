@@ -13,6 +13,7 @@ from ...core import envfile, storage
 from ...core.constants import (
     ADVANCED_VARS,
     IMAGE_SOURCE_VAR,
+    IMAGE_VERSION_VAR,
     LLM_VARS,
     MODAL_HOST_VARS,
     MODAL_VARS,
@@ -87,6 +88,15 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         [s.value for s in ImageSource],
         width=300,
     )
+    image_version_input = theme.SettingsInput(
+        IMAGE_VERSION_VAR,
+        state.env.get(IMAGE_VERSION_VAR, ""),
+        description=(
+            "Pin The Published Image Version (Leave Empty For The Installed "
+            "One)"
+        ),
+        password=False,
+    )
 
     llm_inputs, llm_fields = _input_fields(LLM_VARS, state.env)
     modal_text_vars = tuple(v for v in MODAL_VARS if v.name != _FORCE_BUILD)
@@ -132,6 +142,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         state.load_deployment(state.env)
         backend_dd.dropdown.value = state.backend.value
         source_dd.dropdown.value = state.source.value
+        image_version_input.field.value = state.env.get(IMAGE_VERSION_VAR, "")
         page.update()
         state.notify(f"Imported {source.name}  ↦  Review And Save", "success")
 
@@ -152,6 +163,11 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             state.env[_FORCE_BUILD] = "1"
         else:
             state.env.pop(_FORCE_BUILD, None)
+        image_version = (image_version_input.field.value or "").strip()
+        if image_version:
+            state.env[IMAGE_VERSION_VAR] = image_version
+        else:
+            state.env.pop(IMAGE_VERSION_VAR, None)
         # Persist the deployment choice so it survives restarts and reaches the
         # server (the compose template reads MIRUMOJI_TRANSCRIBE_BACKEND)
         state.env[TRANSCRIBE_BACKEND_VAR] = state.backend.value
@@ -248,6 +264,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             theme.Section(
                 "Deployment",
                 ft.Row([backend_dd, source_dd], spacing=16, wrap=True),
+                image_version_input,
             ),
             theme.Section(
                 "LLM Providers",
