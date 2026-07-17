@@ -20,7 +20,6 @@ from rich.table import Table
 from rich.text import Text
 
 from ... import __version__
-from ... import modal as modal_lifecycle
 from ...exceptions import ModalError
 from ...paths import HOST_CONFIG_FILE
 from ..core import checks, envfile, host, lifecycle, process, repo, storage
@@ -36,6 +35,7 @@ from ..core.constants import (
 from ..core.errors import EnvConfigError, LauncherError
 from ..core.models import Backend, CheckResult, CheckStatus, ImageSource
 from ..core.status import parse_status
+from ..modal import lifecycle as modal_lifecycle
 from ..modal.constants import (
     DATA_VOLUME_NAME,
     HOST_APP_NAME,
@@ -552,8 +552,6 @@ def up(
 
         - Value Stored in Config, If Present
 
-        - Shell's MIRUMOJI_TRANSCRIBE_BACKEND environment variable, If Present
-
         - Default Value (`MODAL`)
 
     info: Image Source Resolution
@@ -562,8 +560,6 @@ def up(
         - --pull / --build flags, If Present
 
         - Value Stored in Config, If Present
-
-        - Shell's MIRUMOJI_IMAGE_SOURCE environment variable, If Present
 
         - Default Value (`PULL`)
 
@@ -875,8 +871,6 @@ def dev_up(
 
         - Value Stored in Config, If Present
 
-        - Shell's MIRUMOJI_TRANSCRIBE_BACKEND environment variable, If Present
-
         - Default Value (`MODAL`)
 
     info: Steps
@@ -1022,6 +1016,26 @@ def modal_deploy(
             help="Use This Published Version (Defaults To The Installed One)",
         ),
     ] = None,
+    host_on_gpu: Annotated[
+        bool | None,
+        typer.Option(
+            "--host-on-gpu/--no-host-on-gpu",
+            help=(
+                "Run The Host On A GPU With Whisper In-Process, Overriding "
+                "MIRUMOJI_HOST_ON_GPU (The GPU Type Is MIRUMOJI_MODAL_GPU)"
+            ),
+        ),
+    ] = None,
+    nonpreemptible: Annotated[
+        bool | None,
+        typer.Option(
+            "--nonpreemptible/--preemptible",
+            help=(
+                "Run The CPU Host On Non-Preemptible Capacity, Overriding "
+                "MIRUMOJI_HOST_NONPREEMPTIBLE (Not For A GPU Host)"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """
     Deploys A Fully Functional Mirumoji App To Your Modal Account
@@ -1149,8 +1163,10 @@ def modal_deploy(
     # GPU / Preemptibility Host-Mode Options Resolve The Same Way, And Decide
     # The Transcribe Backend In build_host_app
     host_config = envfile.host_config(env)
-    gpu = envfile.resolve_host_gpu(HOST_CONFIG_FILE)
-    nonpreemptible = envfile.resolve_host_nonpreemptible(HOST_CONFIG_FILE)
+    on_gpu = envfile.resolve_host_on_gpu(HOST_CONFIG_FILE, host_on_gpu)
+    nonpreemptible = envfile.resolve_host_nonpreemptible(
+        HOST_CONFIG_FILE, nonpreemptible
+    )
 
     version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
     require_published_version(version)
@@ -1168,7 +1184,7 @@ def modal_deploy(
                     env,
                     host_config,
                     version=version,
-                    gpu=gpu,
+                    on_gpu=on_gpu,
                     nonpreemptible=nonpreemptible,
                     force=force,
                 )
@@ -1438,13 +1454,23 @@ def modal_logs(
 
     with modal_lifecycle.modal_credentials(env):
         if follow:
-            try:
-                for line in modal_lifecycle.stream_app_logs(HOST_APP_NAME):
-                    console.print(line, markup=False, highlight=False)
-            except KeyboardInterrupt:
-                console.print("Stopped Following Logs", style="muted")
-            except ModalError as exc:
-                raise fail(f"Failed To Stream The Logs  ↦  {exc}") from exc
+            # A handle lets CTRL+C stop the followed stream (the readline would
+            # otherwise block forever waiting for the next entry) and drives it
+            # through the same streaming infrastructure the docker `logs`
+            # command uses, so the GUI can follow and cancel it the same way
+            handle = process.StreamHandle()
+            stream_logs(
+                gen=process.stream(
+                    modal_lifecycle.app_logs_command(
+                        HOST_APP_NAME, follow=True, tail=tail
+                    ),
+                    check=False,
+                    handle=handle,
+                ),
+                identifier="Modal",
+                handle=handle,
+                with_service=False,
+            )
             return
         try:
             output = modal_lifecycle.fetch_app_logs(HOST_APP_NAME, tail)

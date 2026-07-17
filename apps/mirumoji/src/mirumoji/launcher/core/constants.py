@@ -334,18 +334,22 @@ never passed to the server or a container. A deploy option (see
 `DEPLOY_OPTION_VARS`)
 """
 
-# Modal-host deploy-mode keys. These change what the host deploy looks like
-# (which backend, which capacity), so they are resolved with dedicated helpers
-# in `core.envfile` the same way the backend / source / version options are
+# The shared Modal GPU type, passed straight through to whichever component
+# runs on a GPU (never resolved with the deploy options below)
 MODAL_GPU_VAR = "MIRUMOJI_MODAL_GPU"
 """
-Managed config key naming the Modal GPU type (shared with the offload worker)
+Managed config key naming the Modal GPU type (e.g. `A10G`, `A100`)
 
-The GPU host reads it to size its own function when `HOST_ON_GPU_VAR` is
-enabled, so the same value drives whichever component actually holds the GPU.
-Defaults to `DEFAULT_HOST_GPU` when unset
+Passed through exactly as set, independent of any host-mode toggle. The
+on-demand offload worker reads it, and so does a GPU host (`HOST_ON_GPU_VAR`)
+for its own container, each falling back to `DEFAULT_HOST_GPU` only where the
+value is read while unset
 """
 
+# Modal-host mode toggles. These change what the host deploy looks like (which
+# backend, which capacity), so they are resolved with dedicated helpers in
+# `core.envfile`, the same flag > config > shell > default order as the backend
+# / source / version deploy options
 HOST_ON_GPU_VAR = "MIRUMOJI_HOST_ON_GPU"
 """
 Managed config key toggling the single-app GPU host

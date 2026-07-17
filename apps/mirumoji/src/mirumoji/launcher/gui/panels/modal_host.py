@@ -12,11 +12,11 @@ from typing import TypeAlias, cast
 
 import flet as ft
 
-from .... import modal as modal_lifecycle
 from ....exceptions import ModalError
 from ...core import checks, envfile
-from ...core.constants import backend_vars
+from ...core.constants import DEFAULT_HOST_GPU, MODAL_GPU_VAR, backend_vars
 from ...core.models import Backend
+from ...modal import lifecycle as modal_lifecycle
 from ...modal.constants import (
     DATA_VOLUME_NAME,
     HOST_APP_NAME,
@@ -103,9 +103,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         """
         Re-reads the resolved host reservations into the config pills
         """
-        host_config = envfile.host_config(
-            envfile.resolve_managed_config(state.env_path)
-        )
+        env = envfile.resolve_managed_config(state.env_path)
+        host_config = envfile.host_config(env)
         cast(ft.Text, cpu_pill.content).value = host_config[HOST_CPU_VAR]
         cast(ft.Text, memory_pill.content).value = host_config[HOST_MEMORY_VAR]
         cast(ft.Text, concurrency_pill.content).value = host_config[
@@ -114,8 +113,13 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         cast(
             ft.Text, version_pill.content
         ).value = envfile.resolve_image_version(state.env_path)
-        gpu = envfile.resolve_host_gpu(state.env_path)
-        cast(ft.Text, gpu_pill.content).value = gpu or "CPU + Offload"
+        # A GPU host runs on the explicitly set MIRUMOJI_MODAL_GPU (or the
+        # default GPU); a CPU host offloads instead, mirroring build_host_app
+        on_gpu = envfile.resolve_host_on_gpu(state.env_path)
+        gpu = env.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU
+        cast(ft.Text, gpu_pill.content).value = (
+            gpu if on_gpu else "CPU + Offload"
+        )
         cast(ft.Text, capacity_pill.content).value = (
             "Non-Preemptible"
             if envfile.resolve_host_nonpreemptible(state.env_path)
@@ -169,7 +173,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             from ...modal import host as host_deploy
 
             version = envfile.resolve_image_version(state.env_path)
-            gpu = envfile.resolve_host_gpu(state.env_path)
+            on_gpu = envfile.resolve_host_on_gpu(state.env_path)
             nonpreemptible = envfile.resolve_host_nonpreemptible(
                 state.env_path
             )
@@ -179,7 +183,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                     env,
                     host_config,
                     version=version,
-                    gpu=gpu,
+                    on_gpu=on_gpu,
                     nonpreemptible=nonpreemptible,
                 )
                 return {

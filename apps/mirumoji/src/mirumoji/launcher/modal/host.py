@@ -52,12 +52,14 @@ from typing import TYPE_CHECKING
 import modal
 
 from ...exceptions import ModalError
-from ...modal import ensure_deployed, ensure_volume
+from ...modal import ensure_deployed
 from ..core.constants import (
     BACKEND_CPU_IMAGE,
     BACKEND_GPU_IMAGE,
+    DEFAULT_HOST_GPU,
     FRONTEND_IMAGE,
     MODAL_GPU_IMAGE,
+    MODAL_GPU_VAR,
     TRANSCRIBE_BACKEND_VAR,
 )
 from ..core.models import Backend
@@ -71,6 +73,7 @@ from .constants import (
     HOST_MAX_CONCURRENT_REQUESTS_VAR,
     HOST_MEMORY_VAR,
 )
+from .lifecycle import ensure_volume
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -154,7 +157,7 @@ def build_host_app(
     host_config: dict[str, str],
     *,
     version: str,
-    gpu: str | None,
+    on_gpu: bool,
     nonpreemptible: bool,
 ) -> modal.App:
     """
@@ -224,8 +227,8 @@ def build_host_app(
             cores, memory in MiB, and max concurrent requests), each already
             defaulted by the caller, that size the web container
         version (str): The published image version to compose from
-        gpu (str | None): The GPU to run the host on (a GPU host), or `None`
-            for a CPU host that offloads to the worker
+        on_gpu (bool): Run the host on a GPU (a GPU host) with the in-process
+            backend, instead of a CPU host that offloads to the worker
         nonpreemptible (bool): Run the CPU host on non-preemptible capacity
 
     Returns:
@@ -238,19 +241,20 @@ def build_host_app(
     # A GPU host runs the local whisper backend in-process on the GPU; the
     # default CPU host offloads transcription to the separate worker. The
     # backend is decided here (not by the caller) so the CLI and GUI agree
-    if nonpreemptible and gpu is not None:
+    if nonpreemptible and on_gpu:
         raise ModalError(
             "MIRUMOJI_HOST_NONPREEMPTIBLE Cannot Be Combined With "
             "MIRUMOJI_HOST_ON_GPU, Since Modal Does Not Support "
             "Non-Preemptible GPU Functions"
         )
-    backend = Backend.LOCAL if gpu is not None else Backend.MODAL
+    # The GPU type is the explicitly set MIRUMOJI_MODAL_GPU (falling back to
+    # the default GPU when unset), used only when the host runs on a GPU
+    gpu = (env.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU) if on_gpu else None
+    backend = Backend.LOCAL if on_gpu else Backend.MODAL
     secret_env: dict[str, str | None] = dict(env)
     secret_env[TRANSCRIBE_BACKEND_VAR] = backend.value
 
-    app = modal.App(
-        HOST_APP_NAME, image=_host_image(version, gpu=gpu is not None)
-    )
+    app = modal.App(HOST_APP_NAME, image=_host_image(version, gpu=on_gpu))
     volume = modal.Volume.from_name(DATA_VOLUME_NAME, create_if_missing=True)
     secret = modal.Secret.from_dict(secret_env)
 
@@ -281,7 +285,7 @@ def ensure_host_deployed(
     host_config: dict[str, str],
     *,
     version: str,
-    gpu: str | None,
+    on_gpu: bool,
     nonpreemptible: bool,
     force: bool = False,
 ) -> None:
@@ -297,8 +301,8 @@ def ensure_host_deployed(
         host_config (dict[str, str]): The resolved host reservations sizing the
             web container (see `build_host_app`)
         version (str): The published image version to compose from and track
-        gpu (str | None): The GPU to run the host on, or `None` for a CPU host
-            (see `build_host_app`)
+        on_gpu (bool): Run the host on a GPU, instead of a CPU host that
+            offloads to the worker (see `build_host_app`)
         nonpreemptible (bool): Run the CPU host on non-preemptible capacity
         force (bool): Redeploy even when the same version is already live, to
             roll out a code or image change without a version bump
@@ -312,7 +316,7 @@ def ensure_host_deployed(
             env,
             host_config,
             version=version,
-            gpu=gpu,
+            on_gpu=on_gpu,
             nonpreemptible=nonpreemptible,
         ),
         HOST_APP_NAME,
