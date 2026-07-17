@@ -1275,9 +1275,13 @@ def modal_down(
         during shutdown
 
     info: Volume Deletion
-        - The data volume is only deleted when `--volume` is passed, and only
-          after the host app has been stopped since Modal refuses to delete a
-          volume mounted on a deployed app
+        - The data volume is only deleted when `--volume` is passed. Modal
+          refuses to delete a volume mounted on a running app, so the app is
+          stopped first
+
+        - When `--volume` is passed, a failed stop (the app is already stopped
+          or was never deployed) is only a warning, so the volume can still be
+          deleted
 
         - Deleting it permanently erases the hosted profiles, media, and
           database
@@ -1309,8 +1313,17 @@ def modal_down(
         ):
             stop_error = modal_lifecycle.stop(HOST_APP_NAME)
         if stop_error:
-            raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
-        console.print("✓ Stopped The Host App", style="success")
+            # A failed stop is only fatal on its own. When also deleting the
+            # volume, the app is often already stopped or was never deployed,
+            # so warn and carry on so the volume can still be removed
+            if not volume:
+                raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
+            console.print(
+                f"⚠ Could Not Stop The Host App  ↦  {stop_error}",
+                style="warning",
+            )
+        else:
+            console.print("✓ Stopped The Host App", style="success")
 
         if volume:
             try:

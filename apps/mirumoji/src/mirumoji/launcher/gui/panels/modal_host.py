@@ -275,16 +275,24 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     def _run_down(env: dict[str, str], delete_volume: bool) -> None:
         begin("Stopping The Host App", down_btn)
 
-        def do() -> None:
+        def do() -> bool:
             with modal_lifecycle.modal_credentials(env):
                 error = modal_lifecycle.stop(HOST_APP_NAME)
-                if error:
+                # A failed stop is only fatal on its own. When deleting the
+                # volume too, the app is often already stopped, so proceed
+                if error and not delete_volume:
                     raise ModalError(error)
                 if delete_volume:
                     modal_lifecycle.delete_volume(DATA_VOLUME_NAME)
+                return bool(error)
 
-        def stopped(_: None) -> None:
-            terminal.append_log("Stopped The Host App")
+        def stopped(stop_failed: bool) -> None:
+            if stop_failed:
+                terminal.append_log(
+                    "Could Not Stop The Host App (It May Not Be Running)"
+                )
+            else:
+                terminal.append_log("Stopped The Host App")
             if delete_volume:
                 terminal.append_log("Deleted The Data Volume")
             done("Stopped")
