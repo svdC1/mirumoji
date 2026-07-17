@@ -8,8 +8,11 @@ Run `mirumoji --help`, or `mirumoji <command> --help`, for the same information 
 mirumoji [COMMAND] [OPTIONS]
 ```
 
-???+ abstract "Backend & Image-Source Resolution"
-    For the run commands (`up`, `build`, `pull`), the `Transcription Backend` and `Image Source` are evaluated in the following order of precedence. If one of the upper items is missing, the one right below it is used, until reaching a base default value
+!!! tip "Installed Version"
+    `mirumoji --version` prints the installed launcher version and exits *(distinct from the per-command `--image-version`, which pins the published image version)*
+
+???+ abstract "Deploy-Option Resolution"
+    The `Transcription Backend`, `Image Source`, and `Image Version` deploy options are each evaluated in the following order of precedence. If one of the upper items is missing, the one right below it is used, until reaching a base default value
 
     !!! info "Transcription Backend"
         - `Flag` (`--transcribe / -t`)
@@ -19,11 +22,20 @@ mirumoji [COMMAND] [OPTIONS]
         - `Base Default` (`modal`)
 
     !!! info "Image Source"
-        - `Flag` (`--pull / --build`)
+        - `Flag` (`--build / --pull`, on `up` and `render`)
 
         - `Saved Configuration File` (`mirumoji config show`)
 
         - `Base Default` (`pull`)
+
+    !!! info "Image Version"
+        - `Flag` (`--image-version`)
+
+        - `Saved Configuration File` (`MIRUMOJI_IMAGE_VERSION`)
+
+        - `Shell Environment` (`MIRUMOJI_IMAGE_VERSION`)
+
+        - `Base Default` (The Installed Package Version)
 
 ## Lifecycle Commands
 
@@ -40,9 +52,10 @@ mirumoji up [OPTIONS]
 | `-t`, `--transcribe [local \| modal]` | Saved Config, Else `modal` | Transcription Backend |
 | `--build` / `--pull` | Saved Config, Else `--pull` | Build Images Locally / Pull Pre-Buil From Docker Hub |
 | `-d`, `--detach` / `--foreground` | `--detach` | Run In The Background / Stream In The Foreground |
+| `--image-version` | Saved Config, Else Installed Version | Use This Published Image Version |
 
 ??? question "What It Does"
-    - Resolves Your `Transcription Backend` / `Image Source` Options
+    - Resolves Your `Transcription Backend` / `Image Source` / `Image Version` Options
 
     - Validates That Required Keys Are Configured And External Dependencies Are Present
 
@@ -77,8 +90,8 @@ mirumoji reset [OPTIONS]
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--keep-config` | off | Preserve The Config File *(Your LLM / Modal Keys)* |
-| `--keep-logs` | off | Preserve The Log Files |
+| `-kc`, `--keep-config` | off | Preserve The Config File *(Your LLM / Modal Keys)* |
+| `-kl`, `--keep-logs` | off | Preserve The Log Files |
 | `-y`, `--yes` | off | Skip The Confirmation Prompt |
 
 ### `status`
@@ -101,24 +114,33 @@ mirumoji logs [SERVICE] [OPTIONS]
 | --- | --- | --- |
 | `SERVICE` | all | Scope To One Service (`frontend` or `backend`) |
 | `-f`, `--follow` | off | Follow New Output |
-| `--tail N` | all | Show Only Last `N` Lines |
+| `-t`, `--tail N` | all | Show Only Last `N` Lines |
 
 ### `pull`
 
 Pulls Pre-Built Images From Docker Hub For The Chosen Transcription Backend
 
 ```bash
-mirumoji pull [-t local|modal]
+mirumoji pull [OPTIONS]
 ```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `-t`, `--transcribe [local \| modal]` | Saved Config, Else `modal` | Transcription Backend |
+| `--image-version` | Saved Config, Else Installed Version | Pull This Published Image Version |
 
 ### `build`
 
-Clones / Updates The Managed `Mirumoji GitHub Repository` Checkout And Builds The Frontend +
-Backend Images Locally For The Chosen Backend
+Clones / Updates The Managed `Mirumoji GitHub Repository` Checkout At A Release Tag And Builds The Frontend + Backend Images Locally For The Chosen Backend
 
 ```bash
-mirumoji build [-t local|modal]
+mirumoji build [OPTIONS]
 ```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `-t`, `--transcribe [local \| modal]` | Saved Config, Else `modal` | Transcription Backend |
+| `--image-version` | Saved Config, Else Installed Version | Build This Version's Tagged Source *(Its `v<version>` Git Tag)* |
 
 ### `doctor`
 
@@ -153,6 +175,7 @@ mirumoji render [OPTIONS]
 | --- | --- | --- |
 | `-t`, `--transcribe [local \| modal]` | Prompts | Tranascription Backend To Target |
 | `--build` / `--pull` | `--pull` | Reference Locally Built Tags Or Docker Hub Images |
+| `--image-version` | Saved Config, Else Installed Version | Pin The Image Version |
 | `-o`, `--output PATH` | `docker-compose.yaml` | Where To Write The File |
 
 ## Development Commands
@@ -219,11 +242,14 @@ mirumoji modal deploy [OPTIONS]
 | --- | --- | --- |
 | `-gp`, `--generate-password` | off | Generate A Login Password When `MIRUMOJI_WEB_PASSWORD` Is Not Set And Save It To The Config |
 | `-f`, `--force` | off | Redeploy Even If The Same Version Is Already Live |
+| `--image-version` | Saved Config, Else Installed Version | Deploy This Published Image Version |
+| `--host-on-gpu` / `--no-host-on-gpu` | Saved Config | Run The Host On A GPU With Whisper In-Process *(Overrides `MIRUMOJI_HOST_ON_GPU`; The GPU Type Comes From `MIRUMOJI_MODAL_GPU`)* |
+| `--nonpreemptible` / `--preemptible` | Saved Config | Run The CPU Host On Non-Preemptible Capacity *(Overrides `MIRUMOJI_HOST_NONPREEMPTIBLE`; Not For A GPU Host)* |
 
 ??? question "What It Does"
     - Resolves Your [`Managed Config`](#configuration-commands) *(LLM Keys, Modal Config, Host Reservations)* And Injects It Into The Container As A [`Modal Secret`](https://modal.com/docs/guide/secrets)
 
-    - Composes The Host Image From The Published `CPU Backend` + `Frontend` Images
+    - Composes The Host Image From The Published Backend *(CPU, Or GPU For A GPU Host)* + `Frontend` Images
 
     - Creates *(or Reuses)* The `mirumoji-data` Volume That Persists Your Database And Media
 
@@ -243,14 +269,16 @@ mirumoji modal deploy [OPTIONS]
     - A Managed Configuration Value Takes Precedence Over A Environment Variable In The Current Shell
 
 !!! info "The Offload Worker"
-    - The Host Runs On A `CPU-Only` Container And Offloads GPU Tasks To The Same `mirumoji-offload` App That The   [`Modal Transcription Backend`](guides/gpu.md#modal-cloud-gpu) Uses
+    - By Default The Host Runs On A `CPU-Only` Container And Offloads GPU Tasks To The Same `mirumoji-offload` App That The [`Modal Transcription Backend`](guides/gpu.md#modal-cloud-gpu) Uses
 
     - The Server Creates `mirumoji-offload` On Demand And Always Scales To Zero, So An Idle GPU Never Costs You
+
+    - Set `MIRUMOJI_HOST_ON_GPU=1` To Instead Run The Host Itself On A GPU With `faster-whisper` In-Process, So There Is No Offload Worker *(The GPU Is Then Always-Warm)*
 
 !!! info "Configuring The Container"
     - You Can Configure The Provisioned Container That Runs The App With The [`Modal Host Configuration Variables`](#configurable-keys)
 
-    - Configurable Values Are `CPU Core Count` + `Max Concurrent Requests` + `Memory (MiB)`
+    - You Set Its `CPU Core Count`, `Memory (MiB)`, And `Max Concurrent Requests`, Whether It Runs On A GPU (`MIRUMOJI_HOST_ON_GPU`), And Whether It Uses Non-Preemptible Capacity (`MIRUMOJI_HOST_NONPREEMPTIBLE`)
 
 ### `modal status`
 
@@ -259,6 +287,19 @@ Shows The State Of The `mirumoji-host` App And Its `mirumoji-data` Volume
 ```bash
 mirumoji modal status
 ```
+
+### `modal logs`
+
+Fetches Or Live-Streams The Hosted `mirumoji-host` App's Logs *(Useful For Diagnosing A Deploy Or A Failing Job On The Host)*
+
+```bash
+mirumoji modal logs [OPTIONS]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `-n`, `--tail N` | `100` | How Many Recent Log Entries To Fetch |
+| `-f`, `--follow` | off | Live-Stream The Logs Until Interrupted *(Ctrl-C)* |
 
 ### `modal down`
 
@@ -311,7 +352,7 @@ mirumoji config clear # (6)!
 1. Set Or Update One Variable. Rejects Unknown Keys, and Validates The Value Of Deployment
 Keys Against Their Allowed Options
 2. Remove One Variable
-3. Print Current Config (Secrets Masked)
+3. Print Current Config *(Secrets Masked. Pass `--raw` To Unmask Them, Or `--json` For Unmasked `JSON` Output)*
 4. Print The Location Of The Configuration File
 5. Merge an Existing `.env` File
 6. Remove Everything
@@ -324,6 +365,7 @@ Keys Against Their Allowed Options
     | --- | --- | --- | --- |
     | `MIRUMOJI_TRANSCRIBE_BACKEND` | `local`, `modal` | `modal` | Where Transcription / Conversion Runs |
     | `MIRUMOJI_IMAGE_SOURCE` | `pull`, `build` | `pull` | Pull Pre-Built Images / Build Images Locally |
+    | `MIRUMOJI_IMAGE_VERSION` | Any Published Version | Installed Version | Pin The Published Image Version The Launcher Pulls, Composes, Or Builds |
 
 === "LLM providers"
     All Optional &rarr; Set Any Or All To Enable LLM Features
@@ -356,6 +398,8 @@ Keys Against Their Allowed Options
     | `MIRUMOJI_HOST_CPU` | `2` | CPU Cores Reserved For The Always-Warm Web Container (Higher Is Faster But Costs More) |
     | `MIRUMOJI_HOST_MEMORY` | `4096` | Memory (MiB) Reserved For The Always-Warm Web Container |
     | `MIRUMOJI_HOST_MAX_CONCURRENT_REQUESTS` | `100` | How Many Requests The Web Container Serves At Once |
+    | `MIRUMOJI_HOST_ON_GPU` | `0` | Run The Host On A GPU With Whisper In-Process (`1`) Instead Of A CPU Host + Offload Worker (`0`). Uses `MIRUMOJI_MODAL_GPU` For The GPU Type |
+    | `MIRUMOJI_HOST_NONPREEMPTIBLE` | `0` | Run The CPU Host On Non-Preemptible Capacity (`1`) At A 3x Cost. Not Available With A GPU Host |
 
 === "Advanced"
     Optional Overrides &rarr; The Server Has Sensible Defaults For All Of These
@@ -363,7 +407,7 @@ Keys Against Their Allowed Options
     | Key | Description |
     | --- | --- |
     | `MIRUMOJI_LOGGING_LEVEL` | Python Logging Level For The Backend |
-    | `MIRUMOJI_MODAL_IMAGE` | Docker Hub Image That The Modal Containers Run |
+    | `MIRUMOJI_MODAL_IMAGE` | Docker Hub Image The Modal GPU Containers Run *(Default `svdc1/mirumoji-modal-gpu:<version>`)* |
     | `MIRUMOJI_MAX_LLM_CONCURRENCY` | How Many LLM Requests Run At Once When Fixing A Batch Of Subtitles (Default `4`) |
     | `MIRUMOJI_SRT_DEFAULT_SYS_MSG` | Default LLM System Message For Subtitle Refinement |
     | `MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG` | Default LLM System Message For Word Breakdowns |

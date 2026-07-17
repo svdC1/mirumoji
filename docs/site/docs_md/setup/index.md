@@ -1,6 +1,6 @@
 # Setup
 
-There Are `4 Ways` To Get Mirumoji Running
+There Are `3 Ways` To Run Mirumoji Locally
 
 Pick The One That Fits You
 
@@ -19,10 +19,6 @@ Pick The One That Fits You
 - :material-docker: **[Manual Setup](manual.md)**
 
     Run The Docker Compose Commands Yourself, No Launcher &rarr; `More Configuration`
-
-- :material-cloud-outline: **[Modal Host Setup](modal-host.md)**
-
-    Deploy The Whole App Privately To Your `Modal` Account, No Local Docker &rarr; `Access From Anywhere`
 
 </div>
 
@@ -112,3 +108,27 @@ Once the Docker Compose Application is running, the frontend is served over HTTP
     - That's expected on a local network and poses no security risk. You can safely continue past it
 
     - To reach Mirumoji from `outside` your network, see [`Sharing Outside Your Network`](../guides/sharing.md)
+
+## Host On Modal
+
+Rather than running Mirumoji locally, you can deploy the whole app *(server and
+frontend)* privately to your own [`Modal`](https://modal.com) account with one
+command and no local Docker, then reach it from anywhere over `HTTPS`
+
+<div class="grid cards" markdown>
+
+- :material-cloud-outline: **[Modal Host Setup](modal-host.md)**
+
+    Deploy And Manage The Hosted App With `mirumoji modal deploy`
+    &rarr; `Access From Anywhere, No Local Docker`
+
+</div>
+
+???+ question "How It Differs From The Modal Transcription Backend"
+    - The [`Modal Transcription Backend`](../guides/gpu.md#modal-cloud-gpu) runs
+      Mirumoji locally and offloads only the GPU work to Modal
+
+    - The `Modal Host` runs *everything* on Modal, with your data in a
+      `Modal` volume
+
+    - Both use the same Modal Tokens and share the [`Modal Configuration Keys`](../cli.md#configurable-keys)
