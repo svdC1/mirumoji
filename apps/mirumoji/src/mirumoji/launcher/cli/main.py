@@ -27,6 +27,7 @@ from .commands import (
     modal_deploy,
     modal_down,
     modal_download_data,
+    modal_logs,
     modal_status,
     pull,
     render,
@@ -121,6 +122,7 @@ modal_app = typer.Typer(
 )
 modal_app.command("deploy")(modal_deploy)
 modal_app.command("status")(modal_status)
+modal_app.command("logs")(modal_logs)
 modal_app.command("down")(modal_down)
 modal_app.command("download-data")(modal_download_data)
 app.add_typer(modal_app, name="modal")

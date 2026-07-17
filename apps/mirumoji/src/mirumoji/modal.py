@@ -591,3 +591,100 @@ def download_volume(name: str, destination: Path) -> None:
     if result.returncode != 0:
         detail = _clean_subprocess_error(result.stderr)
         raise ModalError(f"Failed To Download Volume '{name}': {detail}")
+
+
+def fetch_app_logs(name: str, tail: int) -> str:
+    """
+    Fetches the most recent log entries of a deployed Modal app
+
+    info: CLI-Backed
+        The `Modal` SDK exposes no log reader, so this shells out to
+        `modal app logs`, which resolves a deployed app by name and prints its
+        recent entries (see `stream_app_logs` for the live-follow variant)
+
+    Args:
+        name (str): The deployed app name
+        tail (int): How many recent log entries to fetch
+
+    Returns:
+        The fetched log text, timestamped and ready to print
+
+    Raises:
+        ModalError: If credentials are missing or the app has no readable logs
+    """
+    ensure_authenticated()
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "modal",
+                "app",
+                "logs",
+                name,
+                "--tail",
+                str(tail),
+                "--timestamps",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            creationflags=_NO_WINDOW,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ModalError(f"Failed To Read Logs For '{name}': {e}") from e
+    if result.returncode != 0:
+        detail = _clean_subprocess_error(result.stderr)
+        raise ModalError(f"Failed To Read Logs For '{name}': {detail}")
+    return result.stdout
+
+
+def stream_app_logs(name: str) -> Iterator[str]:
+    """
+    Live-streams a deployed Modal app's logs line by line until interrupted
+
+    info: CLI-Backed
+        Shells out to `modal app logs -f`, which follows a running app's logs
+        (see `fetch_app_logs` for the bounded fetch variant)
+
+    Args:
+        name (str): The deployed app name
+
+    Yields:
+        Each log line as it is produced
+
+    Raises:
+        ModalError: If credentials are missing or the CLI fails to start
+    """
+    ensure_authenticated()
+    try:
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "modal",
+                "app",
+                "logs",
+                name,
+                "-f",
+                "--timestamps",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=_NO_WINDOW,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ModalError(f"Failed To Stream Logs For '{name}': {e}") from e
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            yield line.rstrip("\n")
+    finally:
+        proc.stdout.close()
+        proc.terminate()
+        proc.wait()

@@ -1400,3 +1400,52 @@ def modal_download_data(
         f"✓ Downloaded The Data Volume To '{destination}'",
         style="success",
     )
+
+
+def modal_logs(
+    tail: Annotated[
+        int,
+        typer.Option(
+            "--tail",
+            "-n",
+            help="How Many Recent Log Entries To Fetch",
+        ),
+    ] = 100,
+    follow: Annotated[
+        bool,
+        typer.Option(
+            "--follow",
+            "-f",
+            help="Live-Stream The Logs Until Interrupted (Ctrl-C)",
+        ),
+    ] = False,
+) -> None:
+    """
+    Shows The Modal-Hosted App's Logs
+
+    Fetches the most recent host log entries, or live-streams them with
+    `--follow`. Useful for diagnosing a deploy or a failing job on the host
+    """
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    with modal_lifecycle.modal_credentials(env):
+        if follow:
+            try:
+                for line in modal_lifecycle.stream_app_logs(HOST_APP_NAME):
+                    console.print(line, markup=False, highlight=False)
+            except KeyboardInterrupt:
+                console.print("Stopped Following Logs", style="muted")
+            except ModalError as exc:
+                raise fail(f"Failed To Stream The Logs  ↦  {exc}") from exc
+            return
+        try:
+            output = modal_lifecycle.fetch_app_logs(HOST_APP_NAME, tail)
+        except ModalError as exc:
+            raise fail(f"Failed To Read The Logs  ↦  {exc}") from exc
+        if output.strip():
+            console.print(output.rstrip("\n"), markup=False, highlight=False)
+        else:
+            console.print("No Log Entries", style="muted")
