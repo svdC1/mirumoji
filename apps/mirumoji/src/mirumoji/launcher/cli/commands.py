@@ -1146,8 +1146,11 @@ def modal_deploy(
 
     # The Host Reservations (CPU, Memory, Concurrency) Size The Modal Function
     # Itself, So They Are Resolved Separately From The Container Config. The
-    # Transcribe Backend Is Decided In build_host_app From The Host Mode
+    # GPU / Preemptibility Host-Mode Options Resolve The Same Way, And Decide
+    # The Transcribe Backend In build_host_app
     host_config = envfile.host_config(env)
+    gpu = envfile.resolve_host_gpu(HOST_CONFIG_FILE)
+    nonpreemptible = envfile.resolve_host_nonpreemptible(HOST_CONFIG_FILE)
 
     version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
     require_published_version(version)
@@ -1162,7 +1165,12 @@ def modal_deploy(
                 spinner_style="accent",
             ):
                 modal_host.ensure_host_deployed(
-                    env, host_config, version=version, force=force
+                    env,
+                    host_config,
+                    version=version,
+                    gpu=gpu,
+                    nonpreemptible=nonpreemptible,
+                    force=force,
                 )
         except ModalError as exc:
             raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc

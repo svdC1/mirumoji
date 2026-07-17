@@ -276,6 +276,15 @@ MODAL_HOST_VARS: tuple[EnvVar, ...] = (
             "(0). Uses MIRUMOJI_MODAL_GPU For The GPU Type"
         ),
     ),
+    EnvVar(
+        "MIRUMOJI_HOST_NONPREEMPTIBLE",
+        default="0",
+        description=(
+            "Run The CPU Host On Non-Preemptible Capacity So It Is Never "
+            "Reclaimed Mid-Job (1), At A 3x CPU + Memory Cost. Not Available "
+            "With MIRUMOJI_HOST_ON_GPU"
+        ),
+    ),
 )
 """
 Environment variables specific to the Modal-hosted deploy
@@ -323,6 +332,58 @@ host from), defaulting to the installed package version
 Launcher-Only. It fills the `{version}` in the image references above and is
 never passed to the server or a container. A deploy option (see
 `DEPLOY_OPTION_VARS`)
+"""
+
+# Modal-host deploy-mode keys. These change what the host deploy looks like
+# (which backend, which capacity), so they are resolved with dedicated helpers
+# in `core.envfile` the same way the backend / source / version options are
+MODAL_GPU_VAR = "MIRUMOJI_MODAL_GPU"
+"""
+Managed config key naming the Modal GPU type (shared with the offload worker)
+
+The GPU host reads it to size its own function when `HOST_ON_GPU_VAR` is
+enabled, so the same value drives whichever component actually holds the GPU.
+Defaults to `DEFAULT_HOST_GPU` when unset
+"""
+
+HOST_ON_GPU_VAR = "MIRUMOJI_HOST_ON_GPU"
+"""
+Managed config key toggling the single-app GPU host
+
+question: The Two Host Modes
+    - Default (`0` / unset) &rarr; the always-warm web container is `CPU-Only`
+      and offloads transcription and conversion to the separate on-demand
+      `mirumoji-offload` GPU app, so a GPU is paid for only while a job runs
+
+    - Enabled (`1`) &rarr; the web container itself runs on a GPU (the type
+      comes from `MODAL_GPU_VAR`) with the `local` whisper backend in-process,
+      so there is one app and no offload worker, at the cost of an always-warm
+      GPU
+
+question: Why A Toggle Rather Than A Second GPU Variable
+    The GPU type is already configured once by `MODAL_GPU_VAR`
+    (`MIRUMOJI_MODAL_GPU`), so this stays a simple on/off switch and never
+    competes with it
+"""
+
+HOST_NONPREEMPTIBLE_VAR = "MIRUMOJI_HOST_NONPREEMPTIBLE"
+"""
+Managed config key running the CPU host on non-preemptible capacity
+
+question: What It Does
+    When `1`, `Modal` guarantees the always-warm CPU container is never
+    reclaimed mid-job, at a 3x `CPU` and memory price multiplier, so a spot
+    reclaim never restarts the server and drops its in-process job
+
+info: Not For GPU Hosts
+    `Modal` does not support non-preemptible GPU functions, so this cannot be
+    combined with `HOST_ON_GPU_VAR`
+"""
+
+DEFAULT_HOST_GPU = "A10G"
+"""
+The GPU a GPU host falls back to when `MODAL_GPU_VAR` is unset, matching the
+`MIRUMOJI_MODAL_GPU` config default
 """
 
 

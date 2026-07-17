@@ -77,6 +77,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     memory_pill = theme.StatusPill("", "info")
     concurrency_pill = theme.StatusPill("", "info")
     version_pill = theme.StatusPill("", "info")
+    gpu_pill = theme.StatusPill("", "info")
+    capacity_pill = theme.StatusPill("", "info")
 
     def _config_row(label: str, pill: ft.Container) -> ft.Row:
         """
@@ -112,6 +114,13 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         cast(
             ft.Text, version_pill.content
         ).value = envfile.resolve_image_version(state.env_path)
+        gpu = envfile.resolve_host_gpu(state.env_path)
+        cast(ft.Text, gpu_pill.content).value = gpu or "CPU + Offload"
+        cast(ft.Text, capacity_pill.content).value = (
+            "Non-Preemptible"
+            if envfile.resolve_host_nonpreemptible(state.env_path)
+            else "Preemptible"
+        )
 
     _refresh_config()
 
@@ -160,10 +169,18 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             from ...modal import host as host_deploy
 
             version = envfile.resolve_image_version(state.env_path)
+            gpu = envfile.resolve_host_gpu(state.env_path)
+            nonpreemptible = envfile.resolve_host_nonpreemptible(
+                state.env_path
+            )
             checks.require_published_version(version)
             with modal_lifecycle.modal_credentials(env):
                 host_deploy.ensure_host_deployed(
-                    env, host_config, version=version
+                    env,
+                    host_config,
+                    version=version,
+                    gpu=gpu,
+                    nonpreemptible=nonpreemptible,
                 )
                 return {
                     "url": modal_lifecycle.web_url(
@@ -415,13 +432,21 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             theme.Section(
                 "Active Configuration",
                 ft.Row(
-                    spacing=36,
+                    spacing=26,
                     wrap=False,
                     controls=[
                         _config_row("CPU Cores", cpu_pill),
                         _config_row("Memory (MiB)", memory_pill),
                         _config_row("Max Requests", concurrency_pill),
+                    ],
+                ),
+                ft.Row(
+                    spacing=26,
+                    wrap=False,
+                    controls=[
                         _config_row("Image Version", version_pill),
+                        _config_row("GPU", gpu_pill),
+                        _config_row("Capacity", capacity_pill),
                     ],
                 ),
             ),

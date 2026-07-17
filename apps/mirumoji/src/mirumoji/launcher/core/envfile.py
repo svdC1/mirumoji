@@ -18,8 +18,12 @@ from dotenv import dotenv_values
 from ... import __version__
 from .constants import (
     CONFIG_ENV_VAR_NAMES,
+    DEFAULT_HOST_GPU,
+    HOST_NONPREEMPTIBLE_VAR,
+    HOST_ON_GPU_VAR,
     IMAGE_SOURCE_VAR,
     IMAGE_VERSION_VAR,
+    MODAL_GPU_VAR,
     MODAL_HOST_VARS,
     TRANSCRIBE_BACKEND_VAR,
 )
@@ -358,3 +362,62 @@ def host_config(env: Mapping[str, str]) -> dict[str, str]:
         for var in MODAL_HOST_VARS
         if var.default
     }
+
+
+def resolve_host_gpu(env_path: Path, flag: str | None = None) -> str | None:
+    """
+    Resolves the GPU a GPU host runs on, or `None` for a CPU host
+
+    info: Order of Precedence
+        - The explicit `flag` override, when provided
+
+        - The persisted `MIRUMOJI_HOST_ON_GPU` toggle and `MIRUMOJI_MODAL_GPU`
+          type, overlaid with the process environment
+
+        - The default GPU, when the host is on a GPU but no type is set
+
+    A CPU host (the toggle unset or `0`) offloads transcription to the separate
+    worker, so this returns `None`
+
+    Args:
+        env_path (Path): The managed config file to read
+        flag (str | None): An explicit GPU override, or `None` to resolve from
+            the config
+
+    Returns:
+        The GPU type for a GPU host, or `None` for a CPU host
+    """
+    if flag is not None:
+        return flag or None
+    values = overlay_environ(read(env_path), [HOST_ON_GPU_VAR, MODAL_GPU_VAR])
+    if values.get(HOST_ON_GPU_VAR) != "1":
+        return None
+    return values.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU
+
+
+def resolve_host_nonpreemptible(
+    env_path: Path, flag: bool | None = None
+) -> bool:
+    """
+    Reports whether the CPU host runs on non-preemptible capacity
+
+    info: Order of Precedence
+        - The explicit `flag` override, when provided
+
+        - The persisted `MIRUMOJI_HOST_NONPREEMPTIBLE`, overlaid with the
+          process environment
+
+        - The default (`False`)
+
+    Args:
+        env_path (Path): The managed config file to read
+        flag (bool | None): An explicit override, or `None` to resolve from the
+            config
+
+    Returns:
+        `True` when the CPU host should run on non-preemptible capacity
+    """
+    if flag is not None:
+        return flag
+    values = overlay_environ(read(env_path), [HOST_NONPREEMPTIBLE_VAR])
+    return values.get(HOST_NONPREEMPTIBLE_VAR) == "1"
