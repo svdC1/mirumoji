@@ -58,6 +58,25 @@ above a normal shutdown and below `Modal`'s grace, turning a grace-period
 `SIGKILL` into a clean exit
 """
 
+_PARTIAL_SUFFIX = ".mirumoji-partial"
+"""
+Reserved suffix of an in-progress write the volume syncer skips
+
+The server writes media to a uniquely named temporary sibling and atomically
+renames it into place (mirroring `server.media.PARTIAL_SUFFIX`). The suffix is
+reserved, so it never matches a real uploaded filename, and skipping it keeps a
+partially written file from reaching the volume
+"""
+
+_DB_FILENAME = "mirumoji.db"
+"""
+Base name of the `SQLite` database file (matches `paths.HOST_DB_PATH.name`)
+
+The database and its `-wal` / `-shm` sidecars are mirrored to the volume after
+the media files in each batch, so the volume never holds a committed row that
+references a media file not yet mirrored
+"""
+
 
 def _is_within(root: Path, path: Path) -> bool:
     """
@@ -225,6 +244,32 @@ async def _warm_cache(cache: Path, mount: Path) -> None:
     )
 
 
+def _is_partial(path: Path) -> bool:
+    """
+    Reports whether `path` is an in-progress write the syncer should skip
+
+    Args:
+        path (Path): The changed path
+
+    Returns:
+        `True` when the name ends in the reserved partial-write suffix
+    """
+    return path.name.endswith(_PARTIAL_SUFFIX)
+
+
+def _is_db_file(path: Path) -> bool:
+    """
+    Reports whether `path` is the `SQLite` database or one of its sidecars
+
+    Args:
+        path (Path): The changed path
+
+    Returns:
+        `True` for `mirumoji.db` and its `-wal` / `-shm` files
+    """
+    return path.name.startswith(_DB_FILENAME)
+
+
 async def _volume_syncer(cache: Path, mount: Path) -> None:
     """
     Long-running background task mirroring every change under `cache` to
@@ -239,6 +284,14 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
         - This task copies additions and modifications to `mount` and removes
           deletions from it, so `Modal`'s background and shutdown commits
           persist the data
+
+    info: Ordering
+        - Each batch is applied media-files-first and database-last (and, for
+          deletions, database-first), so a `Modal` volume commit never captures
+          a committed database row whose media file has not been mirrored yet
+
+        - In-progress writes (`*.part` / `*.tmp`) are skipped, since the server
+          writes to a temporary sibling and renames it into place
 
     info: Resilience
         - Every filesystem operation is guarded, so one failed copy or delete
@@ -257,12 +310,22 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
     # the container the host runs in
     from watchfiles import Change, awatch
 
+    def _order(change: tuple[Change, str]) -> int:
+        change_type, src_str = change
+        is_db = _is_db_file(Path(src_str))
+        if change_type is Change.deleted:
+            return 0 if is_db else 1
+        return 3 if is_db else 2
+
     LOGGER.info(f"[Volume Syncer] Watching '{cache}' -> '{mount}'")
     while True:
         try:
             async for changes in awatch(cache):
-                for change_type, src_str in changes:
+                for change_type, src_str in sorted(changes, key=_order):
                     src = Path(src_str)
+                    if _is_partial(src):
+                        # Skip the temporary sibling of an in-progress write
+                        continue
                     try:
                         rel = src.relative_to(cache)
                     except ValueError:

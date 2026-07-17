@@ -30,6 +30,7 @@ import asyncio
 import logging
 import os
 import shutil
+import uuid
 from pathlib import Path
 
 import aiofiles
@@ -44,6 +45,33 @@ LOGGER = logging.getLogger(__name__)
 BASE_PATH: Path = HOST_MEDIA_PATH
 TEMP_PATH: Path = BASE_PATH / "temp"
 PROFILES_PATH: Path = BASE_PATH / "profiles"
+
+PARTIAL_SUFFIX: str = ".mirumoji-partial"
+"""
+Reserved suffix of a media file that is still being written
+
+Writes land on a uniquely named `<name>.<token>.mirumoji-partial` sibling and
+are atomically renamed into place, so a reader never observes a partially
+written file, two concurrent writes never share a temporary, and the Modal-host
+volume syncer skips it (the reserved suffix never matches a real filename)
+"""
+
+
+def _partial_path(path: Path) -> Path:
+    """
+    Builds a unique temporary sibling path for an atomic write of `path`
+
+    The random token keeps two concurrent writes to the same destination from
+    sharing a temporary file, and the reserved suffix keeps the Modal-host
+    volume syncer from mirroring it
+
+    Args:
+        path (Path): The final destination path
+
+    Returns:
+        A unique `<name>.<token>.mirumoji-partial` sibling of `path`
+    """
+    return path.with_name(f"{path.name}.{uuid.uuid4().hex}{PARTIAL_SUFFIX}")
 
 
 async def save_upload_file(
@@ -71,6 +99,7 @@ async def save_upload_file(
     """
 
     output = Path(output_path).resolve()
+    partial = _partial_path(output)
 
     if description is None:
         description = f"Saving File To {output}"
@@ -78,18 +107,21 @@ async def save_upload_file(
     try:
         total_content = 0
 
+        output.parent.mkdir(parents=True, exist_ok=True)
         with transfer_bar(description) as advance:
-            async with aiofiles.open(output, "wb+") as f:
+            async with aiofiles.open(partial, "wb+") as f:
                 async for chunk in request.stream():
                     await f.write(chunk)
                     advance(len(chunk))
                     total_content += len(chunk)
+        # Atomic Rename
+        await asyncio.to_thread(os.replace, partial, output)
 
         LOGGER.info(f"Saved {total_content} Bytes To {output}")
 
     except Exception as e:
-        # Clean Up Partially Created File
-        output.unlink(missing_ok=True)
+        # Clean Up Partially Written File
+        partial.unlink(missing_ok=True)
         raise UploadError(
             f"Failed to save uploaded content to {output} : {e}"
         ) from e
@@ -122,16 +154,19 @@ async def save_upload_object(
     """
     output = Path(output_path).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
+    partial = _partial_path(output)
     chunk_size = 1024 * 1024
 
     try:
-        async with aiofiles.open(output, "wb") as f:
+        async with aiofiles.open(partial, "wb") as f:
             while chunk := await upload.read(chunk_size):
                 await f.write(chunk)
+        # Atomic Rename
+        await asyncio.to_thread(os.replace, partial, output)
 
     except Exception as e:
-        # Clean Up Partially Created File
-        output.unlink(missing_ok=True)
+        # Clean Up Partially Written File
+        partial.unlink(missing_ok=True)
         raise UploadError(
             f"Failed to save uploaded object to {output} : {e}"
         ) from e
@@ -332,10 +367,15 @@ async def write_file(
     Writes text content to a file relative to the media directory, creating
     parent directories as needed
 
+    info: Atomic Overwrite
+        The content is written to a temporary sibling and then atomically
+        renamed into place, so it replaces any existing file in one step and a
+        reader (or the Modal-host volume syncer) never sees a half-written file
+
     Args:
         file_path_relative (str | os.PathLike[str]): Path of the file to write,
             relative to the media directory
-        content (str): Text content to append to the file
+        content (str): Text content to write to the file
 
     Returns:
         The absolute path to the written file
@@ -344,11 +384,14 @@ async def write_file(
         StorageError: If the file cannot be written
     """
     path = BASE_PATH / file_path_relative
+    partial = _partial_path(path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(path, "a+", encoding="utf-8") as f:
+        async with aiofiles.open(partial, "w", encoding="utf-8") as f:
             await f.write(content)
+        await asyncio.to_thread(os.replace, partial, path)
     except OSError as e:
+        partial.unlink(missing_ok=True)
         raise StorageError(f"Failed To Write File '{path}' : {e}") from e
     return path
 
