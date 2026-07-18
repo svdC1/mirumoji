@@ -58,6 +58,16 @@ BACKEND_GPU_IMAGE = "svdc1/mirumoji:backend-gpu-{version}"
 String template for Docker Hub Identifier of the `Mirumoji` backend image
 for the `local` transcription backend
 """
+MODAL_GPU_IMAGE = "svdc1/mirumoji-modal-gpu:{version}"
+"""
+String template for the Docker Hub Identifier of the published `Modal` GPU
+image
+
+Unlike `BACKEND_GPU_IMAGE`, this image bakes the pre-cached `faster-whisper`
+model. A GPU host grafts only that model cache from it onto the leaner
+`BACKEND_GPU_IMAGE`, so the first in-process transcription needs no download
+(see `launcher.modal.host`)
+"""
 
 # Tags Assigned To Images Built Locally
 FRONTEND_LOCAL_IMAGE = "mirumoji_frontend_local:latest"
@@ -257,6 +267,24 @@ MODAL_HOST_VARS: tuple[EnvVar, ...] = (
             "Container (Higher Avoids Restarts But Costs More)"
         ),
     ),
+    EnvVar(
+        "MIRUMOJI_HOST_ON_GPU",
+        default="0",
+        description=(
+            "Run The Modal-Hosted App On A GPU With Whisper In-Process (1) "
+            "Instead Of A CPU Host That Offloads To An On-Demand GPU Worker "
+            "(0). Uses MIRUMOJI_MODAL_GPU For The GPU Type"
+        ),
+    ),
+    EnvVar(
+        "MIRUMOJI_HOST_NONPREEMPTIBLE",
+        default="0",
+        description=(
+            "Run The CPU Host On Non-Preemptible Capacity So It Is Never "
+            "Reclaimed Mid-Job (1), At A 3x CPU + Memory Cost. Not Available "
+            "With MIRUMOJI_HOST_ON_GPU"
+        ),
+    ),
 )
 """
 Environment variables specific to the Modal-hosted deploy
@@ -296,13 +324,70 @@ Launcher-Only. The compose template never references it, and the server
 ignores it
 """
 
-VERSION_VAR = "MIRUMOJI_VERSION"
+IMAGE_VERSION_VAR = "MIRUMOJI_IMAGE_VERSION"
 """
 Pins the published image version the launcher pulls (and composes the Modal
 host from), defaulting to the installed package version
 
 Launcher-Only. It fills the `{version}` in the image references above and is
-never passed to the server or a container
+never passed to the server or a container. A deploy option (see
+`DEPLOY_OPTION_VARS`)
+"""
+
+# The shared Modal GPU type, passed straight through to whichever component
+# runs on a GPU (never resolved with the deploy options below)
+MODAL_GPU_VAR = "MIRUMOJI_MODAL_GPU"
+"""
+Managed config key naming the Modal GPU type (e.g. `A10G`, `A100`)
+
+Passed through exactly as set, independent of any host-mode toggle. The
+on-demand offload worker reads it, and so does a GPU host (`HOST_ON_GPU_VAR`)
+for its own container, each falling back to `DEFAULT_HOST_GPU` only where the
+value is read while unset
+"""
+
+# Modal-host mode toggles. These change what the host deploy looks like (which
+# backend, which capacity), so they are resolved with dedicated helpers in
+# `core.envfile`, the same flag > config > shell > default order as the backend
+# / source / version deploy options
+HOST_ON_GPU_VAR = "MIRUMOJI_HOST_ON_GPU"
+"""
+Managed config key toggling the single-app GPU host
+
+question: The Two Host Modes
+    - Default (`0` / unset) &rarr; the always-warm web container is `CPU-Only`
+      and offloads transcription and conversion to the separate on-demand
+      `mirumoji-offload` GPU app, so a GPU is paid for only while a job runs
+
+    - Enabled (`1`) &rarr; the web container itself runs on a GPU (the type
+      comes from `MODAL_GPU_VAR`) with the `local` whisper backend in-process,
+      so there is one app and no offload worker, at the cost of an always-warm
+      GPU
+
+question: Why A Toggle Rather Than A Second GPU Variable
+    The GPU type is already configured once by `MODAL_GPU_VAR`
+    (`MIRUMOJI_MODAL_GPU`), so this stays a simple on/off switch and never
+    competes with it
+"""
+
+HOST_NONPREEMPTIBLE_VAR = "MIRUMOJI_HOST_NONPREEMPTIBLE"
+"""
+Managed config key running the CPU host on non-preemptible capacity
+
+question: What It Does
+    When `1`, `Modal` guarantees the always-warm CPU container is never
+    reclaimed mid-job, at a 3x `CPU` and memory price multiplier, so a spot
+    reclaim never restarts the server and drops its in-process job
+
+info: Not For GPU Hosts
+    `Modal` does not support non-preemptible GPU functions, so this cannot be
+    combined with `HOST_ON_GPU_VAR`
+"""
+
+DEFAULT_HOST_GPU = "A10G"
+"""
+The GPU a GPU host falls back to when `MODAL_GPU_VAR` is unset, matching the
+`MIRUMOJI_MODAL_GPU` config default
 """
 
 
@@ -319,18 +404,44 @@ Every user-facing environment variable that the launcher manages in the config
 file (LLM Providers + Modal + Advanced Overrides + Hosted Deploy)
 """
 
-# Deployment keys are also env vars and are managed by the launcher,
-# but they're validated against their respective enums rather than treated as
-# free-form strings
+CONFIG_ENV_VAR_NAMES: tuple[str, ...] = tuple(v.name for v in CONFIG_ENV_VARS)
+"""
+The names of every managed `CONFIG_ENV_VARS` entry
+
+The single source for the managed-config name list, shared by the CLI and the
+GUI so they overlay and inject exactly the same keys
+"""
+
+DEPLOY_OPTION_VARS: tuple[str, ...] = (
+    TRANSCRIBE_BACKEND_VAR,
+    IMAGE_SOURCE_VAR,
+    IMAGE_VERSION_VAR,
+)
+"""
+The launcher-only deploy options, chosen at deploy time and never injected into
+a running container
+
+info: Deploy Options
+    - `MIRUMOJI_TRANSCRIBE_BACKEND` picks the transcription backend (enum)
+
+    - `MIRUMOJI_IMAGE_SOURCE` picks pull-vs-build (enum)
+
+    - `MIRUMOJI_IMAGE_VERSION` pins the published image version (free-form,
+      validated against Docker Hub)
+
+Unlike `CONFIG_ENV_VARS`, these steer what and how the launcher deploys rather
+than configuring the running server
+"""
+
+# The enum-validated deploy options, checked against their allowed values in
+# `mirumoji config set` rather than treated as free-form strings
 _DEPLOYMENT_CHOICES: dict[str, tuple[str, ...]] = {
     TRANSCRIBE_BACKEND_VAR: tuple(b.value for b in Backend),
     IMAGE_SOURCE_VAR: tuple(s.value for s in ImageSource),
 }
 
 CONFIG_KEYS: frozenset[str] = frozenset(
-    [v.name for v in CONFIG_ENV_VARS]
-    + list(_DEPLOYMENT_CHOICES)
-    + [VERSION_VAR]
+    [v.name for v in CONFIG_ENV_VARS] + list(DEPLOY_OPTION_VARS)
 )
 """
 Every environment variable key that the launcher accepts in the managed config

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, cast
 
 from ...exceptions import ModalVolumeError
+from ..media import partial_path
 from ..progress import CountingReader, transfer_bar
 
 if TYPE_CHECKING:
@@ -96,7 +97,10 @@ def download_from_volume(
 
     The file is read from the volume in chunks (never loaded whole into memory)
     while a themed transfer bar reports the progress. The destination's parent
-    directory is created if missing, and a partial file is removed on failure
+    directory is created if missing. The stream lands on a uniquely named
+    temporary sibling and is atomically renamed into place, so a reader (and
+    the Modal-host volume syncer) never sees a partially written file. The
+    temporary is removed on failure
 
     Args:
         volume (modal.Volume): The volume to read from
@@ -112,6 +116,7 @@ def download_from_volume(
         ModalVolumeError: If the download fails
     """
     dest = Path(local_path)
+    partial = partial_path(dest)
     desc = desc or f"Downloading {vol_fp} From Volume"
     LOGGER.info(f"Downloading Volume Path '{vol_fp}' To '{dest}'")
 
@@ -119,13 +124,16 @@ def download_from_volume(
         dest.parent.mkdir(parents=True, exist_ok=True)
         with (
             transfer_bar(desc) as advance,
-            dest.open("wb") as f,
+            partial.open("wb") as f,
         ):
             for chunk in volume.read_file(vol_fp):
                 f.write(chunk)
                 advance(len(chunk))
+        # Atomic rename, so the Modal-host volume syncer copies the finished
+        # file once instead of re-copying it while it streams in
+        os.replace(partial, dest)
     except Exception as e:
-        dest.unlink(missing_ok=True)
+        partial.unlink(missing_ok=True)
         raise ModalVolumeError(
             f"Failed To Download Volume Path '{vol_fp}' To '{dest}': {e}",
         ) from e

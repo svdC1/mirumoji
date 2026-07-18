@@ -77,14 +77,15 @@ Pick The One That Fits You
 <figcaption>Dashboard &rarr; Start, stop, build, and view status in one place</figcaption>
 </figure>
 
-The `Desktop Launcher` Has 4 Panels
+The `Desktop Launcher` Has 5 Panels
 
 | Panel | What It Does |
 | --- | --- |
 | **Dashboard** | Start / Stop / Build Images / Watch Status |
 | **Environment** | Run Dependency Checks *(Same as `mirumoji doctor`)* |
-| **Settings** | Choose The Transcription Backend / Image Source, Set LLM / Modal API Keys + Advanced Overrides, Delete All Local Data |
+| **Settings** | Choose The Transcription Backend / Image Source / Image Version, Set LLM / Modal API Keys + Advanced Overrides, Delete All Local Data |
 | **Logs** | Stream + Filter The Docker Compose Application's Logs |
+| **Modal Host** | Deploy, Inspect, Tear Down, And Back Up The Full App On Your `Modal` Account *(mirrors the [`modal`](../cli.md#modal-host-commands) CLI commands)* |
 
 ### Typical First Run
 
@@ -106,3 +107,20 @@ The `Desktop Launcher` Has 4 Panels
 ![The launcher Settings panel](../assets/images/gui-settings.png)
 <figcaption>Settings &rarr; Pick Transcription Backend + Image Source /  Store LLM / Modal Keys</figcaption>
 </figure>
+
+## Hosting On Modal
+
+The `Modal Host` panel deploys and manages a full, private Mirumoji instance on your own `Modal` account, mirroring the [`mirumoji modal`](../cli.md#modal-host-commands) commands
+
+- **Deploy** &rarr; Build And Deploy The Hosted App, Then See Its URL And Login Details
+
+- **Status** &rarr; Check Whether The App And Its Data Volume Are Live
+
+- **Download Data** &rarr; Back Up The Hosted Volume To A Local Folder
+
+- **Stop** &rarr; Stop The App, Optionally Deleting The Data Volume
+
+The config pills show what a deploy would use *(CPU, memory, requests, image version, GPU, and capacity)*
+
+!!! tip "Full Walkthrough"
+    See the [`Modal Host Setup`](modal-host.md) guide for the complete flow, including the GPU and non-preemptible host options

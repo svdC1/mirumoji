@@ -20,17 +20,14 @@ from rich.table import Table
 from rich.text import Text
 
 from ... import __version__
-from ... import modal as modal_lifecycle
 from ...exceptions import ModalError
 from ...paths import HOST_CONFIG_FILE
 from ..core import checks, envfile, host, lifecycle, process, repo, storage
 from ..core.compose import RESOLVED_COMPOSE_PATH, write_compose
 from ..core.constants import (
+    CONFIG_ENV_VARS,
     CONFIG_KEYS,
     HOST_LAN_IP_VAR,
-    LLM_VARS,
-    MODAL_HOST_VARS,
-    MODAL_VARS,
     TRANSCRIBE_BACKEND_VAR,
     deployment_choices,
     is_config_key,
@@ -38,6 +35,7 @@ from ..core.constants import (
 from ..core.errors import EnvConfigError, LauncherError
 from ..core.models import Backend, CheckResult, CheckStatus, ImageSource
 from ..core.status import parse_status
+from ..modal import lifecycle as modal_lifecycle
 from ..modal.constants import (
     DATA_VOLUME_NAME,
     HOST_APP_NAME,
@@ -50,9 +48,6 @@ from ._common import (
     fail,
     require_env,
     require_published_version,
-    resolve_backend,
-    resolve_managed_config,
-    resolve_source,
     stream_command,
     stream_logs,
 )
@@ -77,12 +72,21 @@ def build(
             help="Transcription Backend (Defaults To The Saved Config)",
         ),
     ] = None,
+    version: Annotated[
+        str | None,
+        typer.Option(
+            "--image-version",
+            help="Build This Version's Tagged Source (Defaults To The "
+            "Installed One)",
+        ),
+    ] = None,
 ) -> None:
     """
     Builds the `Mirumoji` images locally from source
 
-    Clones/Updates the managed `mirumoji` repo checkout and builds the
-    frontend + backend images locally for the chosen backend
+    Clones/Updates the managed `mirumoji` repo checkout at the resolved
+    version's release tag and builds the frontend + backend images locally for
+    the chosen backend
 
     info: Backend Resolution
         The backend value is resolved in the following order
@@ -93,11 +97,26 @@ def build(
 
         - Default Value (`MODAL`)
 
+    info: Version Resolution Order
+        The release tag whose source is built is resolved in the following
+        order
+
+        - Value Passed To --image-version, If Present
+
+        - MIRUMOJI_IMAGE_VERSION Stored In Config, If Present
+
+        - Shell's MIRUMOJI_IMAGE_VERSION Environment Variable, If Present
+
+        - Default Value (The Installed Package Version)
+
+    The locally built images always carry the local build tags, so the version
+    only selects which release's source (its `v<version>` git tag) is built
     """
-    backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
+    backend = envfile.resolve_backend(transcribe, HOST_CONFIG_FILE)
+    version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
 
     repo_path = stream_command(
-        gen=repo.ensure_repo(),
+        gen=repo.ensure_repo(ref=f"v{version}"),
         identifier="Git",
         title="Preparing `mirumoji` Repo Checkout",
     )
@@ -243,7 +262,7 @@ def pull(
     version: Annotated[
         str | None,
         typer.Option(
-            "--version",
+            "--image-version",
             help="Use This Published Version (Defaults To The Installed One)",
         ),
     ] = None,
@@ -266,16 +285,16 @@ def pull(
     info: Version Resolution Order
         The version value is resolved in the following order
 
-        - Value Passed To --version, If Present
+        - Value Passed To --image-version, If Present
 
-        - MIRUMOJI_VERSION Stored In Config, If Present
+        - MIRUMOJI_IMAGE_VERSION Stored In Config, If Present
 
-        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+        - Shell's MIRUMOJI_IMAGE_VERSION Environment Variable, If Present
 
         - Default Value (The Installed Package Version)
     """
-    backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
-    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
+    backend = envfile.resolve_backend(transcribe, HOST_CONFIG_FILE)
+    version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
     require_published_version(version)
     compose_file = write_compose(backend, ImageSource.PULL, version=version)
     stream_command(
@@ -322,12 +341,12 @@ def render(
         ),
     ] = False,
     version: Annotated[
-        str,
+        str | None,
         typer.Option(
-            "--version",
+            "--image-version",
             help="Pin The Image Version (Defaults To The Installed One)",
         ),
-    ] = __version__,
+    ] = None,
     output: Annotated[
         Path,
         typer.Option(
@@ -343,8 +362,20 @@ def render(
     Writes a resolved compose file from the packaged template for a chosen
     backend + image source. Used to produce the static files referenced by the
     manual-install documentation
+
+    info: Version Resolution Order
+        The version value is resolved in the following order
+
+        - Value Passed To --image-version, If Present
+
+        - MIRUMOJI_IMAGE_VERSION Stored In Config, If Present
+
+        - Shell's MIRUMOJI_IMAGE_VERSION Environment Variable, If Present
+
+        - Default Value (The Installed Package Version)
     """
     source = ImageSource.BUILD if build else ImageSource.PULL
+    version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
     try:
         written = write_compose(
             transcribe, source, version=version, out_path=output
@@ -506,7 +537,7 @@ def up(
     version: Annotated[
         str | None,
         typer.Option(
-            "--version",
+            "--image-version",
             help="Use This Published Version (Defaults To The Installed One)",
         ),
     ] = None,
@@ -521,8 +552,6 @@ def up(
 
         - Value Stored in Config, If Present
 
-        - Shell's MIRUMOJI_TRANSCRIBE_BACKEND environment variable, If Present
-
         - Default Value (`MODAL`)
 
     info: Image Source Resolution
@@ -532,18 +561,16 @@ def up(
 
         - Value Stored in Config, If Present
 
-        - Shell's MIRUMOJI_IMAGE_SOURCE environment variable, If Present
-
         - Default Value (`PULL`)
 
     info: Version Resolution Order
         The version value is resolved in the following order
 
-        - Value Passed To --version, If Present
+        - Value Passed To --image-version, If Present
 
-        - MIRUMOJI_VERSION Stored In Config, If Present
+        - MIRUMOJI_IMAGE_VERSION Stored In Config, If Present
 
-        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+        - Shell's MIRUMOJI_IMAGE_VERSION Environment Variable, If Present
 
         - Default Value (The Installed Package Version)
 
@@ -567,9 +594,9 @@ def up(
         - Runs Docker Compose Up using the managed config as the `--env-file`
     """
 
-    backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
-    source = resolve_source(build, HOST_CONFIG_FILE)
-    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
+    backend = envfile.resolve_backend(transcribe, HOST_CONFIG_FILE)
+    source = envfile.resolve_source(build, HOST_CONFIG_FILE)
+    version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
 
     _validate_dependencies(backend, source)
     require_env(backend, HOST_CONFIG_FILE)
@@ -586,7 +613,7 @@ def up(
 
     if source is ImageSource.BUILD:
         repo_path = stream_command(
-            gen=repo.ensure_repo(),
+            gen=repo.ensure_repo(ref=f"v{version}"),
             identifier="Git",
             title="Preparing `mirumoji` Repo Checkout",
         )
@@ -638,11 +665,7 @@ def up(
 # --- Config Sub-App ---
 
 # Variables That Have Their Values Masked When Displaying Config
-_SECRET_NAMES = frozenset(
-    var.name
-    for var in (*LLM_VARS, *MODAL_VARS, *MODAL_HOST_VARS)
-    if var.secret
-)
+_SECRET_NAMES = frozenset(var.name for var in CONFIG_ENV_VARS if var.secret)
 
 
 def config_import(
@@ -848,8 +871,6 @@ def dev_up(
 
         - Value Stored in Config, If Present
 
-        - Shell's MIRUMOJI_TRANSCRIBE_BACKEND environment variable, If Present
-
         - Default Value (`MODAL`)
 
     info: Steps
@@ -869,7 +890,7 @@ def dev_up(
         - Runs Docker Compose Up using the managed config as the `--env-file`
     """
 
-    backend = resolve_backend(transcribe, HOST_CONFIG_FILE)
+    backend = envfile.resolve_backend(transcribe, HOST_CONFIG_FILE)
     source = ImageSource.BUILD
     if path is None:
         path = Path.cwd()
@@ -991,8 +1012,28 @@ def modal_deploy(
     version: Annotated[
         str | None,
         typer.Option(
-            "--version",
+            "--image-version",
             help="Use This Published Version (Defaults To The Installed One)",
+        ),
+    ] = None,
+    host_on_gpu: Annotated[
+        bool | None,
+        typer.Option(
+            "--host-on-gpu/--no-host-on-gpu",
+            help=(
+                "Run The Host On A GPU With Whisper In-Process, Overriding "
+                "MIRUMOJI_HOST_ON_GPU (The GPU Type Is MIRUMOJI_MODAL_GPU)"
+            ),
+        ),
+    ] = None,
+    nonpreemptible: Annotated[
+        bool | None,
+        typer.Option(
+            "--nonpreemptible/--preemptible",
+            help=(
+                "Run The CPU Host On Non-Preemptible Capacity, Overriding "
+                "MIRUMOJI_HOST_NONPREEMPTIBLE (Not For A GPU Host)"
+            ),
         ),
     ] = None,
 ) -> None:
@@ -1032,11 +1073,11 @@ def modal_deploy(
     info: Version Resolution Order
         The version value is resolved in the following order
 
-        - Value Passed To --version, If Present
+        - Value Passed To --image-version, If Present
 
-        - MIRUMOJI_VERSION Stored In Config, If Present
+        - MIRUMOJI_IMAGE_VERSION Stored In Config, If Present
 
-        - Shell's MIRUMOJI_VERSION Environment Variable, If Present
+        - Shell's MIRUMOJI_IMAGE_VERSION Environment Variable, If Present
 
         - Default Value (The Installed Package Version)
 
@@ -1096,7 +1137,7 @@ def modal_deploy(
 
     # Get All Variables From The Managed Config File, Falling Back To The
     # Process' Environment For Missing Values
-    env = resolve_managed_config(HOST_CONFIG_FILE)
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
 
     # Define The Password That Will Be Used To Gate The App
     password = env.get(WEB_PASSWORD_ENV)
@@ -1117,20 +1158,17 @@ def modal_deploy(
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
 
-    # The Host Runs As A Modal-Backend Server So That Transcription Offloads
-    # To The GPU Worker Rather Than Needing A GPU On At All Times
-    env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
-
     # The Host Reservations (CPU, Memory, Concurrency) Size The Modal Function
-    # Itself, So They Are Resolved Separately And Each Falls Back To Its
-    # Managed Config Default When Unset (The Defaulted Host Vars Size It)
-    host_config = {
-        var.name: env.get(var.name) or var.default
-        for var in MODAL_HOST_VARS
-        if var.default
-    }
+    # Itself, So They Are Resolved Separately From The Container Config. The
+    # GPU / Preemptibility Host-Mode Options Resolve The Same Way, And Decide
+    # The Transcribe Backend In build_host_app
+    host_config = envfile.host_config(env)
+    on_gpu = envfile.resolve_host_on_gpu(HOST_CONFIG_FILE, host_on_gpu)
+    nonpreemptible = envfile.resolve_host_nonpreemptible(
+        HOST_CONFIG_FILE, nonpreemptible
+    )
 
-    version = envfile.resolve_version(HOST_CONFIG_FILE, version)
+    version = envfile.resolve_image_version(HOST_CONFIG_FILE, version)
     require_published_version(version)
 
     # The Modal Credentials Are Exported Only For The Deploy Calls, Then The
@@ -1143,7 +1181,12 @@ def modal_deploy(
                 spinner_style="accent",
             ):
                 modal_host.ensure_host_deployed(
-                    env, host_config, version=version, force=force
+                    env,
+                    host_config,
+                    version=version,
+                    on_gpu=on_gpu,
+                    nonpreemptible=nonpreemptible,
+                    force=force,
                 )
         except ModalError as exc:
             raise fail(f"Failed To Deploy The App  ↦  {exc}") from exc
@@ -1185,7 +1228,7 @@ def modal_status() -> None:
     """
     # Get All Variables From The Managed Config File, Falling Back To The
     # Process' Environment For Missing Values
-    env = resolve_managed_config(HOST_CONFIG_FILE)
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
 
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
@@ -1275,16 +1318,20 @@ def modal_down(
         during shutdown
 
     info: Volume Deletion
-        - The data volume is only deleted when `--volume` is passed, and only
-          after the host app has been stopped since Modal refuses to delete a
-          volume mounted on a deployed app
+        - The data volume is only deleted when `--volume` is passed. Modal
+          refuses to delete a volume mounted on a running app, so the app is
+          stopped first
+
+        - When `--volume` is passed, a failed stop (the app is already stopped
+          or was never deployed) is only a warning, so the volume can still be
+          deleted
 
         - Deleting it permanently erases the hosted profiles, media, and
           database
     """
     # Get All Variables From The Managed Config File, Falling Back To The
     # Process' Environment For Missing Values
-    env = resolve_managed_config(HOST_CONFIG_FILE)
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
 
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
@@ -1309,8 +1356,17 @@ def modal_down(
         ):
             stop_error = modal_lifecycle.stop(HOST_APP_NAME)
         if stop_error:
-            raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
-        console.print("✓ Stopped The Host App", style="success")
+            # A failed stop is only fatal on its own. When also deleting the
+            # volume, the app is often already stopped or was never deployed,
+            # so warn and carry on so the volume can still be removed
+            if not volume:
+                raise fail(f"Failed To Stop The Host App  ↦  {stop_error}")
+            console.print(
+                f"⚠ Could Not Stop The Host App  ↦  {stop_error}",
+                style="warning",
+            )
+        else:
+            console.print("✓ Stopped The Host App", style="success")
 
         if volume:
             try:
@@ -1343,7 +1399,7 @@ def modal_download_data(
     """
     # Get All Variables From The Managed Config File, Falling Back To The
     # Process' Environment For Missing Values
-    env = resolve_managed_config(HOST_CONFIG_FILE)
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
 
     # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
     require_env(Backend.MODAL, HOST_CONFIG_FILE)
@@ -1365,3 +1421,62 @@ def modal_download_data(
         f"✓ Downloaded The Data Volume To '{destination}'",
         style="success",
     )
+
+
+def modal_logs(
+    tail: Annotated[
+        int,
+        typer.Option(
+            "--tail",
+            "-n",
+            help="How Many Recent Log Entries To Fetch",
+        ),
+    ] = 100,
+    follow: Annotated[
+        bool,
+        typer.Option(
+            "--follow",
+            "-f",
+            help="Live-Stream The Logs Until Interrupted (Ctrl-C)",
+        ),
+    ] = False,
+) -> None:
+    """
+    Shows The Modal-Hosted App's Logs
+
+    Fetches the most recent host log entries, or live-streams them with
+    `--follow`. Useful for diagnosing a deploy or a failing job on the host
+    """
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
+
+    # Make Sure MODAL_TOKEN_ID + MODAL_TOKEN_SECRET Are Set
+    require_env(Backend.MODAL, HOST_CONFIG_FILE)
+
+    with modal_lifecycle.modal_credentials(env):
+        if follow:
+            # A handle lets CTRL+C stop the followed stream (the readline would
+            # otherwise block forever waiting for the next entry) and drives it
+            # through the same streaming infrastructure the docker `logs`
+            # command uses, so the GUI can follow and cancel it the same way
+            handle = process.StreamHandle()
+            stream_logs(
+                gen=process.stream(
+                    modal_lifecycle.app_logs_command(
+                        HOST_APP_NAME, follow=True, tail=tail
+                    ),
+                    check=False,
+                    handle=handle,
+                ),
+                identifier="Modal",
+                handle=handle,
+                with_service=False,
+            )
+            return
+        try:
+            output = modal_lifecycle.fetch_app_logs(HOST_APP_NAME, tail)
+        except ModalError as exc:
+            raise fail(f"Failed To Read The Logs  ↦  {exc}") from exc
+        if output.strip():
+            console.print(output.rstrip("\n"), markup=False, highlight=False)
+        else:
+            console.print("No Log Entries", style="muted")

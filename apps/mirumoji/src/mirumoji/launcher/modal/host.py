@@ -7,23 +7,20 @@ and the built `React` frontend) privately on their `Modal` account
 The shared deploy lifecycle functions lives in `mirumoji.modal`
 
 info: Compute
-    - The deployed `mirumoji-host` app runs the server with its CPU-Only
-      `modal` transcription backend and keeps exactly one cheap, cpu-only
-      container warm during its entire lifecycle
+    - The deployed `mirumoji-host` app keeps exactly one container warm for its
+      entire lifecycle, so background tasks are never cut off by a scaledown,
+      the in-process job queue keeps running, and the single-writer `SQLite`
+      database only ever has one instance
 
-    - This guarantees that background tasks are never cut off by scaledowns,
-      the in-process job queue keeps running, and the `SQLite` database only
-      has one instance writing to it
+    - By default that container is `CPU-Only` and runs the `modal` backend,
+      offloading every GPU task to a second app (`mirumoji-offload`, the same
+      one the local `modal` backend uses, reusing the same `mirumoji config`
+      variables) that always scales to zero, so a GPU is paid for only while a
+      job runs
 
-    - All GPU tasks are offloaded to another modal app running in parallel
-      (`mirumoji-offload`, the same one used when running the server's `modal`
-      transcription backend locally)
-
-    - The `offload` app uses the same `Modal` configuration
-      variables managed by the launcher (`mirumoji config`) that are used for
-      configuring the locally-run `modal` transcription backend
-
-    - It also always scales to zero, preventing unexpected idle-GPU costs
+    - Setting `MIRUMOJI_HOST_ON_GPU` instead runs that one container on a GPU
+      with the `local` whisper backend in-process, so no offload app is used
+      (see `build_host_app` for the two modes)
 
 info: Persistence
     - A named `modal.Volume` is mounted at `DATA_MOUNT`, a path separate from
@@ -41,25 +38,32 @@ info: Image
       app serves both the frontend and the server (unlike when running locally
       with docker compose, where the frontend is served by Nginx instead)
 
-    - Because of this the Docker image that the hosted app runs is composed
-      from the published CPU backend image with the published frontend build
-      copied in, so `mirumoji modal deploy` always uses the latest published
-      releases
-
-    - This derived image is built at runtime using Modal's Python SDK
+    - The image is composed at runtime with Modal's Python SDK from the
+      published backend image (CPU, or GPU for a GPU host) with the published
+      frontend build copied in, so `mirumoji modal deploy` always uses the
+      latest published releases (see `_host_image`)
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING
 
 import modal
 
-from ... import __version__
 from ...exceptions import ModalError
-from ...modal import ensure_deployed, ensure_volume
-from ..core.constants import BACKEND_CPU_IMAGE, FRONTEND_IMAGE
+from ...modal import ensure_deployed
+from ..core.constants import (
+    BACKEND_CPU_IMAGE,
+    BACKEND_GPU_IMAGE,
+    DEFAULT_HOST_GPU,
+    FRONTEND_IMAGE,
+    MODAL_GPU_IMAGE,
+    MODAL_GPU_VAR,
+    TRANSCRIBE_BACKEND_VAR,
+)
+from ..core.models import Backend
 from .constants import (
     DATA_MOUNT,
     DATA_VOLUME_NAME,
@@ -69,34 +73,63 @@ from .constants import (
     HOST_CPU_VAR,
     HOST_MAX_CONCURRENT_REQUESTS_VAR,
     HOST_MEMORY_VAR,
+    HOST_MODE_KEY,
 )
+from .lifecycle import ensure_volume
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
 LOGGER = logging.getLogger(__name__)
 
+HF_CACHE_DIR = "/root/.cache/huggingface"
+"""
+Where the `faster-whisper` model cache lives in the backend images
 
-def _host_image(version: str) -> modal.Image:
+The GPU host grafts this directory from `MODAL_GPU_IMAGE` (which pre-caches the
+model) onto `BACKEND_GPU_IMAGE`, so the first transcription loads it from disk
+instead of downloading it
+"""
+
+
+def _host_image(version: str, *, gpu: bool) -> modal.Image:
     """
-    Composes the `Modal` host's image from the published backend and frontend
-    images at `version`
+    Composes the `Modal` host's image from the published images at `version`
 
-    Starts from the CPU backend image (the server stack plus the UniDic and
-    Kotobase data) and copies the already-published frontend build in, so the
-    deploy needs no new artifact
+    info: CPU Host (`gpu=False`)
+        Starts from `BACKEND_CPU_IMAGE` (the server stack plus the UniDic and
+        Kotobase data) and copies the already-published frontend build in, so
+        the deploy needs no new artifact. The container has no GPU and offloads
+        transcription to the on-demand `mirumoji-offload` worker
+
+    info: GPU Host (`gpu=True`)
+        Starts from `BACKEND_GPU_IMAGE` (which adds `faster-whisper` and CUDA)
+        so the `local` whisper backend can run in-process, grafts the
+        pre-cached model from `MODAL_GPU_IMAGE` (which bakes it) so the first
+        transcription needs no download, and copies the frontend in the same
+        way. No offload worker is used in this mode
 
     Args:
         version (str): The published image version to compose from
+        gpu (bool): Compose the GPU host image when `True`, otherwise the CPU
+            one
 
     Returns:
         The composed host image
     """
     frontend = FRONTEND_IMAGE.format(version=version)
-    copy = f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
+    copy_frontend = (
+        f"COPY --from={frontend} {FRONTEND_IMAGE_ROOT} {FRONTEND_DIR}"
+    )
+    if not gpu:
+        return modal.Image.from_registry(
+            BACKEND_CPU_IMAGE.format(version=version)
+        ).dockerfile_commands(copy_frontend)
+    modal_gpu = MODAL_GPU_IMAGE.format(version=version)
+    copy_model = f"COPY --from={modal_gpu} {HF_CACHE_DIR} {HF_CACHE_DIR}"
     return modal.Image.from_registry(
-        BACKEND_CPU_IMAGE.format(version=version)
-    ).dockerfile_commands(copy)
+        BACKEND_GPU_IMAGE.format(version=version)
+    ).dockerfile_commands(copy_frontend, copy_model)
 
 
 def web() -> FastAPI:
@@ -126,15 +159,29 @@ def build_host_app(
     host_config: dict[str, str],
     *,
     version: str,
+    on_gpu: bool,
+    nonpreemptible: bool,
 ) -> modal.App:
     """
     Builds the deployable `Modal` host app with the user's config injected
 
+    info: Host Modes
+        - By default the web container is `CPU-Only` and runs the `modal`
+          backend, offloading transcription and conversion to the on-demand
+          `mirumoji-offload` GPU worker, so a GPU is paid for only while a job
+          runs
+
+        - When `MIRUMOJI_HOST_ON_GPU` is `1` the container runs on the GPU
+          named by `MIRUMOJI_MODAL_GPU` with the `local` whisper backend
+          in-process, so there is a single app and no offload worker, at the
+          cost of an always-warm GPU. The transcribe backend is injected here
+          so the CLI and the GUI never have to decide it
+
     info: Injected Environment
-        - `env` carries the user's relevant resolved configuration
-          (Modal Tokens + LLM Keys + Web Password + Offload Worker Config)
-          as an inline `Secret`, so the container behaves like a local server
-          on the `modal` backend with the frontend served alongside it
+        - `env` carries the user's relevant resolved configuration (Modal
+          Tokens + LLM Keys + Web Password + Modal Config) as an inline
+          `Secret`, so the container behaves like a local server with the
+          frontend served alongside it
 
         - The secret is passed inline and bundled with the deploy so that the
           user never has to manage a persistent Modal secret
@@ -168,6 +215,13 @@ def build_host_app(
         - The pinned count also makes a scaledown window unnecessary, so none
           is set
 
+    info: Non-Preemptible
+        - `MIRUMOJI_HOST_NONPREEMPTIBLE=1` runs the CPU host on guaranteed
+          capacity (a 3x price) so a spot reclaim never restarts it mid-job
+
+        - Modal forbids non-preemptible GPU functions, so this is rejected when
+          combined with the GPU host
+
     Args:
         env (dict[str, str]): The environment injected into the container as an
             inline secret
@@ -175,16 +229,36 @@ def build_host_app(
             cores, memory in MiB, and max concurrent requests), each already
             defaulted by the caller, that size the web container
         version (str): The published image version to compose from
+        on_gpu (bool): Run the host on a GPU (a GPU host) with the in-process
+            backend, instead of a CPU host that offloads to the worker
+        nonpreemptible (bool): Run the CPU host on non-preemptible capacity
 
     Returns:
         The configured `mirumoji-host` app with `web` registered
 
     Raises:
-        ModalError: If a host reservation in `host_config` is not a number
+        ModalError: If a host reservation is not a number, or if a
+            non-preemptible GPU host is requested (an unsupported combination)
     """
-    app = modal.App(HOST_APP_NAME, image=_host_image(version))
+    # A GPU host runs the local whisper backend in-process on the GPU; the
+    # default CPU host offloads transcription to the separate worker. The
+    # backend is decided here (not by the caller) so the CLI and GUI agree
+    if nonpreemptible and on_gpu:
+        raise ModalError(
+            "MIRUMOJI_HOST_NONPREEMPTIBLE Cannot Be Combined With "
+            "MIRUMOJI_HOST_ON_GPU, Since Modal Does Not Support "
+            "Non-Preemptible GPU Functions"
+        )
+    # The GPU type is the explicitly set MIRUMOJI_MODAL_GPU (falling back to
+    # the default GPU when unset), used only when the host runs on a GPU
+    gpu = (env.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU) if on_gpu else None
+    backend = Backend.LOCAL if on_gpu else Backend.MODAL
+    secret_env: dict[str, str | None] = dict(env)
+    secret_env[TRANSCRIBE_BACKEND_VAR] = backend.value
+
+    app = modal.App(HOST_APP_NAME, image=_host_image(version, gpu=on_gpu))
     volume = modal.Volume.from_name(DATA_VOLUME_NAME, create_if_missing=True)
-    secret = modal.Secret.from_dict(dict(env))
+    secret = modal.Secret.from_dict(secret_env)
 
     # The caller resolves these with their managed-config defaults, so every
     # key is present, but a user could still set a non-numeric value
@@ -197,6 +271,8 @@ def build_host_app(
     app.function(
         cpu=cpu,
         memory=memory,
+        gpu=gpu,
+        nonpreemptible=nonpreemptible,
         volumes={DATA_MOUNT: volume},
         secrets=[secret],
         min_containers=1,
@@ -211,20 +287,27 @@ def ensure_host_deployed(
     host_config: dict[str, str],
     *,
     version: str,
+    on_gpu: bool,
+    nonpreemptible: bool,
     force: bool = False,
 ) -> None:
     """
     Creates the `modal.Volume` if it doesn't exist and deploys the `Modal`
-    host app if one of the same version is not already deployed
+    host app unless one with the same version and host mode is already live
 
-    Idempotent and version-tracked through `mirumoji.modal`, so it never
-    duplicates the app and rolls it forward when the package version changes
+    Idempotent and identity-tracked through `mirumoji.modal`: it never
+    duplicates the app, rolls it forward when the resolved version changes, and
+    redeploys when the host mode (GPU / non-preemptible) or a reservation
+    changes at the same version (folded into the deploy tags, see below)
 
     Args:
         env (dict[str, str]): The environment to inject into the container
         host_config (dict[str, str]): The resolved host reservations sizing the
             web container (see `build_host_app`)
-        version (str): The published image version to compose from
+        version (str): The published image version to compose from and track
+        on_gpu (bool): Run the host on a GPU, instead of a CPU host that
+            offloads to the worker (see `build_host_app`)
+        nonpreemptible (bool): Run the CPU host on non-preemptible capacity
         force (bool): Redeploy even when the same version is already live, to
             roll out a code or image change without a version bump
 
@@ -232,9 +315,29 @@ def ensure_host_deployed(
         ModalError: If credentials are missing or the deploy fails
     """
     ensure_volume(DATA_VOLUME_NAME)
+    # Fold the host mode and reservations into a tag digest so a change at the
+    # same version forces a redeploy instead of matching the live app (host
+    # settings the version alone can't capture, see `ensure_deployed`)
+    mode_signature = "|".join(
+        (
+            f"gpu={int(on_gpu)}",
+            f"nonpreemptible={int(nonpreemptible)}",
+            f"cpu={host_config.get(HOST_CPU_VAR, '')}",
+            f"memory={host_config.get(HOST_MEMORY_VAR, '')}",
+            f"conc={host_config.get(HOST_MAX_CONCURRENT_REQUESTS_VAR, '')}",
+        )
+    )
+    mode_tag = hashlib.sha256(mode_signature.encode()).hexdigest()[:16]
     ensure_deployed(
-        build_host_app(env, host_config, version=version),
+        build_host_app(
+            env,
+            host_config,
+            version=version,
+            on_gpu=on_gpu,
+            nonpreemptible=nonpreemptible,
+        ),
         HOST_APP_NAME,
-        version=__version__,
+        version=version,
+        extra_tags={HOST_MODE_KEY: mode_tag},
         force=force,
     )

@@ -11,7 +11,7 @@ Run the entire `Mirumoji` app *(the server and the frontend)* privately on your 
 
 ## How It Works
 
-A deploy creates two `Modal` apps and one volume in your workspace
+By default a deploy creates two `Modal` apps and one volume in your workspace
 
 | Resource | Role | Scaling |
 | --- | --- | --- |
@@ -32,6 +32,15 @@ A deploy creates two `Modal` apps and one volume in your workspace
     - The expensive part, the GPU worker, still costs nothing while idle
 
     - You can configure the container's provisioned hardware with the [`Modal Host Configuration Variables`](#tuning-the-host-optional)
+
+???+ question "Compute Modes"
+    The two-app split above is the default, but you can change how the host runs
+
+    - **CPU Host + Offload** *(default)* &rarr; The always-warm container is `CPU-Only` and offloads transcription to `mirumoji-offload`, so a GPU is paid for only while a job runs. This suits most immersion use
+
+    - **Single-App GPU Host** &rarr; Set `MIRUMOJI_HOST_ON_GPU=1` to run the whole app in one container on the GPU named by `MIRUMOJI_MODAL_GPU`, with `faster-whisper` in-process and no offload worker. Transcription starts instantly, but the GPU is now always-warm *(more expensive)*, so this suits heavy back-to-back transcription
+
+    - **Non-Preemptible CPU Host** &rarr; Set `MIRUMOJI_HOST_NONPREEMPTIBLE=1` to run the `CPU-Only` host on guaranteed capacity *(a 3x price)* so a spot reclaim never restarts it mid-job. `Modal` does not allow this on a GPU host, so the two options can't be combined
 
 ## Prerequisites
 
@@ -120,6 +129,8 @@ The host container reserves `CPU` and `Memory` so the server never gets throttle
 | `MIRUMOJI_HOST_CPU` | `2` | CPU Cores Reserved For The Always-Warm Web Container *(Higher Is Faster But Costs More)* |
 | `MIRUMOJI_HOST_MEMORY` | `4096` | Memory In MiB Reserved For The Web Container *(Higher Avoids Restarts But Costs More)* |
 | `MIRUMOJI_HOST_MAX_CONCURRENT_REQUESTS` | `100` | How Many Requests The One Container Serves At Once |
+| `MIRUMOJI_HOST_ON_GPU` | `0` | Run The Host On A GPU With Whisper In-Process (`1`) Instead Of A CPU Host + Offload Worker (`0`). Uses `MIRUMOJI_MODAL_GPU` For The GPU Type |
+| `MIRUMOJI_HOST_NONPREEMPTIBLE` | `0` | Run The `CPU-Only` Host On Non-Preemptible Capacity (`1`) At A 3x Cost. Not Available With A GPU Host |
 
 The GPU worker is tuned by the same [`Modal Variables`](../guides/gpu.md#tuning-modal-optional) that the local `modal` backend uses *(`MIRUMOJI_MODAL_GPU`, `MIRUMOJI_MODAL_SCALEDOWN_WINDOW`, ...)*. Change any of these, then redeploy for them to take effect
 
@@ -128,7 +139,7 @@ The GPU worker is tuned by the same [`Modal Variables`](../guides/gpu.md#tuning-
 ```bash
 mirumoji modal status # (1)!
 mirumoji modal down # (2)!
-mirumoji modal down --volume # (3)!
+mirumoji modal down -v # (3)!
 ```
 
 1. Show The Host App, The Data Volume, And The URLs

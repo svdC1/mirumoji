@@ -19,6 +19,76 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.6.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.6.0) - 2026-07-18
+
+This release hardens the `Modal`-hosted deploy and adds new host compute modes.
+It makes host data durable against a mid-write preemption, adds an offload-less
+GPU host and a non-preemptible CPU host, adds a `modal logs` command, and reworks
+the image-version pin into a single deploy-time option applied across every image
+command. It also fixes a `Windows` crash in the `modal` CLI, several volume-sync
+inefficiencies, a stop that could not delete the volume, and a host-mode toggle
+that silently did nothing
+
+### Breaking Changes
+  - The image-version pin is renamed. The `MIRUMOJI_VERSION` config key becomes
+    `MIRUMOJI_IMAGE_VERSION` and the `--version` command flag becomes
+    `--image-version`, with no compatibility alias, so update any script or
+    config that pinned an image version
+
+  - The global `mirumoji --version` *(which prints the installed package
+    version)* is unchanged
+
+### Added
+
+- `Launcher` &rarr; An offload-less GPU host. Setting `MIRUMOJI_HOST_ON_GPU=1`
+  *(or passing `--host-on-gpu`)* runs the whole host on a GPU with the `local`
+  whisper backend in-process, on the `MIRUMOJI_MODAL_GPU` type, so there is a
+  single always-warm app and no on-demand offload worker
+
+- `Launcher` &rarr; A non-preemptible CPU host. `MIRUMOJI_HOST_NONPREEMPTIBLE=1`
+  *(or `--nonpreemptible`)* runs the host on guaranteed capacity at a 3x price, so
+  a spot reclaim never restarts it mid-job. It cannot be combined with a GPU host,
+  which `Modal` does not allow
+
+- `Launcher` &rarr; A `mirumoji modal logs` command that fetches the hosted app's
+  recent logs *(`--tail`)* or live-follows them *(`--follow`, stopped with
+  Ctrl+C)*
+
+- `Launcher` &rarr; `--image-version` is honored by every image command *(`up`,
+  `pull`, `render`, `build`, `modal deploy`)*, and `build` now checks out the
+  matching `v<version>` source tag
+
+### Changed
+
+- `Launcher` &rarr; The image-version pin is a single deploy-time option resolved
+  in one place *(flag, then config, then shell, then the installed version)* and
+  is never injected into a container. See the breaking note above for the
+  `MIRUMOJI_VERSION` / `--version` rename
+
+### Fixed
+
+- `Launcher` &rarr; A `Fix-SRT` *(or any media write)* could survive a mid-write
+  `Modal` preemption as a database row whose media file was missing. Media writes
+  are now atomic *(written to a temporary sibling and renamed into place)* and the
+  background volume sync is ordered, so the volume never holds a row referencing a
+  file that has not been mirrored yet
+
+- `Launcher` &rarr; The `modal` CLI could crash partway through on `Windows` when
+  its output held a character the legacy `cp1252` console could not encode *(a box
+  border or a Japanese filename)*, so `download-data` and log fetching could fail.
+  Its subprocesses now encode their output as `utf-8`
+
+- `Launcher` &rarr; `mirumoji modal down --volume` could not delete the data
+  volume once the app had stopped or failed to stop. A stop failure is now a
+  warning, so the volume is still deleted
+
+- `Launcher` &rarr; The host volume sync thrashed the `FUSE` layer, re-copying a
+  transcription's growing scratch audio and the streamed-back converted video many
+  times over. Transient scratch is no longer mirrored, and the offload worker's
+  result is written atomically, so each file is copied once
+
+---
+
 ## [`3.5.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.5.1) - 2026-07-16
 
 This release fixes several issues with the `Modal`-hosted deploy. It moves media serving and the

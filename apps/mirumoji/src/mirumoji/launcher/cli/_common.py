@@ -25,7 +25,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ..core import checks, envfile, process
-from ..core.constants import CONFIG_ENV_VARS, backend_vars
+from ..core.constants import CONFIG_ENV_VAR_NAMES, backend_vars
 from ..core.docker_progress import classify
 from ..core.errors import LauncherError
 from ..core.log_render import tokenize
@@ -33,12 +33,6 @@ from ..core.models import Backend, CheckStatus, ImageSource
 from .theme import console, err_console
 
 _T = TypeVar("_T")
-
-_ALL_ENV_VARS = [v.name for v in CONFIG_ENV_VARS]
-"""
-Every environment variable name that the launcher recognises in the user's
-configuration `.env` file
-"""
 
 
 # --- Stream Rendering ---
@@ -514,60 +508,6 @@ def _validate_dependencies(backend: Backend, source: ImageSource) -> None:
         raise fail("Environment Checks Failed  ↦  Run `mirumoji doctor`")
 
 
-def resolve_backend(flag: Backend | None, env_path: Path) -> Backend:
-    """
-    Resolves which transcription backend should be used when running
-    a CLI command
-
-    info: Order of Precedence
-        The values are considered in the following order
-
-        - Direct Flag Passed To Command (--transcribe)
-
-        - Value Stored In The Managed Config File
-
-        - Default (`MODAL`)
-
-    Args:
-        flag (Backend | None): The `--transcribe` value, if provided
-        env_path (Path): The managed config file to fall back to
-
-    Returns:
-        The backend to use for this run
-    """
-    if flag is not None:
-        return flag
-    backend, _ = envfile.read_deployment(envfile.read(env_path))
-    return backend or Backend.MODAL
-
-
-def resolve_source(flag: bool | None, env_path: Path) -> ImageSource:
-    """
-    Resolves which image source should be used when running a CLI command
-
-    info: Order of Precedence
-        The values are considered in the following order
-
-        - Direct Flag Passed To Command (--build/--pull)
-
-        - Value Stored In The Managed Config File
-
-        - Default (`PULL`)
-
-    Args:
-        flag (bool | None): `True` for `--build`, `False` for `--pull`, `None`
-            when neither was passed
-        env_path (Path): The managed config file to fall back to
-
-    Returns:
-        The image source to use for this run
-    """
-    if flag is not None:
-        return ImageSource.BUILD if flag else ImageSource.PULL
-    _, source = envfile.read_deployment(envfile.read(env_path))
-    return source or ImageSource.PULL
-
-
 def require_env(backend: Backend, env_path: Path) -> None:
     """
     Validates that every environment variable required by the chosen backend
@@ -588,7 +528,9 @@ def require_env(backend: Backend, env_path: Path) -> None:
         typer.Exit: If a required variable is set neither in the config nor in
             the process' environment
     """
-    values = envfile.overlay_environ(envfile.read(env_path), _ALL_ENV_VARS)
+    values = envfile.overlay_environ(
+        envfile.read(env_path), CONFIG_ENV_VAR_NAMES
+    )
     missing = envfile.missing_required(backend_vars(backend), values)
     if missing:
         names = ", ".join(var.name for var in missing)
@@ -616,26 +558,3 @@ def require_published_version(version: str) -> None:
         checks.require_published_version(version)
     except LauncherError as exc:
         raise fail(str(exc)) from exc
-
-
-def resolve_managed_config(env_path: Path) -> dict[str, str]:
-    """
-    Resolves the managed config, overlaying it with the process' environment
-
-    Reads the managed `.env` and overlays the process environment
-    (see `envfile.overlay_environ`), keeping only the non-empty managed
-    config keys
-
-    info: Usage
-        This is both the configuration injected into a Modal-hosted container
-        and the source of the Modal credentials that the Modal-hosted deploy
-        authenticates with
-
-    Args:
-        env_path (Path): The managed config file to read
-
-    Returns:
-        The resolved non-empty managed configuration values
-    """
-    merged = envfile.overlay_environ(envfile.read(env_path), _ALL_ENV_VARS)
-    return {name: merged[name] for name in _ALL_ENV_VARS if merged.get(name)}

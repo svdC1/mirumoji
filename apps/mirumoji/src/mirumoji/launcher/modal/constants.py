@@ -25,13 +25,26 @@ info: Pre-Defined Values
 
     - Managed environment variables defining the hardware capability to request
       for the container that runs the `web function`
-      (`HOST_MAX_CONCURRENT_REQUESTS_VAR`, `HOST_CPU_VAR`,
-      `HOST_MEMORY_VAR`)
+      (`HOST_MAX_CONCURRENT_REQUESTS_VAR`, `HOST_CPU_VAR`, `HOST_MEMORY_VAR`)
+
+    - The GPU / preemptibility host-mode keys (`MIRUMOJI_HOST_ON_GPU`,
+      `MIRUMOJI_MODAL_GPU`, `MIRUMOJI_HOST_NONPREEMPTIBLE`) live in
+      `core.constants` and resolve through `core.envfile`
 """
 
 HOST_APP_NAME = "mirumoji-host"
 """
 The deployed host app's name on the user's Modal workspace
+"""
+
+HOST_MODE_KEY = "mirumoji-host-mode"
+"""
+Modal app tag holding a digest of the host's deploy-time configuration (GPU vs
+CPU, preemptibility, and the CPU / memory / concurrency reservations)
+
+Passed to `mirumoji.modal.ensure_deployed` as an extra identity tag, so
+changing the host mode or a reservation at the same version forces a redeploy
+instead of matching the live app and silently doing nothing
 """
 
 WEB_FUNCTION_NAME = "web"

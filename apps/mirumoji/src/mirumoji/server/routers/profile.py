@@ -585,9 +585,8 @@ async def save_subtitles(
             existing = None
 
     if existing is not None:
-        # Overwrite in place (write_file appends, so clear it first). The
+        # Overwrite in place. write_file replaces the file atomically, so the
         # existing record's name, folder, and lineage are preserved as-is.
-        await media.delete_file(existing.path)
         await media.write_file(existing.path, req.content)
         LOGGER.info(
             f"Overwrote SRT File '{existing.id}' For Profile '{profile_id}'"

@@ -16,7 +16,7 @@ from ...core import checks, envfile, lifecycle, repo
 from ...core import compose as compose_core
 from ...core.compose import RESOLVED_COMPOSE_PATH
 from ...core.constants import (
-    CONFIG_ENV_VARS,
+    CONFIG_ENV_VAR_NAMES,
     HOST_LAN_IP_VAR,
     TRANSCRIBE_BACKEND_VAR,
     backend_vars,
@@ -33,13 +33,6 @@ from ..state import AppState
 _CUSTOM_BUTTON: TypeAlias = (
     theme.PrimaryActionButton | theme.SecondaryActionButton
 )
-
-# --- Constants ---
-
-_CONFIG_NAMES = [v.name for v in CONFIG_ENV_VARS]
-"""
-List containing the names of all environment variables managed by the launcher
-"""
 
 # --- Helpers ---
 
@@ -85,7 +78,7 @@ def _missing_required(state: AppState) -> list[str]:
         The missing required variable names, empty when all are configured
     """
     values = envfile.overlay_environ(
-        envfile.read(state.env_path), _CONFIG_NAMES
+        envfile.read(state.env_path), CONFIG_ENV_VAR_NAMES
     )
     missing = envfile.missing_required(backend_vars(state.backend), values)
     return [var.name for var in missing]
@@ -107,9 +100,9 @@ def _up_flow(state: AppState) -> Generator[str, None, str]:
     ip = get_host_lan_ip()
     os.environ[HOST_LAN_IP_VAR] = ip
     os.environ[TRANSCRIBE_BACKEND_VAR] = state.backend.value
-    version = envfile.resolve_version(state.env_path)
+    version = envfile.resolve_image_version(state.env_path)
     if state.source is ImageSource.BUILD:
-        repo_path = yield from repo.ensure_repo()
+        repo_path = yield from repo.ensure_repo(ref=f"v{version}")
         yield from lifecycle.build_images(repo_path, state.backend)
     else:
         checks.require_published_version(version)
@@ -132,7 +125,8 @@ def _build_flow(state: AppState) -> Generator[str, None, None]:
     Yields:
         Output lines from the checkout + image builds
     """
-    repo_path = yield from repo.ensure_repo()
+    version = envfile.resolve_image_version(state.env_path)
+    repo_path = yield from repo.ensure_repo(ref=f"v{version}")
     yield from lifecycle.build_images(repo_path, state.backend)
 
 
@@ -149,7 +143,7 @@ def _pull_flow(state: AppState) -> Generator[str, None, int]:
     Returns:
         The compose exit code
     """
-    version = envfile.resolve_version(state.env_path)
+    version = envfile.resolve_image_version(state.env_path)
     checks.require_published_version(version)
     compose_file = compose_core.write_compose(
         state.backend, ImageSource.PULL, version=version
@@ -360,6 +354,9 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     # the page re-syncs them from the config whenever the Dashboard is shown
     backend_pill = theme.StatusPill(state.backend.value, "info")
     source_pill = theme.StatusPill(state.source.value, "info")
+    version_pill = theme.StatusPill(
+        envfile.resolve_image_version(state.env_path), "info"
+    )
 
     def sync_dashboard() -> None:
         """
@@ -368,6 +365,9 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         state.load_deployment(envfile.read(state.env_path))
         cast(ft.Text, backend_pill.content).value = state.backend.value
         cast(ft.Text, source_pill.content).value = state.source.value
+        cast(
+            ft.Text, version_pill.content
+        ).value = envfile.resolve_image_version(state.env_path)
 
     state.sync_dashboard = sync_dashboard
 
@@ -403,6 +403,16 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                                     theme_style=ft.TextThemeStyle.LABEL_SMALL,
                                 ),
                                 source_pill,
+                            ],
+                            spacing=10,
+                        ),
+                        ft.Row(
+                            [
+                                ft.Text(
+                                    "Version",
+                                    theme_style=ft.TextThemeStyle.LABEL_SMALL,
+                                ),
+                                version_pill,
                             ],
                             spacing=10,
                         ),

@@ -12,16 +12,11 @@ from typing import TypeAlias, cast
 
 import flet as ft
 
-from .... import modal as modal_lifecycle
 from ....exceptions import ModalError
 from ...core import checks, envfile
-from ...core.constants import (
-    CONFIG_ENV_VARS,
-    MODAL_HOST_VARS,
-    TRANSCRIBE_BACKEND_VAR,
-    backend_vars,
-)
+from ...core.constants import DEFAULT_HOST_GPU, MODAL_GPU_VAR, backend_vars
 from ...core.models import Backend
+from ...modal import lifecycle as modal_lifecycle
 from ...modal.constants import (
     DATA_VOLUME_NAME,
     HOST_APP_NAME,
@@ -42,51 +37,7 @@ _CUSTOM_BUTTON: TypeAlias = (
     theme.PrimaryActionButton | theme.SecondaryActionButton
 )
 
-# --- Constants ---
-
-_CONFIG_NAMES = [v.name for v in CONFIG_ENV_VARS]
-"""
-List containing the names of all environment variables managed by the launcher
-"""
-
 # --- Helpers ---
-
-
-def _resolve_env(state: AppState) -> dict[str, str]:
-    """
-    Resolves the managed config overlaid with the process environment
-
-    Keeps only the non-empty managed config keys, matching the `modal` CLI
-    commands so the GUI injects the same configuration into the deploy
-
-    Args:
-        state (AppState): The shared GUI state (holds the config path)
-
-    Returns:
-        The resolved non-empty managed configuration values
-    """
-    merged = envfile.overlay_environ(
-        envfile.read(state.env_path), _CONFIG_NAMES
-    )
-    return {name: merged[name] for name in _CONFIG_NAMES if merged.get(name)}
-
-
-def _host_config(env: dict[str, str]) -> dict[str, str]:
-    """
-    Resolves the host reservations (CPU, memory, concurrency) with their
-    managed-config defaults, matching the `mirumoji modal deploy` command
-
-    Args:
-        env (dict[str, str]): The resolved managed configuration values
-
-    Returns:
-        Every defaulted host variable, so each sizing key is present
-    """
-    return {
-        var.name: env.get(var.name) or var.default
-        for var in MODAL_HOST_VARS
-        if var.default
-    }
 
 
 def _missing_tokens(env: dict[str, str]) -> list[str]:
@@ -125,6 +76,9 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     cpu_pill = theme.StatusPill("", "info")
     memory_pill = theme.StatusPill("", "info")
     concurrency_pill = theme.StatusPill("", "info")
+    version_pill = theme.StatusPill("", "info")
+    gpu_pill = theme.StatusPill("", "info")
+    capacity_pill = theme.StatusPill("", "info")
 
     def _config_row(label: str, pill: ft.Container) -> ft.Row:
         """
@@ -149,12 +103,28 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         """
         Re-reads the resolved host reservations into the config pills
         """
-        host_config = _host_config(_resolve_env(state))
+        env = envfile.resolve_managed_config(state.env_path)
+        host_config = envfile.host_config(env)
         cast(ft.Text, cpu_pill.content).value = host_config[HOST_CPU_VAR]
         cast(ft.Text, memory_pill.content).value = host_config[HOST_MEMORY_VAR]
         cast(ft.Text, concurrency_pill.content).value = host_config[
             HOST_MAX_CONCURRENT_REQUESTS_VAR
         ]
+        cast(
+            ft.Text, version_pill.content
+        ).value = envfile.resolve_image_version(state.env_path)
+        # A GPU host runs on the explicitly set MIRUMOJI_MODAL_GPU (or the
+        # default GPU); a CPU host offloads instead, mirroring build_host_app
+        on_gpu = envfile.resolve_host_on_gpu(state.env_path)
+        gpu = env.get(MODAL_GPU_VAR) or DEFAULT_HOST_GPU
+        cast(ft.Text, gpu_pill.content).value = (
+            gpu if on_gpu else "CPU + Offload"
+        )
+        cast(ft.Text, capacity_pill.content).value = (
+            "Non-Preemptible"
+            if envfile.resolve_host_nonpreemptible(state.env_path)
+            else "Preemptible"
+        )
 
     _refresh_config()
 
@@ -165,7 +135,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         Returns:
             The resolved env when ready, or `None` after notifying the user
         """
-        env = _resolve_env(state)
+        env = envfile.resolve_managed_config(state.env_path)
         missing = _missing_tokens(env)
         if missing:
             state.notify(
@@ -190,10 +160,9 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             password = secrets.token_urlsafe(12)
             envfile.set_value(state.env_path, WEB_PASSWORD_ENV, password)
         env[WEB_PASSWORD_ENV] = password
-        # The host offloads transcription to the GPU worker instead of needing
-        # a GPU on the always-warm web tier
-        env[TRANSCRIBE_BACKEND_VAR] = Backend.MODAL.value
-        host_config = _host_config(env)
+        # The transcribe backend (modal offload or local GPU) is decided in
+        # build_host_app from the host mode, so it is not set here
+        host_config = envfile.host_config(env)
         begin("Deploying The Host App", deploy_btn)
 
         def do() -> dict[str, str | None]:
@@ -203,11 +172,19 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             # loop startup. The `modal_lifecycle` helpers import it lazily too
             from ...modal import host as host_deploy
 
-            version = envfile.resolve_version(state.env_path)
+            version = envfile.resolve_image_version(state.env_path)
+            on_gpu = envfile.resolve_host_on_gpu(state.env_path)
+            nonpreemptible = envfile.resolve_host_nonpreemptible(
+                state.env_path
+            )
             checks.require_published_version(version)
             with modal_lifecycle.modal_credentials(env):
                 host_deploy.ensure_host_deployed(
-                    env, host_config, version=version
+                    env,
+                    host_config,
+                    version=version,
+                    on_gpu=on_gpu,
+                    nonpreemptible=nonpreemptible,
                 )
                 return {
                     "url": modal_lifecycle.web_url(
@@ -275,16 +252,24 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     def _run_down(env: dict[str, str], delete_volume: bool) -> None:
         begin("Stopping The Host App", down_btn)
 
-        def do() -> None:
+        def do() -> bool:
             with modal_lifecycle.modal_credentials(env):
                 error = modal_lifecycle.stop(HOST_APP_NAME)
-                if error:
+                # A failed stop is only fatal on its own. When deleting the
+                # volume too, the app is often already stopped, so proceed
+                if error and not delete_volume:
                     raise ModalError(error)
                 if delete_volume:
                     modal_lifecycle.delete_volume(DATA_VOLUME_NAME)
+                return bool(error)
 
-        def stopped(_: None) -> None:
-            terminal.append_log("Stopped The Host App")
+        def stopped(stop_failed: bool) -> None:
+            if stop_failed:
+                terminal.append_log(
+                    "Could Not Stop The Host App (It May Not Be Running)"
+                )
+            else:
+                terminal.append_log("Stopped The Host App")
             if delete_volume:
                 terminal.append_log("Deleted The Data Volume")
             done("Stopped")
@@ -451,12 +436,21 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             theme.Section(
                 "Active Configuration",
                 ft.Row(
-                    spacing=36,
+                    spacing=26,
                     wrap=False,
                     controls=[
                         _config_row("CPU Cores", cpu_pill),
                         _config_row("Memory (MiB)", memory_pill),
                         _config_row("Max Requests", concurrency_pill),
+                    ],
+                ),
+                ft.Row(
+                    spacing=26,
+                    wrap=False,
+                    controls=[
+                        _config_row("Image Version", version_pill),
+                        _config_row("GPU", gpu_pill),
+                        _config_row("Capacity", capacity_pill),
                     ],
                 ),
             ),

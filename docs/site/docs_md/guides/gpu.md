@@ -125,6 +125,6 @@ The `free` tier includes a generous amount of monthly compute credits, which is 
 | `MIRUMOJI_MODAL_GPU` | `A10G` | Which GPU The Modal Containers Run (`T4`, `L4`, `A10G`, `A100`, ...). See [`Modal's Available GPUs`](https://modal.com/docs/guide/gpu) |
 | `MIRUMOJI_MODAL_SCALEDOWN_WINDOW` | `60` | Seconds To Keep An Idle Modal Container Warm Before It Scales Down (Faster Reuse In Continuous Use) |
 | `MODAL_FORCE_BUILD` | `0` | Set To `1` To Force Modal To Rebuild Its Cached App Image (On Mirumoji Updates) |
-| `MIRUMOJI_MODAL_IMAGE` | Which Image The Modal Containers Use | Override The Docker Image Used By The Modal Containers. &rarr; `Advanced` |
+| `MIRUMOJI_MODAL_IMAGE` | `svdc1/mirumoji-modal-gpu:<version>` | Override The Docker Image The Modal GPU Containers Run &rarr; `Advanced` |
 
 ---

@@ -21,14 +21,11 @@ info: Additional Information
       machine, or whether the launcher couldn't check for it (`CheckStatus`,
       `CheckResult`)
 
-    - All information to pass to Docker Compose in order to correctly start
-      the mirumoji application based on the end-user's choices (`ComposeSpec`)
-
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -176,27 +173,6 @@ class CheckResult:
             `True` if the status is `OK`
         """
         return self.status is CheckStatus.OK
-
-
-@dataclass(frozen=True)
-class ComposeSpec:
-    """
-    Represents all information to pass to Docker Compose in order to correctly
-    start the mirumoji application based on the end-user's choices
-
-    Attributes:
-        backend (Backend): Which mirumoji transcription backend to use
-        source (ImageSource): Whether to pull pre-built images from Docker Hub
-            , or build them locally
-        env (dict[str, str]): All environment variables to pass to the Docker
-            Compose Application
-        project_name (str): The compose project name
-    """
-
-    backend: Backend
-    source: ImageSource
-    env: dict[str, str] = field(default_factory=dict)
-    project_name: str = "mirumoji"
 
 
 @dataclass(frozen=True)
