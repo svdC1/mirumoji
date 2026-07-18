@@ -37,6 +37,16 @@ HOST_APP_NAME = "mirumoji-host"
 The deployed host app's name on the user's Modal workspace
 """
 
+HOST_MODE_KEY = "mirumoji-host-mode"
+"""
+Modal app tag holding a digest of the host's deploy-time configuration (GPU vs
+CPU, preemptibility, and the CPU / memory / concurrency reservations)
+
+Passed to `mirumoji.modal.ensure_deployed` as an extra identity tag, so
+changing the host mode or a reservation at the same version forces a redeploy
+instead of matching the live app and silently doing nothing
+"""
+
 WEB_FUNCTION_NAME = "web"
 """
 The host app's web endpoint name (the `web` function), used for

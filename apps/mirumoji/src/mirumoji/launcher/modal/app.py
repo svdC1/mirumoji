@@ -62,19 +62,34 @@ _PARTIAL_SUFFIX = ".mirumoji-partial"
 """
 Reserved suffix of an in-progress write the volume syncer skips
 
-The server writes media to a uniquely named temporary sibling and atomically
-renames it into place (mirroring `server.media.PARTIAL_SUFFIX`). The suffix is
-reserved, so it never matches a real uploaded filename, and skipping it keeps a
-partially written file from reaching the volume
+The server writes media to a uniquely named temporary sibling and
+atomically renames it into place (mirroring `server.media.PARTIAL_SUFFIX`).
+The suffix isreserved, so it never matches a real uploaded filename,
+and skipping it keeps a partially written file from reaching the volume
 """
 
 _DB_FILENAME = "mirumoji.db"
 """
 Base name of the `SQLite` database file (matches `paths.HOST_DB_PATH.name`)
 
-The database and its `-wal` / `-shm` sidecars are mirrored to the volume after
-the media files in each batch, so the volume never holds a committed row that
-references a media file not yet mirrored
+The database and its `-wal` / `-shm` sidecars are mirrored to the volume
+in the middle of each batch, after media additions and before media deletions,
+so the volume never holds a committed row that references a media file not yet
+mirrored
+"""
+
+_SYNC_COPY_ATTEMPTS = 3
+"""
+How many times the volume syncer tries a single media copy before giving up
+
+A `Modal` volume is `FUSE`-backed, so a copy can hit a transient error that
+clears on a retry. A file that still fails is left pending
+(see `_volume_syncer`)
+"""
+
+_SYNC_RETRY_BACKOFF = 0.5
+"""
+Seconds the volume syncer waits between failed copy attempts of one file
 """
 
 
@@ -286,16 +301,38 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
           persist the data
 
     info: Ordering
-        - Each batch is applied media-files-first and database-last (and, for
-          deletions, database-first), so a `Modal` volume commit never captures
-          a committed database row whose media file has not been mirrored yet
+        - Each batch is applied media-additions first, the database in the
+          middle, then media-deletions, so a `Modal` volume commit never
+          captures a database row whose media file is missing: an added file
+          reaches the volume before the row that references it, and a row is
+          removed before its file
 
-        - In-progress writes (`*.part` / `*.tmp`) are skipped, since the server
-          writes to a temporary sibling and renames it into place
+        - A `WAL` row insert and delete are both a modification of
+          `mirumoji.db-wal`, so they can't be told apart by change type;
+          keeping the database update between media additions and deletions is
+          the safe order for both
+
+        - In-progress writes (the reserved `.mirumoji-partial` suffix) are
+          skipped, since the server writes to a temporary sibling and renames
+          it into place
 
     info: Resilience
-        - Every filesystem operation is guarded, so one failed copy or delete
-          is logged and never stops the task
+        - A media copy is retried a few times before it is left pending, and
+          the database update is held back while any media copy is pending, so
+          a failed copy can't be overtaken by the database row that references
+          it (which would strand a row whose file is missing)
+
+        - A media deletion is likewise retried until the file is gone from the
+          volume, so a file the user deleted never lingers on the paid volume
+          storage
+
+        - Both pending copies and pending deletions are retried at the start of
+          every batch, so a transient failure heals on the next change without
+          a full rescan
+
+        - A failed database copy only leaves the volume's database lagging
+          (never leading) its media, so it is safe and re-runs on the next
+          change
 
         - If the watcher itself errors, it is restarted after a short backoff,
           so a transient failure does not silently end syncing
@@ -311,16 +348,109 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
     from watchfiles import Change, awatch
 
     def _order(change: tuple[Change, str]) -> int:
+        """
+        Determines the order in which changes to the container's local cache
+        are mirrored to the persistent modal volume
+
+        Media additions (0) before the database (1) before media deletions
+        (2). A WAL row insert and delete are both a `mirumoji.db-wal`
+        modification, so the database can't be split by change type. Placing
+        it between media additions and deletions keeps the volume consistent
+        for both (a file lands before its row, a row is removed before its
+        file)
+
+        Args:
+            change (tuple[Change, str]): Tuple of the file change reported
+                by watchfiles and its source path
+
+        Returns:
+            Number between 0-2 representing the priority order of this change's
+                sync
+
+        """
         change_type, src_str = change
-        is_db = _is_db_file(Path(src_str))
-        if change_type is Change.deleted:
-            return 0 if is_db else 1
-        return 3 if is_db else 2
+        if _is_db_file(Path(src_str)):
+            return 1
+        return 2 if change_type is Change.deleted else 0
+
+    async def _mirror(src: Path, dest: Path, attempts: int) -> bool:
+        """
+        Copies `src` to `dest`, retrying a `FUSE` hiccup, and reports success
+
+        Args:
+            src (Path): The container's local cache added/modified file
+            dest (Path): The same file in the peristent modal volume
+            attempts (int): How many times to rety on failures
+
+        Returns:
+            True if the copy succeded, else False
+        """
+        for attempt in range(attempts):
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(shutil.copy2, src, dest)
+                return True
+            except Exception as e:
+                if attempt + 1 == attempts:
+                    LOGGER.error(
+                        f"[Volume Syncer] Failed To Copy '{src}' -> "
+                        f"'{dest}' : {e}"
+                    )
+                    return False
+                await asyncio.sleep(_SYNC_RETRY_BACKOFF)
+        return False
+
+    async def _remove_from_volume(rel_str: str) -> bool:
+        """
+        Removes a mirrored file from the volume, reporting whether it is gone
+
+        Args:
+            rel_str (str): The file's path relative to the container's cache
+
+        Returns:
+            `True` when the volume no longer holds the file (removed now or
+                already absent), so a delete the user asked for never lingers
+                on the paid volume storage
+        """
+        target = mount / rel_str
+        if not target.exists():
+            return True
+        try:
+            await asyncio.to_thread(_remove, target)
+            return True
+        except Exception as e:
+            LOGGER.error(f"[Volume Syncer] Failed To Remove '{target}' : {e}")
+            return False
+
+    # Media files whose copy has not succeeded yet, keyed by their cache-
+    # relative path. The database update is held back while this is non-empty,
+    # so the volume never commits a row whose media file is missing
+    pending_copies: dict[str, Path] = {}
+    # Volume files whose removal has not succeeded yet. Retried so a file the
+    # user deleted never lingers on the paid volume storage
+    pending_deletes: set[str] = set()
 
     LOGGER.info(f"[Volume Syncer] Watching '{cache}' -> '{mount}'")
     while True:
         try:
             async for changes in awatch(cache):
+                # Retry operations stranded by an earlier batch first, so a
+                # transient failure heals before this batch's database update
+                for rel_str, prev in list(pending_copies.items()):
+                    if prev.is_file():
+                        if await _mirror(prev, mount / rel_str, attempts=1):
+                            pending_copies.pop(rel_str, None)
+                            LOGGER.info(f"[Volume Syncer] Copied '{rel_str}'")
+                    else:
+                        # Source gone before it mirrored. Drop the copy and
+                        # clear any stale earlier copy left on the volume
+                        pending_copies.pop(rel_str, None)
+                        if (mount / rel_str).exists():
+                            pending_deletes.add(rel_str)
+                for rel_str in list(pending_deletes):
+                    if await _remove_from_volume(rel_str):
+                        pending_deletes.discard(rel_str)
+
                 for change_type, src_str in sorted(changes, key=_order):
                     src = Path(src_str)
                     if _is_partial(src):
@@ -331,20 +461,49 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
                     except ValueError:
                         # Not under the cache, ignore
                         continue
+                    rel_str = str(rel)
                     dest = mount / rel
-                    try:
-                        if change_type is Change.deleted:
-                            await asyncio.to_thread(_remove, dest)
+
+                    if change_type is Change.deleted:
+                        # Remove the file from the volume, and retry later if
+                        # that fails so a file the user deleted never lingers
+                        # on the paid volume storage
+                        pending_copies.pop(rel_str, None)
+                        if await _remove_from_volume(rel_str):
+                            pending_deletes.discard(rel_str)
                             LOGGER.info(f"[Volume Syncer] Removed '{rel}'")
-                        elif src.is_file():
-                            dest.parent.mkdir(parents=True, exist_ok=True)
-                            await asyncio.to_thread(shutil.copy2, src, dest)
-                            LOGGER.info(f"[Volume Syncer] Copied '{rel}'")
-                    except Exception as e:
-                        LOGGER.error(
-                            f"[Volume Syncer] Failed To Sync "
-                            f"'{src}' -> '{dest}' : {e}"
-                        )
+                        else:
+                            pending_deletes.add(rel_str)
+                        continue
+
+                    if _is_db_file(src):
+                        # Hold the database back until every media file is
+                        # mirrored. The next db-wal change re-runs this. A
+                        # failed copy only leaves the volume's database lagging
+                        # (never leading) its media, which is safe
+                        if pending_copies:
+                            LOGGER.warning(
+                                "[Volume Syncer] Holding The Database Update "
+                                "While A Media File Is Pending"
+                            )
+                            continue
+                        if src.is_file():
+                            await _mirror(
+                                src, dest, attempts=_SYNC_COPY_ATTEMPTS
+                            )
+                        continue
+
+                    # A media addition or modification: its file must reach the
+                    # volume before the database row that references it
+                    if not src.is_file():
+                        # Raced with a delete. The delete event mirrors removal
+                        continue
+                    pending_deletes.discard(rel_str)
+                    if await _mirror(src, dest, attempts=_SYNC_COPY_ATTEMPTS):
+                        pending_copies.pop(rel_str, None)
+                        LOGGER.info(f"[Volume Syncer] Copied '{rel}'")
+                    else:
+                        pending_copies[rel_str] = src
         except asyncio.CancelledError:
             raise
         except Exception as e:

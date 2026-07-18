@@ -187,15 +187,21 @@ def ensure_deployed(
     name: str,
     *,
     version: str,
+    extra_tags: dict[str, str] | None = None,
     force: bool = False,
 ) -> None:
     """
-    Deploys a Modal `app` under `name` unless an app of the same name
-    containing the `managed_tags(version)` is already deployed
+    Deploys a Modal `app` under `name` unless an app of the same name whose
+    tags already match `managed_tags(version)` and any `extra_tags` is deployed
 
     info: Idempotent + Tracked
         - Looks the app up first and returns early when a Mirumoji-managed app
-          of the same version is already deployed
+          of the same version (and matching `extra_tags`) is already deployed
+
+        - `extra_tags` are part of the deployed identity: they are compared
+          alongside the version and set on deploy, so a change to them (not
+          only to the version) forces a redeploy. The host uses this so a
+          changed host mode or reservation is never mistaken for the live app
 
         - If there's no app deployed under `name`, or that app doesn't have the
           `managed_tags(__version__)` tags, the app is deployed with those tags
@@ -219,18 +225,23 @@ def ensure_deployed(
         app (modal.App): The locally-defined app to deploy
         name (str): The deployed app name
         version (str): The package version being deployed
+        extra_tags (dict[str, str] | None): Extra identity tags compared and
+            set alongside the managed tags, so a deploy whose configuration
+            changed (not only its version) is not mistaken for the live one
         force (bool): Redeploy even when the same version is already live
 
     Raises:
         ModalError: If credentials are missing or the deploy fails
     """
     ensure_authenticated()
+    want = managed_tags(version)
+    if extra_tags:
+        want.update(extra_tags)
     tags = deployed_tags(name)
     if (
         not force
         and tags is not None
-        and tags.get(MANAGED_BY_KEY) == MANAGED_BY_VALUE
-        and tags.get(VERSION_KEY) == version
+        and all(tags.get(key) == value for key, value in want.items())
     ):
         LOGGER.info(
             f"Modal App '{name}' Already Deployed At Version {version}"
@@ -240,7 +251,7 @@ def ensure_deployed(
     LOGGER.info(f"Deploying Modal App '{name}' (Version {version})")
     try:
         app.deploy(name=name)
-        app.set_tags(managed_tags(version))
+        app.set_tags(want)
     except Exception as e:
         raise ModalError(f"Failed To Deploy Modal App '{name}': {e}") from e
     LOGGER.info(f"Deployed Modal App '{name}'")

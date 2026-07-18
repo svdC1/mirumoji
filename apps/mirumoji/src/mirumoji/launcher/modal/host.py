@@ -46,6 +46,7 @@ info: Image
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -72,6 +73,7 @@ from .constants import (
     HOST_CPU_VAR,
     HOST_MAX_CONCURRENT_REQUESTS_VAR,
     HOST_MEMORY_VAR,
+    HOST_MODE_KEY,
 )
 from .lifecycle import ensure_volume
 
@@ -291,10 +293,12 @@ def ensure_host_deployed(
 ) -> None:
     """
     Creates the `modal.Volume` if it doesn't exist and deploys the `Modal`
-    host app if one of the same version is not already deployed
+    host app unless one with the same version and host mode is already live
 
-    Idempotent and version-tracked through `mirumoji.modal`, so it never
-    duplicates the app and rolls it forward when the resolved version changes
+    Idempotent and identity-tracked through `mirumoji.modal`: it never
+    duplicates the app, rolls it forward when the resolved version changes, and
+    redeploys when the host mode (GPU / non-preemptible) or a reservation
+    changes at the same version (folded into the deploy tags, see below)
 
     Args:
         env (dict[str, str]): The environment to inject into the container
@@ -311,6 +315,19 @@ def ensure_host_deployed(
         ModalError: If credentials are missing or the deploy fails
     """
     ensure_volume(DATA_VOLUME_NAME)
+    # Fold the host mode and reservations into a tag digest so a change at the
+    # same version forces a redeploy instead of matching the live app (host
+    # settings the version alone can't capture, see `ensure_deployed`)
+    mode_signature = "|".join(
+        (
+            f"gpu={int(on_gpu)}",
+            f"nonpreemptible={int(nonpreemptible)}",
+            f"cpu={host_config.get(HOST_CPU_VAR, '')}",
+            f"memory={host_config.get(HOST_MEMORY_VAR, '')}",
+            f"conc={host_config.get(HOST_MAX_CONCURRENT_REQUESTS_VAR, '')}",
+        )
+    )
+    mode_tag = hashlib.sha256(mode_signature.encode()).hexdigest()[:16]
     ensure_deployed(
         build_host_app(
             env,
@@ -321,5 +338,6 @@ def ensure_host_deployed(
         ),
         HOST_APP_NAME,
         version=version,
+        extra_tags={HOST_MODE_KEY: mode_tag},
         force=force,
     )
