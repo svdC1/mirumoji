@@ -57,7 +57,7 @@ volume syncer skips it (the reserved suffix never matches a real filename)
 """
 
 
-def _partial_path(path: Path) -> Path:
+def partial_path(path: Path) -> Path:
     """
     Builds a unique temporary sibling path for an atomic write of `path`
 
@@ -99,7 +99,7 @@ async def save_upload_file(
     """
 
     output = Path(output_path).resolve()
-    partial = _partial_path(output)
+    partial = partial_path(output)
 
     if description is None:
         description = f"Saving File To {output}"
@@ -154,7 +154,7 @@ async def save_upload_object(
     """
     output = Path(output_path).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    partial = _partial_path(output)
+    partial = partial_path(output)
     chunk_size = 1024 * 1024
 
     try:
@@ -384,7 +384,7 @@ async def write_file(
         StorageError: If the file cannot be written
     """
     path = BASE_PATH / file_path_relative
-    partial = _partial_path(path)
+    partial = partial_path(path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(partial, "w", encoding="utf-8") as f:

@@ -28,7 +28,7 @@ import logging
 import os
 import shutil
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -206,10 +206,15 @@ def _arm_shutdown_watchdog() -> None:
 
     def _force_exit() -> None:
         time.sleep(_HOST_EXIT_BUDGET_S)
-        _shutdown_log(
-            f"[Shutdown Watcher] Shutdown Exceeded "
-            f"{_HOST_EXIT_BUDGET_S:.0f}s, Forcing Exit"
+        # A raw fd write is lock-free, so a stranded thread holding the
+        # buffered-stdout lock can neither swallow this line nor block the
+        # os._exit below (a buffered print could do both)
+        msg = (
+            f"[mirumoji-host] [Shutdown Watcher] Shutdown Exceeded "
+            f"{_HOST_EXIT_BUDGET_S:.0f}s, Forcing Exit\n"
         )
+        with suppress(Exception):
+            os.write(1, msg.encode())
         os._exit(0)
 
     threading.Thread(
@@ -316,6 +321,10 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
           skipped, since the server writes to a temporary sibling and renames
           it into place
 
+        - Transient processing scratch (under `server.media.TEMP_PATH`) is
+          skipped too, since it is re-created per job and deleted after, so
+          persisting it to the volume would only thrash the `FUSE` layer
+
     info: Resilience
         - A media copy is retried a few times before it is left pending, and
           the database update is held back while any media copy is pending, so
@@ -346,6 +355,11 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
     # watchfiles ships as a `modal` dependency, so it is always importable in
     # the container the host runs in
     from watchfiles import Change, awatch
+
+    # The transient processing scratch (audio extraction, intermediate files)
+    # lives under this path. It is re-created per job and deleted after, so
+    # mirroring it to the persistent volume is pure waste and is skipped
+    from ...server.media import TEMP_PATH
 
     def _order(change: tuple[Change, str]) -> int:
         """
@@ -455,6 +469,10 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
                     src = Path(src_str)
                     if _is_partial(src):
                         # Skip the temporary sibling of an in-progress write
+                        continue
+                    if src.is_relative_to(TEMP_PATH):
+                        # Skip transient processing scratch (re-created per job
+                        # and deleted after), never persisted to the volume
                         continue
                     try:
                         rel = src.relative_to(cache)
