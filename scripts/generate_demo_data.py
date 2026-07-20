@@ -466,9 +466,7 @@ class Driver:
         # its audio section (apiKanjiAudio falls back to no clips on a 404)
         if not self.kanji_audio:
             return
-        audio = self.get(
-            "dict/kanji/audio?" + urlencode({"literal": literal})
-        )
+        audio = self.get("dict/kanji/audio?" + urlencode({"literal": literal}))
         clips = audio.get("clips", []) if isinstance(audio, dict) else []
         for clip in clips:
             resp = self.client.get(

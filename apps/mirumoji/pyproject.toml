@@ -140,6 +140,7 @@ indent-width = 4
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
     "F",   # pyflakes
     "I",   # isort
     "B",   # flake8-bugbear
@@ -152,6 +153,8 @@ select = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = 79
 
 # --- MyPy ---
 [tool.mypy]
