@@ -9,7 +9,7 @@ Security fixes are applied to the latest `3.x` release line
 | Version  | Supported          |
 | -------- | ------------------ |
 | `3.7.x`  | :white_check_mark: |
-| `< 3.7.0`| :x:                s|
+| `< 3.7.0`| :x:                |
 
 ## Reporting a Vulnerability
 
