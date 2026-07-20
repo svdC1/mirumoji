@@ -9,7 +9,6 @@ from collections.abc import Generator
 
 import flet as ft
 
-from ....exceptions import ModalError
 from ....paths import HOST_CONFIG_FILE
 from ...core import envfile, lifecycle, process
 from ...core.compose import RESOLVED_COMPOSE_PATH
@@ -52,7 +51,7 @@ def _modal_logs(
         tail (int | None): How many recent entries to fetch, or `None` for the
             default
         follow (bool): Live-follow instead of fetching recent entries
-        handle (StreamHandle): Cancellation token for the followed stream
+        handle (StreamHandle): Cancellation token for the stream
 
     Yields:
         The log lines
@@ -63,20 +62,15 @@ def _modal_logs(
     env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
     entries = min(tail or 100, MODAL_LOGS_MAX_TAIL)
     with modal_lifecycle.modal_credentials(env):
-        if not follow:
-            output = modal_lifecycle.fetch_app_logs(HOST_APP_NAME, entries)
-            yield from (output.rstrip("\n").splitlines() or ["No Log Entries"])
-            return
-        if not modal_lifecycle.modal_cli_available():
-            raise ModalError(
-                "Following Modal Logs Needs A Python Interpreter On This "
-                "Machine. Untick Follow To Fetch Recent Entries Instead"
-            )
-        # `check=False` because cancelling a followed stream kills the process,
-        # which then exits non-zero through no fault of its own
+        # Both modes go through the same stream. A fetch exits on its own once
+        # it has printed its entries, so it needs no separate path, and the
+        # lines land in the terminal as they arrive rather than in one block
+        #
+        # `check=False` because cancelling kills the process, which then exits
+        # non-zero through no fault of its own
         yield from process.stream(
             modal_lifecycle.app_logs_command(
-                HOST_APP_NAME, follow=True, tail=entries
+                HOST_APP_NAME, follow=follow, tail=entries
             ),
             check=False,
             handle=handle,

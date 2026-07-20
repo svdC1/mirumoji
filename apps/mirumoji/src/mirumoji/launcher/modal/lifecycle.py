@@ -27,7 +27,6 @@ from ...modal import (
     deployed_tags,
     ensure_authenticated,
     modal_cli_argv,
-    modal_cli_available,
     stop,
 )
 
@@ -40,7 +39,6 @@ __all__ = [
     "download_volume",
     "ensure_volume",
     "fetch_app_logs",
-    "modal_cli_available",
     "modal_credentials",
     "stop",
     "volume_exists",

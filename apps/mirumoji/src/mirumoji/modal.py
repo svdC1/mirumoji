@@ -145,20 +145,6 @@ def modal_cli_argv(*args: str) -> list[str]:
     )
 
 
-def modal_cli_available() -> bool:
-    """
-    Reports whether a `modal` CLI can be spawned at all
-
-    Lets a caller offer a degraded path (a one-shot in-process read rather than
-    a live stream) instead of failing, since a packaged bundle may ship no
-    interpreter
-
-    Returns:
-        `True` when `modal_cli_argv` would succeed
-    """
-    return python_executable() is not None or shutil.which("modal") is not None
-
-
 def clean_subprocess_error(stderr: str) -> str:
     """
     Distils the `modal` CLI's noisy error output down to one readable line
