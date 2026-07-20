@@ -261,14 +261,17 @@ async def save_clip(
         await media.save_upload_object(clip_file, src)
 
         # Convert to WebM for Anki compatibility. VP9 has no NVENC encoder, so
-        # this is always a CPU encode (the clip is short)
+        # this is always a CPU encode (the clip is short). The encode lands on
+        # a temporary sibling so the Modal-host volume syncer mirrors the
+        # finished clip once instead of re-copying it as ffmpeg writes it
         ffmpeg = audio.get_ffmpeg_path()["ffmpeg"]
-        await asyncio.to_thread(
-            audio.to_webm,
-            ffmpeg_path=ffmpeg,
-            input_path=str(src),
-            output_path=str(webm_loc),
-        )
+        with media.atomic_output(webm_loc) as webm_partial:
+            await asyncio.to_thread(
+                audio.to_webm,
+                ffmpeg_path=ffmpeg,
+                input_path=str(src),
+                output_path=str(webm_partial),
+            )
 
         async with UnitOfWork() as uow:
             file_rec = await uow.files.add(
@@ -524,6 +527,10 @@ async def delete_file(
         StorageError: If deleting the file fails
         DatabaseError: If the deletion fails
     """
+    # The in-flight check reads the already-fetched job ids, so it is raised
+    # outside the transaction. Raising it inside would make the `UnitOfWork`
+    # log an ordinary 409 as a failed transaction
+    in_flight = False
     async with _file_delete_lock(), UnitOfWork() as uow:
         file = await uow.files.get(file_id)
         if file.profile_id != profile_id:
@@ -532,15 +539,17 @@ async def delete_file(
                 details={"file_id": str(file_id)},
             )
         dependent = await uow.jobs.find_referencing_file(profile_id, file_id)
-        if manager.running_job_id in dependent:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="A Running Job Uses This File, Cancel It First",
-            )
-        for job_id in dependent:
-            await uow.jobs.delete(job_id)
-        await uow.files.delete(file_id)
-        await uow.commit()
+        in_flight = manager.running_job_id in dependent
+        if not in_flight:
+            for job_id in dependent:
+                await uow.jobs.delete(job_id)
+            await uow.files.delete(file_id)
+            await uow.commit()
+    if in_flight:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A Running Job Uses This File, Cancel It First",
+        )
     await media.delete_file(file.path)
     LOGGER.info(f"Deleted File '{file_id}' For Profile '{profile_id}'")
     return FileDeleteResponse(
@@ -774,7 +783,10 @@ async def export_anki_deck(
 
     anki_dir = media.get_profile_dir(profile_id, "anki")
     out_loc = anki_dir / f"{uuid.uuid4().hex}_saved_deck.apkg"
-    await asyncio.to_thread(anki.export_deck, cards, str(out_loc))
+    # Written to a temporary sibling first, so the Modal-host volume syncer
+    # never mirrors a half-packaged deck
+    with media.atomic_output(out_loc) as out_partial:
+        await asyncio.to_thread(anki.export_deck, cards, str(out_partial))
 
     rel_out = media.get_relative_path(out_loc)
     LOGGER.info(

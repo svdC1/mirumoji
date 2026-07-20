@@ -417,7 +417,10 @@ class JobQueueManager:
                     await uow.jobs.update(
                         job.id,
                         status="failed",
-                        error="Interrupted By A Server Restart",
+                        error=(
+                            "Interrupted By A Server Restart. Submit It "
+                            "Again To Retry"
+                        ),
                     )
                     orphaned += 1
                 elif job.parent_id is None:
@@ -431,7 +434,10 @@ class JobQueueManager:
                     await uow.jobs.update(
                         job.id,
                         status="failed",
-                        error="Interrupted By A Server Restart",
+                        error=(
+                            "Interrupted By A Server Restart. Submit It "
+                            "Again To Retry"
+                        ),
                     )
                     orphaned += 1
             await uow.commit()
@@ -440,6 +446,11 @@ class JobQueueManager:
                 await self.submit_job(job_id)
 
         if orphaned:
+            # Not re-queued on purpose: a job interrupted after its output
+            # landed but before its status was written would run its side
+            # effect twice, so the retry is left to the user. A host that is
+            # restarted by a spot reclaim can avoid this entirely by running
+            # on guaranteed capacity (`MIRUMOJI_HOST_NONPREEMPTIBLE`)
             LOGGER.warning(
                 f"Failed {orphaned} Orphaned Running "
                 f"Job(s) From A Previous Run"
@@ -475,7 +486,10 @@ class JobQueueManager:
                         await uow.jobs.update(
                             job.id,
                             status="failed",
-                            error="Interrupted By A Server Restart",
+                            error=(
+                                "Interrupted By A Server Restart. Submit It "
+                                "Again To Retry"
+                            ),
                         )
                         interrupted += 1
                 await uow.commit()

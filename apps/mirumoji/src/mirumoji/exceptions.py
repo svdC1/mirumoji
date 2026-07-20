@@ -290,9 +290,16 @@ class DatabaseError(MirumojiServerError):
     code: ClassVar[str] = "Database"
 
 
-class RecordNotFoundError(DatabaseError):
+class RecordNotFoundError(MirumojiServerError):
     """
     Raised when a requested database record does not exist
+
+    info: Not A `DatabaseError`
+        - A missing row is an expected client condition (a stale id, a record
+          another request already deleted), not a storage failure
+        - Keeping it off `DatabaseError` lets callers and the `UnitOfWork` tell
+          "the row is not there" apart from "the database broke", which decides
+          whether the failure is logged as a crash with a traceback
     """
 
     http_status: ClassVar[int] = 404

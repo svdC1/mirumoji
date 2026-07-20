@@ -170,6 +170,18 @@ class UnitOfWork:
         an exception occurred within the context block. Always closes the
         active database session
 
+        info: Expected Conditions Are Not Crashes
+            - A missing row is an ordinary client condition, so logging it as
+              a failed transaction with a full traceback buried real failures
+              in noise (a stale id in the UI produced an `ERROR` per click)
+
+            - Domain exceptions already carry their severity in
+              `MirumojiServerError.http_status`, so anything below `500` is
+              logged as a warning without a traceback, while a genuine failure
+              keeps the `ERROR` and its traceback
+
+            - The rollback is unconditional either way
+
         Args:
             exc_type: The exception class, if an error was raised
             exc_val: The exception instance, if an error was raised
@@ -177,9 +189,15 @@ class UnitOfWork:
         """
 
         if exc_type is not None:
-            LOGGER.exception(
-                "Database Transaction Failed - Rolling Back",
-            )
+            status = getattr(exc_val, "http_status", None)
+            if isinstance(status, int) and status < 500:
+                LOGGER.warning(
+                    f"Database Transaction Rolled Back : {exc_val}",
+                )
+            else:
+                LOGGER.exception(
+                    "Database Transaction Failed - Rolling Back",
+                )
             await self.session.rollback()
         await self.session.close()
 
