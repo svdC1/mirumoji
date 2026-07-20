@@ -39,6 +39,7 @@ from ..modal import lifecycle as modal_lifecycle
 from ..modal.constants import (
     DATA_VOLUME_NAME,
     HOST_APP_NAME,
+    MODAL_LOGS_MAX_TAIL,
     WEB_FUNCTION_NAME,
     WEB_PASSWORD_ENV,
     WEB_USERNAME,
@@ -1429,7 +1430,12 @@ def modal_logs(
         typer.Option(
             "--tail",
             "-n",
-            help="How Many Recent Log Entries To Fetch",
+            "-t",
+            min=1,
+            max=MODAL_LOGS_MAX_TAIL,
+            help=(
+                "How Many Recent Log Entries To Fetch (Ignored With --follow)"
+            ),
         ),
     ] = 100,
     follow: Annotated[
@@ -1446,6 +1452,9 @@ def modal_logs(
 
     Fetches the most recent host log entries, or live-streams them with
     `--follow`. Useful for diagnosing a deploy or a failing job on the host
+
+    A followed stream starts from the newest entries, so `--tail` only applies
+    to a one-shot fetch
     """
     env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
 

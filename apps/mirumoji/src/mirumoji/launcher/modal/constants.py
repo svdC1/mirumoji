@@ -37,6 +37,15 @@ HOST_APP_NAME = "mirumoji-host"
 The deployed host app's name on the user's Modal workspace
 """
 
+MODAL_LOGS_MAX_TAIL = 20000
+"""
+The largest `--tail` the `modal app logs` CLI accepts
+
+Passing more is rejected with a usage error, so the launcher bounds its own
+option here and reports a clean message instead of surfacing modal's raw usage
+text
+"""
+
 HOST_MODE_KEY = "mirumoji-host-mode"
 """
 Modal app tag holding a digest of the host's deploy-time configuration (GPU vs

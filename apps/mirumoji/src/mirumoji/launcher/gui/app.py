@@ -109,10 +109,11 @@ def _page_main(page: ft.Page) -> None:
                 panels[3] = logs.build(page, state)
             else:
                 panels[4] = modal_host.build(page, state)
-        # The Dashboard pills reflect the persisted deployment choice, which
-        # Settings can change. Re-read it from the config each time it's shown
-        if index == 0 and state.sync_dashboard is not None:
-            state.sync_dashboard()
+        # A panel is built once and cached, so anything it renders from the
+        # managed config (the Dashboard's deployment pills, the Modal Host's
+        # mode pills) goes stale as soon as Settings changes it. Re-read it
+        # each time the panel is shown
+        state.sync_panel(index)
         body.content = panels[index]
         page.update()
 
