@@ -29,6 +29,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import { Button, Card, Checkbox, EmptyState, IconButton, Popover, cn } from "@/shared/ui";
 import { staticUrl } from "@/shared/format/files";
 import { toastApiError } from "@/shared/api/errors";
+import type { Job } from "@/shared/jobs/types";
 import { listFiles, deleteFile } from "../api";
 import { buildFileGroups, fileKind, type VideoGroup } from "../grouping";
 import type { FileOrigin, ProfileFile } from "../types";
@@ -170,23 +171,41 @@ export function FilesPanel() {
         }
     };
 
-    // Deleting a file cascades its dependent jobs away server-side. The server
-    // returns those job ids, so they are pruned from the task tray immediately
-    // (which polls only while a job is active) and the Tasks tab is refreshed.
+    // Deleting a file cascades server-side: its dependent jobs are removed, and
+    // its transcripts and clips go with it through the database's own cascades.
+    // Every affected cache is reconciled here.
+    //
+    // The jobs list is pruned through the cache directly rather than by asking
+    // SWR to revalidate it. The Files and Tasks tabs are mutually exclusive, so
+    // when this runs "jobs/history" has no mounted subscriber and a bare
+    // revalidate is a no-op, leaving the deleted job to reappear the moment the
+    // user opens the Tasks tab.
+    const reconcileAfterDelete = (fileIds: string[], jobIds: string[]) => {
+        fileIds.forEach(evictFromPlayer);
+        tasks.forgetUploaded(fileIds);
+        jobIds.forEach((jobId) => tasks.dismiss(jobId));
+        const dropped = new Set(jobIds);
+        void mutate(SWR_KEY);
+        void mutate(
+            "jobs/history",
+            (current?: Job[]) => current?.filter((j) => !dropped.has(j.id)),
+            { revalidate: true }
+        );
+        void mutate("profiles/transcripts");
+        void mutate("profiles/clips");
+    };
+
     const onDelete = async (id: string) => {
         setDeleting(id);
         try {
             const res = await deleteFile(id);
             toast.success("File Deleted");
-            evictFromPlayer(id);
             setSelected((prev) => {
                 const next = new Set(prev);
                 next.delete(id);
                 return next;
             });
-            res.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
-            mutate(SWR_KEY);
-            mutate("jobs/history");
+            reconcileAfterDelete([id], res.deleted_job_ids);
         } catch (e) {
             toastApiError(e);
         } finally {
@@ -199,19 +218,18 @@ export function FilesPanel() {
         if (ids.length === 0) return;
         const results = await Promise.allSettled(ids.map((id) => deleteFile(id)));
         const ok = results.filter((r) => r.status === "fulfilled").length;
-        // Prune the tray of every job cascaded away by the successful deletes,
-        // and evict any deleted file that was loaded in the player.
+        const deletedFileIds: string[] = [];
+        const deletedJobIds: string[] = [];
         results.forEach((r, i) => {
             if (r.status === "fulfilled") {
-                evictFromPlayer(ids[i]);
-                r.value.deleted_job_ids.forEach((jobId) => tasks.dismiss(jobId));
+                deletedFileIds.push(ids[i]);
+                deletedJobIds.push(...r.value.deleted_job_ids);
             }
         });
         clearSelection();
         if (ok > 0) toast.success(`Deleted ${ok} File(s)`);
         if (ok < ids.length) toast.error(`${ids.length - ok} File(s) Could Not Be Deleted`);
-        mutate(SWR_KEY);
-        mutate("jobs/history");
+        reconcileAfterDelete(deletedFileIds, deletedJobIds);
     };
 
     // Library uploads run through the task tray (which shows their progress).

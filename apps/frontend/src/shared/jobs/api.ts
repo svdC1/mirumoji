@@ -84,6 +84,7 @@ export async function deleteJob(id: string): Promise<void> {
  * @param {(percent: number) => void} onProgress Upload progress callback.
  * @param {() => void} onComplete Called when the upload hits 100%.
  * @param {string | undefined} folder Optional group label (e.g. a folder name).
+ * @param {AbortSignal} [signal] Cancels the upload when aborted.
  * @returns {Promise<UploadedFile>} The stored file.
  */
 export function uploadProfileFile(
@@ -91,12 +92,13 @@ export function uploadProfileFile(
     type: string | undefined,
     onProgress: (percent: number) => void,
     onComplete: () => void,
-    folder?: string
+    folder?: string,
+    signal?: AbortSignal
 ): Promise<UploadedFile> {
     const params = new URLSearchParams();
     if (type) params.set("type", type);
     if (folder) params.set("folder", folder);
     const query = params.toString();
     const url = query ? `profiles/files?${query}` : "profiles/files";
-    return uploadFile<UploadedFile>(file, url, {}, onProgress, onComplete);
+    return uploadFile<UploadedFile>(file, url, {}, onProgress, onComplete, signal);
 }

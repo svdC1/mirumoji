@@ -117,22 +117,51 @@ export default function PlayerPage() {
             ) {
                 return;
             }
-            if (video || videoFileId) {
+            const clear = () => {
+                toast.error("This Video Is No Longer Available");
+                setVideo(null);
+                setVideoUrl(null);
+                setVideoFileName(null);
+                setVideoFileId(null);
+            };
+            // A device file that won't decode is convertible, so it stays
+            // loaded for the toolbar's To MP4 action.
+            if (video) {
                 setUnplayable(true);
                 return;
             }
-            toast.error("This Video Is No Longer Available");
-            setVideo(null);
-            setVideoUrl(null);
-            setVideoFileName(null);
-            setVideoFileId(null);
+            // A profile file streams from the server, so the same decode error
+            // covers two very different cases: a container this browser can't
+            // play (convertible) and a file that was deleted (gone). Asking the
+            // server which it is stops a deleted video from sitting behind a
+            // "Convert To Play" prompt that can never succeed.
+            if (videoFileId && videoUrl) {
+                void fetch(videoUrl, { method: "HEAD" })
+                    .then((res) => (res.status === 404 ? clear() : setUnplayable(true)))
+                    .catch(() => setUnplayable(true));
+                return;
+            }
+            if (videoFileId) {
+                setUnplayable(true);
+                return;
+            }
+            clear();
         };
         videoEl.addEventListener("error", onError);
         // The element may have already failed before this listener attached
         // (a fast local blob, or a source set before the effect ran).
         if (videoEl.error) onError();
         return () => videoEl.removeEventListener("error", onError);
-    }, [videoEl, video, videoFileId, setVideo, setVideoUrl, setVideoFileName, setVideoFileId]);
+    }, [
+        videoEl,
+        video,
+        videoFileId,
+        videoUrl,
+        setVideo,
+        setVideoUrl,
+        setVideoFileName,
+        setVideoFileId,
+    ]);
 
     // Restore the saved position on load; persist it on pause / source change.
     useEffect(() => {

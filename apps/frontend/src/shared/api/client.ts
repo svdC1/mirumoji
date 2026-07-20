@@ -99,17 +99,36 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
 }
 
 /**
+ * The `ApiError` code reported when an upload is cancelled by the caller.
+ *
+ * Distinguishes a deliberate cancel from a genuine failure, so the tray drops
+ * the row instead of showing it as an error.
+ */
+export const UPLOAD_ABORTED_CODE = "UploadAborted";
+
+/**
+ * Whether an error is an upload the caller cancelled, rather than a failure.
+ *
+ * @param {unknown} error The caught error.
+ * @returns {boolean} `true` when the upload was aborted deliberately.
+ */
+export function isUploadAborted(error: unknown): boolean {
+    return error instanceof ApiError && error.code === UPLOAD_ABORTED_CODE;
+}
+
+/**
  * Wires the shared progress + completion handling for an upload `XMLHttpRequest`
  * (progress events, the 2xx/JSON-parse success path, the structured-error path,
- * and the unreachable-server path), so the upload helpers only differ in how
- * they build and send the request.
+ * the unreachable-server path, and the caller-cancelled path), so the upload
+ * helpers only differ in how they build and send the request.
  */
 function settleUpload<T>(
     xhr: XMLHttpRequest,
     resolve: (value: T) => void,
     reject: (reason: ApiError) => void,
     onProgress: (percent: number) => void,
-    onUploadComplete: () => void
+    onUploadComplete: () => void,
+    signal?: AbortSignal
 ): void {
     xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -141,6 +160,23 @@ function settleUpload<T>(
         reject(
             new ApiError(0, "Could not reach the server", "BackendUnreachable", undefined, false)
         );
+
+    // Without this, calling `abort()` fires `onabort` (never `onerror`) and the
+    // promise would stay pending forever.
+    xhr.onabort = () =>
+        reject(new ApiError(0, "Upload Cancelled", UPLOAD_ABORTED_CODE, undefined, false));
+
+    if (signal) {
+        if (signal.aborted) {
+            xhr.abort();
+            return;
+        }
+        const onAbort = () => xhr.abort();
+        signal.addEventListener("abort", onAbort, { once: true });
+        // Detach once the request settles, so a long-lived controller does not
+        // retain the xhr after it is done.
+        xhr.onloadend = () => signal.removeEventListener("abort", onAbort);
+    }
 }
 
 /**
@@ -153,6 +189,8 @@ function settleUpload<T>(
  * @param {Record<string, string>} headers Additional request headers.
  * @param {(percent: number) => void} onProgress Upload progress callback.
  * @param {() => void} onUploadComplete Called when the upload hits 100%.
+ * @param {AbortSignal} [signal] Cancels the upload when aborted, rejecting with
+ *   an {@link ApiError} carrying {@link UPLOAD_ABORTED_CODE}.
  * @returns {Promise<T>} The parsed JSON response.
  */
 export async function uploadFile<T = unknown>(
@@ -160,7 +198,8 @@ export async function uploadFile<T = unknown>(
     url: string,
     headers: Record<string, string>,
     onProgress: (percent: number) => void,
-    onUploadComplete: () => void
+    onUploadComplete: () => void,
+    signal?: AbortSignal
 ): Promise<T> {
     return new Promise((resolve, reject) => {
         const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
@@ -182,7 +221,7 @@ export async function uploadFile<T = unknown>(
             xhr.setRequestHeader(key, headers[key]);
         }
 
-        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete);
+        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete, signal);
         xhr.send(file);
     });
 }
@@ -199,13 +238,16 @@ export async function uploadFile<T = unknown>(
  * @param {FormData} formData The multipart payload (file part + fields).
  * @param {(percent: number) => void} onProgress Upload progress callback.
  * @param {() => void} onUploadComplete Called when the upload hits 100%.
+ * @param {AbortSignal} [signal] Cancels the upload when aborted, rejecting with
+ *   an {@link ApiError} carrying {@link UPLOAD_ABORTED_CODE}.
  * @returns {Promise<T>} The parsed JSON response.
  */
 export async function uploadFormData<T = unknown>(
     url: string,
     formData: FormData,
     onProgress: (percent: number) => void,
-    onUploadComplete: () => void
+    onUploadComplete: () => void,
+    signal?: AbortSignal
 ): Promise<T> {
     return new Promise((resolve, reject) => {
         const fullUrl = url.startsWith("http") ? url : `${API_BASE}/${url}`;
@@ -218,7 +260,7 @@ export async function uploadFormData<T = unknown>(
         xhr.open("POST", fullUrl, true);
         xhr.setRequestHeader("X-Profile-ID", profileId);
 
-        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete);
+        settleUpload(xhr, resolve, reject, onProgress, onUploadComplete, signal);
         xhr.send(formData);
     });
 }

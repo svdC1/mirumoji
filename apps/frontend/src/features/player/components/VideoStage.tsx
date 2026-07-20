@@ -62,6 +62,7 @@ export function VideoStage({
             className="h-full w-full"
             onVideoEl={handleVideoEl}
             keyboardControls
+            tapToSeek
             overlay={({ controlsShown }) => {
                 // Anchor the overlay to the painted frame when known, else the
                 // element box. While the controls are shown, lift the subtitle

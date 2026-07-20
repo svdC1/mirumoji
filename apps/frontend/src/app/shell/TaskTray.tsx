@@ -16,8 +16,17 @@ import type { Job } from "@/shared/jobs/types";
 import { cn, IconButton, Spinner } from "@/shared/ui";
 
 /** A row for a client-side upload that is feeding a job. */
-function UploadRow({ task, onDismiss }: { task: UploadTask; onDismiss: () => void }) {
+function UploadRow({
+    task,
+    onCancel,
+    onDismiss,
+}: {
+    task: UploadTask;
+    onCancel: () => void;
+    onDismiss: () => void;
+}) {
     const failed = task.status === "error";
+    const cancellable = !failed && task.cancellable === true;
     return (
         <li className="px-3 py-2.5">
             <div className="flex items-start gap-2.5">
@@ -40,8 +49,12 @@ function UploadRow({ task, onDismiss }: { task: UploadTask; onDismiss: () => voi
                     </p>
                     {!failed && <ProgressBar percent={task.progress} />}
                 </div>
-                {failed && (
-                    <IconButton label="Dismiss" onClick={onDismiss} className="shrink-0">
+                {(failed || cancellable) && (
+                    <IconButton
+                        label={cancellable ? "Cancel" : "Dismiss"}
+                        onClick={cancellable ? onCancel : onDismiss}
+                        className="shrink-0"
+                    >
                         <X size={15} />
                     </IconButton>
                 )}
@@ -112,7 +125,7 @@ function JobRow({
  * @returns {JSX.Element | null} The floating tray, or `null` when idle/empty.
  */
 export function TaskTray() {
-    const { jobs, uploads, busy, cancel, dismiss } = useTasks();
+    const { jobs, uploads, busy, cancel, cancelUpload, dismiss } = useTasks();
     const applyResult = useJobResult();
     const [open, setOpen] = useState(false);
 
@@ -158,7 +171,12 @@ export function TaskTray() {
                     </header>
                     <ul className="min-h-0 flex-1 divide-y divide-ink/5 overflow-y-auto">
                         {uploads.map((u) => (
-                            <UploadRow key={u.id} task={u} onDismiss={() => dismiss(u.id)} />
+                            <UploadRow
+                                key={u.id}
+                                task={u}
+                                onCancel={() => cancelUpload(u.id)}
+                                onDismiss={() => dismiss(u.id)}
+                            />
                         ))}
                         {jobs.map((j) => (
                             <JobRow

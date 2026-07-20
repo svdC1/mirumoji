@@ -17,6 +17,7 @@ import React, {
     ReactNode,
 } from "react";
 import { ApiError, toastApiError } from "@/shared/api/errors";
+import { isUploadAborted } from "@/shared/api/client";
 import { inferFileType } from "@/shared/format/files";
 import { useProfile } from "./ProfileContext";
 import {
@@ -42,6 +43,22 @@ const POLL_INTERVAL_MS = 2000;
 
 const ACTIVE_STATUSES: JobStatus[] = ["queued", "running"];
 
+/**
+ * Identity key for the upload cache.
+ *
+ * Keyed by content identity rather than by `File` object identity: re-picking
+ * the same file from the OS dialog yields a brand new `File`, which would miss
+ * a per-object cache and upload again. It also keeps the cache from retaining a
+ * strong reference to every `File` uploaded this session, which pinned
+ * multi-hundred-MB blobs in memory for the lifetime of the page.
+ *
+ * @param {File} file The file to key.
+ * @returns {string} A stable key for this file's contents.
+ */
+function fileKey(file: File): string {
+    return `${file.name}|${file.size}|${file.lastModified}`;
+}
+
 /** A client-side upload, shown in the tray during its upload. */
 export interface UploadTask {
     /** Client-generated id (distinct from server job ids). */
@@ -56,6 +73,8 @@ export interface UploadTask {
     status: "uploading" | "error";
     /** Failure message when `status` is `error`. */
     error?: string;
+    /** Whether this upload can still be cancelled. */
+    cancellable?: boolean;
 }
 
 /** Everything a submitted job needs beyond the uploaded file reference. */
@@ -92,10 +111,14 @@ export interface TaskContextType {
     waitFor: (id: string) => Promise<Job>;
     /** Cancels a queued or running job. */
     cancel: (id: string) => Promise<void>;
+    /** Aborts an in-flight upload by its tray id. */
+    cancelUpload: (id: string) => void;
     /** Permanently deletes a finished job (server-side) and drops it locally. */
     deleteJob: (id: string) => Promise<void>;
     /** Removes a finished job or a failed upload from the tray. */
     dismiss: (id: string) => void;
+    /** Forgets the cached profile file ids for the given ids. */
+    forgetUploaded: (fileIds: string[]) => void;
     /** Re-fetches the active jobs immediately. */
     refresh: () => Promise<void>;
 }
@@ -125,9 +148,16 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const jobsRef = useRef<Job[]>([]);
     jobsRef.current = jobs;
 
-    // Re-upload elimination: remembers the profile file id for each File
-    // uploaded this session, so a second job on the same File skips the upload.
-    const uploadedRef = useRef(new Map<File, string>());
+    // Re-upload elimination: remembers the in-flight upload for each file
+    // uploaded this session, so a second job on the same file joins it instead
+    // of starting its own. The promise is stored (not the resolved id) and it is
+    // stored *before* the first await, so two actions fired together on one
+    // local file share a single upload rather than each uploading the whole
+    // file. Keyed by content identity, see `fileKey`.
+    const uploadedRef = useRef(new Map<string, Promise<UploadedFile>>());
+
+    // Abort controllers for in-flight uploads, keyed by their tray id.
+    const abortersRef = useRef(new Map<string, AbortController>());
 
     const refresh = useCallback(async () => {
         if (!profileId) return;
@@ -161,8 +191,14 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
 
+        // A job we were tracking that neither appears as active nor could be
+        // fetched has been removed server-side (deleting a file cascades its
+        // jobs away), so it is dropped rather than kept forever. Without this
+        // the tray and the tasks list resurrect jobs that no longer exist.
+        const gone = new Set(justFinished.filter((j, i) => finished[i] === null).map((j) => j.id));
+
         setJobs((prev) => {
-            const byId = new Map(prev.map((j) => [j.id, j]));
+            const byId = new Map(prev.filter((j) => !gone.has(j.id)).map((j) => [j.id, j]));
             for (const j of active) byId.set(j.id, j);
             for (const j of finished) if (j) byId.set(j.id, j);
             return [...byId.values()].sort(byNewest);
@@ -173,6 +209,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         setJobs([]);
         setUploads([]);
+        // Abort anything still streaming, otherwise a switched-away profile
+        // keeps uploading into the profile the user just left.
+        for (const controller of abortersRef.current.values()) controller.abort();
+        abortersRef.current.clear();
         uploadedRef.current.clear();
         if (!profileId) return;
         let cancelled = false;
@@ -210,12 +250,20 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (files.length === 0) return 0;
         const uploadId = `lib-${Date.now()}`;
         const name = folder ?? `${files.length} File(s)`;
-        setUploads((prev) => [...prev, { id: uploadId, name, progress: 0, status: "uploading" }]);
+        const controller = new AbortController();
+        abortersRef.current.set(uploadId, controller);
+        setUploads((prev) => [
+            ...prev,
+            { id: uploadId, name, progress: 0, status: "uploading", cancellable: true },
+        ]);
         const patch = (changes: Partial<UploadTask>) =>
             setUploads((prev) => prev.map((u) => (u.id === uploadId ? { ...u, ...changes } : u)));
 
         let ok = 0;
         for (let i = 0; i < files.length; i++) {
+            // Cancelling the set stops before the next file rather than only
+            // aborting the one in flight.
+            if (controller.signal.aborted) break;
             try {
                 await uploadProfileFile(
                     files[i],
@@ -223,32 +271,52 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     // Overall progress across the whole set.
                     (percent) => patch({ progress: ((i + percent / 100) / files.length) * 100 }),
                     () => undefined,
-                    folder
+                    folder,
+                    controller.signal
                 );
                 ok += 1;
-            } catch {
+            } catch (e) {
+                if (isUploadAborted(e)) break;
                 // Keep going; the panel reports the final success count.
             }
             patch({ progress: ((i + 1) / files.length) * 100 });
         }
+        abortersRef.current.delete(uploadId);
         setUploads((prev) => prev.filter((u) => u.id !== uploadId));
         return ok;
     }, []);
 
     const uploadAndSubmit = useCallback(
         async (file: File, options: SubmitOptions): Promise<Job | null> => {
-            // Reuse the file id when this exact File was already uploaded.
-            const cachedId = uploadedRef.current.get(file);
-            if (cachedId) {
-                return submit({
-                    type: options.jobType,
-                    file_id: cachedId,
-                    opts: options.opts,
-                    model: options.model,
-                    sys_msg: options.sysMsg,
-                });
+            const key = fileKey(file);
+            const pending = uploadedRef.current.get(key);
+            // Join the existing upload for this file, whether it already
+            // finished or is still streaming. Both branches are inside the try
+            // so a rejection (a stale file id the server no longer has) is
+            // reported rather than becoming an unhandled rejection.
+            if (pending) {
+                try {
+                    const uploaded = await pending;
+                    return await submit({
+                        type: options.jobType,
+                        file_id: uploaded.id,
+                        opts: options.opts,
+                        model: options.model,
+                        sys_msg: options.sysMsg,
+                    });
+                } catch (e) {
+                    // A rejected upload must not poison the cache, otherwise
+                    // every later action on this file replays the same failure.
+                    if (uploadedRef.current.get(key) === pending) {
+                        uploadedRef.current.delete(key);
+                    }
+                    throw e;
+                }
             }
+
             const uploadId = `upload-${file.name}-${Date.now()}`;
+            const controller = new AbortController();
+            abortersRef.current.set(uploadId, controller);
             setUploads((prev) => [
                 ...prev,
                 {
@@ -257,6 +325,7 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     jobType: options.jobType,
                     progress: 0,
                     status: "uploading",
+                    cancellable: true,
                 },
             ]);
             const patch = (changes: Partial<UploadTask>) =>
@@ -264,14 +333,20 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     prev.map((u) => (u.id === uploadId ? { ...u, ...changes } : u))
                 );
 
+            // Registered synchronously, before the first await, so a second
+            // action fired in the same tick finds it and joins.
+            const upload = uploadProfileFile(
+                file,
+                options.fileType,
+                (percent) => patch({ progress: percent }),
+                () => patch({ progress: 100, cancellable: false }),
+                undefined,
+                controller.signal
+            );
+            uploadedRef.current.set(key, upload);
+
             try {
-                const uploaded: UploadedFile = await uploadProfileFile(
-                    file,
-                    options.fileType,
-                    (percent) => patch({ progress: percent }),
-                    () => patch({ progress: 100 })
-                );
-                uploadedRef.current.set(file, uploaded.id);
+                const uploaded: UploadedFile = await upload;
                 const job = await submit({
                     type: options.jobType,
                     file_id: uploaded.id,
@@ -282,9 +357,20 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUploads((prev) => prev.filter((u) => u.id !== uploadId));
                 return job;
             } catch (e) {
+                if (uploadedRef.current.get(key) === upload) {
+                    uploadedRef.current.delete(key);
+                }
+                // A cancel is a deliberate action, so the row is dropped rather
+                // than left behind as a failure the user has to dismiss.
+                if (isUploadAborted(e)) {
+                    setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+                    return null;
+                }
                 const message = e instanceof Error ? e.message : "Upload Failed";
-                patch({ status: "error", error: message });
-                return null;
+                patch({ status: "error", error: message, cancellable: false });
+                throw e;
+            } finally {
+                abortersRef.current.delete(uploadId);
             }
         },
         [submit]
@@ -307,14 +393,44 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, []);
 
+    const cancelUpload = useCallback((id: string) => {
+        abortersRef.current.get(id)?.abort();
+    }, []);
+
     const deleteJob = useCallback(async (id: string) => {
-        await deleteJobApi(id);
-        setJobs((prev) => prev.filter((j) => j.id !== id));
+        try {
+            await deleteJobApi(id);
+        } catch (e) {
+            // A job that is already gone is the desired end state, so the row is
+            // dropped either way. Without this the tray can never shed a job the
+            // server removed (deleting a file cascades its jobs away), leaving a
+            // phantom row that 404s on every click.
+            if (!(e instanceof ApiError) || e.status !== 404) throw e;
+        } finally {
+            setJobs((prev) => prev.filter((j) => j.id !== id));
+        }
     }, []);
 
     const dismiss = useCallback((id: string) => {
         setJobs((prev) => prev.filter((j) => j.id !== id));
         setUploads((prev) => prev.filter((u) => u.id !== id));
+    }, []);
+
+    const forgetUploaded = useCallback((fileIds: string[]) => {
+        if (fileIds.length === 0) return;
+        const dropped = new Set(fileIds);
+        // Resolved entries pointing at a deleted profile file are dropped, so a
+        // later action on the same local file re-uploads instead of submitting
+        // against an id the server no longer has.
+        for (const [key, pending] of uploadedRef.current.entries()) {
+            void pending
+                .then((uploaded) => {
+                    if (dropped.has(uploaded.id) && uploadedRef.current.get(key) === pending) {
+                        uploadedRef.current.delete(key);
+                    }
+                })
+                .catch(() => undefined);
+        }
     }, []);
 
     const busy = uploads.some((u) => u.status === "uploading") || hasActiveJobs;
@@ -330,8 +446,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             uploadFiles,
             waitFor,
             cancel,
+            cancelUpload,
             deleteJob,
             dismiss,
+            forgetUploaded,
             refresh,
         }),
         [
@@ -344,8 +462,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             uploadFiles,
             waitFor,
             cancel,
+            cancelUpload,
             deleteJob,
             dismiss,
+            forgetUploaded,
             refresh,
         ]
     );
