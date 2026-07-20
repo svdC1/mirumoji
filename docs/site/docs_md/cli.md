@@ -298,8 +298,11 @@ mirumoji modal logs [OPTIONS]
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `-n`, `--tail N` | `100` | How Many Recent Log Entries To Fetch |
+| `-n`, `-t`, `--tail N` | `100` | How Many Recent Log Entries To Fetch, From `1` To `20000` *(Ignored With `--follow`)* |
 | `-f`, `--follow` | off | Live-Stream The Logs Until Interrupted *(Ctrl-C)* |
+
+!!! note "Tail Bound"
+    `20000` Is The Largest `--tail` `Modal` Accepts. A Follow Always Starts From The Newest Entries, So `--tail` Only Applies To A One-Shot Fetch
 
 ### `modal down`
 
