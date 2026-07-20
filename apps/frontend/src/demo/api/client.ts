@@ -93,14 +93,45 @@ export async function apiFetch<T = unknown>(url: string, opts: RequestInit = {})
     return decodeFixture(fx) as T;
 }
 
+/**
+ * Mirrors the real client's cancelled-upload code, so the shared upload paths
+ * can tell a deliberate cancel apart from a failure here too.
+ */
+export const UPLOAD_ABORTED_CODE = "UploadAborted";
+
+/**
+ * Whether an error is an upload the caller cancelled, rather than a failure.
+ *
+ * @param {unknown} error The caught error.
+ * @returns {boolean} `true` when the upload was aborted deliberately.
+ */
+export function isUploadAborted(error: unknown): boolean {
+    return error instanceof ApiError && error.code === UPLOAD_ABORTED_CODE;
+}
+
+/**
+ * Rejects when `signal` is already aborted.
+ *
+ * A demo upload completes in one tick, so there is no window to cancel inside.
+ * Only an abort that already happened is honoured, which keeps the shared
+ * callers on the same branch they take against the real client.
+ */
+function throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) {
+        throw new ApiError(0, "Upload Cancelled", UPLOAD_ABORTED_CODE, undefined, false);
+    }
+}
+
 /** Fakes a profile-file upload; the file bytes are ignored (the sample is canned). */
 export async function uploadFile<T = unknown>(
     file: File,
     url: string,
     _headers: Record<string, string>,
     onProgress: (percent: number) => void,
-    onUploadComplete: () => void
+    onUploadComplete: () => void,
+    signal?: AbortSignal
 ): Promise<T> {
+    throwIfAborted(signal);
     onProgress(100);
     onUploadComplete();
     const type = new URLSearchParams(url.split("?")[1] ?? "").get("type") ?? undefined;
@@ -112,8 +143,10 @@ export async function uploadFormData<T = unknown>(
     _url: string,
     formData: FormData,
     onProgress: (percent: number) => void,
-    onUploadComplete: () => void
+    onUploadComplete: () => void,
+    signal?: AbortSignal
 ): Promise<T> {
+    throwIfAborted(signal);
     onProgress(100);
     onUploadComplete();
     const blob = formData.get("clip_file");
