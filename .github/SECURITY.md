@@ -8,8 +8,8 @@ Security fixes are applied to the latest `3.x` release line
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| `3.5.x`  | :white_check_mark: |
-| `< 3.5.0`  | :x:                |
+| `3.7.x`  | :white_check_mark: |
+| `< 3.7.0`| :x:                s|
 
 ## Reporting a Vulnerability
 
