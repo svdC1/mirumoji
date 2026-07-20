@@ -84,7 +84,7 @@ The `Desktop Launcher` Has 5 Panels
 | **Dashboard** | Start / Stop / Build Images / Watch Status |
 | **Environment** | Run Dependency Checks *(Same as `mirumoji doctor`)* |
 | **Settings** | Choose The Transcription Backend / Image Source / Image Version, Set LLM / Modal API Keys + Advanced Overrides, Delete All Local Data |
-| **Logs** | Stream + Filter The Docker Compose Application's Logs |
+| **Logs** | Stream + Filter The Docker Compose Application's Logs, Or Read The `Modal`-Hosted App's |
 | **Modal Host** | Deploy, Inspect, Tear Down, And Back Up The Full App On Your `Modal` Account *(mirrors the [`modal`](../cli.md#modal-host-commands) CLI commands)* |
 
 ### Typical First Run
@@ -124,3 +124,18 @@ The config pills show what a deploy would use *(CPU, memory, requests, image ver
 
 !!! tip "Full Walkthrough"
     See the [`Modal Host Setup`](modal-host.md) guide for the complete flow, including the GPU and non-preemptible host options
+
+## Reading Logs
+
+The `Logs` panel streams the local `Docker Compose` application, and can also read the `Modal`-hosted app
+
+- **Source** &rarr; Choose Between `Docker` And `Modal`
+
+- **Service** &rarr; Narrow The Stream To One Container. `Docker` Only, So It Is Disabled Under `Modal`
+
+- **Tail Lines** &rarr; How Much Recent History To Fetch
+
+- **Follow** &rarr; Keep Streaming Until You Press `Stop`
+
+!!! note "Modal Logs"
+    The `Modal` source needs your `Modal` credentials set and the host deployed. It mirrors [`mirumoji modal logs`](../cli.md#modal-logs), so `Tail Lines` is capped at `20000` and is ignored while `Follow` is on

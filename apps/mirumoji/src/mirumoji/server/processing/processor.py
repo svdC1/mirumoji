@@ -325,13 +325,17 @@ class Processor:
             "use_gpu": await asyncio.to_thread(nvenc_available, ffmpeg),
             **(to_mp4_kwargs or {}),
         }
-        await asyncio.to_thread(
-            audio.to_mp4,
-            ffmpeg_path=ffmpeg,
-            input_path=str(input_path),
-            output_path=str(out),
-            **kwargs,
-        )
+        # The encode lands on a temporary sibling, so a host whose media tree
+        # is mirrored to a volume (see `launcher.modal.app`) copies the
+        # finished MP4 once instead of re-copying it as ffmpeg grows it
+        with media.atomic_output(out) as out_partial:
+            await asyncio.to_thread(
+                audio.to_mp4,
+                ffmpeg_path=ffmpeg,
+                input_path=str(input_path),
+                output_path=str(out_partial),
+                **kwargs,
+            )
         return out
 
     # --- Modal Batch Helpers ---

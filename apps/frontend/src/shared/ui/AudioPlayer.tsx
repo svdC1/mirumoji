@@ -30,35 +30,56 @@ export function AudioPlayer({ src, className }: AudioPlayerProps) {
         const a = ref.current;
         if (!a) return;
         const onTime = () => setCurrent(a.currentTime);
-        const onMeta = () => setDuration(Number.isFinite(a.duration) ? a.duration : 0);
+        // A recording captured by MediaRecorder carries no duration in its
+        // WebM header, so `a.duration` is Infinity until the browser has read
+        // the whole stream. Storing 0 for that pinned the range input at
+        // max={0}, which froze the thumb and showed 0:00 for the length.
+        // `durationchange` is the only event that fires when the real duration
+        // is finally known, so it has to be listened for as well.
+        const onMeta = () => {
+            if (Number.isFinite(a.duration) && a.duration > 0) setDuration(a.duration);
+        };
         const onEnd = () => setPlaying(false);
         const onPlay = () => setPlaying(true);
         const onPause = () => setPlaying(false);
         a.addEventListener("timeupdate", onTime);
         a.addEventListener("loadedmetadata", onMeta);
+        a.addEventListener("durationchange", onMeta);
         a.addEventListener("ended", onEnd);
         a.addEventListener("play", onPlay);
         a.addEventListener("pause", onPause);
+        // Metadata can already be loaded by the time this effect runs, in which
+        // case neither event fires again and the duration would be lost.
+        if (a.readyState >= 1) onMeta();
         return () => {
             a.removeEventListener("timeupdate", onTime);
             a.removeEventListener("loadedmetadata", onMeta);
+            a.removeEventListener("durationchange", onMeta);
             a.removeEventListener("ended", onEnd);
             a.removeEventListener("play", onPlay);
             a.removeEventListener("pause", onPause);
         };
     }, []);
 
-    // Reset when the source changes.
+    // Reset when the source changes. The duration is reset too, otherwise a new
+    // clip inherits the previous one's length until its own metadata arrives.
     useEffect(() => {
         setCurrent(0);
+        setDuration(0);
         setPlaying(false);
     }, [src]);
 
     const toggle = () => {
         const a = ref.current;
         if (!a) return;
-        if (a.paused) a.play().catch(() => undefined);
-        else a.pause();
+        if (a.paused) {
+            // iOS ignores `preload="metadata"` on cellular and in low-power
+            // mode, so the duration can still be unknown at this point. The
+            // play gesture is the one moment loading is guaranteed to be
+            // allowed, so nudge it then.
+            if (!duration && a.readyState === 0) a.load();
+            a.play().catch(() => undefined);
+        } else a.pause();
     };
 
     const onSeek = (e: React.ChangeEvent<HTMLInputElement>) => {

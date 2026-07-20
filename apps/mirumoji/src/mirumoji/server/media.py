@@ -27,14 +27,17 @@ info: Modal Paths
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import shutil
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 
 import aiofiles
 from fastapi import Request, UploadFile
+from starlette.requests import ClientDisconnect
 
 from ..exceptions import InvalidMediaPathError, StorageError, UploadError
 from ..paths import HOST_MEDIA_PATH
@@ -48,12 +51,11 @@ PROFILES_PATH: Path = BASE_PATH / "profiles"
 
 PARTIAL_SUFFIX: str = ".mirumoji-partial"
 """
-Reserved suffix of a media file that is still being written
+Reserved marker naming a media file that is still being written
 
-Writes land on a uniquely named `<name>.<token>.mirumoji-partial` sibling and
-are atomically renamed into place, so a reader never observes a partially
-written file, two concurrent writes never share a temporary, and the Modal-host
-volume syncer skips it (the reserved suffix never matches a real filename)
+Writes land on a uniquely named `<stem>.<token>.mirumoji-partial<ext>` sibling
+and are atomically renamed into place, so a reader never observes a partially
+written file and two concurrent writes never share a temporary
 """
 
 
@@ -62,16 +64,57 @@ def partial_path(path: Path) -> Path:
     Builds a unique temporary sibling path for an atomic write of `path`
 
     The random token keeps two concurrent writes to the same destination from
-    sharing a temporary file, and the reserved suffix keeps the Modal-host
+    sharing a temporary file, and the reserved marker keeps the Modal-host
     volume syncer from mirroring it
+
+    info: The Marker Sits Before The Extension
+        - `FFMPEG` picks its muxer from the output's extension and takes no
+          format flag here, so the temporary has to keep the real one
+
+        - Appending the marker would leave `ffmpeg` unable to infer a container
 
     Args:
         path (Path): The final destination path
 
     Returns:
-        A unique `<name>.<token>.mirumoji-partial` sibling of `path`
+        A unique `<stem>.<token>.mirumoji-partial<ext>` sibling of `path`
     """
-    return path.with_name(f"{path.name}.{uuid.uuid4().hex}{PARTIAL_SUFFIX}")
+    token = f".{uuid.uuid4().hex}{PARTIAL_SUFFIX}"
+    return path.with_name(f"{path.stem}{token}{path.suffix}")
+
+
+@contextlib.contextmanager
+def atomic_output(path: str | os.PathLike[str]) -> Iterator[Path]:
+    """
+    Yields a temporary sibling to write to, renamed into `path` on success
+
+    info: Producers That Write Their Own Output
+        The helpers in this module stream their own bytes, so they build the
+        temporary themselves. `FFMPEG` and `genanki` instead take a
+        destination path and write it over many seconds
+
+    Args:
+        path (str | os.PathLike[str]): The final destination path
+
+    Yields:
+        The temporary sibling to write to
+
+    Raises:
+        StorageError: If the finished output cannot be renamed into place
+    """
+    final = Path(path)
+    final.parent.mkdir(parents=True, exist_ok=True)
+    partial = partial_path(final)
+    try:
+        yield partial
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    try:
+        os.replace(partial, final)
+    except OSError as e:
+        partial.unlink(missing_ok=True)
+        raise StorageError(f"Failed To Finalise Output '{final}' : {e}") from e
 
 
 async def save_upload_file(
@@ -95,6 +138,7 @@ async def save_upload_file(
         `output_path`, if the file was written successfully
 
     Raises:
+        ClientDisconnect: If the client cancelled the upload
         UploadError: If the upload fails for any reason
     """
 
@@ -118,6 +162,14 @@ async def save_upload_file(
         await asyncio.to_thread(os.replace, partial, output)
 
         LOGGER.info(f"Saved {total_content} Bytes To {output}")
+
+    except ClientDisconnect:
+        # The client cancelled the upload, which is an ordinary outcome rather
+        # than a failure. The temporary is dropped and nothing is renamed into
+        # place, so the caller never records a half-uploaded file
+        partial.unlink(missing_ok=True)
+        LOGGER.info(f"Upload To {output} Cancelled By The Client")
+        raise
 
     except Exception as e:
         # Clean Up Partially Written File

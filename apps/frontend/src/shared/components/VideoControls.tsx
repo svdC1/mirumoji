@@ -42,7 +42,14 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
     useEffect(() => {
         if (!video) return;
         const onTime = () => setCurrent(video.currentTime);
-        const onMeta = () => setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+        // A stream whose container carries no duration reports Infinity until
+        // the browser has read it all, so keep the last known good value rather
+        // than zeroing it (max={0} freezes the scrubber, see `AudioPlayer`).
+        const onMeta = () => {
+            if (Number.isFinite(video.duration) && video.duration > 0) {
+                setDuration(video.duration);
+            }
+        };
         const onPlay = () => setPlaying(true);
         const onPause = () => setPlaying(false);
         const onVol = () => {
@@ -60,6 +67,7 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
 
         video.addEventListener("timeupdate", onTime);
         video.addEventListener("loadedmetadata", onMeta);
+        video.addEventListener("durationchange", onMeta);
         video.addEventListener("play", onPlay);
         video.addEventListener("pause", onPause);
         video.addEventListener("volumechange", onVol);
@@ -67,6 +75,7 @@ export function VideoControls({ video, visible }: VideoControlsProps) {
         return () => {
             video.removeEventListener("timeupdate", onTime);
             video.removeEventListener("loadedmetadata", onMeta);
+            video.removeEventListener("durationchange", onMeta);
             video.removeEventListener("play", onPlay);
             video.removeEventListener("pause", onPause);
             video.removeEventListener("volumechange", onVol);

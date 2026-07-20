@@ -1,20 +1,80 @@
 """
 Defines the Logs panel
 
-Streams Docker Compose container logs for the whole stack or a single service
+Streams Docker Compose container logs for the whole stack or a single service,
+or the Modal-hosted app's logs when the host is deployed
 """
+
+from collections.abc import Generator
 
 import flet as ft
 
-from ...core import lifecycle
+from ....paths import HOST_CONFIG_FILE
+from ...core import envfile, lifecycle, process
 from ...core.compose import RESOLVED_COMPOSE_PATH
 from ...core.constants import BACKEND_SERVICE, FRONTEND_SERVICE
 from ...core.process import StreamHandle
+from ...modal import lifecycle as modal_lifecycle
+from ...modal.constants import HOST_APP_NAME, MODAL_LOGS_MAX_TAIL
 from .. import theme
 from ..runner import run_stream
 from ..state import AppState
 
 _ALL = "all"
+
+_DOCKER_SOURCE = "Docker"
+"""
+Log source label for the local Docker Compose stack
+"""
+
+_MODAL_SOURCE = "Modal"
+"""
+Log source label for the Modal-hosted app
+"""
+
+
+def _modal_logs(
+    tail: int | None,
+    follow: bool,
+    handle: StreamHandle,
+) -> Generator[str, None, None]:
+    """
+    Streams the Modal-hosted app's logs
+
+    info: Credential Lifetime
+        `modal_credentials` mutates `os.environ` for the duration of its block,
+        and the caller consumes this generator lazily on a worker thread. The
+        block is therefore opened inside the generator, so the credentials are
+        still in place when the process is actually spawned
+
+    Args:
+        tail (int | None): How many recent entries to fetch, or `None` for the
+            default
+        follow (bool): Live-follow instead of fetching recent entries
+        handle (StreamHandle): Cancellation token for the stream
+
+    Yields:
+        The log lines
+
+    Raises:
+        ModalError: If credentials are missing or the logs cannot be read
+    """
+    env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
+    entries = min(tail or 100, MODAL_LOGS_MAX_TAIL)
+    with modal_lifecycle.modal_credentials(env):
+        # Both modes go through the same stream. A fetch exits on its own once
+        # it has printed its entries, so it needs no separate path, and the
+        # lines land in the terminal as they arrive rather than in one block
+        #
+        # `check=False` because cancelling kills the process, which then exits
+        # non-zero through no fault of its own
+        yield from process.stream(
+            modal_lifecycle.app_logs_command(
+                HOST_APP_NAME, follow=follow, tail=entries
+            ),
+            check=False,
+            handle=handle,
+        )
 
 
 def build(page: ft.Page, state: AppState) -> ft.Control:
@@ -39,6 +99,20 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
     tail_input = theme.SettingsInput("Tail Lines", "200")
     tail_input.width = 160
     follow_cb = ft.Checkbox(label="Follow", value=False)
+
+    def on_source_select(_: ft.Event[ft.Dropdown]) -> None:
+        # The Service picker only means anything for the compose stack, so it
+        # is disabled rather than silently ignored when reading Modal logs
+        service_dd.disabled = source_dd.dropdown.value == _MODAL_SOURCE
+        page.update()
+
+    source_dd = theme.SettingsDropdown(
+        "Source",
+        _DOCKER_SOURCE,
+        [_DOCKER_SOURCE, _MODAL_SOURCE],
+        width=180,
+    )
+    source_dd.dropdown.on_select = on_source_select
 
     def resolve_tail() -> tuple[int | None, bool]:
         """
@@ -77,6 +151,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         stop_btn.disabled = False
         page.update()
 
+        on_modal = source_dd.dropdown.value == _MODAL_SOURCE
         compose_file = (
             RESOLVED_COMPOSE_PATH if RESOLVED_COMPOSE_PATH.is_file() else None
         )
@@ -85,8 +160,9 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             if service_dd.dropdown.value == _ALL
             else service_dd.dropdown.value
         )
-        # Highlight the docker service prefix only when showing every service
-        terminal.with_service = service is None
+        # Highlight the docker service prefix only when showing every service.
+        # Modal's lines carry no service prefix at all
+        terminal.with_service = service is None and not on_modal
 
         def settle() -> None:
             """
@@ -112,19 +188,18 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             state.notify(message, "danger")
             page.update()
 
-        run_stream(
-            page,
-            lifecycle.logs(
+        gen = (
+            _modal_logs(tail, bool(follow_cb.value), handle)
+            if on_modal
+            else lifecycle.logs(
                 service,
                 follow=bool(follow_cb.value),
                 tail=tail,
                 compose_file=compose_file,
                 handle=handle,
-            ),
-            terminal,
-            on_done=done,
-            on_error=fail,
+            )
         )
+        run_stream(page, gen, terminal, on_done=done, on_error=fail)
 
     def stop(_: ft.Event[ft.Button]) -> None:
         handle = active["handle"]
@@ -150,7 +225,8 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         controls=[
             ft.Text("Logs", theme_style=ft.TextThemeStyle.HEADLINE_LARGE),
             ft.Text(
-                "Container Logs From The Running Docker Compose Application",
+                "Container Logs From The Running Docker Compose Application, "
+                "Or The Modal-Hosted App",
                 theme_style=ft.TextThemeStyle.BODY_MEDIUM,
             ),
             theme.Section(
@@ -160,6 +236,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
                     wrap=True,
                     vertical_alignment=ft.CrossAxisAlignment.END,
                     controls=[
+                        source_dd,
                         service_dd,
                         tail_input,
                         follow_cb,

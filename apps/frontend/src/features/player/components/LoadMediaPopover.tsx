@@ -137,15 +137,19 @@ export function LoadMediaPopover({ className }: { className?: string }) {
         else loadVideo(file);
     };
 
+    // A file input fires `change` only when the picked file differs from its
+    // current value, so re-picking the same file after a reset-less pick is
+    // silently ignored and the dialog reads as unresponsive. Every path clears
+    // the value, including the ones that succeed.
     const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = "";
         if (!file) return;
         // The input has no `accept` (an iOS/.mkv workaround), so it accepts any
         // file. Reject non-video picks here so Generate SRT / Convert never run
         // FFmpeg/Whisper over a text or other unrelated file.
         if (!isVideoName(file.name)) {
             toast.error("Please Select A Video File");
-            e.target.value = "";
             return;
         }
         setVideoUrl(null);
@@ -157,6 +161,7 @@ export function LoadMediaPopover({ className }: { className?: string }) {
 
     const onPickSrt = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = "";
         if (!file) return;
         setSrt(file);
         setSrtFileName(file.name);
@@ -165,6 +170,26 @@ export function LoadMediaPopover({ className }: { className?: string }) {
 
     return (
         <div className={cn("relative", className)}>
+            {/*
+             * Mounted outside the Popover, which unmounts its children when it
+             * closes. On iOS, opening the native file sheet can dismiss the
+             * popover, and an input torn down while the sheet is still up never
+             * receives its `change` event, so the pick is silently lost and the
+             * dialog reads as unresponsive.
+             *
+             * No `accept` on the video input: iOS maps accept tokens to UTTypes
+             * and greys anything it can't map, and Matroska (.mkv) has no Apple
+             * UTType, so any video filter hides .mkv there. Leaving it open
+             * keeps every container selectable.
+             */}
+            <input ref={videoInputRef} type="file" onChange={onPickVideo} className="hidden" />
+            <input
+                ref={srtInputRef}
+                type="file"
+                accept=".srt"
+                onChange={onPickSrt}
+                className="hidden"
+            />
             <IconButton label="Load media" active={open} onClick={() => setOpen((v) => !v)}>
                 <FolderOpen size={18} />
             </IconButton>
@@ -190,25 +215,6 @@ export function LoadMediaPopover({ className }: { className?: string }) {
                         >
                             Select Subtitles
                         </Button>
-                        {/*
-                         * No `accept`: iOS maps accept tokens to UTTypes and
-                         * greys anything it can't map, and Matroska (.mkv) has
-                         * no Apple UTType, so any video filter hides .mkv on
-                         * iOS. Leaving it open keeps every container selectable.
-                         */}
-                        <input
-                            ref={videoInputRef}
-                            type="file"
-                            onChange={onPickVideo}
-                            className="hidden"
-                        />
-                        <input
-                            ref={srtInputRef}
-                            type="file"
-                            accept=".srt"
-                            onChange={onPickSrt}
-                            className="hidden"
-                        />
                     </div>
 
                     {profileId && (

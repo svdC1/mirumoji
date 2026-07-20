@@ -102,19 +102,24 @@ async def submit_job(
             detail=f"Invalid File Id '{req.file_id}'",
         ) from e
 
+    # The ownership check reads the already-fetched record, so it is raised
+    # outside the transaction. Raising it inside would make the `UnitOfWork`
+    # log an ordinary 404 as a failed transaction
     async with UnitOfWork() as uow:
         file_rec = await uow.files.get(file_uuid)
-        if file_rec.profile_id != profile_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File Not Found",
+        owned = file_rec.profile_id == profile_id
+        if owned:
+            job = await uow.jobs.add(
+                profile_id=profile_id,
+                type=req.type,
+                params=req.to_params(),
             )
-        job = await uow.jobs.add(
-            profile_id=profile_id,
-            type=req.type,
-            params=req.to_params(),
+            await uow.commit()
+    if not owned:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File Not Found",
         )
-        await uow.commit()
 
     await manager.submit_job(job.id)
     LOGGER.info(
@@ -356,6 +361,16 @@ async def delete_job(
     job whose handler has not returned yet) is refused, so the worker is never
     left holding a deleted row
 
+    info: Idempotent
+        - Deleting a job that is already gone succeeds, matching `DELETE`
+          semantics and `JobRepository.delete`, which is a no-op on a missing
+          row
+
+        - Deleting a file removes the jobs that reference it, so a client
+          holding a list from before that delete would otherwise get a `404`
+          it can never clear. The ownership and in-flight checks do not apply
+          to a row that no longer exists
+
     Args:
         job_id (uuid.UUID): The job id
         profile_id (str): Validated profile id
@@ -364,24 +379,33 @@ async def delete_job(
     Raises:
         HTTPException: If the job isn't owned by the profile, or is still
             active or in flight
-        RecordNotFoundError: If the job does not exist
         DatabaseError: If the deletion fails
     """
+    # The ownership and in-flight checks read the already-fetched record, so
+    # they are raised outside the transaction. Raising them inside would make
+    # the `UnitOfWork` log an ordinary client condition as a failed transaction
+    conflict: HTTPException | None = None
     async with UnitOfWork() as uow:
-        job = await uow.jobs.get(job_id)
+        job = await uow.jobs.find(job_id)
+        if job is None:
+            LOGGER.info(f"Job '{job_id}' Already Deleted, Nothing To Do")
+            return
         if job.profile_id != profile_id:
-            raise HTTPException(
+            conflict = HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Job Not Found",
             )
-        if (
+        elif (
             job.status in ("queued", "running")
             or job_id == manager.running_job_id
         ):
-            raise HTTPException(
+            conflict = HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="The Job Is Still Finishing, Try Again In A Moment",
             )
-        await uow.jobs.delete(job_id)
-        await uow.commit()
+        else:
+            await uow.jobs.delete(job_id)
+            await uow.commit()
+    if conflict is not None:
+        raise conflict
     LOGGER.info(f"Job '{job_id}' Deleted For Profile '{profile_id}'")

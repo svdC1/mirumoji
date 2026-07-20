@@ -40,11 +40,10 @@ class AppState:
         env_path (Path): Path to the managed user configuration file (`.env`)
         env (dict[str, str]): Resolved environment variables (from `env_path`)
         busy (bool): Whether a long-running action is in progress
-        sync_dashboard (Callable[[], None] | None): The callback function
-            attached to the dashboard's configuration-display elements that
-            updates the shown configuration based on the managed user
-            configuration file whenver the dashboard is re-loaded by the main
-            page
+        panel_sync (dict[int, Callable[[], None]]): Per-panel refresh
+            callbacks, keyed by navigation index, that re-read the managed
+            user configuration into the panel's display elements whenever the
+            main page shows it again
     """
 
     notify: Callable[[str, str], None]
@@ -54,7 +53,33 @@ class AppState:
     env_path: Path = HOST_CONFIG_FILE
     env: dict[str, str] = field(default_factory=dict)
     busy: bool = False
-    sync_dashboard: Callable[[], None] | None = None
+    panel_sync: dict[int, Callable[[], None]] = field(default_factory=dict)
+
+    def register_sync(self, index: int, refresh: Callable[[], None]) -> None:
+        """
+        Registers a panel's refresh callback under its navigation index
+
+        A panel is built once and then cached, so anything it renders from the
+        managed configuration goes stale as soon as another panel changes it.
+        Registering here is what makes the main page refresh it on every visit
+
+        Args:
+            index (int): The panel's navigation index
+            refresh (Callable[[], None]): Re-reads the configuration into the
+                panel's display elements
+        """
+        self.panel_sync[index] = refresh
+
+    def sync_panel(self, index: int) -> None:
+        """
+        Runs a panel's refresh callback, if it registered one
+
+        Args:
+            index (int): The panel's navigation index
+        """
+        refresh = self.panel_sync.get(index)
+        if refresh is not None:
+            refresh()
 
     def load_deployment(self, env: Mapping[str, str]) -> None:
         """

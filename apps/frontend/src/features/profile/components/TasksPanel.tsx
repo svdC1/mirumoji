@@ -224,12 +224,20 @@ export function TasksPanel() {
     }, [liveJobs]);
 
     const onDelete = async (id: string) => {
+        // The row is dropped from the cache before the request settles, so a
+        // task the server has already removed (deleting a file cascades its
+        // jobs away) disappears instead of 404ing on every click with no way
+        // to clear it. `deleteJob` treats a 404 as success for the same reason.
+        void mutate("jobs/history", (current?: Job[]) => current?.filter((j) => j.id !== id), {
+            revalidate: false,
+        });
         try {
             await deleteJob(id);
-            void mutate("jobs/history");
             toast.success("Task Deleted");
         } catch (e) {
             toastApiError(e);
+        } finally {
+            void mutate("jobs/history");
         }
     };
 

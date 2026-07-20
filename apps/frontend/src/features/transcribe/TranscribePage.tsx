@@ -3,7 +3,7 @@
  * it (clickable furigana), and optionally get an LLM sentence explanation.
  */
 
-import { useRef, useState, useLayoutEffect, ChangeEvent } from "react";
+import { useEffect, useRef, useState, useLayoutEffect, ChangeEvent } from "react";
 import { toast } from "react-hot-toast";
 import { Mic, Square, Upload, Trash2, Send } from "lucide-react";
 import { apiTokenize } from "@/shared/dict/api";
@@ -43,6 +43,40 @@ export default function TranscribePage() {
     const chatEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+    // Every blob URL minted here, so none outlives the page. Each one pins its
+    // whole audio blob in memory until revoked, and on iOS a handful of
+    // unreleased recordings is enough to make the browser start refusing work.
+    const objectUrlsRef = useRef<Set<string>>(new Set());
+    // URLs handed to a chat message, which renders them for the rest of the
+    // session. Those are owned by the message and must survive a preview swap.
+    const retainedUrlsRef = useRef<Set<string>>(new Set());
+
+    useEffect(
+        () => () => {
+            for (const url of objectUrlsRef.current) URL.revokeObjectURL(url);
+            objectUrlsRef.current.clear();
+        },
+        []
+    );
+
+    /**
+     * Points the preview at `file`, releasing the previous URL unless a chat
+     * message is still rendering it.
+     */
+    const replacePreview = (file: File | null) => {
+        if (previewUrl && !retainedUrlsRef.current.has(previewUrl)) {
+            URL.revokeObjectURL(previewUrl);
+            objectUrlsRef.current.delete(previewUrl);
+        }
+        if (!file) {
+            setPreviewUrl("");
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        objectUrlsRef.current.add(url);
+        setPreviewUrl(url);
+    };
+
     useLayoutEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
@@ -79,8 +113,11 @@ export default function TranscribePage() {
                 let ext = mimeType.split(/[/;]+/)[1] || "ogg";
                 if (ext === "opus") ext = "webm";
                 const file = new File([blob], `recording.${ext}`, { type: mimeType });
+                // The chunks are now inside `blob`, so holding them would keep
+                // a second full copy of the recording alive.
+                chunksRef.current = [];
                 setRecordedFile(file);
-                setPreviewUrl(URL.createObjectURL(file));
+                replacePreview(file);
                 if (mediaStreamRef.current) {
                     mediaStreamRef.current.getTracks().forEach((t) => t.stop());
                     mediaStreamRef.current = null;
@@ -110,7 +147,7 @@ export default function TranscribePage() {
     const deleteMedia = () => {
         setRecordedFile(null);
         setUploadedFile(null);
-        setPreviewUrl("");
+        replacePreview(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -120,10 +157,13 @@ export default function TranscribePage() {
 
     const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
+        // Cleared even on a successful pick, otherwise choosing the same file
+        // again fires no `change` event and the dialog looks unresponsive.
+        event.target.value = "";
         if (file) {
             setUploadedFile(file);
             setRecordedFile(null);
-            setPreviewUrl(URL.createObjectURL(file));
+            replacePreview(file);
         }
     };
 
@@ -135,6 +175,10 @@ export default function TranscribePage() {
         const loaderId = `loader-${Date.now()}`;
         const userMessageId = `user-${Date.now() + 1}`;
 
+        // The chat bubble renders this URL for the rest of the session, so
+        // ownership passes to the message and a later preview swap must not
+        // revoke it out from under the bubble.
+        if (previewUrl) retainedUrlsRef.current.add(previewUrl);
         setMessages((prev) => [
             ...prev,
             { id: userMessageId, type: "user", audioUrl: previewUrl, isAudioMessage: true },

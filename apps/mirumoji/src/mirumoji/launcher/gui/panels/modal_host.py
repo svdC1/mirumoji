@@ -31,6 +31,11 @@ from .. import theme
 from ..runner import run_blocking
 from ..state import AppState
 
+PANEL_INDEX = 4
+"""
+This panel's navigation index, which its refresh callback registers under
+"""
+
 # --- Types ---
 
 _CUSTOM_BUTTON: TypeAlias = (
@@ -127,6 +132,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
         )
 
     _refresh_config()
+    state.register_sync(PANEL_INDEX, _refresh_config)
 
     def _ready() -> dict[str, str] | None:
         """

@@ -750,16 +750,37 @@ class JobRepository:
             RecordNotFoundError: If the job does not exist
             DatabaseError: If the lookup fails
         """
-        try:
-            job = await self.session.get(Job, job_id)
-        except Exception as e:
-            raise DatabaseError(f"Failed To Fetch Job : {e}") from e
+        job = await self.find(job_id)
         if job is None:
             raise RecordNotFoundError(
                 f"Job '{job_id}' Not Found",
                 details={"job_id": str(job_id)},
             )
-        return JobDTO.model_validate(job)
+        return job
+
+    async def find(self, job_id: uuid.UUID) -> JobDTO | None:
+        """
+        Fetches a job by id, or `None` when it does not exist
+
+        info: Non-Raising
+            Used where a missing job is an ordinary outcome rather than an
+            error, so the caller decides without paying for an exception
+            (see the idempotent delete route)
+
+        Args:
+            job_id (uuid.UUID): The job id
+
+        Returns:
+            The matching `JobDTO`, or `None` when no such job exists
+
+        Raises:
+            DatabaseError: If the lookup fails
+        """
+        try:
+            job = await self.session.get(Job, job_id)
+        except Exception as e:
+            raise DatabaseError(f"Failed To Fetch Job : {e}") from e
+        return JobDTO.model_validate(job) if job is not None else None
 
     async def list_for_profile(
         self,

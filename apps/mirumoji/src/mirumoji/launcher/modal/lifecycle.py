@@ -15,10 +15,9 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from ...exceptions import ModalError
 from ...modal import (
@@ -27,6 +26,7 @@ from ...modal import (
     clean_subprocess_error,
     deployed_tags,
     ensure_authenticated,
+    modal_cli_argv,
     stop,
 )
 
@@ -282,14 +282,17 @@ def download_volume(name: str, destination: Path) -> None:
     """
     Downloads every file in a named `modal.Volume` into a local directory
 
-    info: CLI-Backed
-        The `Modal` SDK exposes no bulk recursive download, so this shells out
-        to `modal volume get`, which downloads the whole volume tree in one
-        pass (mirroring how `stop` shells out for an app stop)
+    info: SDK-Backed
+        - Walks the volume with `listdir(recursive=True)` and streams each file
+          out through the SDK, so nothing is spawned
+
+        - This used to shell out to `modal volume get`. In the packaged desktop
+          GUI `sys.executable` is the app binary rather than an interpreter, so
+          that spawned a second GUI window and blocked forever waiting on it
 
     info: Overwrites
-        Passes `--force`, so re-downloading into a populated directory
-        overwrites the existing copies rather than failing
+        An existing local copy is replaced, so re-downloading into a populated
+        directory refreshes it rather than failing
 
     info: Blocking
         Performs network I/O and can take a while for a large volume, so a
@@ -303,9 +306,10 @@ def download_volume(name: str, destination: Path) -> None:
         ModalError: If credentials are missing, the volume is absent, or the
             download fails
     """
+    import modal
+
     ensure_authenticated()
-    # Guard the common case with a clean message instead of the modal CLI's
-    # noisy "volume not found" stderr
+    # Guard the common case with a clean message instead of a raw SDK error
     if not volume_exists(name):
         raise ModalError(
             f"The Data Volume '{name}' Does Not Exist. Deploy The Host App "
@@ -314,30 +318,32 @@ def download_volume(name: str, destination: Path) -> None:
     LOGGER.info(f"Downloading Modal Volume '{name}' To '{destination}'")
     try:
         destination.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "modal",
-                "volume",
-                "get",
-                name,
-                "/",
-                str(destination),
-                "--force",
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-            creationflags=NO_WINDOW,
-        )
-    except (OSError, subprocess.SubprocessError) as e:
+        volume = modal.Volume.from_name(name)
+        entries = volume.listdir("/", recursive=True)
+    except Exception as e:
         raise ModalError(f"Failed To Download Volume '{name}': {e}") from e
-    if result.returncode != 0:
-        detail = clean_subprocess_error(result.stderr)
-        raise ModalError(f"Failed To Download Volume '{name}': {detail}")
+
+    copied = 0
+    for entry in entries:
+        # Directories are implied by their files, so only files are streamed
+        if getattr(entry, "type", None) == modal.types.FileEntryType.DIRECTORY:
+            continue
+        relative = PurePosixPath(entry.path.lstrip("/"))
+        target = destination / Path(*relative.parts)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("wb") as f:
+                for chunk in volume.read_file(entry.path):
+                    f.write(chunk)
+        except Exception as e:
+            raise ModalError(
+                f"Failed To Download '{entry.path}' From Volume '{name}': {e}"
+            ) from e
+        copied += 1
+
+    LOGGER.info(
+        f"Downloaded {copied} File(s) From Volume '{name}' To '{destination}'"
+    )
 
 
 def app_logs_command(name: str, *, follow: bool, tail: int) -> list[str]:
@@ -359,16 +365,11 @@ def app_logs_command(name: str, *, follow: bool, tail: int) -> list[str]:
 
     Returns:
         The `modal app logs` argv
+
+    Raises:
+        ModalError: If there is no interpreter or `modal` executable to spawn
     """
-    argv = [
-        sys.executable,
-        "-m",
-        "modal",
-        "app",
-        "logs",
-        name,
-        "--timestamps",
-    ]
+    argv = modal_cli_argv("app", "logs", name, "--timestamps")
     if follow:
         argv.append("-f")
     else:
@@ -381,10 +382,14 @@ def fetch_app_logs(name: str, tail: int) -> str:
     Fetches the most recent log entries of a deployed Modal app
 
     info: CLI-Backed
-        The `Modal` SDK exposes no log reader, so this shells out to
-        `modal app logs`, which resolves a deployed app by name and prints its
-        recent entries (see streaming `app_logs_command(follow=True)` through
-        `launcher.core.process.stream` for the live-follow variant)
+        - The `Modal` SDK exposes no log reader, so this shells out to
+          `modal app logs`, which resolves a deployed app by name and prints
+          its recent entries (see streaming `app_logs_command(follow=True)`
+          through `launcher.core.process.stream` for the live-follow variant)
+
+        - Unlike the stop and volume paths, there is nothing in-process to fall
+          back to, so a bundle with no interpreter reports that plainly rather
+          than spawning the app binary at itself
 
     Args:
         name (str): The deployed app name
@@ -398,13 +403,21 @@ def fetch_app_logs(name: str, tail: int) -> str:
     """
     ensure_authenticated()
     try:
+        argv = app_logs_command(name, follow=False, tail=tail)
+    except ModalError as e:
+        raise ModalError(
+            f"Failed To Read Logs For '{name}': {e}. Read Them From The Modal "
+            "Dashboard Or The 'mirumoji modal logs' Command Instead"
+        ) from e
+    try:
         result = subprocess.run(
-            app_logs_command(name, follow=False, tail=tail),
+            argv,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             check=False,
+            stdin=subprocess.DEVNULL,
             creationflags=NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError) as e:

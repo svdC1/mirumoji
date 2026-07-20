@@ -28,6 +28,11 @@ from .. import theme
 from ..runner import run_blocking, run_stream
 from ..state import AppState
 
+PANEL_INDEX = 0
+"""
+This panel's navigation index, which its refresh callback registers under
+"""
+
 # --- Types ---
 
 _CUSTOM_BUTTON: TypeAlias = (
@@ -369,7 +374,7 @@ def build(page: ft.Page, state: AppState) -> ft.Control:
             ft.Text, version_pill.content
         ).value = envfile.resolve_image_version(state.env_path)
 
-    state.sync_dashboard = sync_dashboard
+    state.register_sync(PANEL_INDEX, sync_dashboard)
 
     return ft.Column(
         expand=True,

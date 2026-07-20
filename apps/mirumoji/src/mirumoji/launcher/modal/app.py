@@ -60,12 +60,16 @@ above a normal shutdown and below `Modal`'s grace, turning a grace-period
 
 _PARTIAL_SUFFIX = ".mirumoji-partial"
 """
-Reserved suffix of an in-progress write the volume syncer skips
+Reserved marker of an in-progress write the volume syncer skips
 
 The server writes media to a uniquely named temporary sibling and
 atomically renames it into place (mirroring `server.media.PARTIAL_SUFFIX`).
-The suffix isreserved, so it never matches a real uploaded filename,
+The marker is reserved, so it never matches a real uploaded filename,
 and skipping it keeps a partially written file from reaching the volume
+
+The marker sits before the extension (`<stem>.<token>.mirumoji-partial<ext>`)
+because `FFMPEG` picks its muxer from the output's extension, so it is matched
+anywhere in the name rather than only at the end
 """
 
 _DB_FILENAME = "mirumoji.db"
@@ -272,9 +276,9 @@ def _is_partial(path: Path) -> bool:
         path (Path): The changed path
 
     Returns:
-        `True` when the name ends in the reserved partial-write suffix
+        `True` when the name carries the reserved partial-write marker
     """
-    return path.name.endswith(_PARTIAL_SUFFIX)
+    return _PARTIAL_SUFFIX in path.name
 
 
 def _is_db_file(path: Path) -> bool:
@@ -505,10 +509,10 @@ async def _volume_syncer(cache: Path, mount: Path) -> None:
                                 "While A Media File Is Pending"
                             )
                             continue
-                        if src.is_file():
-                            await _mirror(
-                                src, dest, attempts=_SYNC_COPY_ATTEMPTS
-                            )
+                        if src.is_file() and await _mirror(
+                            src, dest, attempts=_SYNC_COPY_ATTEMPTS
+                        ):
+                            LOGGER.info(f"[Volume Syncer] Copied '{rel}'")
                         continue
 
                     # A media addition or modification: its file must reach the

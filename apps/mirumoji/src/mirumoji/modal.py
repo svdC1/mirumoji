@@ -10,10 +10,11 @@ abstract: Server
     runs locally
 
 abstract: Launcher
-    The launcher deploys mirumoji itself as a hosted app, with both backend
-    and frontend running on Modal. Its launcher-only host operations
-    (credentials, volume management, URLs, and logs) live in
-    `launcher.modal.lifecycle`
+    - The launcher deploys mirumoji itself as a hosted app, with both backend
+      and frontend running on Modal
+
+    - Its launcher-only host operations (credentials, volume management, URLs,
+      and logs) live in `launcher.modal.lifecycle`
 
 info: Authentication
     Every call authenticates through the environment's `MODAL_TOKEN_ID` /
@@ -38,8 +39,10 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .exceptions import ModalError
@@ -64,7 +67,7 @@ Matches the ANSI colour escape codes the `modal` CLI writes to its output
 _BOX_DRAWING = "".join(chr(code) for code in range(0x2500, 0x2580))
 """
 Every character in Unicode's Box Drawing block, so the borders `Rich` frames
-the `modal` CLI's error panels with can be stripped whatever style it uses
+the `modal` CLI's error panels with can be stripped
 """
 
 _ASCII_BORDER = "+-|"
@@ -72,6 +75,74 @@ _ASCII_BORDER = "+-|"
 The ASCII characters `Rich` draws its panel borders with when it renders to a
 non-`UTF` terminal (a Windows `cp1252` console)
 """
+
+_PYTHON_STEMS = frozenset({"python", "pythonw", "python3", "pythonw3"})
+"""
+Executable names that identify `sys.executable` as a real Python interpreter
+
+question: Why
+    - The desktop GUI ships as a `flet build` bundle that embeds Python in the
+      Flutter host process, so `sys.executable` is the app binary rather than
+      an interpreter
+
+    - Spawning `sys.executable -m modal ...` there re-launches the GUI in a
+      second window that never answers, so any command that shells out has to
+      verify what it is about to run first
+"""
+
+
+def python_executable() -> str | None:
+    """
+    Returns a real Python interpreter to spawn, or `None` when there is none
+
+    info: Packaged Builds
+        - A `pip`-installed launcher runs under a genuine interpreter, so
+          `sys.executable` is used directly
+
+        - Inside a packaged bundle `sys.executable` is the app binary, so
+          `PATH` is searched instead and `None` is returned when the machine
+          has no interpreter at all
+
+    Returns:
+        A path to a Python interpreter, or `None` when none is available
+    """
+    if not getattr(sys, "frozen", False):
+        stem = Path(sys.executable).stem.lower()
+        if stem in _PYTHON_STEMS:
+            return sys.executable
+    for name in ("python3", "python"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def modal_cli_argv(*args: str) -> list[str]:
+    """
+    Builds the argv for a `modal` CLI invocation
+
+    Prefers `<interpreter> -m modal`, falling back to a `modal` entry point on
+    the `PATH` when the process has no interpreter to spawn
+
+    Args:
+        *args: The `modal` sub-command and its arguments
+
+    Returns:
+        The argv to spawn
+
+    Raises:
+        ModalError: If neither an interpreter nor a `modal` executable is found
+    """
+    interpreter = python_executable()
+    if interpreter is not None:
+        return [interpreter, "-m", "modal", *args]
+    entry_point = shutil.which("modal")
+    if entry_point is not None:
+        return [entry_point, *args]
+    raise ModalError(
+        "No Python Interpreter Or 'modal' Executable Was Found To Run The "
+        "Modal CLI With"
+    )
 
 
 def clean_subprocess_error(stderr: str) -> str:
@@ -257,14 +328,45 @@ def ensure_deployed(
     LOGGER.info(f"Deployed Modal App '{name}'")
 
 
+def _stop_in_process(name: str) -> None:
+    """
+    Stops a deployed `Modal` app through modal's own command callback
+
+    question: Why Not A Subprocess
+        - Modal's SDK exposes no public app-stop, and the packaged desktop GUI
+          has no interpreter to shell out with, so the CLI command's underlying
+          callback is invoked directly
+
+        - It is reached through a narrow wrapper so a modal release that moves
+          it degrades to the subprocess path instead of breaking the caller
+
+    Args:
+        name (str): The deployed app name to stop
+
+    Raises:
+        SystemExit: If modal reports the app is already stopped
+        Exception: If the stop fails or modal's command layout changed
+    """
+    from modal.cli.app import stop as stop_command
+
+    callback = stop_command.callback
+    if callback is None:
+        raise AttributeError("Modal's App-Stop Command Exposes No Callback")
+    callback(name, yes=True)
+
+
 def stop(name: str) -> str | None:
     """
     Stops a deployed `Modal` app under `name`, removing it from the workspace
 
-    info: CLI-Backed
+    info: In-Process First
         - Modal's Python SDK exposes no public call to stop an app, so this
-          shells out to the modal's CLI `modal app stop` via a subprocess
-          call
+          drives modal's own command callback in-process and falls back to
+          the `modal app stop` CLI when that is unavailable
+
+        - The packaged desktop GUI embeds Python in the app binary, so
+          `sys.executable` is not an interpreter there. Running the callback
+          in-process keeps the stop working without spawning anything
 
         - Stopping is one-way, so a stopped app is redeployed
           rather than restarted
@@ -288,17 +390,38 @@ def stop(name: str) -> str | None:
 
     LOGGER.info(f"Stopping Modal App '{name}'")
     try:
+        _stop_in_process(name)
+    except SystemExit as e:
+        # Modal exits with a message when the app is already stopped, which is
+        # the desired end state rather than a failure
+        LOGGER.info(f"Modal App '{name}' Was Already Stopped : {e}")
+        return None
+    except (ImportError, AttributeError, TypeError) as e:
+        # Modal moved or reshaped the command, so fall back to the CLI
+        LOGGER.warning(
+            f"Could Not Stop Modal App '{name}' In-Process, Falling Back To "
+            f"The Modal CLI : {e}"
+        )
+    except Exception as e:
+        message = f"Could Not Stop Modal App '{name}': {e}"
+        LOGGER.warning(message)
+        return message
+    else:
+        return None
+
+    try:
         result = subprocess.run(
-            [sys.executable, "-m", "modal", "app", "stop", name, "-y"],
+            modal_cli_argv("app", "stop", name, "-y"),
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             timeout=30,
             check=False,
+            stdin=subprocess.DEVNULL,
             creationflags=NO_WINDOW,
         )
-    except (OSError, subprocess.SubprocessError) as e:
+    except (OSError, subprocess.SubprocessError, ModalError) as e:
         message = f"Could Not Stop Modal App '{name}': {e}"
         LOGGER.warning(message)
         return message

@@ -19,6 +19,92 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.7.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.7.0) - 2026-07-20
+
+This release stops a local video being uploaded once per player action,
+makes the interface report what actually happened instead of assuming success,
+and fixes two `GUI` `Modal` actions that opened a second window and hung forever.
+It also adds upload cancellation, double-tap seeking, a `Modal` log source in
+the `GUI`, and quiets a large amount of misleading `ERROR` noise in the host logs.
+It has no breaking changes
+
+### Added
+
+- `Frontend` &rarr; An in-flight upload can be cancelled from the task tray, which
+  stops the transfer and drops the row rather than leaving it to finish
+
+- `Frontend` &rarr; Double-tapping the left or right side of the player skips 5
+  seconds, matching the arrow keys
+
+- `Launcher` &rarr; The `GUI` Logs panel reads the `Modal`-hosted app's logs as
+  well as the local `Docker Compose` stack, chosen with a new Source control,
+  with the same tail and follow controls
+
+### Fixed
+
+- `Frontend` &rarr; Running two player actions on the same device video uploaded
+  the whole file twice. Clicking `Generate SRT` and `To MP4` on one video sent it
+  in full on each action and left two profile files sharing a name. An action
+  started while an upload is still running now joins that upload instead of
+  beginning its own
+
+- `Frontend` &rarr; A player action on a file that had since been deleted reported
+  success while the server rejected it, and no task ever appeared. Actions now
+  wait for the result and report the real outcome, naming a deleted file rather
+  than failing silently
+
+- `Frontend` &rarr; A profile video deleted while it was loaded showed the
+  `Convert To Play` prompt, which could never succeed. A deleted file is now told
+  apart from a container the browser cannot decode, and clears the player
+
+- `Frontend` &rarr; Deleting a file left the jobs it removed on the tasks
+  dashboard, where deleting them failed with a not-found error that could not be
+  cleared. Those jobs are dropped as the file is deleted, and any task that is
+  already gone server-side clears instead of erroring. Transcripts and clips are
+  refreshed the same way
+
+- `Frontend` &rarr; On `iOS` a recording's audio slider never moved and its length
+  showed as `0:00`, because a browser recording carries no duration until it has
+  been read in full. The duration is now picked up when it becomes known
+
+- `Frontend` &rarr; On `iOS` the file dialog stopped responding after a few
+  uploads. Picking the same file twice raised no event, and each preview held its
+  audio in memory for the rest of the session, so repeated picks exhausted the
+  browser. File inputs now reset between picks and previews are released once
+  nothing shows them
+
+- `Launcher` &rarr; `Down` and `Download Data` in the `GUI`'s `Modal Host` panel
+  opened a second application window and hung indefinitely. The packaged app
+  embeds `Python`, so the `modal` CLI could not be run the way those two actions
+  ran it. `Download Data` now streams the volume directly and `Down` stops the app
+  in-process, so neither spawns anything
+
+- `Launcher` &rarr; The `Modal Host` panel's mode pills kept whatever was true
+  when the panel first opened, so a change made in `Settings` was not reflected on
+  returning to it. They are re-read on every visit, as the `Dashboard` already did
+
+- `CLI` &rarr; `mirumoji modal logs --tail` accepted counts the `modal` CLI
+  rejects, surfacing its raw usage text. It is bounded to the accepted range, also
+  takes `-t`, and states that it does not apply with `--follow`
+
+- `Server` &rarr; Video conversions, saved clips and `Anki` exports were mirrored
+  to the `Modal` volume repeatedly while they were still being written, re-copying
+  the same output several times over. Each is now written aside and moved into
+  place when finished, so it is copied once
+
+- `Server` &rarr; Ordinary outcomes were logged as failures. A stale reference
+  from the interface produced a database `ERROR` and a full traceback on every
+  attempt, burying real problems. Only genuine failures are logged that way now
+
+- `Server` &rarr; Deleting a task that was already gone failed instead of
+  succeeding, which left the interface unable to clear it. Deleting a task that no
+  longer exists now succeeds
+
+- `Server` &rarr; A cancelled upload was recorded as a server failure rather than
+  as the deliberate action it is
+
+---
+
 ## [`3.6.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.6.0) - 2026-07-18
 
 This release hardens the `Modal`-hosted deploy and adds new host compute modes.

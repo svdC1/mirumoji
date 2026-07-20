@@ -10,6 +10,17 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/shared/ui";
 import { VideoControls } from "./VideoControls";
 
+/** How far the arrow keys and the double-tap zones skip, in seconds. */
+const SKIP_SECONDS = 5;
+
+/**
+ * How long to wait for a second tap before treating the first as a plain click.
+ *
+ * Roughly the platform double-click threshold: long enough that a real double
+ * tap is never split, short enough that play/pause still feels immediate.
+ */
+const DOUBLE_TAP_MS = 250;
+
 /** Context passed to a {@link VideoPlayerProps.overlay} render function. */
 export interface VideoPlayerOverlayContext {
     /** Whether the control bar is currently shown (overlays lift above it). */
@@ -28,6 +39,13 @@ export interface VideoPlayerProps {
     onVideoEl?: (el: HTMLVideoElement | null) => void;
     /** Toggle play/pause on the spacebar (for the primary, on-page player). */
     keyboardControls?: boolean;
+    /**
+     * Skip 5s by double-tapping the left / right edge of the video.
+     *
+     * Off by default so a small embedded preview (a clip) keeps a plain
+     * click-to-toggle with no tap-detection delay.
+     */
+    tapToSeek?: boolean;
     /** Renders an overlay above the video (e.g. subtitles). */
     overlay?: (ctx: VideoPlayerOverlayContext) => ReactNode;
 }
@@ -45,6 +63,7 @@ export function VideoPlayer({
     crossOrigin,
     onVideoEl,
     keyboardControls = false,
+    tapToSeek = false,
     overlay,
 }: VideoPlayerProps) {
     const [el, setEl] = useState<HTMLVideoElement | null>(null);
@@ -74,12 +93,22 @@ export function VideoPlayer({
         };
     }, [el]);
 
+    // Seeks by `delta` seconds, clamped to the media. Shared by the arrow keys
+    // and the double-tap zones so both skip by exactly the same amount.
+    const seekBy = useCallback(
+        (delta: number) => {
+            if (!el) return;
+            const duration = Number.isFinite(el.duration) ? el.duration : Infinity;
+            el.currentTime = Math.min(Math.max(el.currentTime + delta, 0), duration);
+        },
+        [el]
+    );
+
     // Keyboard controls for the primary, on-page player: the spacebar toggles
     // play/pause and the arrows skip by 5s. Ignored while typing so they never
     // hijack a form control.
     useEffect(() => {
         if (!el || !keyboardControls) return;
-        const SKIP_SECONDS = 5;
         const onKey = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement | null;
             if (
@@ -97,14 +126,12 @@ export function VideoPlayer({
                 else el.pause();
             } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                 e.preventDefault();
-                const duration = Number.isFinite(el.duration) ? el.duration : Infinity;
-                const delta = e.key === "ArrowRight" ? SKIP_SECONDS : -SKIP_SECONDS;
-                el.currentTime = Math.min(Math.max(el.currentTime + delta, 0), duration);
+                seekBy(e.key === "ArrowRight" ? SKIP_SECONDS : -SKIP_SECONDS);
             }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [el, keyboardControls]);
+    }, [el, keyboardControls, seekBy]);
 
     const revealControls = () => {
         setControlsVisible(true);
@@ -116,6 +143,26 @@ export function VideoPlayer({
         if (!el) return;
         if (el.paused) el.play().catch(() => undefined);
         else el.pause();
+    };
+
+    // A single tap toggles play/pause and a double tap seeks, so the first tap
+    // has to wait to find out which it was. Without the delay a double tap
+    // would toggle twice on its way to seeking.
+    const tapRef = useRef<number | undefined>(undefined);
+    useEffect(() => () => window.clearTimeout(tapRef.current), []);
+
+    const onZoneClick = (direction: -1 | 1) => {
+        revealControls();
+        if (tapRef.current !== undefined) {
+            window.clearTimeout(tapRef.current);
+            tapRef.current = undefined;
+            seekBy(direction * SKIP_SECONDS);
+            return;
+        }
+        tapRef.current = window.setTimeout(() => {
+            tapRef.current = undefined;
+            togglePlay();
+        }, DOUBLE_TAP_MS);
     };
 
     const controlsShown = controlsVisible || paused;
@@ -132,10 +179,30 @@ export function VideoPlayer({
                 src={src ?? undefined}
                 playsInline
                 crossOrigin={crossOrigin}
-                onClick={togglePlay}
+                onClick={tapToSeek ? undefined : togglePlay}
                 {...{ "webkit-playsinline": "true" }}
                 className="h-full w-full object-contain focus:outline-none"
             />
+            {tapToSeek && (
+                // Sits below the overlay so a subtitle token still takes its own
+                // tap, and stops short of the control bar so scrubbing is not
+                // swallowed. `touch-action: manipulation` suppresses iOS's
+                // double-tap-to-zoom, which would otherwise eat the second tap.
+                <div className="absolute inset-x-0 bottom-[88px] top-0 flex touch-manipulation">
+                    <button
+                        type="button"
+                        aria-label={`Back ${SKIP_SECONDS} Seconds`}
+                        className="h-full flex-1 cursor-default focus:outline-none"
+                        onClick={() => onZoneClick(-1)}
+                    />
+                    <button
+                        type="button"
+                        aria-label={`Forward ${SKIP_SECONDS} Seconds`}
+                        className="h-full flex-1 cursor-default focus:outline-none"
+                        onClick={() => onZoneClick(1)}
+                    />
+                </div>
+            )}
             {overlay?.({ controlsShown })}
             <VideoControls video={el} visible={controlsShown} />
         </div>

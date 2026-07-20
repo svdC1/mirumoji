@@ -19,7 +19,9 @@ import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { apiGetTemplate } from "@/shared/llm/api";
 import { ApiError, toastApiError } from "@/shared/api/errors";
+import { isUploadAborted } from "@/shared/api/client";
 import type { SubmitJobRequest } from "@/shared/jobs/types";
+import type { SubmitOptions } from "@/contexts/TaskContext";
 import { Button, IconButton, InfoTip, Popover, cn } from "@/shared/ui";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -118,6 +120,48 @@ export function PlayerToolbar() {
         }
     };
 
+    // Which actions are mid-submission. Tracked per action rather than as one
+    // flag so that starting "Generate SRT" on a device file does not block
+    // "To MP4": the second action joins the first action's upload instead of
+    // starting its own, which is exactly the case that used to upload twice.
+    const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+
+    const withPending = async (key: string, run: () => Promise<void>): Promise<void> => {
+        if (pending.has(key)) return;
+        setPending((prev) => new Set(prev).add(key));
+        try {
+            await run();
+        } finally {
+            setPending((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+            });
+        }
+    };
+
+    // Uploads a device file and submits its job, reporting the real outcome.
+    // A cancelled upload is silent (the user asked for it); a 404 means the
+    // cached profile copy was deleted, so it is named rather than shown as a
+    // generic failure.
+    const runUpload = async (
+        file: File,
+        options: SubmitOptions,
+        successMessage: string
+    ): Promise<void> => {
+        try {
+            const job = await tasks.uploadAndSubmit(file, options);
+            if (job) toast.success(successMessage);
+        } catch (err) {
+            if (isUploadAborted(err)) return;
+            if (err instanceof ApiError && err.status === 404) {
+                toast.error("That File Was Deleted From Your Profile");
+                return;
+            }
+            toastApiError(err);
+        }
+    };
+
     // Mobile -> Compact bar with the SRT actions tucked into a "More" menu
     // Desktop -> Keeps every control inline
     const isMobile = useIsMobile();
@@ -127,86 +171,96 @@ export function PlayerToolbar() {
     // A profile video is operated on by reference (no re-upload); a device
     // video is uploaded first. Either way the tray tracks it and loads the
     // result back into the player.
-    const handleGenerate = async () => {
-        if (videoFileId) {
-            const ok = await submitByRef(
-                { type: "generate_srt", file_id: videoFileId, opts: whisperOpts() },
-                () => setVideoFileId(null)
-            );
-            if (ok) toast.success("Subtitle Generation Started");
-            return;
-        }
-        if (!video) return;
-        void tasks.uploadAndSubmit(video, {
-            jobType: "generate_srt",
-            fileType: "video",
-            opts: whisperOpts(),
-        });
-        toast.success("Subtitle Generation Started");
-    };
-
-    const handleConvert = async () => {
-        if (!video && !videoFileId) return;
-        const name = (videoFileName ?? video?.name ?? "").toLowerCase();
-        if (name.endsWith(".mp4")) {
-            toast.success("Already MP4");
-            return;
-        }
-        if (videoFileId) {
-            const ok = await submitByRef(
-                { type: "convert", file_id: videoFileId, opts: convertOpts() },
-                () => setVideoFileId(null)
-            );
-            if (ok) toast.success("Conversion Started");
-            return;
-        }
-        if (!video) return;
-        void tasks.uploadAndSubmit(video, {
-            jobType: "convert",
-            fileType: "video",
-            opts: convertOpts(),
-        });
-        toast.success("Conversion Started");
-    };
-
-    const handleFixSrt = async () => {
-        if (!srt) return;
-        let template;
-        try {
-            template = await apiGetTemplate();
-        } catch (err) {
-            toastApiError(err);
-            return;
-        }
-        if (!template) {
-            toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
-            return;
-        }
-        const model = template.srt_model || template.model;
-        const sysMsg = template.srt_sys_msg || undefined;
-
-        // A known profile SRT is fixed by reference. If that file was deleted
-        // the submit 404s, so we drop the stale id and fall through to
-        // re-uploading the in-memory SRT (a locally loaded one takes that path
-        // directly, since its content lives here regardless).
-        if (srtFileId) {
-            try {
-                await tasks.submit({ type: "fix_srt", file_id: srtFileId, model, sys_msg: sysMsg });
-                toast.success("Subtitle Fix Started");
+    const handleGenerate = () =>
+        withPending("generate_srt", async () => {
+            if (videoFileId) {
+                const ok = await submitByRef(
+                    { type: "generate_srt", file_id: videoFileId, opts: whisperOpts() },
+                    () => setVideoFileId(null)
+                );
+                if (ok) toast.success("Subtitle Generation Started");
                 return;
-            } catch (err) {
-                if (!(err instanceof ApiError && err.status === 404)) {
-                    toastApiError(err);
-                    return;
-                }
-                setSrtFileId(null);
             }
-        }
-        void tasks
-            .uploadAndSubmit(srt, { jobType: "fix_srt", fileType: "srt", model, sysMsg })
-            .catch(toastApiError);
-        toast.success("Subtitle Fix Started");
-    };
+            if (!video) return;
+            // Awaited, so the toast reports what actually happened. Firing it
+            // optimistically claimed success even when the submit 404'd against
+            // a file that had since been deleted, and no task ever appeared.
+            await runUpload(
+                video,
+                { jobType: "generate_srt", fileType: "video", opts: whisperOpts() },
+                "Subtitle Generation Started"
+            );
+        });
+
+    const handleConvert = () =>
+        withPending("convert", async () => {
+            if (!video && !videoFileId) return;
+            const name = (videoFileName ?? video?.name ?? "").toLowerCase();
+            if (name.endsWith(".mp4")) {
+                toast.success("Already MP4");
+                return;
+            }
+            if (videoFileId) {
+                const ok = await submitByRef(
+                    { type: "convert", file_id: videoFileId, opts: convertOpts() },
+                    () => setVideoFileId(null)
+                );
+                if (ok) toast.success("Conversion Started");
+                return;
+            }
+            if (!video) return;
+            await runUpload(
+                video,
+                { jobType: "convert", fileType: "video", opts: convertOpts() },
+                "Conversion Started"
+            );
+        });
+
+    const handleFixSrt = () =>
+        withPending("fix_srt", async () => {
+            if (!srt) return;
+            let template;
+            try {
+                template = await apiGetTemplate();
+            } catch (err) {
+                toastApiError(err);
+                return;
+            }
+            if (!template) {
+                toast.error("Configure An LLM Model In Your Profile To Fix Subtitles");
+                return;
+            }
+            const model = template.srt_model || template.model;
+            const sysMsg = template.srt_sys_msg || undefined;
+
+            // A known profile SRT is fixed by reference. If that file was
+            // deleted the submit 404s, so we drop the stale id and fall through
+            // to re-uploading the in-memory SRT (a locally loaded one takes that
+            // path directly, since its content lives here regardless).
+            if (srtFileId) {
+                try {
+                    await tasks.submit({
+                        type: "fix_srt",
+                        file_id: srtFileId,
+                        model,
+                        sys_msg: sysMsg,
+                    });
+                    toast.success("Subtitle Fix Started");
+                    return;
+                } catch (err) {
+                    if (!(err instanceof ApiError && err.status === 404)) {
+                        toastApiError(err);
+                        return;
+                    }
+                    setSrtFileId(null);
+                }
+            }
+            await runUpload(
+                srt,
+                { jobType: "fix_srt", fileType: "srt", model, sysMsg },
+                "Subtitle Fix Started"
+            );
+        });
 
     const furiganaButton = (
         <button
@@ -229,7 +283,9 @@ export function PlayerToolbar() {
     );
 
     // Shared once so that the desktop row and the mobile
-    // "More" menu render the same buttons (full width inside the menu)
+    // "More" menu render the same buttons (full width inside the menu).
+    // Disabled while a submission is in flight so a second click can't fire
+    // before the first has registered its upload.
     const actionButtons = (
         <>
             <Button
@@ -237,7 +293,7 @@ export function PlayerToolbar() {
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleGenerate}
-                disabled={!video && !videoFileId}
+                disabled={pending.has("generate_srt") || (!video && !videoFileId)}
                 title="Transcribe Audio Into Subtitles Using Whisper"
             >
                 <FileText size={15} /> Generate SRT
@@ -247,7 +303,7 @@ export function PlayerToolbar() {
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleConvert}
-                disabled={!video && !videoFileId}
+                disabled={pending.has("convert") || (!video && !videoFileId)}
                 title="Convert Video To MP4 Using FFMPEG"
             >
                 <Clapperboard size={15} /> To MP4
@@ -257,7 +313,7 @@ export function PlayerToolbar() {
                 size="sm"
                 className={isMobile ? "w-full" : undefined}
                 onClick={handleFixSrt}
-                disabled={!srt}
+                disabled={pending.has("fix_srt") || !srt}
                 title="Improve Subtitles With An LLM"
             >
                 <Sparkles size={15} /> Fix SRT

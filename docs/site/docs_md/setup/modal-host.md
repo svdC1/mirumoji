@@ -42,6 +42,8 @@ By default a deploy creates two `Modal` apps and one volume in your workspace
 
     - **Non-Preemptible CPU Host** &rarr; Set `MIRUMOJI_HOST_NONPREEMPTIBLE=1` to run the `CPU-Only` host on guaranteed capacity *(a 3x price)* so a spot reclaim never restarts it mid-job. `Modal` does not allow this on a GPU host, so the two options can't be combined
 
+    - A restart matters because a job that was running at the time is marked failed rather than re-queued. Re-running it automatically could duplicate an output that had already been written but not yet recorded, so the retry is left to you. Long batches are the case that benefits most from guaranteed capacity
+
 ## Prerequisites
 
 You'll need a [`Modal`](https://modal.com) account with your `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` configured. This is the same token pair that the `modal` backend uses, so if you have already set that up you are ready. If not, follow [`Get Your API Token Pair`](../guides/gpu.md#get-your-api-token-pair)
@@ -100,9 +102,11 @@ Once you log in, the whole app loads and works exactly like a local install, wit
 Unlike a local install *(which keeps your data in local Docker volumes)*, the hosted app stores your media and database in the `mirumoji-data` [`Modal Volume`](https://modal.com/docs/guide/volumes), created automatically on the first deploy
 
 ???+ question "How It Stays Fast And Durable"
-    - The host does not read and write directly on the volume, whose network layer is slow for the many small, random reads that video playback and the database make. It operates on the container's local disk and mirrors every change to the volume in the background
+    - The host does not read and write directly on the volume, whose network layer is slow for the many small, random reads that video playback and the database make. It operates on the container's local disk and mirrors your media and database to the volume in the background. Scratch a job re-creates each run is skipped, and a file still being written is only mirrored once it is complete
 
     - `Modal` commits the volume as the app runs and on shutdown, and the host restores it into the container on every start, so your data survives a redeploy, a stop, or a spot preemption
+
+    - This covers your stored data, not work in progress. A job that was running when the container restarted is marked failed and has to be submitted again *(see [`How It Works`](#how-it-works) for the non-preemptible option that avoids the restart entirely)*
 
 === "Back It Up"
     Download everything in the volume to a local folder at any time
