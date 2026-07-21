@@ -19,6 +19,28 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.7.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.7.1) - 2026-07-21
+
+This release makes the packaged desktop `GUI` read the `Modal`-hosted app's
+logs without needing a `Python` interpreter on the machine, and makes
+deletions feel instant on a hosted deployment by removing rows optimistically
+instead of waiting for the server round trip. It has no breaking changes
+
+### Fixed
+
+- `Launcher` &rarr; Reading the `Modal`-hosted app's logs from the packaged
+  desktop `GUI` failed with a `No Python Interpreter` message because the logs
+  were the one `Modal` action that still shelled out to the `modal` `CLI`.
+  Logs are now read through the `SDK` in-process like the stop and volume actions,
+  with the `CLI` kept as a fallback, and a followed stream polls in-process when no
+  `CLI` can be spawned
+
+- `Frontend` &rarr; Deleting a file, transcript, or clip only updated the
+  interface after the delete and a follow-up list refetch had both completed,
+  which on a hosted deployment left the row visible for noticeable time after
+  the click. Rows now leave the list immediately and are restored if the
+  delete turns out to have failed
+
 ## [`3.7.0`](https://github.com/svdC1/mirumoji/releases/tag/v3.7.0) - 2026-07-20
 
 This release stops a local video being uploaded once per player action,

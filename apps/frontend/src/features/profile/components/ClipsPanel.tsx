@@ -36,17 +36,24 @@ export function ClipsPanel() {
     if (!profileId) return <NoProfile what="view your saved clips" />;
     if (isLoading && !data) return <PanelLoading />;
 
+    // The delete is optimistic: the clip leaves the cached list before the
+    // request so the panel responds on click even on a high-latency host, and
+    // a revalidation follows to reconcile (restoring the clip if the delete
+    // failed).
     const onDelete = async (id: string) => {
         setDeleting(id);
         const tId = toast.loading("Deleting Clip ...");
+        void mutate(key, (current?: Clip[]) => current?.filter((c) => c.id !== id), {
+            revalidate: false,
+        });
         try {
             await deleteClip(id);
             toast.success("Clip Deleted", { id: tId });
             if (selected?.id === id) setSelected(null);
-            mutate(key);
         } catch (e) {
             toastApiError(e, tId);
         } finally {
+            void mutate(key);
             setDeleting(null);
         }
     };

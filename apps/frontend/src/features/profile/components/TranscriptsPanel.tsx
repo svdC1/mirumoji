@@ -50,15 +50,22 @@ export function TranscriptsPanel() {
         );
     }
 
+    // The delete is optimistic: the card leaves the cached list before the
+    // request so the panel responds on click even on a high-latency host, and
+    // a revalidation follows to reconcile (restoring the card if the delete
+    // failed).
     const onDelete = async (id: string) => {
         setDeleting(id);
+        void mutate(key, (current?: ProfileTranscript[]) => current?.filter((t) => t.id !== id), {
+            revalidate: false,
+        });
         try {
             await deleteTranscript(id);
             toast.success("Transcript Deleted");
-            mutate(key);
         } catch (e) {
             toastApiError(e);
         } finally {
+            void mutate(key);
             setDeleting(null);
         }
     };
