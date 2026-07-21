@@ -12,10 +12,10 @@ operations defined below
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
@@ -391,6 +391,16 @@ def _tail_logs_in_process(
         caller can poll with the newest timestamp it has seen and drop the
         entries it already yielded
 
+    info: Synchronizer Loop
+        - The blocking `App.lookup` creates modal's singleton client on the
+          SDK's own synchronizer event loop, so the fetch coroutine must run
+          on that same loop
+
+        - Running it on a second loop (a plain `asyncio.run`) makes the RPC
+          lose its cancellation context and hang, with modal warning
+          `RPC request made outside of task context`, so the coroutine is
+          handed to modal's `synchronizer` the way the SDK's CLI helpers are
+
     Args:
         name (str): The deployed app name
         tail (int): How many recent entries to fetch
@@ -406,6 +416,7 @@ def _tail_logs_in_process(
     """
     import modal
     from modal._logs import tail_logs
+    from modal._utils.async_utils import synchronizer
     from modal.client import _Client
     from modal.exception import NotFoundError
 
@@ -424,7 +435,8 @@ def _tail_logs_in_process(
                 entries.append((item.timestamp, item.data))
         return entries
 
-    return asyncio.run(_collect())
+    result: list[tuple[float, str]] = synchronizer.wrap(_collect)()
+    return result
 
 
 def _format_log_lines(entries: list[tuple[float, str]]) -> list[str]:
@@ -560,8 +572,8 @@ def follow_app_logs(
     Live-follows a deployed Modal app's logs until the handle is cancelled
 
     info: CLI Stream First
-        - When a `modal` CLI argv can be built, the follow is a real
-          `modal app logs -f` subprocess through
+        - Outside the packaged bundle, when a `modal` CLI argv can be built,
+          the follow is a real `modal app logs -f` subprocess through
           `launcher.core.process.stream`, which is the lowest-latency stream
           and the behavior the CLI and dev GUI have always had
 
@@ -569,10 +581,12 @@ def follow_app_logs(
           exits non-zero through no fault of its own
 
     info: Polling Fallback
-        - The packaged desktop GUI has no interpreter to spawn, so there the
-          follow polls the SDK-backed fetch about every 2 seconds with a
-          timestamp cursor, deduping the entries that share the cursor's
-          timestamp
+        - The packaged desktop GUI never spawns a CLI. Its own interpreter is
+          the app binary, and whatever `python` the `PATH` offers is not the
+          one carrying its modal (on Windows it can even be the Store alias
+          stub that only prints an install prompt), so there the follow polls
+          the SDK-backed fetch about every 2 seconds with a timestamp cursor,
+          deduping the entries that share the cursor's timestamp
 
         - Entries therefore arrive with up to a couple of seconds of delay
           rather than live, which is the closest the SDK allows without a
@@ -593,13 +607,18 @@ def follow_app_logs(
     Raises:
         ModalError: If credentials are missing or the logs cannot be read
     """
-    try:
-        argv = app_logs_command(name, follow=True, tail=tail)
-    except ModalError:
-        LOGGER.info(
-            f"No Modal CLI Available, Following Logs For '{name}' In-Process"
-        )
+    argv: list[str] | None = None
+    if getattr(sys, "frozen", False):
+        LOGGER.info(f"Packaged Bundle, Following Logs For '{name}' In-Process")
     else:
+        try:
+            argv = app_logs_command(name, follow=True, tail=tail)
+        except ModalError:
+            LOGGER.info(
+                f"No Modal CLI Available, Following Logs For '{name}' "
+                "In-Process"
+            )
+    if argv is not None:
         yield from stream(argv, check=False, handle=handle)
         return
 
