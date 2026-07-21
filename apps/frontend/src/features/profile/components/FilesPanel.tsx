@@ -195,8 +195,23 @@ export function FilesPanel() {
         void mutate("profiles/clips");
     };
 
+    // Deletes are optimistic: the rows leave the cached list before the
+    // request so the panel responds on click even on a high-latency host. A
+    // failed delete is restored by the follow-up revalidation of the files
+    // key (reconcileAfterDelete on the shared path, the explicit mutate in
+    // the single-delete catch), which re-adds whatever the server still has.
+    const dropFromCache = (ids: string[]) => {
+        const dropping = new Set(ids);
+        void mutate(
+            SWR_KEY,
+            (current?: ProfileFile[]) => current?.filter((f) => !dropping.has(f.id)),
+            { revalidate: false }
+        );
+    };
+
     const onDelete = async (id: string) => {
         setDeleting(id);
+        dropFromCache([id]);
         try {
             const res = await deleteFile(id);
             toast.success("File Deleted");
@@ -208,6 +223,7 @@ export function FilesPanel() {
             reconcileAfterDelete([id], res.deleted_job_ids);
         } catch (e) {
             toastApiError(e);
+            void mutate(SWR_KEY);
         } finally {
             setDeleting(null);
         }
@@ -216,6 +232,7 @@ export function FilesPanel() {
     const deleteSelected = async () => {
         const ids = [...selected];
         if (ids.length === 0) return;
+        dropFromCache(ids);
         const results = await Promise.allSettled(ids.map((id) => deleteFile(id)));
         const ok = results.filter((r) => r.status === "fulfilled").length;
         const deletedFileIds: string[] = [];
