@@ -12,7 +12,6 @@ operations defined below
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import subprocess
@@ -391,6 +390,16 @@ def _tail_logs_in_process(
         caller can poll with the newest timestamp it has seen and drop the
         entries it already yielded
 
+    info: Synchronizer Loop
+        - The blocking `App.lookup` creates modal's singleton client on the
+          SDK's own synchronizer event loop, so the fetch coroutine must run
+          on that same loop
+
+        - Running it on a second loop (a plain `asyncio.run`) makes the RPC
+          lose its cancellation context and hang, with modal warning
+          `RPC request made outside of task context`, so the coroutine is
+          handed to modal's `synchronizer` the way the SDK's CLI helpers are
+
     Args:
         name (str): The deployed app name
         tail (int): How many recent entries to fetch
@@ -406,6 +415,7 @@ def _tail_logs_in_process(
     """
     import modal
     from modal._logs import tail_logs
+    from modal._utils.async_utils import synchronizer
     from modal.client import _Client
     from modal.exception import NotFoundError
 
@@ -424,7 +434,8 @@ def _tail_logs_in_process(
                 entries.append((item.timestamp, item.data))
         return entries
 
-    return asyncio.run(_collect())
+    result: list[tuple[float, str]] = synchronizer.wrap(_collect)()
+    return result
 
 
 def _format_log_lines(entries: list[tuple[float, str]]) -> list[str]:
