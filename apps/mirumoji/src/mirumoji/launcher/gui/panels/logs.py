@@ -10,7 +10,7 @@ from collections.abc import Generator
 import flet as ft
 
 from ....paths import HOST_CONFIG_FILE
-from ...core import envfile, lifecycle, process
+from ...core import envfile, lifecycle
 from ...core.compose import RESOLVED_COMPOSE_PATH
 from ...core.constants import BACKEND_SERVICE, FRONTEND_SERVICE
 from ...core.process import StreamHandle
@@ -62,19 +62,19 @@ def _modal_logs(
     env = envfile.resolve_managed_config(HOST_CONFIG_FILE)
     entries = min(tail or 100, MODAL_LOGS_MAX_TAIL)
     with modal_lifecycle.modal_credentials(env):
-        # Both modes go through the same stream. A fetch exits on its own once
-        # it has printed its entries, so it needs no separate path, and the
-        # lines land in the terminal as they arrive rather than in one block
-        #
-        # `check=False` because cancelling kills the process, which then exits
-        # non-zero through no fault of its own
-        yield from process.stream(
-            modal_lifecycle.app_logs_command(
-                HOST_APP_NAME, follow=follow, tail=entries
-            ),
-            check=False,
-            handle=handle,
-        )
+        # Both paths work in-process when the packaged GUI has no interpreter
+        # to spawn a `modal` CLI with (see `follow_app_logs` for the follow
+        # fallback), so Modal logs stay readable in the frozen bundle
+        if follow:
+            yield from modal_lifecycle.follow_app_logs(
+                HOST_APP_NAME, tail=entries, handle=handle
+            )
+            return
+        output = modal_lifecycle.fetch_app_logs(HOST_APP_NAME, entries)
+        if not output.strip():
+            yield "No Log Entries"
+            return
+        yield from output.rstrip("\n").splitlines()
 
 
 def build(page: ft.Page, state: AppState) -> ft.Control:

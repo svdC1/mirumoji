@@ -12,11 +12,14 @@ operations defined below
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import subprocess
-from collections.abc import Iterator
+import time
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from ...exceptions import ModalError
@@ -29,6 +32,7 @@ from ...modal import (
     modal_cli_argv,
     stop,
 )
+from ..core.process import StreamHandle, stream
 
 __all__ = [
     "VERSION_KEY",
@@ -39,6 +43,7 @@ __all__ = [
     "download_volume",
     "ensure_volume",
     "fetch_app_logs",
+    "follow_app_logs",
     "modal_credentials",
     "stop",
     "volume_exists",
@@ -346,6 +351,109 @@ def download_volume(name: str, destination: Path) -> None:
     )
 
 
+_FOLLOW_POLL_SECONDS = 2.0
+"""
+How long the in-process follow fallback waits between log polls
+"""
+
+_FOLLOW_POLL_STEP = 0.2
+"""
+How often the poll wait checks its `StreamHandle` for a stop request, so the
+Stop button stays responsive while the fallback sleeps between polls
+"""
+
+_FOLLOW_POLL_LIMIT = 1000
+"""
+How many entries each follow poll requests, bounding a burst between polls
+"""
+
+
+def _tail_logs_in_process(
+    name: str,
+    tail: int,
+    since: datetime | None = None,
+) -> list[tuple[float, str]]:
+    """
+    Fetches recent log entries of a deployed Modal app through the SDK
+
+    question: Why Not A Subprocess
+        - The Modal SDK exposes no public log reader, and the packaged desktop
+          GUI has no interpreter to shell out with, so the CLI's underlying
+          fetch helper is driven directly
+
+        - The internals are imported inside the function so a modal release
+          that moves or reshapes them surfaces as `ImportError` or
+          `AttributeError`, which the caller turns into a CLI fallback rather
+          than a hard failure (the `_stop_in_process` contract)
+
+    info: Cursor Fetches
+        `since` is an inclusive hard floor in modal's fetch, so a follow
+        caller can poll with the newest timestamp it has seen and drop the
+        entries it already yielded
+
+    Args:
+        name (str): The deployed app name
+        tail (int): How many recent entries to fetch
+        since (datetime | None): Only return entries at or after this time
+
+    Returns:
+        The fetched entries as `(timestamp, text)` pairs
+
+    Raises:
+        ModalError: If the app is not deployed
+        ImportError: If modal no longer ships the internals driven here
+        AttributeError: If modal reshaped those internals
+    """
+    import modal
+    from modal._logs import tail_logs
+    from modal.client import _Client
+    from modal.exception import NotFoundError
+
+    try:
+        app_id = modal.App.lookup(name, create_if_missing=False).app_id
+    except NotFoundError as e:
+        raise ModalError(f"The Modal App '{name}' Is Not Deployed") from e
+    if app_id is None:
+        raise ModalError(f"The Modal App '{name}' Is Not Deployed")
+
+    async def _collect() -> list[tuple[float, str]]:
+        client = await _Client.from_env()
+        entries: list[tuple[float, str]] = []
+        async for batch in tail_logs(client, app_id, tail, since=since):
+            for item in batch.items:
+                entries.append((item.timestamp, item.data))
+        return entries
+
+    return asyncio.run(_collect())
+
+
+def _format_log_lines(entries: list[tuple[float, str]]) -> list[str]:
+    """
+    Renders fetched `(timestamp, text)` log entries as timestamped lines
+
+    An entry's text can span multiple lines, so each is split and every line
+    carries the entry's `ISO-8601` `UTC` timestamp. Empty entries are skipped.
+    The rendering is close to, though not byte-identical with, the
+    `modal app logs --timestamps` output the CLI path produces
+
+    Args:
+        entries (list[tuple[float, str]]): The fetched log entries
+
+    Returns:
+        The timestamped log lines
+    """
+    lines: list[str] = []
+    for timestamp, data in entries:
+        if not data:
+            continue
+        prefix = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        for line in data.splitlines():
+            lines.append(f"{prefix} {line}")
+    return lines
+
+
 def app_logs_command(name: str, *, follow: bool, tail: int) -> list[str]:
     """
     Builds the `modal app logs` argv for fetching or following an app's logs
@@ -381,15 +489,13 @@ def fetch_app_logs(name: str, tail: int) -> str:
     """
     Fetches the most recent log entries of a deployed Modal app
 
-    info: CLI-Backed
-        - The `Modal` SDK exposes no log reader, so this shells out to
-          `modal app logs`, which resolves a deployed app by name and prints
-          its recent entries (see streaming `app_logs_command(follow=True)`
-          through `launcher.core.process.stream` for the live-follow variant)
+    info: In-Process First
+        - Reads the logs through the Modal SDK in-process, so the packaged
+          desktop GUI (whose `sys.executable` is the app binary rather than an
+          interpreter) can fetch them without spawning anything
 
-        - Unlike the stop and volume paths, there is nothing in-process to fall
-          back to, so a bundle with no interpreter reports that plainly rather
-          than spawning the app binary at itself
+        - Falls back to the `modal app logs` CLI when modal moved or reshaped
+          the internals the in-process read drives, mirroring the `stop` path
 
     Args:
         name (str): The deployed app name
@@ -402,6 +508,22 @@ def fetch_app_logs(name: str, tail: int) -> str:
         ModalError: If credentials are missing or the app has no readable logs
     """
     ensure_authenticated()
+    try:
+        entries = _tail_logs_in_process(name, tail)
+    except (ImportError, AttributeError, TypeError) as e:
+        # Modal moved or reshaped its internals, so fall back to the CLI
+        LOGGER.warning(
+            f"Could Not Read Logs For '{name}' In-Process, Falling Back To "
+            f"The Modal CLI : {e}"
+        )
+    except ModalError:
+        raise
+    except Exception as e:
+        raise ModalError(f"Failed To Read Logs For '{name}': {e}") from e
+    else:
+        lines = _format_log_lines(entries)
+        return "\n".join(lines) + "\n" if lines else ""
+
     try:
         argv = app_logs_command(name, follow=False, tail=tail)
     except ModalError as e:
@@ -426,3 +548,88 @@ def fetch_app_logs(name: str, tail: int) -> str:
         detail = clean_subprocess_error(result.stderr)
         raise ModalError(f"Failed To Read Logs For '{name}': {detail}")
     return result.stdout
+
+
+def follow_app_logs(
+    name: str,
+    *,
+    tail: int,
+    handle: StreamHandle,
+) -> Generator[str, None, None]:
+    """
+    Live-follows a deployed Modal app's logs until the handle is cancelled
+
+    info: CLI Stream First
+        - When a `modal` CLI argv can be built, the follow is a real
+          `modal app logs -f` subprocess through
+          `launcher.core.process.stream`, which is the lowest-latency stream
+          and the behavior the CLI and dev GUI have always had
+
+        - `check=False` because cancelling kills the process, which then
+          exits non-zero through no fault of its own
+
+    info: Polling Fallback
+        - The packaged desktop GUI has no interpreter to spawn, so there the
+          follow polls the SDK-backed fetch about every 2 seconds with a
+          timestamp cursor, deduping the entries that share the cursor's
+          timestamp
+
+        - Entries therefore arrive with up to a couple of seconds of delay
+          rather than live, which is the closest the SDK allows without a
+          subprocess
+
+    info: Cancellation
+        Cooperative through `handle`. The CLI stream is killed by it and the
+        polling loop checks it several times a second while waiting
+
+    Args:
+        name (str): The deployed app name
+        tail (int): How many recent entries to show when the follow starts
+        handle (StreamHandle): Cancellation token that stops the follow
+
+    Yields:
+        The log lines
+
+    Raises:
+        ModalError: If credentials are missing or the logs cannot be read
+    """
+    try:
+        argv = app_logs_command(name, follow=True, tail=tail)
+    except ModalError:
+        LOGGER.info(
+            f"No Modal CLI Available, Following Logs For '{name}' In-Process"
+        )
+    else:
+        yield from stream(argv, check=False, handle=handle)
+        return
+
+    ensure_authenticated()
+    cursor: float | None = None
+    seen: set[tuple[float, str]] = set()
+    while not handle.cancelled:
+        since = (
+            datetime.fromtimestamp(cursor, tz=timezone.utc)
+            if cursor is not None
+            else None
+        )
+        limit = tail if cursor is None else _FOLLOW_POLL_LIMIT
+        try:
+            entries = _tail_logs_in_process(name, limit, since=since)
+        except ModalError:
+            raise
+        except Exception as e:
+            raise ModalError(
+                f"Failed To Follow Logs For '{name}': {e}. Read Them From "
+                "The Modal Dashboard Instead"
+            ) from e
+        fresh = [entry for entry in entries if entry not in seen]
+        if fresh:
+            yield from _format_log_lines(fresh)
+            cursor = max(timestamp for timestamp, _ in fresh)
+            # Only entries sharing the cursor's timestamp can reappear in the
+            # next poll (`since` is inclusive), so the dedupe set stays small
+            seen = {entry for entry in seen | set(fresh) if entry[0] == cursor}
+        waited = 0.0
+        while waited < _FOLLOW_POLL_SECONDS and not handle.cancelled:
+            time.sleep(_FOLLOW_POLL_STEP)
+            waited += _FOLLOW_POLL_STEP

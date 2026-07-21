@@ -1469,12 +1469,8 @@ def modal_logs(
             # command uses, so the GUI can follow and cancel it the same way
             handle = process.StreamHandle()
             stream_logs(
-                gen=process.stream(
-                    modal_lifecycle.app_logs_command(
-                        HOST_APP_NAME, follow=True, tail=tail
-                    ),
-                    check=False,
-                    handle=handle,
+                gen=modal_lifecycle.follow_app_logs(
+                    HOST_APP_NAME, tail=tail, handle=handle
                 ),
                 identifier="Modal",
                 handle=handle,
