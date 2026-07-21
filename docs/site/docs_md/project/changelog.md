@@ -19,6 +19,29 @@ starting from **`v3.0.0`**
 
 ---
 
+## [`3.7.2`](https://github.com/svdC1/mirumoji/releases/tag/v3.7.2) - 2026-07-21
+
+This release fixes the in-process `Modal` log reading introduced in `3.7.1`,
+which could hang instead of returning entries, and stops the packaged `GUI`
+from spawning `Windows`' fake Store `python` when following logs. It has no
+breaking changes
+
+### Fixed
+
+- `Launcher` &rarr; Reading the `Modal`-hosted app's logs in-process could hang
+  with an `RPC request made outside of task context` warning. Looking the app
+  up creates modal's client on the `SDK`'s own event loop, and the fetch then
+  ran on a second loop, where the request lost its cancellation context and
+  never completed. The fetch now runs on modal's own loop, the same way the
+  `SDK`'s `CLI` helpers run
+
+- `Launcher` &rarr; Following logs from the packaged `GUI` printed a
+  `Microsoft Store` install prompt instead of streaming. On `Windows` the
+  `PATH` carries a fake `python.exe` (the app execution alias), which the
+  bundle picked up to spawn the `modal` `CLI` with. The alias is no longer
+  treated as an interpreter anywhere, and the packaged `GUI` now always
+  follows logs in-process instead of spawning whatever `PATH` offers
+
 ## [`3.7.1`](https://github.com/svdC1/mirumoji/releases/tag/v3.7.1) - 2026-07-21
 
 This release makes the packaged desktop `GUI` read the `Modal`-hosted app's
