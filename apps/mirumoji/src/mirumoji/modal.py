@@ -103,6 +103,12 @@ def python_executable() -> str | None:
           `PATH` is searched instead and `None` is returned when the machine
           has no interpreter at all
 
+    info: Store Alias Stub
+        On Windows, `PATH` carries a fake `python.exe` under
+        `Microsoft\\WindowsApps` (the app execution alias). Running it only
+        prints a Microsoft Store install prompt, so a hit from there is not
+        an interpreter and is skipped
+
     Returns:
         A path to a Python interpreter, or `None` when none is available
     """
@@ -112,7 +118,7 @@ def python_executable() -> str | None:
             return sys.executable
     for name in ("python3", "python"):
         found = shutil.which(name)
-        if found:
+        if found and "windowsapps" not in found.lower():
             return found
     return None
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
@@ -571,8 +572,8 @@ def follow_app_logs(
     Live-follows a deployed Modal app's logs until the handle is cancelled
 
     info: CLI Stream First
-        - When a `modal` CLI argv can be built, the follow is a real
-          `modal app logs -f` subprocess through
+        - Outside the packaged bundle, when a `modal` CLI argv can be built,
+          the follow is a real `modal app logs -f` subprocess through
           `launcher.core.process.stream`, which is the lowest-latency stream
           and the behavior the CLI and dev GUI have always had
 
@@ -580,10 +581,12 @@ def follow_app_logs(
           exits non-zero through no fault of its own
 
     info: Polling Fallback
-        - The packaged desktop GUI has no interpreter to spawn, so there the
-          follow polls the SDK-backed fetch about every 2 seconds with a
-          timestamp cursor, deduping the entries that share the cursor's
-          timestamp
+        - The packaged desktop GUI never spawns a CLI. Its own interpreter is
+          the app binary, and whatever `python` the `PATH` offers is not the
+          one carrying its modal (on Windows it can even be the Store alias
+          stub that only prints an install prompt), so there the follow polls
+          the SDK-backed fetch about every 2 seconds with a timestamp cursor,
+          deduping the entries that share the cursor's timestamp
 
         - Entries therefore arrive with up to a couple of seconds of delay
           rather than live, which is the closest the SDK allows without a
@@ -604,13 +607,18 @@ def follow_app_logs(
     Raises:
         ModalError: If credentials are missing or the logs cannot be read
     """
-    try:
-        argv = app_logs_command(name, follow=True, tail=tail)
-    except ModalError:
-        LOGGER.info(
-            f"No Modal CLI Available, Following Logs For '{name}' In-Process"
-        )
+    argv: list[str] | None = None
+    if getattr(sys, "frozen", False):
+        LOGGER.info(f"Packaged Bundle, Following Logs For '{name}' In-Process")
     else:
+        try:
+            argv = app_logs_command(name, follow=True, tail=tail)
+        except ModalError:
+            LOGGER.info(
+                f"No Modal CLI Available, Following Logs For '{name}' "
+                "In-Process"
+            )
+    if argv is not None:
         yield from stream(argv, check=False, handle=handle)
         return
 
