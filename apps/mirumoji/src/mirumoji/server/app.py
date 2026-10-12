@@ -106,6 +106,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
         - Stops The Modal App If It Exists (`modal` Backend Only)
 
+        - Cancels A Pending Idle Unload Of The Local Whisper Model
+
         - Tears Down The Logging Setup
     Args:
       app (FastAPI): The API object
@@ -176,6 +178,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     # Remove Deployed Modal App When Using The Modal Backend
     # No-Op Otherwise
     await app.state.processor.stop_modal_app()
+
+    # Cancel A Pending Idle Unload Of The Local Whisper Model
+    await app.state.processor.close()
 
     _teardown_end = perf_counter()
 

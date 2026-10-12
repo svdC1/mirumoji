@@ -26,6 +26,7 @@ from .constants import (
     DEFAULT_BREAKDOWN_SYS_MSG,
     DEFAULT_MODAL_SCALEDOWN_WINDOW,
     DEFAULT_SRT_SYS_MSG,
+    DEFAULT_WHISPER_IDLE_UNLOAD,
     MAX_LLM_CONCURRENCY,
 )
 
@@ -87,6 +88,8 @@ class Settings:
             fixing a batch of subtitles
         srt_sys_msg (str): System message for SRT-fixing
         breakdown_sys_msg (str): System message for word-nuance breakdowns
+        whisper_idle_unload (int): Seconds an idle local Whisper model stays
+            loaded before its GPU memory is freed (`0` never frees it)
     """
 
     logging_level: str
@@ -96,6 +99,7 @@ class Settings:
     max_llm_concurrency: int
     srt_sys_msg: str
     breakdown_sys_msg: str
+    whisper_idle_unload: int
 
 
 @lru_cache(maxsize=1)
@@ -136,6 +140,10 @@ def get_settings() -> Settings:
         breakdown_sys_msg=os.environ.get(
             "MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG",
             DEFAULT_BREAKDOWN_SYS_MSG,
+        ),
+        whisper_idle_unload=_env_int(
+            "MIRUMOJI_WHISPER_IDLE_UNLOAD",
+            DEFAULT_WHISPER_IDLE_UNLOAD,
         ),
     )
 
