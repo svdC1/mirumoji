@@ -74,6 +74,16 @@ keeps a container warm longer, so back-to-back jobs skip the cold start at the
 cost of more idle GPU time
 """
 
+DEFAULT_WHISPER_IDLE_UNLOAD = 0
+"""
+Default number of seconds the `local` backend keeps an idle Whisper model
+loaded before freeing its GPU memory
+
+`0` keeps the model loaded for the process lifetime. A positive value (via
+`MIRUMOJI_WHISPER_IDLE_UNLOAD`) frees the memory once no transcription has run
+for that long, at the cost of reloading the model on the next job
+"""
+
 # --- Local Whisper Model Download ---
 
 MODEL_DOWNLOAD_RETRIES = 4

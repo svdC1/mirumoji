@@ -412,6 +412,7 @@ Keys Against Their Allowed Options
     | `MIRUMOJI_LOGGING_LEVEL` | Python Logging Level For The Backend |
     | `MIRUMOJI_MODAL_IMAGE` | Docker Hub Image The Modal GPU Containers Run *(Default `svdc1/mirumoji-modal-gpu:<version>`)* |
     | `MIRUMOJI_MAX_LLM_CONCURRENCY` | How Many LLM Requests Run At Once When Fixing A Batch Of Subtitles (Default `4`) |
+    | `MIRUMOJI_WHISPER_IDLE_UNLOAD` | Seconds An Idle Local Whisper Model Stays Loaded Before Its GPU Memory Is Freed (Default `0`, Keeps It Loaded) |
     | `MIRUMOJI_SRT_DEFAULT_SYS_MSG` | Default LLM System Message For Subtitle Refinement |
     | `MIRUMOJI_BREAKDOWN_DEFAULT_SYS_MSG` | Default LLM System Message For Word Breakdowns |
 

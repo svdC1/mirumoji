@@ -214,6 +214,14 @@ ADVANCED_VARS: tuple[EnvVar, ...] = (
         default="4",
     ),
     EnvVar(
+        "MIRUMOJI_WHISPER_IDLE_UNLOAD",
+        description=(
+            "Seconds An Idle Local Whisper Model Stays Loaded Before Its GPU "
+            "Memory Is Freed (0 Keeps It Loaded)"
+        ),
+        default="0",
+    ),
+    EnvVar(
         "MIRUMOJI_SRT_DEFAULT_SYS_MSG",
         description=(
             "The Default LLM System Message Used For SRT Fixing When A "

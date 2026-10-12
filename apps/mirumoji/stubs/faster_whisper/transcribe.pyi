@@ -5,6 +5,7 @@ Minimal stubs for `faster_whisper.transcribe` (only what the server uses)
 from collections.abc import Iterable
 from typing import Any, BinaryIO
 
+import ctranslate2
 from numpy import ndarray
 
 from .vad import VadOptions
@@ -70,6 +71,7 @@ class TranscriptionInfo:
     ...
 
 class WhisperModel:
+    model: ctranslate2.models.Whisper
     def __init__(
         self,
         model_size_or_path: str,

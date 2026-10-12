@@ -17,6 +17,7 @@ import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
@@ -29,7 +30,7 @@ from ...exceptions import (
 )
 from ...modal import stop
 from .. import media
-from ..config import nvenc_available, transcribe_backend
+from ..config import get_settings, nvenc_available, transcribe_backend
 from ..modal_processing import volume_io, worker
 from . import audio, whisper
 
@@ -70,6 +71,14 @@ class Processor:
     def __init__(self) -> None:
         self.backend = transcribe_backend()
         self._model: WhisperModel | None = None
+        # Idle unload of the local model (`0` keeps it for the process
+        # lifetime). `_model_users` counts transcriptions holding the model so
+        # that it is never freed under a running job
+        self._idle_unload = get_settings().whisper_idle_unload
+        self._model_lock = asyncio.Lock()
+        self._model_users = 0
+        self._unload_handle: asyncio.TimerHandle | None = None
+        self._unload_task: asyncio.Task[None] | None = None
         # The instantiated Modal Cls resolves its `.transcribe` / `.convert`
         # methods through a dynamic `__getattr__`, so it has no public,
         # method-aware static type. `Any` is the correct annotation here
@@ -80,14 +89,18 @@ class Processor:
 
     # --- Lazy Backends ---
 
-    def _get_model(self) -> WhisperModel:
+    async def _get_model(self) -> WhisperModel:
         """
         Loads the local `WhisperModel` object on first use, returning the
         cached model on subsequent calls
 
         info: Caching
-            The model is built once with the default options and cached for the
-            process lifetime
+            - The model is built once with the default options and cached for
+              the process lifetime, or until it has been idle for
+              `MIRUMOJI_WHISPER_IDLE_UNLOAD` seconds when that is positive
+
+            - The load runs in a thread under a lock, so a reload after an idle
+              unload neither blocks the event loop nor loads the model twice
 
         Raises:
             WhisperUnavailableError: If `faster-whisper` is not installed or
@@ -96,10 +109,94 @@ class Processor:
         Returns:
             The local `WhisperModel` object that should be used
         """
-        if self._model is None:
-            LOGGER.info("Loading Local Whisper Model")
-            self._model = whisper.load_model()
-        return self._model
+        async with self._model_lock:
+            if self._model is None:
+                LOGGER.info("Loading Local Whisper Model")
+                self._model = await asyncio.to_thread(whisper.load_model)
+            return self._model
+
+    @asynccontextmanager
+    async def _use_model(self) -> AsyncIterator[WhisperModel]:
+        """
+        Holds the local `WhisperModel` for the duration of one transcription
+
+        info: Idle Unload
+            - Any pending unload is cancelled while the model is in use
+
+            - When the last user releases it, an unload is scheduled
+              `MIRUMOJI_WHISPER_IDLE_UNLOAD` seconds later (when positive)
+
+        Yields:
+            The loaded `WhisperModel` object
+        """
+        self._cancel_unload()
+        self._model_users += 1
+        try:
+            yield await self._get_model()
+        finally:
+            self._model_users -= 1
+            self._schedule_unload()
+
+    def _cancel_unload(self) -> None:
+        """
+        Cancels a scheduled idle unload, if any
+        """
+        if self._unload_handle is not None:
+            self._unload_handle.cancel()
+            self._unload_handle = None
+
+    def _schedule_unload(self) -> None:
+        """
+        Schedules the idle unload of the local model when it is loaded, unused,
+        and `MIRUMOJI_WHISPER_IDLE_UNLOAD` is positive
+        """
+        if self._idle_unload <= 0 or self._model is None or self._model_users:
+            return
+        self._cancel_unload()
+        self._unload_handle = asyncio.get_running_loop().call_later(
+            self._idle_unload,
+            self._start_unload,
+        )
+
+    def _start_unload(self) -> None:
+        """
+        Runs the idle unload as a task when its timer fires, keeping a
+        reference so that the task is not garbage-collected while it runs
+        """
+        self._unload_handle = None
+        self._unload_task = asyncio.create_task(self._unload_if_idle())
+
+    async def _unload_if_idle(self) -> None:
+        """
+        Frees the local model's GPU memory if no transcription is using it
+
+        info: Unloading
+            - The unload runs in a thread under the model lock, so it does not
+              block the event loop, and a job arriving meanwhile waits for it
+              instead of loading a second copy next to the one being freed
+
+            - The next transcription reloads the model through `_get_model`,
+              from the local Hugging Face cache
+        """
+        async with self._model_lock:
+            if self._model is None or self._model_users:
+                return
+            model, self._model = self._model, None
+            # Frees the weights explicitly instead of relying on garbage
+            # collection
+            await asyncio.to_thread(model.model.unload_model)
+        LOGGER.info(
+            f"Unloaded Local Whisper Model After {self._idle_unload}s Idle",
+        )
+
+    async def close(self) -> None:
+        """
+        Cancels a scheduled idle unload on server shutdown, and waits for one
+        that is already running
+        """
+        self._cancel_unload()
+        if self._unload_task is not None:
+            await self._unload_task
 
     async def _offload_worker(self) -> Any:
         """
@@ -217,13 +314,13 @@ class Processor:
                 ) from e
 
         # Local Backend
-        model = self._get_model()
-        segments, _info = await asyncio.to_thread(
-            whisper.transcribe,
-            model=model,
-            audio_path=media_path,
-            w_transcribe_args=w_transcribe_args,
-        )
+        async with self._use_model() as model:
+            segments, _info = await asyncio.to_thread(
+                whisper.transcribe,
+                model=model,
+                audio_path=media_path,
+                w_transcribe_args=w_transcribe_args,
+            )
         if output_format == "joined":
             return whisper.to_string(segments)
         return whisper.to_srt(segments)

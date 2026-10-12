@@ -49,6 +49,19 @@ mirumoji config set MIRUMOJI_TRANSCRIBE_BACKEND local
 mirumoji up
 ```
 
+### Freeing GPU Memory When Idle (Optional)
+
+The model stays loaded after the first transcription (about 3.3 GB of GPU memory for `large-v3`), so back-to-back jobs skip the load. If the GPU is shared with other applications, set `MIRUMOJI_WHISPER_IDLE_UNLOAD` to free that memory once no transcription has run for that many seconds. The next job reloads the model from the local cache
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `MIRUMOJI_WHISPER_IDLE_UNLOAD` | `0` | Seconds An Idle Local Whisper Model Stays Loaded Before Its GPU Memory Is Freed (`0` Keeps It Loaded) |
+
+```bash
+# CLI
+mirumoji config set MIRUMOJI_WHISPER_IDLE_UNLOAD 600
+```
+
 ---
 
 ## Modal (Cloud GPU)
